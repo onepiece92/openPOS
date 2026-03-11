@@ -8,7 +8,6 @@ import 'package:go_router/go_router.dart';
 import 'package:pos_app/core/theme/app_theme.dart';
 import 'package:pos_app/features/cart/domain/cart_notifier.dart';
 import 'package:pos_app/features/cart/domain/held_orders_notifier.dart';
-import 'package:pos_app/features/customers/domain/customers_provider.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
 
 // ─── Checkout bar (bottomNavigationBar slot) ──────────────────────────────────
@@ -24,7 +23,6 @@ class CheckoutBar extends ConsumerWidget {
 
     final summary = ref.watch(cartSummaryProvider);
     final symbol = ref.watch(currencySymbolProvider);
-    final customerName = ref.watch(cartCustomerNameProvider);
     final tt = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
 
@@ -43,10 +41,7 @@ class CheckoutBar extends ConsumerWidget {
                 height: 56,
                 child: OutlinedButton.icon(
                   onPressed: () {
-                    ref.read(heldOrdersProvider.notifier).hold(
-                          cart,
-                          customerName: customerName,
-                        );
+                    ref.read(heldOrdersProvider.notifier).holdCurrentCart();
                     ref.read(cartProvider.notifier).clear();
                   },
                   icon: const Icon(Icons.pause_circle_outline_rounded, size: 18),

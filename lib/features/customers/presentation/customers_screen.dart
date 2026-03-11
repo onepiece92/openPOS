@@ -2,13 +2,14 @@ import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import 'package:go_router/go_router.dart';
+
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/features/cart/domain/cart_notifier.dart';
 import 'package:pos_app/features/customers/domain/customers_provider.dart';
 import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
+
 
 class CustomersScreen extends ConsumerStatefulWidget {
   const CustomersScreen({super.key});
@@ -17,9 +18,29 @@ class CustomersScreen extends ConsumerStatefulWidget {
   ConsumerState<CustomersScreen> createState() => _CustomersScreenState();
 }
 
+enum _SortBy { nameAsc, nameDesc, newest, oldest, loyaltyDesc }
+
+extension _SortByLabel on _SortBy {
+  String get label => switch (this) {
+        _SortBy.nameAsc => 'Name A–Z',
+        _SortBy.nameDesc => 'Name Z–A',
+        _SortBy.newest => 'Newest first',
+        _SortBy.oldest => 'Oldest first',
+        _SortBy.loyaltyDesc => 'Most loyalty points',
+      };
+  IconData get icon => switch (this) {
+        _SortBy.nameAsc => Icons.sort_by_alpha_rounded,
+        _SortBy.nameDesc => Icons.sort_by_alpha_rounded,
+        _SortBy.newest => Icons.arrow_downward_rounded,
+        _SortBy.oldest => Icons.arrow_upward_rounded,
+        _SortBy.loyaltyDesc => Icons.stars_rounded,
+      };
+}
+
 class _CustomersScreenState extends ConsumerState<CustomersScreen> {
   String _search = '';
   bool _showSearch = false;
+  _SortBy _sortBy = _SortBy.nameAsc;
   final _searchCtrl = TextEditingController();
 
   @override
@@ -28,17 +49,74 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
     super.dispose();
   }
 
-  List<Customer> _filter(List<Customer> all) {
-    if (_search.isEmpty) return all;
-    final q = _search.toLowerCase();
-    return all
-        .where(
-          (c) =>
-              c.name.toLowerCase().contains(q) ||
-              (c.phone?.toLowerCase().contains(q) ?? false) ||
-              (c.email?.toLowerCase().contains(q) ?? false),
-        )
-        .toList();
+  List<Customer> _filterAndSort(List<Customer> all) {
+    var list = _search.isEmpty
+        ? [...all]
+        : all
+            .where((c) =>
+                c.name.toLowerCase().contains(_search.toLowerCase()) ||
+                (c.phone?.toLowerCase().contains(_search.toLowerCase()) ??
+                    false) ||
+                (c.email?.toLowerCase().contains(_search.toLowerCase()) ??
+                    false))
+            .toList();
+    switch (_sortBy) {
+      case _SortBy.nameAsc:
+        list.sort((a, b) => a.name.compareTo(b.name));
+      case _SortBy.nameDesc:
+        list.sort((a, b) => b.name.compareTo(a.name));
+      case _SortBy.newest:
+        list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      case _SortBy.oldest:
+        list.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+      case _SortBy.loyaltyDesc:
+        list.sort((a, b) => b.loyaltyPoints.compareTo(a.loyaltyPoints));
+    }
+    return list;
+  }
+
+  void _showSortSheet() {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Theme.of(ctx).colorScheme.outlineVariant,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Sort by',
+                    style: Theme.of(ctx).textTheme.titleMedium),
+              ),
+            ),
+            for (final option in _SortBy.values)
+              ListTile(
+                leading: Icon(option.icon),
+                title: Text(option.label),
+                trailing: _sortBy == option
+                    ? Icon(Icons.check_rounded,
+                        color: Theme.of(ctx).colorScheme.primary)
+                    : null,
+                onTap: () {
+                  setState(() => _sortBy = option);
+                  Navigator.pop(ctx);
+                },
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
   }
 
   void _openForm({Customer? customer}) {
@@ -63,13 +141,18 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                 controller: _searchCtrl,
                 autofocus: true,
                 decoration: const InputDecoration(
-                  hintText: 'Search customers...',
+                  hintText: 'Search customers…',
                   border: InputBorder.none,
                 ),
                 onChanged: (v) => setState(() => _search = v),
               )
             : const Text('Customers'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.sort_rounded),
+            tooltip: 'Sort',
+            onPressed: _showSortSheet,
+          ),
           IconButton(
             icon: Icon(
               _showSearch ? Icons.search_off_rounded : Icons.search_rounded,
@@ -87,12 +170,9 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
       ),
       body: customersAsync.when(
         data: (all) {
-          final filtered = _filter(all);
+          if (all.isEmpty) return _EmptyState(onAdd: () => _openForm());
 
-          if (all.isEmpty) {
-            return _EmptyState(onAdd: () => _openForm());
-          }
-
+          final filtered = _filterAndSort(all);
           if (filtered.isEmpty) {
             return Center(
               child: Text(
@@ -102,12 +182,10 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
             );
           }
 
-          return ListView.separated(
-            padding: const EdgeInsets.symmetric(vertical: 8),
+          return ListView.builder(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
             itemCount: filtered.length,
-            separatorBuilder: (_, __) =>
-                const Divider(height: 1, indent: 72),
-            itemBuilder: (_, i) => _CustomerTile(
+            itemBuilder: (_, i) => _CustomerCard(
               customer: filtered[i],
               onEdit: () => _openForm(customer: filtered[i]),
             ),
@@ -125,10 +203,10 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
   }
 }
 
-// ── Customer tile ─────────────────────────────────────────────────────────────
+// ── Customer card ─────────────────────────────────────────────────────────────
 
-class _CustomerTile extends ConsumerWidget {
-  const _CustomerTile({required this.customer, required this.onEdit});
+class _CustomerCard extends ConsumerWidget {
+  const _CustomerCard({required this.customer, required this.onEdit});
   final Customer customer;
   final VoidCallback onEdit;
 
@@ -138,124 +216,164 @@ class _CustomerTile extends ConsumerWidget {
     final tt = Theme.of(context).textTheme;
     final selectedId = ref.watch(cartSessionProvider).customerId;
     final isSelected = selectedId == customer.id;
-
-    void select() {
-      ref
-          .read(cartSessionProvider.notifier)
-          .setCustomer(isSelected ? null : customer.id);
-      if (!isSelected) context.go('/pos');
+    void toggle() {
+      final notifier = ref.read(cartSessionProvider.notifier);
+      if (isSelected) {
+        notifier.setCustomer(null);
+        notifier.setOrderDiscount(0, isPercent: false);
+      } else {
+        notifier.setCustomer(customer.id);
+        if (customer.defaultDiscount > 0) {
+          notifier.setOrderDiscount(
+            customer.defaultDiscount,
+            isPercent: customer.defaultDiscountIsPercent,
+          );
+        }
+        context.go('/pos');
+      }
     }
 
-    return ListTile(
-      onTap: select,
-      leading: RadioGroup<int?>(
-        groupValue: selectedId,
-        onChanged: (_) => select(),
-        child: Radio<int?>(
-          value: customer.id,
-          toggleable: true,
-        ),
-      ),
-      title: Text(customer.name, style: tt.bodyLarge),
-      subtitle: Text(
-        [
-          if (customer.phone != null) customer.phone!,
-          if (customer.email != null) customer.email!,
-        ].join(' · '),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(color: cs.onSurfaceVariant),
-      ),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (customer.defaultDiscount > 0)
-            _DiscountBadge(customer: customer, cs: cs, tt: tt),
-          if (customer.defaultDiscount > 0 && customer.loyaltyPoints > 0)
-            const SizedBox(width: 6),
-          if (customer.loyaltyPoints > 0)
-            _LoyaltyBadge(points: customer.loyaltyPoints, cs: cs, tt: tt),
-          const SizedBox(width: 6),
-          IconButton(
-            icon: Icon(Icons.edit_outlined, size: 18, color: cs.onSurfaceVariant),
-            onPressed: onEdit,
-            tooltip: 'Edit',
-            visualDensity: VisualDensity.compact,
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      color: isSelected ? cs.primaryContainer : null,
+      child: InkWell(
+        onTap: toggle,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+          child: Row(
+            children: [
+              // ── Radio ───────────────────────────────────────────────────
+              RadioGroup<int?>(
+                groupValue: selectedId,
+                onChanged: (_) => toggle(),
+                child: Radio<int?>(
+                  value: customer.id,
+                  toggleable: true,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+              const SizedBox(width: 14),
+
+              // ── Info ────────────────────────────────────────────────────
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      customer.name,
+                      style: tt.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: isSelected ? cs.onPrimaryContainer : null,
+                      ),
+                    ),
+                    if (customer.phone != null || customer.email != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        [
+                          if (customer.phone != null) customer.phone!,
+                          if (customer.email != null) customer.email!,
+                        ].join('  ·  '),
+                        style: tt.bodySmall?.copyWith(
+                          color: isSelected
+                              ? cs.onPrimaryContainer.withValues(alpha: 0.7)
+                              : cs.onSurfaceVariant,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                    // ── Badges ──────────────────────────────────────────
+                    if (customer.defaultDiscount > 0 ||
+                        customer.loyaltyPoints > 0 ||
+                        customer.isTaxExempt) ...[
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 6,
+                        children: [
+                          if (customer.defaultDiscount > 0)
+                            _Badge(
+                              icon: Icons.local_offer_rounded,
+                              label: customer.defaultDiscountIsPercent
+                                  ? '${customer.defaultDiscount.toStringAsFixed(customer.defaultDiscount % 1 == 0 ? 0 : 1)}% off'
+                                  : '${customer.defaultDiscount.toStringAsFixed(0)} off',
+                              bg: cs.errorContainer,
+                              fg: cs.onErrorContainer,
+                            ),
+                          if (customer.loyaltyPoints > 0)
+                            _Badge(
+                              icon: Icons.stars_rounded,
+                              label: '${customer.loyaltyPoints} pts',
+                              bg: cs.tertiaryContainer,
+                              fg: cs.onTertiaryContainer,
+                            ),
+                          if (customer.isTaxExempt)
+                            _Badge(
+                              icon: Icons.receipt_long_outlined,
+                              label: 'Tax exempt',
+                              bg: cs.secondaryContainer,
+                              fg: cs.onSecondaryContainer,
+                            ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+
+              // ── Edit ────────────────────────────────────────────────────
+              IconButton(
+                icon: Icon(Icons.edit_outlined,
+                    size: 18,
+                    color: isSelected
+                        ? cs.onPrimaryContainer.withValues(alpha: 0.7)
+                        : cs.onSurfaceVariant),
+                onPressed: onEdit,
+                tooltip: 'Edit',
+                visualDensity: VisualDensity.compact,
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 }
 
-class _DiscountBadge extends StatelessWidget {
-  const _DiscountBadge({
-    required this.customer,
-    required this.cs,
-    required this.tt,
+// ── Badge chip ────────────────────────────────────────────────────────────────
+
+class _Badge extends StatelessWidget {
+  const _Badge({
+    required this.icon,
+    required this.label,
+    required this.bg,
+    required this.fg,
   });
-  final Customer customer;
-  final ColorScheme cs;
-  final TextTheme tt;
+  final IconData icon;
+  final String label;
+  final Color bg;
+  final Color fg;
 
   @override
   Widget build(BuildContext context) {
-    final label = customer.defaultDiscountIsPercent
-        ? '${customer.defaultDiscount.toStringAsFixed(customer.defaultDiscount % 1 == 0 ? 0 : 1)}% off'
-        : '${customer.defaultDiscount.toStringAsFixed(0)} off';
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: cs.errorContainer,
-        borderRadius: BorderRadius.circular(12),
+        color: bg,
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.local_offer_rounded, size: 13, color: cs.onErrorContainer),
+          Icon(icon, size: 12, color: fg),
           const SizedBox(width: 4),
           Text(
             label,
-            style: tt.labelSmall?.copyWith(
-              color: cs.onErrorContainer,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _LoyaltyBadge extends StatelessWidget {
-  const _LoyaltyBadge({
-    required this.points,
-    required this.cs,
-    required this.tt,
-  });
-  final int points;
-  final ColorScheme cs;
-  final TextTheme tt;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: cs.tertiaryContainer,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.stars_rounded, size: 14, color: cs.onTertiaryContainer),
-          const SizedBox(width: 4),
-          Text(
-            '$points pts',
-            style: tt.labelSmall?.copyWith(
-              color: cs.onTertiaryContainer,
-              fontWeight: FontWeight.bold,
-            ),
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: fg,
+                  fontWeight: FontWeight.w700,
+                ),
           ),
         ],
       ),
@@ -275,11 +393,16 @@ class _CustomerForm extends ConsumerStatefulWidget {
 
 class _CustomerFormState extends ConsumerState<_CustomerForm> {
   final _formKey = GlobalKey<FormState>();
-  late final _nameCtrl = TextEditingController(text: widget.customer?.name ?? '');
-  late final _phoneCtrl = TextEditingController(text: widget.customer?.phone ?? '');
-  late final _emailCtrl = TextEditingController(text: widget.customer?.email ?? '');
-  late final _addressCtrl = TextEditingController(text: widget.customer?.address ?? '');
-  late bool _discountIsPercent = widget.customer?.defaultDiscountIsPercent ?? false;
+  late final _nameCtrl =
+      TextEditingController(text: widget.customer?.name ?? '');
+  late final _phoneCtrl =
+      TextEditingController(text: widget.customer?.phone ?? '');
+  late final _emailCtrl =
+      TextEditingController(text: widget.customer?.email ?? '');
+  late final _addressCtrl =
+      TextEditingController(text: widget.customer?.address ?? '');
+  late bool _discountIsPercent =
+      widget.customer?.defaultDiscountIsPercent ?? false;
   late final _discountCtrl = TextEditingController(
     text: (widget.customer?.defaultDiscount ?? 0) > 0
         ? widget.customer!.defaultDiscount.toStringAsFixed(
@@ -303,19 +426,20 @@ class _CustomerFormState extends ConsumerState<_CustomerForm> {
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
-
     final db = ref.read(databaseProvider);
     final discountVal = double.tryParse(_discountCtrl.text) ?? 0.0;
-    final entry = CustomersCompanion(
+    await db.customersDao.upsert(CustomersCompanion(
       id: _isEdit ? Value(widget.customer!.id) : const Value.absent(),
       name: Value(_nameCtrl.text.trim()),
-      phone: Value(_phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim()),
-      email: Value(_emailCtrl.text.trim().isEmpty ? null : _emailCtrl.text.trim()),
-      address: Value(_addressCtrl.text.trim().isEmpty ? null : _addressCtrl.text.trim()),
+      phone: Value(
+          _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim()),
+      email: Value(
+          _emailCtrl.text.trim().isEmpty ? null : _emailCtrl.text.trim()),
+      address: Value(
+          _addressCtrl.text.trim().isEmpty ? null : _addressCtrl.text.trim()),
       defaultDiscount: Value(discountVal),
       defaultDiscountIsPercent: Value(_discountIsPercent),
-    );
-    await db.customersDao.upsert(entry);
+    ));
     if (mounted) {
       setState(() => _loading = false);
       Navigator.pop(context);
@@ -327,7 +451,8 @@ class _CustomerFormState extends ConsumerState<_CustomerForm> {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Delete customer?'),
-        content: const Text('This will permanently remove the customer profile.'),
+        content:
+            const Text('This will permanently remove the customer profile.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -355,6 +480,7 @@ class _CustomerFormState extends ConsumerState<_CustomerForm> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
 
     return Padding(
       padding: EdgeInsets.only(
@@ -369,13 +495,12 @@ class _CustomerFormState extends ConsumerState<_CustomerForm> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Header
             Row(
               children: [
                 Expanded(
                   child: Text(
                     _isEdit ? 'Edit Customer' : 'New Customer',
-                    style: Theme.of(context).textTheme.titleLarge,
+                    style: tt.titleLarge,
                   ),
                 ),
                 if (_isEdit)
@@ -387,8 +512,6 @@ class _CustomerFormState extends ConsumerState<_CustomerForm> {
               ],
             ),
             const SizedBox(height: 20),
-
-            // Name
             TextFormField(
               controller: _nameCtrl,
               textCapitalization: TextCapitalization.words,
@@ -401,12 +524,12 @@ class _CustomerFormState extends ConsumerState<_CustomerForm> {
                   (v == null || v.trim().isEmpty) ? 'Name is required' : null,
             ),
             const SizedBox(height: 14),
-
-            // Phone
             TextFormField(
               controller: _phoneCtrl,
               keyboardType: TextInputType.phone,
-              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9+\-\s()]'))],
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9+\-\s()]'))
+              ],
               decoration: const InputDecoration(
                 labelText: 'Phone',
                 prefixIcon: Icon(Icons.phone_outlined),
@@ -414,8 +537,6 @@ class _CustomerFormState extends ConsumerState<_CustomerForm> {
               ),
             ),
             const SizedBox(height: 14),
-
-            // Email
             TextFormField(
               controller: _emailCtrl,
               keyboardType: TextInputType.emailAddress,
@@ -426,13 +547,12 @@ class _CustomerFormState extends ConsumerState<_CustomerForm> {
               ),
               validator: (v) {
                 if (v == null || v.trim().isEmpty) return null;
-                final ok = RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(v.trim());
-                return ok ? null : 'Enter a valid email';
+                return RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(v.trim())
+                    ? null
+                    : 'Enter a valid email';
               },
             ),
             const SizedBox(height: 14),
-
-            // Address
             TextFormField(
               controller: _addressCtrl,
               maxLines: 2,
@@ -443,12 +563,7 @@ class _CustomerFormState extends ConsumerState<_CustomerForm> {
               ),
             ),
             const SizedBox(height: 20),
-
-            // Default discount
-            Text(
-              'Default Discount',
-              style: Theme.of(context).textTheme.labelLarge,
-            ),
+            Text('Default Discount', style: tt.labelLarge),
             const SizedBox(height: 8),
             SegmentedButton<bool>(
               segments: const [
@@ -484,7 +599,6 @@ class _CustomerFormState extends ConsumerState<_CustomerForm> {
               },
             ),
             const SizedBox(height: 24),
-
             FilledButton(
               onPressed: _loading ? null : _save,
               child: _loading
@@ -516,19 +630,26 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.people_outline_rounded,
-            size: 72,
-            color: cs.onSurfaceVariant.withValues(alpha: 0.4),
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: cs.primaryContainer,
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Icon(Icons.people_rounded,
+                size: 40, color: cs.onPrimaryContainer),
           ),
-          const SizedBox(height: 16),
-          Text('No customers yet', style: tt.titleMedium?.copyWith(color: cs.onSurfaceVariant)),
-          const SizedBox(height: 8),
+          const SizedBox(height: 20),
+          Text('No customers yet',
+              style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 6),
           Text(
-            'Add your first customer to get started.',
-            style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+            'Add customers to track loyalty and apply discounts.',
+            style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 28),
           FilledButton.icon(
             onPressed: onAdd,
             icon: const Icon(Icons.person_add_rounded),

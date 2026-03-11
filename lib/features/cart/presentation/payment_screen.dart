@@ -6,8 +6,10 @@ import 'package:go_router/go_router.dart';
 
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
+import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/core/theme/app_theme.dart';
 import 'package:pos_app/features/cart/domain/cart_notifier.dart';
+import 'package:pos_app/features/customers/domain/customers_provider.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
 
 // ─── Payment screen (/checkout/payment) ──────────────────────────────────────
@@ -22,6 +24,7 @@ class PaymentScreen extends ConsumerStatefulWidget {
 class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   String _paymentMethod = 'cash';
   final _tenderedCtrl = TextEditingController();
+  final _loyaltyCtrl = TextEditingController();
   bool _placing = false;
 
   @override
@@ -36,6 +39,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   @override
   void dispose() {
     _tenderedCtrl.dispose();
+    _loyaltyCtrl.dispose();
     super.dispose();
   }
 
@@ -120,6 +124,18 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       }
     }
 
+    // Loyalty: redeem then earn
+    if (session.customerId != null) {
+      if (session.loyaltyPointsToRedeem > 0) {
+        await db.customersDao.redeemLoyaltyPoints(
+            session.customerId!, session.loyaltyPointsToRedeem);
+      }
+      if (summary.pointsToEarn > 0) {
+        await db.customersDao
+            .addLoyaltyPoints(session.customerId!, summary.pointsToEarn);
+      }
+    }
+
     ref.read(cartProvider.notifier).clear();
     if (mounted) {
       setState(() => _placing = false);
@@ -131,6 +147,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   Widget build(BuildContext context) {
     final summary = ref.watch(cartSummaryProvider);
     final symbol = ref.watch(currencySymbolProvider);
+    final loyaltyEnabled = ref.watch(loyaltyEnabledProvider);
+    final customer = ref.watch(cartCustomerProvider);
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
     final change = (_tendered - summary.total).clamp(0.0, double.infinity);
@@ -212,6 +230,21 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
               ),
             ],
           ],
+          if (loyaltyEnabled && customer != null) ...[
+            const SizedBox(height: 24),
+            _LoyaltySection(
+              customer: customer,
+              summary: summary,
+              symbol: symbol,
+              loyaltyCtrl: _loyaltyCtrl,
+              onChanged: (pts) {
+                ref
+                    .read(cartSessionProvider.notifier)
+                    .setLoyaltyPoints(pts);
+                setState(() {});
+              },
+            ),
+          ],
         ],
       ),
     );
@@ -289,6 +322,91 @@ class _PaymentChip extends StatelessWidget {
       showCheckmark: false,
       selectedColor: cs.primary,
       labelStyle: TextStyle(color: selected ? cs.onPrimary : null),
+    );
+  }
+}
+
+// ─── Loyalty section ──────────────────────────────────────────────────────────
+
+class _LoyaltySection extends StatelessWidget {
+  const _LoyaltySection({
+    required this.customer,
+    required this.summary,
+    required this.symbol,
+    required this.loyaltyCtrl,
+    required this.onChanged,
+  });
+
+  final Customer customer;
+  final CartSummary summary;
+  final String symbol;
+  final TextEditingController loyaltyCtrl;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    final available = customer.loyaltyPoints;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Loyalty Points', style: tt.titleMedium),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: cs.tertiaryContainer.withValues(alpha: 0.4),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.stars_rounded,
+                  size: 20, color: cs.tertiary),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${customer.name} has $available pts available',
+                      style: tt.bodyMedium
+                          ?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                    if (summary.pointsToEarn > 0)
+                      Text(
+                        'Will earn +${summary.pointsToEarn} pts from this sale',
+                        style: tt.bodySmall
+                            ?.copyWith(color: cs.onSurfaceVariant),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (available > 0) ...[
+          const SizedBox(height: 12),
+          TextField(
+            controller: loyaltyCtrl,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            decoration: InputDecoration(
+              labelText: 'Points to redeem (max $available)',
+              prefixIcon: const Icon(Icons.redeem_rounded),
+              border: const OutlineInputBorder(),
+              helperText: summary.loyaltyDiscount > 0
+                  ? 'Discount: $symbol ${summary.loyaltyDiscount.toStringAsFixed(2)}'
+                  : null,
+            ),
+            onChanged: (v) {
+              final pts = (int.tryParse(v) ?? 0).clamp(0, available);
+              onChanged(pts);
+            },
+          ),
+        ],
+      ],
     );
   }
 }

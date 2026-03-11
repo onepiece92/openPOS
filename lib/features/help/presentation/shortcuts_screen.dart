@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
 
 class ShortcutsScreen extends StatelessWidget {
   const ShortcutsScreen({super.key});
@@ -9,6 +10,7 @@ class ShortcutsScreen extends StatelessWidget {
     final tt = Theme.of(context).textTheme;
 
     return Scaffold(
+      drawer: const PosDrawer(),
       appBar: AppBar(title: const Text('Shortcuts')),
       body: ListView(
         padding: const EdgeInsets.all(16),

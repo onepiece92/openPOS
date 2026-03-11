@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import 'package:pos_app/features/cart/domain/cart_item.dart';
+import 'package:pos_app/features/cart/domain/cart_notifier.dart';
 import 'package:pos_app/features/cart/domain/held_order.dart';
+import 'package:pos_app/features/customers/domain/customers_provider.dart';
 
 // ── Hive box provider ─────────────────────────────────────────────────────────
 
@@ -36,7 +38,14 @@ class HeldOrdersNotifier extends Notifier<List<HeldOrder>> {
   }
 
   /// Saves the current cart as a held ticket and returns the new [HeldOrder].
-  HeldOrder hold(List<CartItem> items, {String? label, String? customerName}) {
+  HeldOrder hold(
+    List<CartItem> items, {
+    String? label,
+    String? customerName,
+    int? customerId,
+    double orderDiscount = 0.0,
+    bool orderDiscountIsPercent = false,
+  }) {
     final now = DateTime.now();
     final id = now.millisecondsSinceEpoch.toString();
     final ticket = HeldOrder(
@@ -45,10 +54,27 @@ class HeldOrdersNotifier extends Notifier<List<HeldOrder>> {
       createdAt: now,
       items: items,
       customerName: customerName,
+      customerId: customerId,
+      orderDiscount: orderDiscount,
+      orderDiscountIsPercent: orderDiscountIsPercent,
     );
     _box.put(id, jsonEncode(ticket.toJson()));
     state = _loadAll();
     return ticket;
+  }
+
+  /// Holds the current cart + session state as a ticket in one call.
+  HeldOrder holdCurrentCart() {
+    final cart = ref.read(cartProvider);
+    final session = ref.read(cartSessionProvider);
+    final customerName = ref.read(cartCustomerNameProvider);
+    return hold(
+      cart,
+      customerName: customerName,
+      customerId: session.customerId,
+      orderDiscount: session.orderDiscount,
+      orderDiscountIsPercent: session.orderDiscountIsPercent,
+    );
   }
 
   /// Removes a held ticket by id.

@@ -106,46 +106,76 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
     }
     setState(() => _loading = true);
 
-    final db = ref.read(databaseProvider);
-    final sku = _skuCtrl.text.trim().isEmpty
-        ? const Uuid().v4().substring(0, 8).toUpperCase()
-        : _skuCtrl.text.trim();
+    try {
+      final db = ref.read(databaseProvider);
+      final sku = _skuCtrl.text.trim().isEmpty
+          ? const Uuid().v4().substring(0, 8).toUpperCase()
+          : _skuCtrl.text.trim();
+      final stockQty =
+          _isComposite ? 0 : (int.tryParse(_stockCtrl.text) ?? 0);
 
-    final entry = ProductsCompanion.insert(
-      name: _nameCtrl.text.trim(),
-      sku: sku,
-      price: double.parse(_priceCtrl.text),
-      // Composite products don't track their own stock
-      stockQuantity: Value(_isComposite ? 0 : (int.tryParse(_stockCtrl.text) ?? 0)),
-      categoryId: Value(_categoryId),
-      isTaxable: Value(_isTaxable),
-      isComposite: Value(_isComposite),
-      isHiddenInPos: Value(_isHiddenInPos),
-      id: _isEdit ? Value(widget.productId!) : const Value.absent(),
-    );
+      int compositeId;
+      if (_isEdit) {
+        // Targeted update — doesn't touch isActive, imagePath, createdAt
+        await db.productsDao.updateProduct(
+          widget.productId!,
+          ProductsCompanion(
+            name: Value(_nameCtrl.text.trim()),
+            sku: Value(sku),
+            price: Value(double.parse(_priceCtrl.text)),
+            categoryId: Value(_categoryId),
+            isTaxable: Value(_isTaxable),
+            isComposite: Value(_isComposite),
+            isHiddenInPos: Value(_isHiddenInPos),
+          ),
+        );
+        // Set stock via direct SQL to guarantee it's written
+        if (!_isComposite) {
+          await db.productsDao.setStock(widget.productId!, stockQty);
+        }
+        compositeId = widget.productId!;
+      } else {
+        final savedId = await db.productsDao.upsert(
+          ProductsCompanion.insert(
+            name: _nameCtrl.text.trim(),
+            sku: sku,
+            price: double.parse(_priceCtrl.text),
+            stockQuantity: Value(stockQty),
+            categoryId: Value(_categoryId),
+            isTaxable: Value(_isTaxable),
+            isComposite: Value(_isComposite),
+            isHiddenInPos: Value(_isHiddenInPos),
+          ),
+        );
+        compositeId = savedId;
+      }
 
-    final savedId = await db.productsDao.upsert(entry);
-    final compositeId = _isEdit ? widget.productId! : savedId;
+      if (_isComposite) {
+        await db.productsDao.replaceComponents(
+          compositeId,
+          _components
+              .map((c) => ProductComponentsCompanion.insert(
+                    compositeProductId: compositeId,
+                    componentProductId: c.product.id,
+                    quantity: Value(c.quantity),
+                  ))
+              .toList(),
+        );
+      } else {
+        await db.productsDao.replaceComponents(compositeId, []);
+      }
 
-    if (_isComposite) {
-      await db.productsDao.replaceComponents(
-        compositeId,
-        _components
-            .map((c) => ProductComponentsCompanion.insert(
-                  compositeProductId: compositeId,
-                  componentProductId: c.product.id,
-                  quantity: Value(c.quantity),
-                ))
-            .toList(),
-      );
-    } else {
-      // If toggled off, clear any leftover components
-      await db.productsDao.replaceComponents(compositeId, []);
-    }
-
-    if (mounted) {
-      setState(() => _loading = false);
-      context.pop();
+      if (mounted) {
+        setState(() => _loading = false);
+        context.pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Save failed: $e')),
+        );
+      }
     }
   }
 
@@ -279,7 +309,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                     const SizedBox(height: 14),
                     categoriesAsync.when(
                       data: (cats) => DropdownButtonFormField<int?>(
-                        value: _categoryId,
+                        initialValue: _categoryId,
                         decoration: const InputDecoration(
                           labelText: 'Category',
                           prefixIcon: Icon(Icons.category_rounded),

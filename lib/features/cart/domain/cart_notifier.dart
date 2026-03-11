@@ -16,6 +16,7 @@ class CartSession {
     this.orderDiscount = 0.0,
     this.orderDiscountIsPercent = false,
     this.taxEnabled = true,
+    this.loyaltyPointsToRedeem = 0,
   });
 
   final String ticketNumber;
@@ -24,12 +25,14 @@ class CartSession {
   final double orderDiscount;
   final bool orderDiscountIsPercent;
   final bool taxEnabled;
+  final int loyaltyPointsToRedeem;
 
   CartSession copyWith({
     int? customerId,
     double? orderDiscount,
     bool? orderDiscountIsPercent,
     bool? taxEnabled,
+    int? loyaltyPointsToRedeem,
     bool clearCustomer = false,
   }) =>
       CartSession(
@@ -40,6 +43,8 @@ class CartSession {
         orderDiscountIsPercent:
             orderDiscountIsPercent ?? this.orderDiscountIsPercent,
         taxEnabled: taxEnabled ?? this.taxEnabled,
+        loyaltyPointsToRedeem:
+            loyaltyPointsToRedeem ?? this.loyaltyPointsToRedeem,
       );
 
   static CartSession fresh() {
@@ -64,6 +69,8 @@ class CartSessionNotifier extends Notifier<CartSession> {
           orderDiscount: amount, orderDiscountIsPercent: isPercent);
   void setTaxEnabled(bool enabled) =>
       state = state.copyWith(taxEnabled: enabled);
+  void setLoyaltyPoints(int points) =>
+      state = state.copyWith(loyaltyPointsToRedeem: points.clamp(0, 999999));
   void reset() => state = CartSession.fresh();
 }
 
@@ -121,26 +128,32 @@ class CartSummary {
   const CartSummary({
     required this.subtotal,
     required this.orderDiscount,
+    required this.loyaltyDiscount,
     required this.taxLines,
     required this.taxAmount,
     required this.total,
     required this.taxEnabled,
+    required this.pointsToEarn,
   });
 
   final double subtotal;
   final double orderDiscount;
+  final double loyaltyDiscount; // currency value of redeemed points
   final List<TaxLine> taxLines;
-  final double taxAmount; // sum of taxLine.amount when taxEnabled, else 0
+  final double taxAmount;
   final double total;
   final bool taxEnabled;
+  final int pointsToEarn; // pts customer will earn for this purchase
 
   static const zero = CartSummary(
     subtotal: 0,
     orderDiscount: 0,
+    loyaltyDiscount: 0,
     taxLines: [],
     taxAmount: 0,
     total: 0,
     taxEnabled: true,
+    pointsToEarn: 0,
   );
 }
 
@@ -229,6 +242,8 @@ final cartSummaryProvider = Provider<CartSummary>((ref) {
   final selectedIds = ref.watch(selectedTaxRatesProvider);
   final taxAsync = ref.watch(taxRatesStreamProvider);
   final allRates = taxAsync.valueOrNull ?? [];
+  final earnRate = ref.watch(loyaltyEarnRateProvider);
+  final pointValue = ref.watch(loyaltyPointValueProvider);
 
   // Resolve selected tax rate objects
   final selectedRates = selectedIds
@@ -303,14 +318,25 @@ final cartSummaryProvider = Provider<CartSummary>((ref) {
           .where((l) => !l.isInclusive)
           .fold(0.0, (s, l) => s + l.amount)
       : 0.0;
-  final total = discountedSubtotal + exclusiveTax;
+
+  // Loyalty redemption: convert redeemed points to currency discount
+  final loyaltyDiscount =
+      (session.loyaltyPointsToRedeem * pointValue).clamp(0.0, double.infinity);
+
+  final total = (discountedSubtotal + exclusiveTax - loyaltyDiscount)
+      .clamp(0.0, double.infinity);
+
+  // Points customer will earn = total spent * earnRate (rounded down)
+  final pointsToEarn = (total * earnRate).floor();
 
   return CartSummary(
     subtotal: subtotal,
     orderDiscount: effectiveDiscount,
+    loyaltyDiscount: loyaltyDiscount,
     taxLines: taxLines,
     taxAmount: taxAmount,
     total: total,
     taxEnabled: session.taxEnabled,
+    pointsToEarn: pointsToEarn,
   );
 });

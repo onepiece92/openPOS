@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
 
 class LearnScreen extends StatelessWidget {
   const LearnScreen({super.key});
@@ -9,6 +10,7 @@ class LearnScreen extends StatelessWidget {
     final tt = Theme.of(context).textTheme;
 
     return Scaffold(
+      drawer: const PosDrawer(),
       appBar: AppBar(title: const Text('Learn')),
       body: ListView(
         padding: const EdgeInsets.all(16),

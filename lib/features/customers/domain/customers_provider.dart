@@ -19,3 +19,15 @@ final cartCustomerNameProvider = Provider<String?>((ref) {
     return null;
   }
 });
+
+/// Resolves the full Customer object for the cart session's selected customer.
+final cartCustomerProvider = Provider<Customer?>((ref) {
+  final customerId = ref.watch(cartSessionProvider).customerId;
+  if (customerId == null) return null;
+  final customers = ref.watch(customersStreamProvider).valueOrNull ?? [];
+  try {
+    return customers.firstWhere((c) => c.id == customerId);
+  } catch (_) {
+    return null;
+  }
+});

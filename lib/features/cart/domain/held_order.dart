@@ -7,6 +7,9 @@ class HeldOrder {
     required this.createdAt,
     required this.items,
     this.customerName,
+    this.customerId,
+    this.orderDiscount = 0.0,
+    this.orderDiscountIsPercent = false,
   });
 
   final String id;
@@ -14,6 +17,9 @@ class HeldOrder {
   final DateTime createdAt;
   final List<CartItem> items;
   final String? customerName;
+  final int? customerId;
+  final double orderDiscount;
+  final bool orderDiscountIsPercent;
 
   int get itemCount => items.fold(0, (s, i) => s + i.quantity);
   double get subtotal => items.fold(0.0, (s, i) => s + i.lineSubtotal);
@@ -23,6 +29,9 @@ class HeldOrder {
         'label': label,
         'createdAt': createdAt.toIso8601String(),
         if (customerName != null) 'customerName': customerName,
+        if (customerId != null) 'customerId': customerId,
+        if (orderDiscount != 0.0) 'orderDiscount': orderDiscount,
+        if (orderDiscountIsPercent) 'orderDiscountIsPercent': true,
         'items': items
             .map((i) => {
                   'productId': i.productId,
@@ -40,6 +49,10 @@ class HeldOrder {
         label: json['label'] as String,
         createdAt: DateTime.parse(json['createdAt'] as String),
         customerName: json['customerName'] as String?,
+        customerId: json['customerId'] as int?,
+        orderDiscount: (json['orderDiscount'] as num?)?.toDouble() ?? 0.0,
+        orderDiscountIsPercent:
+            json['orderDiscountIsPercent'] as bool? ?? false,
         items: (json['items'] as List)
             .map((i) {
               final m = i as Map<String, dynamic>;

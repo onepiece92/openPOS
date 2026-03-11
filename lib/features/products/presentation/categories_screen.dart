@@ -7,6 +7,22 @@ import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
 import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
 
+// ── Palette cycled by category id ─────────────────────────────────────────────
+const _palette = [
+  Color(0xFF6750A4), // purple
+  Color(0xFF0077B6), // blue
+  Color(0xFF2D9CDB), // sky
+  Color(0xFF00897B), // teal
+  Color(0xFF388E3C), // green
+  Color(0xFFD4860B), // amber
+  Color(0xFFE64A19), // deep orange
+  Color(0xFFAD1457), // pink
+];
+
+Color _colorFor(int id) => _palette[id % _palette.length];
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 class CategoriesScreen extends ConsumerWidget {
   const CategoriesScreen({super.key});
 
@@ -16,46 +32,55 @@ class CategoriesScreen extends ConsumerWidget {
 
     return Scaffold(
       drawer: const PosDrawer(),
-      appBar: AppBar(title: const Text('Categories')),
+      appBar: AppBar(
+        title: const Text('Categories'),
+        actions: [
+          categoriesAsync.maybeWhen(
+            data: (cats) => cats.isNotEmpty
+                ? Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: TextButton.icon(
+                      onPressed: () => _showForm(context, ref, null),
+                      icon: const Icon(Icons.add_rounded, size: 18),
+                      label: const Text('Add'),
+                    ),
+                  )
+                : const SizedBox.shrink(),
+            orElse: () => const SizedBox.shrink(),
+          ),
+        ],
+      ),
       body: categoriesAsync.when(
         data: (cats) => cats.isEmpty
             ? _EmptyState(onAdd: () => _showForm(context, ref, null))
             : ReorderableListView.builder(
-                padding: const EdgeInsets.symmetric(vertical: 8),
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
                 itemCount: cats.length,
+                proxyDecorator: (child, index, animation) => Material(
+                  elevation: 6,
+                  borderRadius: BorderRadius.circular(14),
+                  child: child,
+                ),
                 onReorder: (oldIndex, newIndex) =>
                     _reorder(ref, cats, oldIndex, newIndex),
-                itemBuilder: (_, i) {
-                  final c = cats[i];
-                  return ListTile(
-                    key: ValueKey(c.id),
-                    leading: const Icon(Icons.drag_handle_rounded),
-                    title: Text(c.name),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit_outlined),
-                          onPressed: () => _showForm(context, ref, c),
-                        ),
-                        IconButton(
-                          icon: Icon(
-                            Icons.delete_outline_rounded,
-                            color: Theme.of(context).colorScheme.error,
-                          ),
-                          onPressed: () => _confirmDelete(context, ref, c),
-                        ),
-                      ],
-                    ),
-                  );
-                },
+                itemBuilder: (_, i) => _CategoryCard(
+                  key: ValueKey(cats[i].id),
+                  category: cats[i],
+                  onEdit: () => _showForm(context, ref, cats[i]),
+                  onDelete: () => _confirmDelete(context, ref, cats[i]),
+                ),
               ),
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showForm(context, ref, null),
-        child: const Icon(Icons.add_rounded),
+      floatingActionButton: categoriesAsync.maybeWhen(
+        data: (cats) => cats.isEmpty
+            ? null
+            : FloatingActionButton(
+                onPressed: () => _showForm(context, ref, null),
+                child: const Icon(Icons.add_rounded),
+              ),
+        orElse: () => null,
       ),
     );
   }
@@ -174,6 +199,105 @@ class CategoriesScreen extends ConsumerWidget {
   }
 }
 
+// ─── Category card ─────────────────────────────────────────────────────────────
+
+class _CategoryCard extends ConsumerWidget {
+  const _CategoryCard({
+    super.key,
+    required this.category,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final Category category;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    final productsAsync = ref.watch(productsByCategoryProvider(category.id));
+    final count = productsAsync.valueOrNull?.length ?? 0;
+    final color = _colorFor(category.id);
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: ListTile(
+        contentPadding: const EdgeInsets.fromLTRB(14, 6, 4, 6),
+        leading: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Center(
+            child: Text(
+              category.name.isNotEmpty
+                  ? category.name[0].toUpperCase()
+                  : '?',
+              style: tt.titleMedium?.copyWith(
+                color: color,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ),
+        title: Text(
+          category.name,
+          style: tt.bodyLarge?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        subtitle: Text(
+          count == 1 ? '1 product' : '$count products',
+          style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            PopupMenuButton<String>(
+              icon: Icon(Icons.more_vert_rounded,
+                  color: cs.onSurfaceVariant, size: 20),
+              onSelected: (v) {
+                if (v == 'edit') onEdit();
+                if (v == 'delete') onDelete();
+              },
+              itemBuilder: (_) => [
+                const PopupMenuItem(
+                  value: 'edit',
+                  child: ListTile(
+                    leading: Icon(Icons.edit_outlined),
+                    title: Text('Edit'),
+                    contentPadding: EdgeInsets.zero,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'delete',
+                  child: ListTile(
+                    leading: Icon(Icons.delete_outline_rounded,
+                        color: Theme.of(context).colorScheme.error),
+                    title: Text('Delete',
+                        style: TextStyle(
+                            color: Theme.of(context).colorScheme.error)),
+                    contentPadding: EdgeInsets.zero,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+              ],
+            ),
+            const Icon(Icons.drag_handle_rounded, size: 20),
+            const SizedBox(width: 4),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Empty state ───────────────────────────────────────────────────────────────
+
 class _EmptyState extends StatelessWidget {
   const _EmptyState({required this.onAdd});
   final VoidCallback onAdd;
@@ -181,19 +305,30 @@ class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.category_outlined, size: 64,
-              color: cs.onSurfaceVariant.withAlpha(80)),
-          const SizedBox(height: 16),
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: cs.primaryContainer,
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Icon(Icons.category_rounded,
+                size: 40, color: cs.onPrimaryContainer),
+          ),
+          const SizedBox(height: 20),
           Text('No categories yet',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleMedium
-                  ?.copyWith(color: cs.onSurfaceVariant)),
-          const SizedBox(height: 24),
+              style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 6),
+          Text(
+            'Group your products for faster searching.',
+            style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+          const SizedBox(height: 28),
           FilledButton.icon(
             onPressed: onAdd,
             icon: const Icon(Icons.add_rounded),

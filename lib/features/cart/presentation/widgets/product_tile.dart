@@ -72,7 +72,7 @@ class PosProductTile extends StatelessWidget {
               )
             else
               Text(
-                '$currencySymbol ${product.price.toStringAsFixed(2)}',
+                product.price.toStringAsFixed(2),
                 style: tt.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w600,
                   color: inCart ? cs.onPrimaryContainer : cs.onSurfaceVariant,

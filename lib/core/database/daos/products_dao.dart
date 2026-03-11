@@ -57,6 +57,10 @@ class ProductsDao extends DatabaseAccessor<AppDatabase>
   Future<int> upsert(ProductsCompanion entry) =>
       into(products).insertOnConflictUpdate(entry);
 
+  /// Targeted update for edit mode — only touches columns present in [companion].
+  Future<void> updateProduct(int id, ProductsCompanion companion) =>
+      (update(products)..where((p) => p.id.equals(id))).write(companion);
+
   Future<int> upsertVariant(ProductVariantsCompanion entry) =>
       into(productVariants).insertOnConflictUpdate(entry);
 
@@ -77,6 +81,13 @@ class ProductsDao extends DatabaseAccessor<AppDatabase>
       updates: {products},
     );
   }
+
+  /// Set stock to an absolute value.
+  Future<void> setStock(int productId, int quantity) => customUpdate(
+        'UPDATE products SET stock_quantity = ? WHERE id = ?',
+        variables: [Variable(quantity), Variable(productId)],
+        updates: {products},
+      );
 
   /// Adjust stock by delta (positive = add, negative = remove).
   Future<void> adjustStock(int productId, int delta) async {

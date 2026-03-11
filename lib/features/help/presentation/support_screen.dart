@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class SupportScreen extends StatelessWidget {
   const SupportScreen({super.key});
@@ -9,6 +11,7 @@ class SupportScreen extends StatelessWidget {
     final tt = Theme.of(context).textTheme;
 
     return Scaffold(
+      drawer: const PosDrawer(),
       appBar: AppBar(title: const Text('Support')),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -23,12 +26,20 @@ class SupportScreen extends StatelessWidget {
             onTap: () {},
           ),
           _SupportTile(
-            icon: Icons.chat_bubble_outline_rounded,
-            title: 'Live Chat',
-            subtitle: 'Available Mon–Fri, 9am–6pm',
+            icon: Icons.chat_rounded,
+            title: 'WhatsApp Chat',
+            subtitle: '+977 982-6189697',
             cs: cs,
             tt: tt,
-            onTap: () {},
+            onTap: () async {
+              final native = Uri.parse('whatsapp://send?phone=9779826189697');
+              final web = Uri.parse('https://wa.me/9779826189697');
+              if (await canLaunchUrl(native)) {
+                await launchUrl(native, mode: LaunchMode.externalApplication);
+              } else {
+                await launchUrl(web, mode: LaunchMode.externalApplication);
+              }
+            },
           ),
           const SizedBox(height: 20),
           _SectionHeader('Resources', tt, cs),

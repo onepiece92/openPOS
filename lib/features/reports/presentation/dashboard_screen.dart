@@ -13,9 +13,9 @@ enum _Period { today, week, month, year }
 extension on _Period {
   String get label => switch (this) {
         _Period.today => 'Today',
-        _Period.week => 'This Week',
-        _Period.month => 'This Month',
-        _Period.year => 'This Year',
+        _Period.week => 'Week',
+        _Period.month => 'Month',
+        _Period.year => 'Year',
       };
 
   DateTime get from {
@@ -154,8 +154,7 @@ final _reportProvider =
     const slotCount = 8;
     final totals = List<double>.filled(slotCount, 0.0);
     for (final o in periodOrders) {
-      final idx =
-          ((o.createdAt.hour - startH) ~/ 2).clamp(0, slotCount - 1);
+      final idx = ((o.createdAt.hour - startH) ~/ 2).clamp(0, slotCount - 1);
       totals[idx] += o.total;
     }
     chartDates = [
@@ -236,8 +235,8 @@ final _reportProvider =
     }
     chartDates = months.map((m) => monthFmt.format(m)).toList();
     chartTotals = totals;
-    chartHighlightIndex = months.indexWhere(
-        (m) => m.year == now.year && m.month == now.month);
+    chartHighlightIndex =
+        months.indexWhere((m) => m.year == now.year && m.month == now.month);
     if (chartHighlightIndex < 0) chartHighlightIndex = months.length - 1;
   }
 
@@ -278,8 +277,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         label: 'Custom Range',
       );
     }
-    return _Query(
-        from: _period.from, to: _period.to, label: _period.label);
+    return _Query(from: _period.from, to: _period.to, label: _period.label);
   }
 
   Future<void> _pickDateRange() async {
@@ -342,8 +340,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
               child: Row(
                 children: [
-                  Icon(Icons.date_range_rounded,
-                      size: 14, color: cs.primary),
+                  Icon(Icons.date_range_rounded, size: 14, color: cs.primary),
                   const SizedBox(width: 6),
                   Text(
                     '${_rangeLabelFmt.format(_customRange!.start)} – ${_rangeLabelFmt.format(_customRange!.end)}',
@@ -365,12 +362,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           Expanded(
             child: reportAsync.when(
               data: (data) => _Body(
-                  data: data,
-                  symbol: symbol,
-                  cs: cs,
-                  periodLabel: query.label),
-              loading: () =>
-                  const Center(child: CircularProgressIndicator()),
+                  data: data, symbol: symbol, cs: cs, periodLabel: query.label),
+              loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(child: Text('Error: $e')),
             ),
           ),
@@ -473,13 +466,12 @@ class _Body extends StatelessWidget {
                         title: Text(
                           '${p.method[0].toUpperCase()}${p.method.substring(1)}',
                         ),
-                        subtitle: Text(
-                            '${p.count} order${p.count == 1 ? '' : 's'}'),
+                        subtitle:
+                            Text('${p.count} order${p.count == 1 ? '' : 's'}'),
                         trailing: Text(
                           '$symbol ${_fmt(p.total)}',
                           style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: cs.secondary),
+                              fontWeight: FontWeight.w600, color: cs.secondary),
                         ),
                       )),
                 ],
@@ -494,82 +486,76 @@ class _Body extends StatelessWidget {
           _SectionHeader('Top Products', cs),
           Card(
             child: Column(
-              children: data.topProducts.indexed
-                  .map((entry) {
-                    final i = entry.$1;
-                    final p = entry.$2;
-                    final maxQty = data.topProducts.first.qty;
-                    return Column(
-                      children: [
-                        if (i > 0) const Divider(height: 1, indent: 16),
-                        Padding(
-                          padding:
-                              const EdgeInsets.fromLTRB(16, 10, 16, 10),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+              children: data.topProducts.indexed.map((entry) {
+                final i = entry.$1;
+                final p = entry.$2;
+                final maxQty = data.topProducts.first.qty;
+                return Column(
+                  children: [
+                    if (i > 0) const Divider(height: 1, indent: 16),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
                             children: [
-                              Row(
-                                children: [
-                                  Container(
-                                    width: 22,
-                                    height: 22,
-                                    alignment: Alignment.center,
-                                    decoration: BoxDecoration(
-                                      color: i == 0
-                                          ? cs.primaryContainer
-                                          : cs.surfaceContainerHighest,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: Text(
-                                      '${i + 1}',
-                                      style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                          color: i == 0
-                                              ? cs.onPrimaryContainer
-                                              : cs.onSurfaceVariant),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                      child: Text(p.name,
-                                          style: const TextStyle(
-                                              fontWeight: FontWeight.w500))),
-                                  Text(
-                                    '${p.qty} sold',
-                                    style: TextStyle(
-                                        fontSize: 12,
-                                        color: cs.onSurfaceVariant),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    '$symbol ${_fmt(p.revenue)}',
-                                    style: TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                        color: cs.primary),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 6),
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(4),
-                                child: LinearProgressIndicator(
-                                  value:
-                                      maxQty > 0 ? p.qty / maxQty : 0,
-                                  minHeight: 4,
-                                  backgroundColor:
-                                      cs.surfaceContainerHighest,
-                                  valueColor: AlwaysStoppedAnimation(
-                                      i == 0 ? cs.primary : cs.secondary),
+                              Container(
+                                width: 22,
+                                height: 22,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: i == 0
+                                      ? cs.primaryContainer
+                                      : cs.surfaceContainerHighest,
+                                  shape: BoxShape.circle,
                                 ),
+                                child: Text(
+                                  '${i + 1}',
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: i == 0
+                                          ? cs.onPrimaryContainer
+                                          : cs.onSurfaceVariant),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                  child: Text(p.name,
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.w500))),
+                              Text(
+                                '${p.qty} sold',
+                                style: TextStyle(
+                                    fontSize: 12, color: cs.onSurfaceVariant),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '$symbol ${_fmt(p.revenue)}',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    color: cs.primary),
                               ),
                             ],
                           ),
-                        ),
-                      ],
-                    );
-                  })
-                  .toList(),
+                          const SizedBox(height: 6),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              value: maxQty > 0 ? p.qty / maxQty : 0,
+                              minHeight: 4,
+                              backgroundColor: cs.surfaceContainerHighest,
+                              valueColor: AlwaysStoppedAnimation(
+                                  i == 0 ? cs.primary : cs.secondary),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              }).toList(),
             ),
           ),
         ],
@@ -609,8 +595,7 @@ class _Body extends StatelessWidget {
                 label: 'Net Profit',
                 value: '$symbol ${_fmt(data.profit)}',
                 icon: Icons.account_balance_rounded,
-                color:
-                    data.profit >= 0 ? const Color(0xFF16A34A) : cs.error,
+                color: data.profit >= 0 ? const Color(0xFF16A34A) : cs.error,
                 cs: cs,
               ),
             ),
@@ -766,14 +751,11 @@ class _KpiCard extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             Text(label,
-                style: TextStyle(
-                    fontSize: 12, color: cs.onSurfaceVariant)),
+                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
             const SizedBox(height: 2),
             Text(value,
                 style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.bold,
-                    color: color),
+                    fontSize: 17, fontWeight: FontWeight.bold, color: color),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis),
           ],

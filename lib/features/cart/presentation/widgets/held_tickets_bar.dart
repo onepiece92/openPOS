@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import 'package:pos_app/core/theme/tron_border.dart';
+import 'package:pos_app/core/widgets/customer_avatar.dart';
 import 'package:pos_app/features/cart/domain/cart_notifier.dart';
 import 'package:pos_app/features/cart/domain/held_order.dart';
 import 'package:pos_app/features/cart/domain/held_orders_notifier.dart';
@@ -119,7 +120,6 @@ class _HeldTicketsSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final held = ref.watch(heldOrdersProvider);
     final symbol = ref.watch(currencySymbolProvider);
-    final currentCustomerName = ref.watch(cartCustomerNameProvider);
     final cs = Theme.of(context).colorScheme;
     final dateFmt = DateFormat('dd MMM  HH:mm');
 
@@ -192,27 +192,10 @@ class _HeldTicketsSheet extends ConsumerWidget {
                       }
                       // ── Ticket row ─────────────────────────────────────
                       final ticket = held[i];
-                      final initials = ticket.customerName
-                          ?.trim()
-                          .split(' ')
-                          .where((s) => s.isNotEmpty)
-                          .take(2)
-                          .map((s) => s[0].toUpperCase())
-                          .join();
                       return ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: ticket.customerName != null
-                              ? cs.primaryContainer
-                              : cs.secondaryContainer,
-                          child: initials != null
-                              ? Text(initials,
-                                  style: TextStyle(
-                                    color: cs.onPrimaryContainer,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 13,
-                                  ))
-                              : Icon(Icons.pause_rounded,
-                                  size: 18, color: cs.onSecondaryContainer),
+                        leading: CustomerAvatar(
+                          name: ticket.customerName,
+                          fallbackIcon: Icons.pause_rounded,
                         ),
                         title: Text(ticket.label),
                         subtitle: Text(
@@ -227,8 +210,7 @@ class _HeldTicketsSheet extends ConsumerWidget {
                               .read(heldOrdersProvider.notifier)
                               .delete(ticket.id),
                         ),
-                        onTap: () => _resume(ctx, ref, ticket,
-                            currentCustomerName: currentCustomerName),
+                        onTap: () => _resume(ctx, ref, ticket),
                       );
                     },
                   ),
@@ -241,9 +223,8 @@ class _HeldTicketsSheet extends ConsumerWidget {
   void _resume(
     BuildContext context,
     WidgetRef ref,
-    HeldOrder ticket, {
-    String? currentCustomerName,
-  }) {
+    HeldOrder ticket,
+  ) {
     final current = ref.read(cartProvider);
     if (current.isNotEmpty) {
       final nav = Navigator.of(context);
@@ -272,10 +253,7 @@ class _HeldTicketsSheet extends ConsumerWidget {
       ).then((action) {
         if (action == null || action == _ResumeAction.cancel) return;
         if (action == _ResumeAction.save) {
-          ref.read(heldOrdersProvider.notifier).hold(
-                current,
-                customerName: currentCustomerName,
-              );
+          ref.read(heldOrdersProvider.notifier).holdCurrentCart();
         }
         _loadTicket(nav, router, ref, ticket);
       });
@@ -290,6 +268,30 @@ class _HeldTicketsSheet extends ConsumerWidget {
     notifier.clear();
     for (final item in ticket.items) {
       notifier.addItem(item);
+    }
+    // Restore the session state that was active when the ticket was held
+    final sessionNotifier = ref.read(cartSessionProvider.notifier);
+    if (ticket.customerId != null) {
+      sessionNotifier.setCustomer(ticket.customerId);
+    }
+    if (ticket.orderDiscount > 0) {
+      sessionNotifier.setOrderDiscount(
+        ticket.orderDiscount,
+        isPercent: ticket.orderDiscountIsPercent,
+      );
+    } else if (ticket.customerId != null) {
+      // Fallback: apply the customer's default discount if ticket had none
+      final customers =
+          ref.read(customersStreamProvider).valueOrNull ?? [];
+      try {
+        final c = customers.firstWhere((c) => c.id == ticket.customerId);
+        if (c.defaultDiscount > 0) {
+          sessionNotifier.setOrderDiscount(
+            c.defaultDiscount,
+            isPercent: c.defaultDiscountIsPercent,
+          );
+        }
+      } catch (_) {}
     }
     ref.read(heldOrdersProvider.notifier).delete(ticket.id);
     nav.pop(); // close the sheet

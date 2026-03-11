@@ -5,9 +5,9 @@ import 'package:intl/intl.dart';
 
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/theme/app_theme.dart';
+import 'package:pos_app/core/widgets/customer_avatar.dart';
 import 'package:pos_app/features/cart/domain/cart_item.dart';
 import 'package:pos_app/features/cart/domain/cart_notifier.dart';
-import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/features/customers/domain/customers_provider.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
 
@@ -189,9 +189,11 @@ class _TicketHeader extends ConsumerWidget {
                   ),
                   if (selectedCustomer != null)
                     GestureDetector(
-                      onTap: () => ref
-                          .read(cartSessionProvider.notifier)
-                          .setCustomer(null),
+                      onTap: () {
+                        final n = ref.read(cartSessionProvider.notifier);
+                        n.setCustomer(null);
+                        n.setOrderDiscount(0, isPercent: false);
+                      },
                       child: Icon(Icons.close_rounded,
                           size: 16, color: cs.onSurfaceVariant),
                     )
@@ -301,17 +303,7 @@ class _CustomerPickerSheetState extends State<_CustomerPickerSheet> {
                 final c = filtered[i];
                 final selected = c.id == widget.selectedId;
                 return ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: cs.primaryContainer,
-                    child: Text(
-                      c.name.isNotEmpty
-                          ? c.name[0].toUpperCase()
-                          : '?',
-                      style: TextStyle(
-                          color: cs.onPrimaryContainer,
-                          fontWeight: FontWeight.bold),
-                    ),
-                  ),
+                  leading: CustomerAvatar(name: c.name),
                   title: Text(c.name),
                   subtitle: c.phone != null ? Text(c.phone!) : null,
                   trailing: selected
@@ -359,7 +351,7 @@ class _CartLineItem extends ConsumerWidget {
                     overflow: TextOverflow.ellipsis),
                 const SizedBox(height: 2),
                 Text(
-                  '$currencySymbol ${item.unitPrice.toStringAsFixed(2)} each',
+                  '${item.unitPrice.toStringAsFixed(2)} each',
                   style: tt.labelSmall
                       ?.copyWith(color: cs.onSurfaceVariant),
                 ),
@@ -396,7 +388,7 @@ class _CartLineItem extends ConsumerWidget {
           SizedBox(
             width: 72,
             child: Text(
-              '$currencySymbol ${item.lineSubtotal.toStringAsFixed(2)}',
+              item.lineSubtotal.toStringAsFixed(2),
               textAlign: TextAlign.end,
               style: tt.bodyMedium
                   ?.copyWith(fontWeight: FontWeight.w600),
