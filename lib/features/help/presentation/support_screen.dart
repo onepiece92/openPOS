@@ -23,7 +23,9 @@ class SupportScreen extends StatelessWidget {
             subtitle: 'support@rebuzzpos.com',
             cs: cs,
             tt: tt,
-            onTap: () {},
+            onTap: () => launchUrl(
+              Uri.parse('mailto:support@rebuzzpos.com'),
+            ),
           ),
           _SupportTile(
             icon: Icons.chat_rounded,
@@ -49,7 +51,11 @@ class SupportScreen extends StatelessWidget {
             subtitle: 'Let us know what went wrong',
             cs: cs,
             tt: tt,
-            onTap: () {},
+            onTap: () => launchUrl(
+              Uri.parse(
+                'mailto:support@rebuzzpos.com?subject=${Uri.encodeComponent('openPOS Bug')}',
+              ),
+            ),
           ),
           _SupportTile(
             icon: Icons.lightbulb_outline_rounded,
@@ -57,7 +63,11 @@ class SupportScreen extends StatelessWidget {
             subtitle: 'Suggest improvements',
             cs: cs,
             tt: tt,
-            onTap: () {},
+            onTap: () => launchUrl(
+              Uri.parse(
+                'mailto:support@rebuzzpos.com?subject=${Uri.encodeComponent('openPOS Feature Request')}',
+              ),
+            ),
           ),
           _SupportTile(
             icon: Icons.article_outlined,
@@ -65,13 +75,138 @@ class SupportScreen extends StatelessWidget {
             subtitle: 'Full product docs & guides',
             cs: cs,
             tt: tt,
-            onTap: () {},
+            onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Documentation coming soon')),
+            ),
+          ),
+          const SizedBox(height: 20),
+          _SectionHeader('Upgrade POS', tt, cs),
+          _UpgradeCard(
+            icon: Icons.rocket_launch_rounded,
+            title: 'RebuzzPOS',
+            subtitle: 'Online POS with 40+ additional features',
+            gradient: const [Color(0xFF6B68FF), Color(0xFF00B8C8)],
+            cs: cs,
+            tt: tt,
+            onTap: () => launchUrl(
+              Uri.parse('https://rebuzzpos.com'),
+              mode: LaunchMode.externalApplication,
+            ),
+          ),
+          const SizedBox(height: 8),
+          _UpgradeCard(
+            icon: Icons.phone_iphone_rounded,
+            title: 'Ordering App',
+            subtitle:
+                'Get your own online ordering mobile app for your business',
+            gradient: const [Color(0xFFE01E6A), Color(0xFFFF8C42)],
+            cs: cs,
+            tt: tt,
+            onTap: () => launchUrl(
+              Uri.parse('https://rebuzzpos.com'),
+              mode: LaunchMode.externalApplication,
+            ),
           ),
           const SizedBox(height: 20),
           _SectionHeader('App Info', tt, cs),
           _InfoRow(label: 'Version', value: '1.0.0', cs: cs, tt: tt),
           _InfoRow(label: 'Build', value: '2026.03', cs: cs, tt: tt),
         ],
+      ),
+    );
+  }
+}
+
+class _UpgradeCard extends StatelessWidget {
+  const _UpgradeCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.gradient,
+    required this.cs,
+    required this.tt,
+    required this.onTap,
+  });
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final List<Color> gradient;
+  final ColorScheme cs;
+  final TextTheme tt;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = cs.brightness == Brightness.dark;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: dark
+                ? [
+                    gradient[0].withValues(alpha: 0.25),
+                    gradient[1].withValues(alpha: 0.12),
+                  ]
+                : [
+                    gradient[0].withValues(alpha: 0.10),
+                    gradient[1].withValues(alpha: 0.06),
+                  ],
+          ),
+          border: Border.all(
+            color: dark
+                ? gradient[0].withValues(alpha: 0.30)
+                : gradient[0].withValues(alpha: 0.25),
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: gradient,
+                ),
+              ),
+              child: Icon(icon, color: Colors.white, size: 24),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: tt.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: tt.bodySmall?.copyWith(
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              Icons.arrow_forward_rounded,
+              color: gradient[0],
+              size: 20,
+            ),
+          ],
+        ),
       ),
     );
   }

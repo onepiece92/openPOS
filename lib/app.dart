@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:pos_app/features/backup/presentation/backup_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -62,7 +64,29 @@ class POSApp extends ConsumerWidget {
           decoration: BoxDecoration(
             gradient: AppTheme.backgroundGradient(brightness),
           ),
-          child: child!,
+          child: CallbackShortcuts(
+            bindings: {
+              const SingleActivator(LogicalKeyboardKey.keyH, meta: true):
+                  () => router.go('/pos'),
+              const SingleActivator(LogicalKeyboardKey.keyP, meta: true):
+                  () => router.go('/pos'),
+              const SingleActivator(LogicalKeyboardKey.keyO, meta: true):
+                  () => router.go('/orders'),
+              const SingleActivator(LogicalKeyboardKey.keyU, meta: true):
+                  () => router.go('/customers'),
+              const SingleActivator(LogicalKeyboardKey.keyE, meta: true):
+                  () => router.go('/expenses'),
+              const SingleActivator(LogicalKeyboardKey.comma, meta: true):
+                  () => router.go('/settings'),
+              const SingleActivator(LogicalKeyboardKey.keyN, meta: true):
+                  () => router.push('/products/add'),
+              const SingleActivator(LogicalKeyboardKey.keyW, meta: true):
+                  () {
+                if (router.canPop()) router.pop();
+              },
+            },
+            child: Focus(autofocus: true, child: child!),
+          ),
         );
       },
       routerConfig: router,
@@ -178,6 +202,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: 'profile',
             pageBuilder: (_, state) =>
                 _slide(state, const StoreProfileEditScreen()),
+          ),
+          GoRoute(
+            path: 'backup',
+            pageBuilder: (_, state) => _slide(state, const BackupScreen()),
           ),
         ],
       ),

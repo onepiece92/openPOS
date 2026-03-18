@@ -16,9 +16,11 @@ class ShortcutsScreen extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         children: [
           _SectionHeader('Navigation', tt, cs),
+          _ShortcutRow(keys: const ['⌘', 'H'], label: 'Home', tt: tt, cs: cs),
           _ShortcutRow(keys: const ['⌘', 'P'], label: 'Open POS', tt: tt, cs: cs),
           _ShortcutRow(keys: const ['⌘', 'O'], label: 'Orders', tt: tt, cs: cs),
           _ShortcutRow(keys: const ['⌘', 'U'], label: 'Customers', tt: tt, cs: cs),
+          _ShortcutRow(keys: const ['⌘', 'E'], label: 'Expenses', tt: tt, cs: cs),
           _ShortcutRow(keys: const ['⌘', ','], label: 'Settings', tt: tt, cs: cs),
           const SizedBox(height: 20),
           _SectionHeader('POS / Cart', tt, cs),
@@ -30,10 +32,8 @@ class ShortcutsScreen extends StatelessWidget {
           const SizedBox(height: 20),
           _SectionHeader('Products', tt, cs),
           _ShortcutRow(keys: const ['⌘', 'N'], label: 'New product', tt: tt, cs: cs),
-          _ShortcutRow(keys: const ['⌘', 'S'], label: 'Save product', tt: tt, cs: cs),
           const SizedBox(height: 20),
           _SectionHeader('General', tt, cs),
-          _ShortcutRow(keys: const ['⌘', 'Z'], label: 'Undo', tt: tt, cs: cs),
           _ShortcutRow(keys: const ['⌘', 'W'], label: 'Close / Back', tt: tt, cs: cs),
           const SizedBox(height: 20),
           Container(

@@ -43,12 +43,12 @@ class _HeldTicketsBarState extends ConsumerState<HeldTicketsBar>
 
   @override
   Widget build(BuildContext context) {
-    final held = ref.watch(heldOrdersProvider);
-    if (held.isEmpty) return const SizedBox.shrink();
+    final active = ref.watch(activeHeldOrdersProvider);
+    if (active.isEmpty) return const SizedBox.shrink();
 
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
-    final count = held.length;
+    final count = active.length;
     final dark = cs.brightness == Brightness.dark;
 
     return Material(
@@ -113,12 +113,33 @@ class _HeldTicketsBarState extends ConsumerState<HeldTicketsBar>
 
 // ─── Held tickets sheet ───────────────────────────────────────────────────────
 
-class _HeldTicketsSheet extends ConsumerWidget {
+class _HeldTicketsSheet extends ConsumerStatefulWidget {
   const _HeldTicketsSheet();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final held = ref.watch(heldOrdersProvider);
+  ConsumerState<_HeldTicketsSheet> createState() => _HeldTicketsSheetState();
+}
+
+class _HeldTicketsSheetState extends ConsumerState<_HeldTicketsSheet>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabCtrl = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final active = ref.watch(activeHeldOrdersProvider);
+    final archived = ref.watch(archivedHeldOrdersProvider);
     final symbol = ref.watch(currencySymbolProvider);
     final cs = Theme.of(context).colorScheme;
     final dateFmt = DateFormat('dd MMM  HH:mm');
@@ -130,93 +151,165 @@ class _HeldTicketsSheet extends ConsumerWidget {
       builder: (ctx, scrollCtrl) => Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
             child: Text('Held Tickets',
                 style: Theme.of(ctx).textTheme.titleLarge),
           ),
+          TabBar(
+            controller: _tabCtrl,
+            tabs: [
+              Tab(text: 'Active (${active.length})'),
+              Tab(text: 'Archived (${archived.length})'),
+            ],
+          ),
           Expanded(
-            child: held.isEmpty
-                ? Center(
-                    child: Text('No held tickets',
-                        style: TextStyle(color: cs.onSurfaceVariant)),
-                  )
-                : ListView.separated(
-                    controller: scrollCtrl,
-                    // +1 for the "Clear all" row at the end
-                    itemCount: held.length + 1,
-                    separatorBuilder: (_, __) =>
-                        const Divider(height: 1, indent: 16),
-                    itemBuilder: (_, i) {
-                      // ── Clear all footer ───────────────────────────────
-                      if (i == held.length) {
-                        return ListTile(
-                          leading: Icon(Icons.delete_sweep_rounded,
-                              color: cs.error),
-                          title: Text('Clear all tickets',
-                              style: TextStyle(color: cs.error)),
-                          onTap: () async {
-                            final confirm = await showDialog<bool>(
-                              context: ctx,
-                              builder: (dCtx) => AlertDialog(
-                                title: const Text('Clear all tickets?'),
-                                content: Text(
-                                  'This will permanently delete all ${held.length} held ${held.length == 1 ? 'ticket' : 'tickets'}.',
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () =>
-                                        Navigator.pop(dCtx, false),
-                                    child: const Text('Cancel'),
-                                  ),
-                                  FilledButton(
-                                    style: FilledButton.styleFrom(
-                                      backgroundColor: cs.error,
-                                      foregroundColor: cs.onError,
-                                    ),
-                                    onPressed: () =>
-                                        Navigator.pop(dCtx, true),
-                                    child: const Text('Clear all'),
-                                  ),
-                                ],
-                              ),
-                            );
-                            if (confirm == true) {
-                              ref
-                                  .read(heldOrdersProvider.notifier)
-                                  .deleteAll();
-                              // ignore: use_build_context_synchronously
-                              Navigator.pop(ctx);
-                            }
-                          },
-                        );
-                      }
-                      // ── Ticket row ─────────────────────────────────────
-                      final ticket = held[i];
-                      return ListTile(
-                        leading: CustomerAvatar(
-                          name: ticket.customerName,
-                          fallbackIcon: Icons.pause_rounded,
-                        ),
-                        title: Text(ticket.label),
-                        subtitle: Text(
-                          '${ticket.itemCount} items · '
-                          '$symbol ${ticket.subtotal.toStringAsFixed(2)} · '
-                          '${dateFmt.format(ticket.createdAt)}',
-                        ),
-                        trailing: IconButton(
-                          icon: Icon(Icons.delete_outline_rounded,
-                              color: cs.error),
-                          onPressed: () => ref
-                              .read(heldOrdersProvider.notifier)
-                              .delete(ticket.id),
-                        ),
-                        onTap: () => _resume(ctx, ref, ticket),
-                      );
-                    },
-                  ),
+            child: TabBarView(
+              controller: _tabCtrl,
+              children: [
+                // ── Active tab ──────────────────────────────────────
+                _buildActiveList(ctx, active, symbol, cs, dateFmt),
+                // ── Archived tab ────────────────────────────────────
+                _buildArchivedList(ctx, archived, symbol, cs, dateFmt),
+              ],
+            ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildActiveList(BuildContext ctx, List<HeldOrder> active,
+      String symbol, ColorScheme cs, DateFormat dateFmt) {
+    if (active.isEmpty) {
+      return Center(
+        child: Text('No held tickets',
+            style: TextStyle(color: cs.onSurfaceVariant)),
+      );
+    }
+    return ListView.separated(
+      itemCount: active.length + 1,
+      separatorBuilder: (_, __) => const Divider(height: 1, indent: 16),
+      itemBuilder: (_, i) {
+        // ── Archive all footer ──────────────────────────────
+        if (i == active.length) {
+          return ListTile(
+            leading:
+                Icon(Icons.archive_rounded, color: cs.onSurfaceVariant),
+            title: Text('Archive all tickets',
+                style: TextStyle(color: cs.onSurfaceVariant)),
+            onTap: () {
+              ref.read(heldOrdersProvider.notifier).archiveAll();
+            },
+          );
+        }
+        final ticket = active[i];
+        return ListTile(
+          leading: CustomerAvatar(
+            name: ticket.customerName,
+            fallbackIcon: Icons.pause_rounded,
+          ),
+          title: Text(ticket.label),
+          subtitle: Text(
+            '${ticket.itemCount} items · '
+            '$symbol ${ticket.subtotal.toStringAsFixed(2)} · '
+            '${dateFmt.format(ticket.createdAt)}',
+          ),
+          trailing: IconButton(
+            icon: Icon(Icons.archive_outlined, color: cs.onSurfaceVariant),
+            tooltip: 'Archive',
+            onPressed: () =>
+                ref.read(heldOrdersProvider.notifier).archive(ticket.id),
+          ),
+          onTap: () => _resume(ctx, ref, ticket),
+        );
+      },
+    );
+  }
+
+  Widget _buildArchivedList(BuildContext ctx, List<HeldOrder> archived,
+      String symbol, ColorScheme cs, DateFormat dateFmt) {
+    if (archived.isEmpty) {
+      return Center(
+        child: Text('No archived tickets',
+            style: TextStyle(color: cs.onSurfaceVariant)),
+      );
+    }
+    return ListView.separated(
+      itemCount: archived.length + 1,
+      separatorBuilder: (_, __) => const Divider(height: 1, indent: 16),
+      itemBuilder: (_, i) {
+        // ── Clear all archived footer ───────────────────────
+        if (i == archived.length) {
+          return ListTile(
+            leading:
+                Icon(Icons.delete_sweep_rounded, color: cs.error),
+            title: Text('Delete all archived',
+                style: TextStyle(color: cs.error)),
+            onTap: () async {
+              final confirm = await showDialog<bool>(
+                context: ctx,
+                builder: (dCtx) => AlertDialog(
+                  title: const Text('Delete all archived?'),
+                  content: Text(
+                    'This will permanently delete ${archived.length} archived ${archived.length == 1 ? 'ticket' : 'tickets'}.',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(dCtx, false),
+                      child: const Text('Cancel'),
+                    ),
+                    FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: cs.error,
+                        foregroundColor: cs.onError,
+                      ),
+                      onPressed: () => Navigator.pop(dCtx, true),
+                      child: const Text('Delete all'),
+                    ),
+                  ],
+                ),
+              );
+              if (confirm == true) {
+                ref.read(heldOrdersProvider.notifier).deleteAllArchived();
+              }
+            },
+          );
+        }
+        final ticket = archived[i];
+        return ListTile(
+          leading: CustomerAvatar(
+            name: ticket.customerName,
+            fallbackIcon: Icons.archive_rounded,
+          ),
+          title: Text(ticket.label),
+          subtitle: Text(
+            '${ticket.itemCount} items · '
+            '$symbol ${ticket.subtotal.toStringAsFixed(2)} · '
+            '${dateFmt.format(ticket.createdAt)}',
+          ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: Icon(Icons.unarchive_outlined, color: cs.primary),
+                tooltip: 'Restore',
+                onPressed: () => ref
+                    .read(heldOrdersProvider.notifier)
+                    .unarchive(ticket.id),
+              ),
+              IconButton(
+                icon:
+                    Icon(Icons.delete_outline_rounded, color: cs.error),
+                tooltip: 'Delete',
+                onPressed: () => ref
+                    .read(heldOrdersProvider.notifier)
+                    .delete(ticket.id),
+              ),
+            ],
+          ),
+          onTap: () => _resume(ctx, ref, ticket),
+        );
+      },
     );
   }
 
@@ -269,7 +362,6 @@ class _HeldTicketsSheet extends ConsumerWidget {
     for (final item in ticket.items) {
       notifier.addItem(item);
     }
-    // Restore the session state that was active when the ticket was held
     final sessionNotifier = ref.read(cartSessionProvider.notifier);
     if (ticket.customerId != null) {
       sessionNotifier.setCustomer(ticket.customerId);
@@ -280,7 +372,6 @@ class _HeldTicketsSheet extends ConsumerWidget {
         isPercent: ticket.orderDiscountIsPercent,
       );
     } else if (ticket.customerId != null) {
-      // Fallback: apply the customer's default discount if ticket had none
       final customers =
           ref.read(customersStreamProvider).valueOrNull ?? [];
       try {

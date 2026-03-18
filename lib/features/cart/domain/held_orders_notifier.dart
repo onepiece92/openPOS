@@ -77,19 +77,56 @@ class HeldOrdersNotifier extends Notifier<List<HeldOrder>> {
     );
   }
 
-  /// Removes a held ticket by id.
+  /// Archives a held ticket by id.
+  void archive(String id) {
+    final ticket = state.firstWhere((t) => t.id == id);
+    final archived = ticket.copyWith(archivedAt: DateTime.now());
+    _box.put(id, jsonEncode(archived.toJson()));
+    state = _loadAll();
+  }
+
+  /// Unarchives a ticket (moves it back to active).
+  void unarchive(String id) {
+    final ticket = state.firstWhere((t) => t.id == id);
+    final restored = ticket.copyWith(clearArchived: true);
+    _box.put(id, jsonEncode(restored.toJson()));
+    state = _loadAll();
+  }
+
+  /// Permanently removes a held ticket by id.
   void delete(String id) {
     _box.delete(id);
     state = _loadAll();
   }
 
-  /// Removes all held tickets.
-  void deleteAll() {
-    _box.clear();
-    state = [];
+  /// Archives all active tickets.
+  void archiveAll() {
+    for (final ticket in state.where((t) => !t.isArchived)) {
+      final archived = ticket.copyWith(archivedAt: DateTime.now());
+      _box.put(ticket.id, jsonEncode(archived.toJson()));
+    }
+    state = _loadAll();
+  }
+
+  /// Permanently removes all archived tickets.
+  void deleteAllArchived() {
+    for (final ticket in state.where((t) => t.isArchived)) {
+      _box.delete(ticket.id);
+    }
+    state = _loadAll();
   }
 }
 
 final heldOrdersProvider =
     NotifierProvider<HeldOrdersNotifier, List<HeldOrder>>(
         HeldOrdersNotifier.new);
+
+/// Only active (non-archived) tickets.
+final activeHeldOrdersProvider = Provider<List<HeldOrder>>((ref) {
+  return ref.watch(heldOrdersProvider).where((t) => !t.isArchived).toList();
+});
+
+/// Only archived tickets.
+final archivedHeldOrdersProvider = Provider<List<HeldOrder>>((ref) {
+  return ref.watch(heldOrdersProvider).where((t) => t.isArchived).toList();
+});

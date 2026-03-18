@@ -12,6 +12,8 @@ class CustomersDao extends DatabaseAccessor<AppDatabase>
 
   Stream<List<Customer>> watchAll() => select(customers).watch();
 
+  Future<List<Customer>> getAll() => select(customers).get();
+
   Future<List<Customer>> search(String query) {
     final term = '%$query%';
     return (select(customers)

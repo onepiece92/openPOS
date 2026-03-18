@@ -440,6 +440,50 @@ class _ExpenseFormState extends ConsumerState<_ExpenseForm> {
     setState(() => _imagePath = null);
   }
 
+  // ── Add category dialog ──────────────────────────────────────────────────
+
+  Future<void> _showAddCategoryDialog() async {
+    final nameCtrl = TextEditingController();
+    final newId = await showDialog<int>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('New Category'),
+        content: TextField(
+          controller: nameCtrl,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Category name',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final name = nameCtrl.text.trim();
+              if (name.isEmpty) return;
+              final db = ref.read(databaseProvider);
+              final id = await db.expensesDao.insertCategory(
+                ExpenseCategoriesCompanion(
+                  name: Value(name),
+                ),
+              );
+              if (ctx.mounted) Navigator.pop(ctx, id);
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+    nameCtrl.dispose();
+    if (newId != null && mounted) {
+      setState(() => _categoryId = newId);
+    }
+  }
+
   // ── Save / delete ─────────────────────────────────────────────────────────
 
   Future<void> _save() async {
@@ -574,19 +618,37 @@ class _ExpenseFormState extends ConsumerState<_ExpenseForm> {
             // ── Category ─────────────────────────────────────────────────
             categoriesAsync.when(
               data: (cats) => DropdownButtonFormField<int>(
+                key: ValueKey(_categoryId),
                 initialValue: _categoryId,
                 decoration: const InputDecoration(
                   labelText: 'Category *',
                   prefixIcon: Icon(Icons.label_outline_rounded),
                   border: OutlineInputBorder(),
                 ),
-                items: cats
-                    .map((c) => DropdownMenuItem(
-                          value: c.id,
-                          child: Text(c.name),
-                        ))
-                    .toList(),
-                onChanged: (v) => setState(() => _categoryId = v),
+                items: [
+                  ...cats.map((c) => DropdownMenuItem(
+                        value: c.id,
+                        child: Text(c.name),
+                      )),
+                  DropdownMenuItem(
+                    value: -1,
+                    child: Row(
+                      children: [
+                        Icon(Icons.add_rounded, size: 18, color: cs.primary),
+                        const SizedBox(width: 8),
+                        Text('Add new category',
+                            style: TextStyle(color: cs.primary)),
+                      ],
+                    ),
+                  ),
+                ],
+                onChanged: (v) {
+                  if (v == -1) {
+                    _showAddCategoryDialog();
+                    return;
+                  }
+                  setState(() => _categoryId = v);
+                },
               ),
               loading: () => const LinearProgressIndicator(),
               error: (_, __) => const SizedBox.shrink(),

@@ -10,6 +10,7 @@ class HeldOrder {
     this.customerId,
     this.orderDiscount = 0.0,
     this.orderDiscountIsPercent = false,
+    this.archivedAt,
   });
 
   final String id;
@@ -20,6 +21,22 @@ class HeldOrder {
   final int? customerId;
   final double orderDiscount;
   final bool orderDiscountIsPercent;
+  final DateTime? archivedAt;
+
+  bool get isArchived => archivedAt != null;
+
+  HeldOrder copyWith({DateTime? archivedAt, bool clearArchived = false}) =>
+      HeldOrder(
+        id: id,
+        label: label,
+        createdAt: createdAt,
+        items: items,
+        customerName: customerName,
+        customerId: customerId,
+        orderDiscount: orderDiscount,
+        orderDiscountIsPercent: orderDiscountIsPercent,
+        archivedAt: clearArchived ? null : (archivedAt ?? this.archivedAt),
+      );
 
   int get itemCount => items.fold(0, (s, i) => s + i.quantity);
   double get subtotal => items.fold(0.0, (s, i) => s + i.lineSubtotal);
@@ -32,6 +49,7 @@ class HeldOrder {
         if (customerId != null) 'customerId': customerId,
         if (orderDiscount != 0.0) 'orderDiscount': orderDiscount,
         if (orderDiscountIsPercent) 'orderDiscountIsPercent': true,
+        if (archivedAt != null) 'archivedAt': archivedAt!.toIso8601String(),
         'items': items
             .map((i) => {
                   'productId': i.productId,
@@ -53,6 +71,9 @@ class HeldOrder {
         orderDiscount: (json['orderDiscount'] as num?)?.toDouble() ?? 0.0,
         orderDiscountIsPercent:
             json['orderDiscountIsPercent'] as bool? ?? false,
+        archivedAt: json['archivedAt'] != null
+            ? DateTime.parse(json['archivedAt'] as String)
+            : null,
         items: (json['items'] as List)
             .map((i) {
               final m = i as Map<String, dynamic>;

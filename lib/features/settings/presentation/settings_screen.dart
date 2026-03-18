@@ -62,6 +62,8 @@ class SettingsScreen extends ConsumerWidget {
           _LoyaltySection(),
           const _SectionHeader('Appearance'),
           _AppearanceSection(),
+          const _SectionHeader('Data Management'),
+          _BackupSection(),
           const _SectionHeader('Danger Zone'),
           _DangerSection(),
           const SizedBox(height: 32),
@@ -522,6 +524,24 @@ class _AppearanceSection extends ConsumerWidget {
     showModalBottomSheet(
       context: context,
       builder: (_) => _ThemePickerSheet(current: current),
+    );
+  }
+}
+
+// ── Backup & Restore ──────────────────────────────────────────────────────────
+
+class _BackupSection extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: ListTile(
+        leading: const Icon(Icons.backup_outlined),
+        title: const Text('Backup & Restore'),
+        subtitle: const Text('Export or import data via CSV'),
+        trailing: const Icon(Icons.chevron_right_rounded),
+        onTap: () => context.push('/settings/backup'),
+      ),
     );
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pos_app/core/database/app_database.dart';
@@ -77,7 +78,31 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     final salesCounts = salesCountsAsync.valueOrNull ?? {};
     final assignedCustomerId = ref.watch(cartSessionProvider).customerId;
 
-    return Scaffold(
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.keyF, meta: true): () {
+          _searchFocus.requestFocus();
+        },
+        const SingleActivator(LogicalKeyboardKey.escape): () {
+          setState(() {
+            _search = '';
+            _searchCtrl.clear();
+          });
+          _searchFocus.unfocus();
+        },
+        const SingleActivator(LogicalKeyboardKey.enter, meta: true): () {
+          if (cart.isNotEmpty) context.push('/cart');
+        },
+        const SingleActivator(LogicalKeyboardKey.keyK, meta: true): () {
+          ref.read(cartProvider.notifier).clear();
+        },
+        const SingleActivator(LogicalKeyboardKey.keyG, meta: true): () {
+          setState(() => _isGrid = !_isGrid);
+        },
+      },
+      child: Focus(
+        autofocus: true,
+        child: Scaffold(
       drawer: const PosDrawer(),
       appBar: AppBar(
         title: const Text('POS'),
@@ -306,6 +331,8 @@ class _CartScreenState extends ConsumerState<CartScreen> {
           ),
         ],
       ),
+    ),
+    ),
     );
   }
 }

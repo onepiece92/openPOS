@@ -26,6 +26,16 @@ class ExpensesDao extends DatabaseAccessor<AppDatabase>
       (update(expenses)..where((e) => e.id.equals(entry.id.value)))
           .write(entry);
 
+  Future<List<Expense>> getAll() => select(expenses).get();
+
+  Future<List<ExpenseCategory>> getAllCategories() => select(expenseCategories).get();
+
+  Future<int> insertCategory(ExpenseCategoriesCompanion entry) =>
+      into(expenseCategories).insert(entry);
+
+  Future<int> upsertCategory(ExpenseCategoriesCompanion entry) =>
+      into(expenseCategories).insertOnConflictUpdate(entry);
+
   Future<double> totalForPeriod(DateTime from, DateTime to) async {
     final result = await customSelect(
       'SELECT COALESCE(SUM(amount), 0.0) as total FROM expenses '

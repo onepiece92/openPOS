@@ -134,4 +134,23 @@ class OrdersDao extends DatabaseAccessor<AppDatabase> with _$OrdersDaoMixin {
             row.read<int>('product_id'): row.read<int>('total_sold'),
         });
   }
+
+  /// Bulk retrieval for backups.
+  Future<List<Map<String, dynamic>>> getAllOrdersWithItems() async {
+    final rows = await customSelect(
+      'SELECT '
+      'o.id as o_id, o.status, o.subtotal as o_subtotal, o.tax_total, o.discount_total as o_discount, o.total as o_total, '
+      'o.payment_method, o.tendered_amount, o.change_amount, o.customer_id, o.notes, o.created_at, '
+      'oi.id as item_id, oi.product_id, oi.product_name, oi.unit_price, oi.quantity, oi.discount as item_discount, '
+      'oi.tax_amount as item_tax, oi.line_total, '
+      'c.name as customer_name '
+      'FROM orders o '
+      'LEFT JOIN order_items oi ON o.id = oi.order_id '
+      'LEFT JOIN customers c ON o.customer_id = c.id '
+      'ORDER BY o.created_at DESC',
+      readsFrom: {orders, orderItems, customers},
+    ).get();
+
+    return rows.map((r) => r.data).toList();
+  }
 }
