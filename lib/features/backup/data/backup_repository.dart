@@ -6,8 +6,8 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
-import '../../../core/database/app_database.dart';
-import '../../../core/providers/database_provider.dart';
+import 'package:pos_app/core/database/app_database.dart';
+import 'package:pos_app/core/providers/database_provider.dart';
 
 final backupRepositoryProvider = Provider((ref) {
   final db = ref.watch(databaseProvider);
@@ -30,8 +30,15 @@ class BackupRepository {
 
     final List<List<dynamic>> rows = [
       [
-        'SKU', 'Name', 'Price', 'Category', 'Stock', 'Is Taxable', 'Tax Rates',
-        'Is Hidden', 'Is Composite'
+        'SKU',
+        'Name',
+        'Price',
+        'Category',
+        'Stock',
+        'Is Taxable',
+        'Tax Rates',
+        'Is Hidden',
+        'Is Composite'
       ],
     ];
 
@@ -87,20 +94,26 @@ class BackupRepository {
         final name = row[nameIdx].toString();
         final price = double.tryParse(row[priceIdx].toString()) ?? 0.0;
         final catName = catIdx != -1 ? row[catIdx].toString() : 'Uncategorized';
-        final stock = stockIdx != -1 ? int.tryParse(row[stockIdx].toString()) ?? 0 : 0;
+        final stock =
+            stockIdx != -1 ? int.tryParse(row[stockIdx].toString()) ?? 0 : 0;
         final isTaxable = taxableIdx != -1 ? _parseBool(row[taxableIdx]) : true;
-        final taxNames = taxesIdx != -1 ? row[taxesIdx].toString().split('|') : <String>[];
+        final taxNames =
+            taxesIdx != -1 ? row[taxesIdx].toString().split('|') : <String>[];
         final isHidden = hiddenIdx != -1 ? _parseBool(row[hiddenIdx]) : false;
-        final isComposite = compositeIdx != -1 ? _parseBool(row[compositeIdx]) : false;
+        final isComposite =
+            compositeIdx != -1 ? _parseBool(row[compositeIdx]) : false;
 
         // 1. Handle Category
         int? catId;
         if (catName.isNotEmpty && catName != 'Uncategorized') {
-          final existingCat = await (_db.select(_db.categories)..where((c) => c.name.equals(catName))).getSingleOrNull();
+          final existingCat = await (_db.select(_db.categories)
+                ..where((c) => c.name.equals(catName)))
+              .getSingleOrNull();
           if (existingCat != null) {
             catId = existingCat.id;
           } else {
-            catId = await _db.productsDao.upsertCategory(CategoriesCompanion.insert(name: catName));
+            catId = await _db.productsDao
+                .upsertCategory(CategoriesCompanion.insert(name: catName));
           }
         }
 
@@ -122,7 +135,9 @@ class BackupRepository {
           final taxIds = <int>[];
           for (final tName in taxNames) {
             if (tName.trim().isEmpty) continue;
-            final existingTax = await (_db.select(_db.taxRates)..where((t) => t.name.equals(tName.trim()))).getSingleOrNull();
+            final existingTax = await (_db.select(_db.taxRates)
+                  ..where((t) => t.name.equals(tName.trim())))
+                .getSingleOrNull();
             if (existingTax != null) {
               taxIds.add(existingTax.id);
             }
@@ -185,7 +200,9 @@ class BackupRepository {
 
         final phone = phoneIdx != -1 ? row[phoneIdx].toString() : null;
         final email = emailIdx != -1 ? row[emailIdx].toString() : null;
-        final points = pointsIdx != -1 ? (double.tryParse(row[pointsIdx].toString()) ?? 0.0).toInt() : 0;
+        final points = pointsIdx != -1
+            ? (double.tryParse(row[pointsIdx].toString()) ?? 0.0).toInt()
+            : 0;
         final isExempt = exemptIdx != -1 ? _parseBool(row[exemptIdx]) : false;
 
         await _db.customersDao.upsert(CustomersCompanion.insert(
@@ -209,7 +226,16 @@ class BackupRepository {
     final categoryMap = {for (var c in categories) c.id: c.name};
 
     final List<List<dynamic>> rows = [
-      ['Amount', 'Date', 'Category', 'Notes', 'Is Recurring', 'Frequency', 'Tax Deductible', 'Status'],
+      [
+        'Amount',
+        'Date',
+        'Category',
+        'Notes',
+        'Is Recurring',
+        'Frequency',
+        'Tax Deductible',
+        'Status'
+      ],
     ];
 
     for (final e in expenses) {
@@ -256,7 +282,8 @@ class BackupRepository {
         if (row.length < 2) continue;
 
         final amount = double.tryParse(row[amountIdx].toString()) ?? 0.0;
-        final date = DateTime.tryParse(row[dateIdx].toString()) ?? DateTime.now();
+        final date =
+            DateTime.tryParse(row[dateIdx].toString()) ?? DateTime.now();
         final catName = catIdx != -1 ? row[catIdx].toString() : 'General';
         final notes = notesIdx != -1 ? row[notesIdx].toString() : null;
         final isRecurring = recurIdx != -1 ? _parseBool(row[recurIdx]) : false;
@@ -266,11 +293,14 @@ class BackupRepository {
 
         // 1. Handle Category
         int catId;
-        final existingCat = await (_db.select(_db.expenseCategories)..where((c) => c.name.equals(catName))).getSingleOrNull();
+        final existingCat = await (_db.select(_db.expenseCategories)
+              ..where((c) => c.name.equals(catName)))
+            .getSingleOrNull();
         if (existingCat != null) {
           catId = existingCat.id;
         } else {
-          catId = await _db.expensesDao.upsertCategory(ExpenseCategoriesCompanion.insert(name: catName));
+          catId = await _db.expensesDao
+              .upsertCategory(ExpenseCategoriesCompanion.insert(name: catName));
         }
 
         // 2. Insert Expense (ID is auto-inc, so this is always a new record)
@@ -298,10 +328,26 @@ class BackupRepository {
     final data = await _db.ordersDao.getAllOrdersWithItems();
     final List<List<dynamic>> rows = [
       [
-        'Order ID', 'Status', 'Subtotal', 'Tax Total', 'Discount', 'Total',
-        'Payment Method', 'Tendered', 'Change', 'Customer Name', 'Notes', 'Created At',
-        'Item Product ID', 'Item Name', 'Item SKU', 'Item Price', 'Item Qty', 'Item Discount',
-        'Item Tax', 'Item Total'
+        'Order ID',
+        'Status',
+        'Subtotal',
+        'Tax Total',
+        'Discount',
+        'Total',
+        'Payment Method',
+        'Tendered',
+        'Change',
+        'Customer Name',
+        'Notes',
+        'Created At',
+        'Item Product ID',
+        'Item Name',
+        'Item SKU',
+        'Item Price',
+        'Item Qty',
+        'Item Discount',
+        'Item Tax',
+        'Item Total'
       ],
     ];
 
@@ -309,32 +355,35 @@ class BackupRepository {
       // Get SKU if possible (though we have name as snapshot)
       // Note: productId might be null if product was deleted but order remains
       String sku = '';
-      if (row['product_id'] != null) {
-        final p = await (_db.select(_db.products)..where((p) => p.id.equals(row['product_id'] as int))).getSingleOrNull();
+      final productId = row.read<int?>('product_id');
+      if (productId != null) {
+        final p = await (_db.select(_db.products)
+              ..where((p) => p.id.equals(productId)))
+            .getSingleOrNull();
         sku = p?.sku ?? '';
       }
 
       rows.add([
-        row['o_id'],
-        row['status'],
-        row['o_subtotal'],
-        row['tax_total'],
-        row['o_discount'],
-        row['o_total'],
-        row['payment_method'],
-        row['tendered_amount'] ?? 0.0,
-        row['change_amount'] ?? 0.0,
-        row['customer_name'] ?? '',
-        row['notes'] ?? '',
-        (row['created_at'] as DateTime).toIso8601String(),
-        row['product_id'] ?? '',
-        row['product_name'] ?? '',
+        row.read<int>('o_id'),
+        row.read<String>('status'),
+        row.read<double>('o_subtotal'),
+        row.read<double>('tax_total'),
+        row.read<double>('o_discount'),
+        row.read<double>('o_total'),
+        row.read<String>('payment_method'),
+        row.read<double?>('tendered_amount') ?? 0.0,
+        row.read<double?>('change_amount') ?? 0.0,
+        row.read<String?>('customer_name') ?? '',
+        row.read<String?>('notes') ?? '',
+        row.read<DateTime>('created_at').toIso8601String(),
+        productId ?? '',
+        row.read<String?>('product_name') ?? '',
         sku,
-        row['unit_price'] ?? 0.0,
-        row['quantity'] ?? 0,
-        row['item_discount'] ?? 0.0,
-        row['item_tax'] ?? 0.0,
-        row['line_total'] ?? 0.0,
+        row.read<double?>('unit_price') ?? 0.0,
+        row.read<int?>('quantity') ?? 0,
+        row.read<double?>('item_discount') ?? 0.0,
+        row.read<double?>('item_tax') ?? 0.0,
+        row.read<double?>('line_total') ?? 0.0,
       ]);
     }
 
@@ -355,7 +404,7 @@ class BackupRepository {
     final methodIdx = header.indexOf('payment method');
     final customerIdx = header.indexOf('customer name');
     final dateIdx = header.indexOf('created at');
-    
+
     final itemNameIdx = header.indexOf('item name');
     final itemSkuIdx = header.indexOf('item sku');
     final itemPriceIdx = header.indexOf('item price');
@@ -363,7 +412,8 @@ class BackupRepository {
     final itemTotalIdx = header.indexOf('item total');
 
     if (oIdIdx == -1 || dateIdx == -1 || itemNameIdx == -1) {
-      throw Exception('Format invalid. Missing required columns (Order ID, Created At, Item Name)');
+      throw Exception(
+          'Format invalid. Missing required columns (Order ID, Created At, Item Name)');
     }
 
     // Group rows by Order ID to reconstruct orders
@@ -384,23 +434,36 @@ class BackupRepository {
         int? customerId;
         final cName = first[customerIdx].toString();
         if (cName.isNotEmpty) {
-          final existing = await (_db.select(_db.customers)..where((c) => c.name.equals(cName))).getSingleOrNull();
+          final existing = await (_db.select(_db.customers)
+                ..where((c) => c.name.equals(cName)))
+              .getSingleOrNull();
           customerId = existing?.id;
         }
 
         // 2. Insert Order
         final orderId = await _db.ordersDao.insertOrder(OrdersCompanion.insert(
           status: Value(first[statusIdx].toString()),
-          subtotal: double.tryParse(first[header.indexOf('subtotal')].toString()) ?? 0.0,
-          taxTotal: Value(double.tryParse(first[header.indexOf('tax total')].toString()) ?? 0.0),
-          discountTotal: Value(double.tryParse(first[header.indexOf('discount')].toString()) ?? 0.0),
+          subtotal:
+              double.tryParse(first[header.indexOf('subtotal')].toString()) ??
+                  0.0,
+          taxTotal: Value(
+              double.tryParse(first[header.indexOf('tax total')].toString()) ??
+                  0.0),
+          discountTotal: Value(
+              double.tryParse(first[header.indexOf('discount')].toString()) ??
+                  0.0),
           total: double.tryParse(first[totalIdx].toString()) ?? 0.0,
           paymentMethod: first[methodIdx].toString(),
-          tenderedAmount: Value(double.tryParse(first[header.indexOf('tendered')].toString()) ?? 0.0),
-          changeAmount: Value(double.tryParse(first[header.indexOf('change')].toString()) ?? 0.0),
+          tenderedAmount: Value(
+              double.tryParse(first[header.indexOf('tendered')].toString()) ??
+                  0.0),
+          changeAmount: Value(
+              double.tryParse(first[header.indexOf('change')].toString()) ??
+                  0.0),
           customerId: Value(customerId),
           notes: Value(first[header.indexOf('notes')].toString()),
-          createdAt: Value(DateTime.tryParse(first[dateIdx].toString()) ?? DateTime.now()),
+          createdAt: Value(
+              DateTime.tryParse(first[dateIdx].toString()) ?? DateTime.now()),
         ));
 
         // 3. Insert Items
@@ -410,26 +473,35 @@ class BackupRepository {
           int? productId;
           final sku = row[itemSkuIdx].toString();
           final name = row[itemNameIdx].toString();
-          
+
           if (sku.isNotEmpty) {
-            final p = await (_db.select(_db.products)..where((p) => p.sku.equals(sku))).getSingleOrNull();
+            final p = await (_db.select(_db.products)
+                  ..where((p) => p.sku.equals(sku)))
+                .getSingleOrNull();
             productId = p?.id;
           }
           if (productId == null && name.isNotEmpty) {
-            final p = await (_db.select(_db.products)..where((p) => p.name.equals(name))).getSingleOrNull();
+            final p = await (_db.select(_db.products)
+                  ..where((p) => p.name.equals(name)))
+                .getSingleOrNull();
             productId = p?.id;
           }
 
-          if (productId == null) continue; // Skip if product doesn't exist? Or allow null?
-          
+          if (productId == null)
+            continue; // Skip if product doesn't exist? Or allow null?
+
           items.add(OrderItemsCompanion.insert(
             orderId: orderId,
             productId: productId,
             productName: name,
             unitPrice: double.tryParse(row[itemPriceIdx].toString()) ?? 0.0,
             quantity: int.tryParse(row[itemQtyIdx].toString()) ?? 1,
-            discount: Value(double.tryParse(row[header.indexOf('item discount')].toString()) ?? 0.0),
-            taxAmount: Value(double.tryParse(row[header.indexOf('item tax')].toString()) ?? 0.0),
+            discount: Value(double.tryParse(
+                    row[header.indexOf('item discount')].toString()) ??
+                0.0),
+            taxAmount: Value(
+                double.tryParse(row[header.indexOf('item tax')].toString()) ??
+                    0.0),
             lineTotal: double.tryParse(row[itemTotalIdx].toString()) ?? 0.0,
           ));
         }
@@ -449,20 +521,30 @@ class BackupRepository {
   Future<void> exportSalesReport() async {
     final data = await _db.ordersDao.getAllOrdersWithItems();
     final List<List<dynamic>> rows = [
-      ['Date', 'Order ID', 'Item', 'Qty', 'Unit Price', 'Line Total', 'Payment', 'Customer', 'Status'],
+      [
+        'Date',
+        'Order ID',
+        'Item',
+        'Qty',
+        'Unit Price',
+        'Line Total',
+        'Payment',
+        'Customer',
+        'Status'
+      ],
     ];
 
     for (final row in data) {
       rows.add([
-        (row['created_at'] as DateTime).toIso8601String().split('T')[0],
-        row['o_id'],
-        row['product_name'],
-        row['quantity'],
-        row['unit_price'],
-        row['line_total'],
-        row['payment_method'],
-        row['customer_name'] ?? 'Walk-in',
-        row['status'],
+        row.read<DateTime>('created_at').toIso8601String().split('T')[0],
+        row.read<int>('o_id'),
+        row.read<String?>('product_name') ?? 'Unknown',
+        row.read<int?>('quantity') ?? 0,
+        row.read<double?>('unit_price') ?? 0.0,
+        row.read<double?>('line_total') ?? 0.0,
+        row.read<String>('payment_method'),
+        row.read<String?>('customer_name') ?? 'Walk-in',
+        row.read<String>('status'),
       ]);
     }
 

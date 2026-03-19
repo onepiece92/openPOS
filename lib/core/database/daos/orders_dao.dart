@@ -136,8 +136,8 @@ class OrdersDao extends DatabaseAccessor<AppDatabase> with _$OrdersDaoMixin {
   }
 
   /// Bulk retrieval for backups.
-  Future<List<Map<String, dynamic>>> getAllOrdersWithItems() async {
-    final rows = await customSelect(
+  Future<List<QueryRow>> getAllOrdersWithItems() async {
+    return customSelect(
       'SELECT '
       'o.id as o_id, o.status, o.subtotal as o_subtotal, o.tax_total, o.discount_total as o_discount, o.total as o_total, '
       'o.payment_method, o.tendered_amount, o.change_amount, o.customer_id, o.notes, o.created_at, '
@@ -150,7 +150,5 @@ class OrdersDao extends DatabaseAccessor<AppDatabase> with _$OrdersDaoMixin {
       'ORDER BY o.created_at DESC',
       readsFrom: {orders, orderItems, customers},
     ).get();
-
-    return rows.map((r) => r.data).toList();
   }
 }
