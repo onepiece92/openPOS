@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Pos App</string>
+	<string>Open POS (Free &amp; Offline)</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -13,7 +13,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>pos_app</string>
+	<string>Open POS (Free &amp; Offline)</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -48,6 +48,25 @@
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>whatsapp</string>
+	</array>
+	<!-- Camera (mobile_scanner, image_picker) -->
+	<key>NSCameraUsageDescription</key>
+	<string>This app uses the camera to scan barcodes and take product photos.</string>
+	<!-- Photo Library (image_picker) -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app accesses the photo library to select product images.</string>
+	<!-- Bluetooth (flutter_thermal_printer) -->
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>This app uses Bluetooth to connect to thermal receipt printers.</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>This app uses Bluetooth to connect to thermal receipt printers.</string>
+	<!-- Local Network (flutter_thermal_printer network printers) -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>This app uses the local network to discover and connect to network printers.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_ipp._tcp</string>
+		<string>_printer._tcp</string>
 	</array>
 </dict>
 </plist>

@@ -1,11 +1,11 @@
 name: pos_app
 description: Offline-first Flutter POS — single-user, works fully without internet.
-publish_to: 'none'
-version: 1.0.0+1
+publish_to: "none"
+version: 1.0.0+2
 
 environment:
-  sdk: '>=3.3.0 <4.0.0'
-  flutter: '>=3.22.0'
+  sdk: ">=3.3.0 <4.0.0"
+  flutter: ">=3.22.0"
 
 dependencies:
   flutter:
@@ -46,7 +46,7 @@ dependencies:
   flutter_svg: ^2.0.10+1
 
   # ── Background Tasks ─────────────────────────────────────────────────
-  workmanager: ^0.5.2
+  workmanager: ^0.6.0
   flutter_local_notifications: ^17.2.3
 
   # ── File System & Export ──────────────────────────────────────────────
@@ -67,7 +67,7 @@ dependencies:
   google_fonts: ^6.2.1
   collection: ^1.18.0
   decimal: ^2.3.3
-  file_picker: ^6.1.1
+  file_picker: ^8.0.0
 
 dev_dependencies:
   flutter_test:
@@ -79,11 +79,22 @@ dev_dependencies:
   drift_dev: ^2.20.3
   freezed: ^2.5.7
   json_serializable: ^6.8.0
+  flutter_launcher_icons: ^0.14.4
   # riverpod_generator omitted — providers written manually (no @riverpod needed)
 
   # ── Linting (re-enable once custom_lint supports analyzer ^7.x) ───────
   # custom_lint: ^0.7.3
   # riverpod_lint: ^2.6.1
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  web:
+    generate: true
+    image_path: "assets/images/logo.jpg"
+  image_path: "assets/images/logo.jpg"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/images/logo.jpg"
 
 flutter:
   uses-material-design: true

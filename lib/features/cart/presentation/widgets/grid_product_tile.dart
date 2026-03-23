@@ -74,30 +74,32 @@ class GridProductTile extends StatelessWidget {
                 ),
               ],
             ),
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(10),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // ── Name ────────────────────────────────────────────────
-                Text(
-                  product.name,
-                  style: tt.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: outOfStock
-                        ? cs.onSurface.withValues(alpha: 0.3)
-                        : cs.onSurface,
-                    height: 1.2,
+                Expanded(
+                  child: Text(
+                    product.name,
+                    style: tt.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: outOfStock
+                          ? cs.onSurface.withValues(alpha: 0.3)
+                          : cs.onSurface,
+                      height: 1.2,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                 ),
-                const Spacer(),
+                const SizedBox(height: 4),
                 // ── Price ───────────────────────────────────────────────
                 Text(
                   outOfStock
                       ? 'Out of stock'
                       : '$currencySymbol ${product.price.toStringAsFixed(2)}',
-                  style: tt.bodyMedium?.copyWith(
+                  style: tt.bodySmall?.copyWith(
                     fontWeight: FontWeight.w500,
                     color: outOfStock
                         ? cs.error.withValues(alpha: 0.6)
@@ -106,12 +108,12 @@ class GridProductTile extends StatelessWidget {
                 ),
                 // ── Stepper row (in-cart only) ───────────────────────────
                 if (inCart) ...[
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 6),
                   Row(
                     children: [
                       Text(
                         'x$qtyInCart',
-                        style: tt.labelLarge?.copyWith(
+                        style: tt.labelSmall?.copyWith(
                           fontWeight: FontWeight.w700,
                           color: cs.onSurface,
                         ),
@@ -125,7 +127,7 @@ class GridProductTile extends StatelessWidget {
                         isDestructive: qtyInCart == 1,
                         cs: cs,
                       ),
-                      const SizedBox(width: 6),
+                      const SizedBox(width: 4),
                       _StepBtn(
                         icon: Icons.add_rounded,
                         onTap: onIncrement,
@@ -187,17 +189,17 @@ class _StepBtn extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 30,
-        height: 30,
+        width: 26,
+        height: 26,
         decoration: BoxDecoration(
           color: isDestructive
               ? cs.errorContainer.withValues(alpha: 0.6)
               : cs.onSurface.withValues(alpha: 0.10),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(7),
         ),
         child: Icon(
           icon,
-          size: 16,
+          size: 14,
           color: isDestructive ? cs.error : cs.onSurface,
         ),
       ),

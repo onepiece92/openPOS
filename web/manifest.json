@@ -1,6 +1,6 @@
 {
-    "name": "pos_app",
-    "short_name": "pos_app",
+    "name": "Open POS : Offline",
+    "short_name": "Open POS",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

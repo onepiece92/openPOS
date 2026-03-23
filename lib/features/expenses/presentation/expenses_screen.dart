@@ -1,12 +1,14 @@
 import 'dart:io';
 
 import 'package:drift/drift.dart' show Value;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:pos_app/core/database/app_database.dart';
@@ -406,6 +408,26 @@ class _ExpenseFormState extends ConsumerState<_ExpenseForm> {
   }
 
   Future<void> _pickImage(ImageSource source) async {
+    if (!kIsWeb) {
+      final permission =
+          source == ImageSource.camera ? Permission.camera : Permission.photos;
+      final status = await permission.request();
+      if (!status.isGranted) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                  '${source == ImageSource.camera ? 'Camera' : 'Photo library'} permission denied'),
+              action: SnackBarAction(
+                label: 'Settings',
+                onPressed: openAppSettings,
+              ),
+            ),
+          );
+        }
+        return;
+      }
+    }
     final picker = ImagePicker();
     final xFile = await picker.pickImage(
       source: source,

@@ -53,7 +53,7 @@ class POSApp extends ConsumerWidget {
     final router = ref.watch(routerProvider);
 
     return MaterialApp.router(
-      title: 'Rebuzz POS',
+      title: 'Open POS : Offline',
       debugShowCheckedModeBanner: false,
       themeMode: themeMode,
       theme: AppTheme.light(),
@@ -66,26 +66,25 @@ class POSApp extends ConsumerWidget {
           ),
           child: CallbackShortcuts(
             bindings: {
-              const SingleActivator(LogicalKeyboardKey.keyH, meta: true):
-                  () => router.go('/pos'),
-              const SingleActivator(LogicalKeyboardKey.keyP, meta: true):
-                  () => router.go('/pos'),
-              const SingleActivator(LogicalKeyboardKey.keyO, meta: true):
-                  () => router.go('/orders'),
-              const SingleActivator(LogicalKeyboardKey.keyU, meta: true):
-                  () => router.go('/customers'),
-              const SingleActivator(LogicalKeyboardKey.keyE, meta: true):
-                  () => router.go('/expenses'),
-              const SingleActivator(LogicalKeyboardKey.comma, meta: true):
-                  () => router.go('/settings'),
-              const SingleActivator(LogicalKeyboardKey.keyN, meta: true):
-                  () => router.push('/products/add'),
-              const SingleActivator(LogicalKeyboardKey.keyW, meta: true):
-                  () {
+              const SingleActivator(LogicalKeyboardKey.keyH, meta: true): () =>
+                  router.go('/pos'),
+              const SingleActivator(LogicalKeyboardKey.keyP, meta: true): () =>
+                  router.go('/pos'),
+              const SingleActivator(LogicalKeyboardKey.keyO, meta: true): () =>
+                  router.go('/orders'),
+              const SingleActivator(LogicalKeyboardKey.keyU, meta: true): () =>
+                  router.go('/customers'),
+              const SingleActivator(LogicalKeyboardKey.keyE, meta: true): () =>
+                  router.go('/expenses'),
+              const SingleActivator(LogicalKeyboardKey.comma, meta: true): () =>
+                  router.go('/settings'),
+              const SingleActivator(LogicalKeyboardKey.keyN, meta: true): () =>
+                  router.push('/products/add'),
+              const SingleActivator(LogicalKeyboardKey.keyW, meta: true): () {
                 if (router.canPop()) router.pop();
               },
             },
-            child: Focus(autofocus: true, child: child!),
+            child: child!,
           ),
         );
       },
@@ -137,8 +136,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         routes: [
           GoRoute(
             path: 'add',
-            pageBuilder: (_, state) =>
-                _slide(state, const ProductFormScreen()),
+            pageBuilder: (_, state) => _slide(state, const ProductFormScreen()),
           ),
           GoRoute(
             path: ':id',
@@ -211,8 +209,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/theme/preview',
-        pageBuilder: (_, state) =>
-            _slide(state, const ThemePreviewScreen()),
+        pageBuilder: (_, state) => _slide(state, const ThemePreviewScreen()),
       ),
       GoRoute(
         path: '/help/support',
