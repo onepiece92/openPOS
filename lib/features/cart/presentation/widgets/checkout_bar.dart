@@ -25,6 +25,7 @@ class CheckoutBar extends ConsumerWidget {
     final symbol = ref.watch(currencySymbolProvider);
     final tt = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
+    final assignedCustomerId = ref.watch(cartSessionProvider).customerId;
 
     final bottomInset = MediaQuery.of(context).padding.bottom;
 
@@ -49,6 +50,32 @@ class CheckoutBar extends ConsumerWidget {
                 ),
               ),
               const SizedBox(width: 10),
+              // ── Customer button ────────────────────────────────────────
+              SizedBox(
+                height: 56,
+                width: 56,
+                child: Tooltip(
+                  message: assignedCustomerId != null
+                      ? 'Customer assigned'
+                      : 'Assign customer',
+                  child: OutlinedButton(
+                    onPressed: () => context.push('/customers'),
+                    style: OutlinedButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      side: assignedCustomerId != null
+                          ? BorderSide(color: cs.primary, width: 2)
+                          : null,
+                    ),
+                    child: Icon(
+                      assignedCustomerId != null
+                          ? Icons.person_rounded
+                          : Icons.person_outline_rounded,
+                      color: assignedCustomerId != null ? cs.primary : null,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
               // ── Checkout CTA ───────────────────────────────────────────
               Expanded(
                 child: SizedBox(
@@ -57,14 +84,15 @@ class CheckoutBar extends ConsumerWidget {
                     onPressed: () => context.push('/cart'),
                     style: AppTheme.ctaButtonStyle(cs),
                     child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Expanded(
-                          child: Text(
-                            'Checkout  ·  $itemCount ${itemCount == 1 ? 'item' : 'items'}',
-                            style: tt.titleSmall?.copyWith(
-                              color: cs.onPrimary,
-                              fontWeight: FontWeight.w700,
-                            ),
+                        Icon(Icons.shopping_cart_checkout_rounded,
+                            color: cs.onPrimary),
+                        Text(
+                          '$itemCount',
+                          style: tt.titleSmall?.copyWith(
+                            color: cs.onPrimary.withValues(alpha: 0.8),
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                         Container(

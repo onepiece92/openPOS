@@ -1,7 +1,7 @@
 name: pos_app
 description: Offline-first Flutter POS — single-user, works fully without internet.
 publish_to: "none"
-version: 1.0.0+2
+version: 1.0.0+1
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
@@ -38,7 +38,6 @@ dependencies:
   printing: ^5.13.2
 
   # ── Barcode & QR ─────────────────────────────────────────────────────
-  mobile_scanner: ^5.2.3
   qr_flutter: ^4.1.0
 
   # ── Camera & Images ───────────────────────────────────────────────────

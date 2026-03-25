@@ -592,175 +592,177 @@ class _ExpenseFormState extends ConsumerState<_ExpenseForm> {
       ),
       child: Form(
         key: _formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // ── Header ───────────────────────────────────────────────────
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    _isEdit ? 'Edit Expense' : 'New Expense',
-                    style: Theme.of(context).textTheme.titleLarge,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // ── Header ───────────────────────────────────────────────────
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _isEdit ? 'Edit Expense' : 'New Expense',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
                   ),
-                ),
-                if (_isEdit)
-                  IconButton(
-                    icon: Icon(Icons.delete_outline_rounded, color: cs.error),
-                    onPressed: _delete,
-                    tooltip: 'Delete',
-                  ),
-              ],
-            ),
-            const SizedBox(height: 20),
-
-            // ── Amount ───────────────────────────────────────────────────
-            TextFormField(
-              controller: _amountCtrl,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
-              ],
-              autofocus: !_isEdit,
-              decoration: const InputDecoration(
-                labelText: 'Amount *',
-                prefixIcon: Icon(Icons.attach_money_rounded),
-                border: OutlineInputBorder(),
+                  if (_isEdit)
+                    IconButton(
+                      icon: Icon(Icons.delete_outline_rounded, color: cs.error),
+                      onPressed: _delete,
+                      tooltip: 'Delete',
+                    ),
+                ],
               ),
-              validator: (v) {
-                if (v == null || v.isEmpty) return 'Amount is required';
-                if (double.tryParse(v) == null) return 'Enter a valid amount';
-                return null;
-              },
-            ),
-            const SizedBox(height: 14),
+              const SizedBox(height: 20),
 
-            // ── Category ─────────────────────────────────────────────────
-            categoriesAsync.when(
-              data: (cats) => DropdownButtonFormField<int>(
-                key: ValueKey(_categoryId),
-                initialValue: _categoryId,
+              // ── Amount ───────────────────────────────────────────────────
+              TextFormField(
+                controller: _amountCtrl,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                ],
+                autofocus: !_isEdit,
                 decoration: const InputDecoration(
-                  labelText: 'Category *',
-                  prefixIcon: Icon(Icons.label_outline_rounded),
+                  labelText: 'Amount *',
+                  prefixIcon: Icon(Icons.attach_money_rounded),
                   border: OutlineInputBorder(),
                 ),
-                items: [
-                  ...cats.map((c) => DropdownMenuItem(
-                        value: c.id,
-                        child: Text(c.name),
-                      )),
-                  DropdownMenuItem(
-                    value: -1,
-                    child: Row(
-                      children: [
-                        Icon(Icons.add_rounded, size: 18, color: cs.primary),
-                        const SizedBox(width: 8),
-                        Text('Add new category',
-                            style: TextStyle(color: cs.primary)),
-                      ],
-                    ),
-                  ),
-                ],
-                onChanged: (v) {
-                  if (v == -1) {
-                    _showAddCategoryDialog();
-                    return;
-                  }
-                  setState(() => _categoryId = v);
+                validator: (v) {
+                  if (v == null || v.isEmpty) return 'Amount is required';
+                  if (double.tryParse(v) == null) return 'Enter a valid amount';
+                  return null;
                 },
               ),
-              loading: () => const LinearProgressIndicator(),
-              error: (_, __) => const SizedBox.shrink(),
-            ),
-            const SizedBox(height: 14),
+              const SizedBox(height: 14),
 
-            // ── Date ─────────────────────────────────────────────────────
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.calendar_today_outlined),
-              title: const Text('Date'),
-              subtitle: Text(DateFormat('d MMM y').format(_date)),
-              trailing: const Icon(Icons.chevron_right_rounded),
-              onTap: _pickDate,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-                side: BorderSide(color: cs.outline),
-              ),
-            ),
-            const SizedBox(height: 14),
-
-            // ── Notes ────────────────────────────────────────────────────
-            TextFormField(
-              controller: _notesCtrl,
-              maxLines: 2,
-              decoration: const InputDecoration(
-                labelText: 'Notes (optional)',
-                prefixIcon: Icon(Icons.notes_rounded),
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 14),
-
-            // ── Receipt photo ────────────────────────────────────────────
-            if (_imagePath != null && File(_imagePath!).existsSync())
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.file(
-                      File(_imagePath!),
-                      height: 160,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                    ),
+              // ── Category ─────────────────────────────────────────────────
+              categoriesAsync.when(
+                data: (cats) => DropdownButtonFormField<int>(
+                  key: ValueKey(_categoryId),
+                  initialValue: _categoryId,
+                  decoration: const InputDecoration(
+                    labelText: 'Category *',
+                    prefixIcon: Icon(Icons.label_outline_rounded),
+                    border: OutlineInputBorder(),
                   ),
-                  Positioned(
-                    top: -8,
-                    right: -8,
-                    child: GestureDetector(
-                      onTap: _removeImage,
-                      child: Container(
-                        padding: const EdgeInsets.all(5),
-                        decoration: BoxDecoration(
-                          color: cs.error,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(Icons.close_rounded,
-                            size: 14, color: cs.onError),
+                  items: [
+                    ...cats.map((c) => DropdownMenuItem(
+                          value: c.id,
+                          child: Text(c.name),
+                        )),
+                    DropdownMenuItem(
+                      value: -1,
+                      child: Row(
+                        children: [
+                          Icon(Icons.add_rounded, size: 18, color: cs.primary),
+                          const SizedBox(width: 8),
+                          Text('Add new category',
+                              style: TextStyle(color: cs.primary)),
+                        ],
                       ),
                     ),
-                  ),
-                ],
-              )
-            else
-              // shape/textStyle/side inherited from outlinedButtonTheme
-              OutlinedButton.icon(
-                onPressed: _showImageSourceSheet,
-                icon: const Icon(Icons.add_photo_alternate_outlined),
-                label: const Text('Add Receipt Photo'),
+                  ],
+                  onChanged: (v) {
+                    if (v == -1) {
+                      _showAddCategoryDialog();
+                      return;
+                    }
+                    setState(() => _categoryId = v);
+                  },
+                ),
+                loading: () => const LinearProgressIndicator(),
+                error: (_, __) => const SizedBox.shrink(),
               ),
-            const SizedBox(height: 24),
+              const SizedBox(height: 14),
 
-            // ── Save ─────────────────────────────────────────────────────
-            SizedBox(
-              height: 56,
-              child: FilledButton(
-                onPressed: _loading ? null : _save,
-                style: AppTheme.ctaButtonStyle(cs),
-                child: _loading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Text(_isEdit ? 'Save Changes' : 'Add Expense'),
+              // ── Date ─────────────────────────────────────────────────────
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.calendar_today_outlined),
+                title: const Text('Date'),
+                subtitle: Text(DateFormat('d MMM y').format(_date)),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: _pickDate,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  side: BorderSide(color: cs.outline),
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 14),
+
+              // ── Notes ────────────────────────────────────────────────────
+              TextFormField(
+                controller: _notesCtrl,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: 'Notes (optional)',
+                  prefixIcon: Icon(Icons.notes_rounded),
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // ── Receipt photo ────────────────────────────────────────────
+              if (_imagePath != null && File(_imagePath!).existsSync())
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.file(
+                        File(_imagePath!),
+                        height: 160,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                    Positioned(
+                      top: -8,
+                      right: -8,
+                      child: GestureDetector(
+                        onTap: _removeImage,
+                        child: Container(
+                          padding: const EdgeInsets.all(5),
+                          decoration: BoxDecoration(
+                            color: cs.error,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(Icons.close_rounded,
+                              size: 14, color: cs.onError),
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              else
+                // shape/textStyle/side inherited from outlinedButtonTheme
+                OutlinedButton.icon(
+                  onPressed: _showImageSourceSheet,
+                  icon: const Icon(Icons.add_photo_alternate_outlined),
+                  label: const Text('Add Receipt Photo'),
+                ),
+              const SizedBox(height: 24),
+
+              // ── Save ─────────────────────────────────────────────────────
+              SizedBox(
+                height: 56,
+                child: FilledButton(
+                  onPressed: _loading ? null : _save,
+                  style: AppTheme.ctaButtonStyle(cs),
+                  child: _loading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text(_isEdit ? 'Save Changes' : 'Add Expense'),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

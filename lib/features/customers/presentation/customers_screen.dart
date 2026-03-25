@@ -491,125 +491,127 @@ class _CustomerFormState extends ConsumerState<_CustomerForm> {
       ),
       child: Form(
         key: _formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    _isEdit ? 'Edit Customer' : 'New Customer',
-                    style: tt.titleLarge,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _isEdit ? 'Edit Customer' : 'New Customer',
+                      style: tt.titleLarge,
+                    ),
                   ),
+                  if (_isEdit)
+                    IconButton(
+                      icon: Icon(Icons.delete_outline_rounded, color: cs.error),
+                      onPressed: _delete,
+                      tooltip: 'Delete',
+                    ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              TextFormField(
+                controller: _nameCtrl,
+                textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(
+                  labelText: 'Name *',
+                  prefixIcon: Icon(Icons.person_outline_rounded),
+                  border: OutlineInputBorder(),
                 ),
-                if (_isEdit)
-                  IconButton(
-                    icon: Icon(Icons.delete_outline_rounded, color: cs.error),
-                    onPressed: _delete,
-                    tooltip: 'Delete',
-                  ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            TextFormField(
-              controller: _nameCtrl,
-              textCapitalization: TextCapitalization.words,
-              decoration: const InputDecoration(
-                labelText: 'Name *',
-                prefixIcon: Icon(Icons.person_outline_rounded),
-                border: OutlineInputBorder(),
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? 'Name is required' : null,
               ),
-              validator: (v) =>
-                  (v == null || v.trim().isEmpty) ? 'Name is required' : null,
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _phoneCtrl,
-              keyboardType: TextInputType.phone,
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'[0-9+\-\s()]'))
-              ],
-              decoration: const InputDecoration(
-                labelText: 'Phone',
-                prefixIcon: Icon(Icons.phone_outlined),
-                border: OutlineInputBorder(),
+              const SizedBox(height: 14),
+              TextFormField(
+                controller: _phoneCtrl,
+                keyboardType: TextInputType.phone,
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'[0-9+\-\s()]'))
+                ],
+                decoration: const InputDecoration(
+                  labelText: 'Phone',
+                  prefixIcon: Icon(Icons.phone_outlined),
+                  border: OutlineInputBorder(),
+                ),
               ),
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _emailCtrl,
-              keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(
-                labelText: 'Email',
-                prefixIcon: Icon(Icons.email_outlined),
-                border: OutlineInputBorder(),
+              const SizedBox(height: 14),
+              TextFormField(
+                controller: _emailCtrl,
+                keyboardType: TextInputType.emailAddress,
+                decoration: const InputDecoration(
+                  labelText: 'Email',
+                  prefixIcon: Icon(Icons.email_outlined),
+                  border: OutlineInputBorder(),
+                ),
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return null;
+                  return RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(v.trim())
+                      ? null
+                      : 'Enter a valid email';
+                },
               ),
-              validator: (v) {
-                if (v == null || v.trim().isEmpty) return null;
-                return RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(v.trim())
-                    ? null
-                    : 'Enter a valid email';
-              },
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _addressCtrl,
-              maxLines: 2,
-              decoration: const InputDecoration(
-                labelText: 'Address',
-                prefixIcon: Icon(Icons.location_on_outlined),
-                border: OutlineInputBorder(),
+              const SizedBox(height: 14),
+              TextFormField(
+                controller: _addressCtrl,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: 'Address',
+                  prefixIcon: Icon(Icons.location_on_outlined),
+                  border: OutlineInputBorder(),
+                ),
               ),
-            ),
-            const SizedBox(height: 20),
-            Text('Default Discount', style: tt.labelLarge),
-            const SizedBox(height: 8),
-            SegmentedButton<bool>(
-              segments: const [
-                ButtonSegment(value: false, label: Text('Flat amount')),
-                ButtonSegment(value: true, label: Text('Percentage (%)')),
-              ],
-              selected: {_discountIsPercent},
-              onSelectionChanged: (s) => setState(() {
-                _discountIsPercent = s.first;
-                _discountCtrl.clear();
-              }),
-            ),
-            const SizedBox(height: 10),
-            TextFormField(
-              controller: _discountCtrl,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-              decoration: InputDecoration(
-                labelText: _discountIsPercent
-                    ? 'Discount percentage'
-                    : 'Discount amount',
-                hintText: '0',
-                suffixText: _discountIsPercent ? '%' : null,
-                prefixIcon: const Icon(Icons.local_offer_outlined),
-                border: const OutlineInputBorder(),
+              const SizedBox(height: 20),
+              Text('Default Discount', style: tt.labelLarge),
+              const SizedBox(height: 8),
+              SegmentedButton<bool>(
+                segments: const [
+                  ButtonSegment(value: false, label: Text('Flat amount')),
+                  ButtonSegment(value: true, label: Text('Percentage (%)')),
+                ],
+                selected: {_discountIsPercent},
+                onSelectionChanged: (s) => setState(() {
+                  _discountIsPercent = s.first;
+                  _discountCtrl.clear();
+                }),
               ),
-              validator: (v) {
-                if (v == null || v.trim().isEmpty) return null;
-                final n = double.tryParse(v);
-                if (n == null || n < 0) return 'Enter a valid number';
-                if (_discountIsPercent && n > 100) return 'Max 100%';
-                return null;
-              },
-            ),
-            const SizedBox(height: 24),
-            FilledButton(
-              onPressed: _loading ? null : _save,
-              child: _loading
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Text(_isEdit ? 'Save Changes' : 'Add Customer'),
-            ),
-          ],
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _discountCtrl,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(
+                  labelText: _discountIsPercent
+                      ? 'Discount percentage'
+                      : 'Discount amount',
+                  hintText: '0',
+                  suffixText: _discountIsPercent ? '%' : null,
+                  prefixIcon: const Icon(Icons.local_offer_outlined),
+                  border: const OutlineInputBorder(),
+                ),
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return null;
+                  final n = double.tryParse(v);
+                  if (n == null || n < 0) return 'Enter a valid number';
+                  if (_discountIsPercent && n > 100) return 'Max 100%';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 24),
+              FilledButton(
+                onPressed: _loading ? null : _save,
+                child: _loading
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Text(_isEdit ? 'Save Changes' : 'Add Customer'),
+              ),
+            ],
+          ),
         ),
       ),
     );
