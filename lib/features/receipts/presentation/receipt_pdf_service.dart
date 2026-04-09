@@ -8,16 +8,21 @@ import 'package:pos_app/features/receipts/presentation/receipt_body.dart';
 
 // ─── PDF builder ──────────────────────────────────────────────────────────────
 
-pw.Document buildReceiptPdf(ReceiptBodyData data, String symbol) {
+Future<pw.Document> buildReceiptPdf(ReceiptBodyData data, String symbol) async {
   final doc = pw.Document();
   final dateFmt = DateFormat('MM/dd/yyyy hh:mm:ss a');
 
+  // Load JetBrains Mono for PDF
+  final font = await PdfGoogleFonts.jetBrainsMonoRegular();
+  final fontBold = await PdfGoogleFonts.jetBrainsMonoBold();
+  final fontItalic = await PdfGoogleFonts.jetBrainsMonoItalic();
+
   // Styles
-  const baseStyle = pw.TextStyle(fontSize: 10);
-  final boldStyle = pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold);
-  final headerStyle = pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold);
-  final smallStyle = pw.TextStyle(fontSize: 9, color: PdfColors.grey600);
-  final titleStyle = pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold);
+  final baseStyle = pw.TextStyle(fontSize: 10, font: font);
+  final boldStyle = pw.TextStyle(fontSize: 10, font: fontBold, fontWeight: pw.FontWeight.bold);
+  final headerStyle = pw.TextStyle(fontSize: 11, font: fontBold, fontWeight: pw.FontWeight.bold);
+  final smallStyle = pw.TextStyle(fontSize: 9, font: font, color: PdfColors.grey600);
+  final titleStyle = pw.TextStyle(fontSize: 14, font: fontBold, fontWeight: pw.FontWeight.bold);
 
   final order = data.order;
   final customerName = data.customer?.name ?? 'Walk-in';
@@ -69,12 +74,13 @@ pw.Document buildReceiptPdf(ReceiptBodyData data, String symbol) {
                 child: pw.Text('Name',
                     style: pw.TextStyle(
                         fontSize: 9,
+                        font: fontBold,
                         fontWeight: pw.FontWeight.bold,
                         decoration: pw.TextDecoration.underline)),
               ),
-              _headerCell('Qty'),
-              _headerCell('Rate ($symbol)'),
-              _headerCell('Amt ($symbol)'),
+              _headerCell('Qty', fontBold),
+              _headerCell('Rate ($symbol)', fontBold),
+              _headerCell('Amt ($symbol)', fontBold),
             ],
           ),
           pw.SizedBox(height: 2),
@@ -88,9 +94,9 @@ pw.Document buildReceiptPdf(ReceiptBodyData data, String symbol) {
                     pw.Expanded(
                         flex: 5,
                         child: pw.Text(item.productName, style: baseStyle)),
-                    _dataCell('x ${item.quantity}'),
-                    _dataCell(item.unitPrice.toStringAsFixed(2)),
-                    _dataCell(item.lineTotal.toStringAsFixed(2)),
+                    _dataCell('x ${item.quantity}', font),
+                    _dataCell(item.unitPrice.toStringAsFixed(2), font),
+                    _dataCell(item.lineTotal.toStringAsFixed(2), font),
                   ],
                 ),
               )),
@@ -147,6 +153,7 @@ pw.Document buildReceiptPdf(ReceiptBodyData data, String symbol) {
               'Thank you for your purchase!',
               style: pw.TextStyle(
                   fontSize: 9,
+                  font: fontItalic,
                   fontStyle: pw.FontStyle.italic,
                   color: PdfColors.grey600),
             ),
@@ -163,7 +170,7 @@ pw.Document buildReceiptPdf(ReceiptBodyData data, String symbol) {
 
 Future<void> downloadReceiptPdf(
     BuildContext context, ReceiptBodyData data, String symbol) async {
-  final doc = buildReceiptPdf(data, symbol);
+  final doc = await buildReceiptPdf(data, symbol);
   final bytes = await doc.save();
   final fileName = 'receipt_order_${data.order.id}.pdf';
 
@@ -172,21 +179,22 @@ Future<void> downloadReceiptPdf(
 
 // ─── Private helpers ──────────────────────────────────────────────────────────
 
-pw.Widget _headerCell(String text) => pw.SizedBox(
+pw.Widget _headerCell(String text, pw.Font font) => pw.SizedBox(
       width: 64,
       child: pw.Text(
         text,
         textAlign: pw.TextAlign.right,
         style: pw.TextStyle(
             fontSize: 9,
+            font: font,
             fontWeight: pw.FontWeight.bold,
             decoration: pw.TextDecoration.underline),
       ),
     );
 
-pw.Widget _dataCell(String text) => pw.SizedBox(
+pw.Widget _dataCell(String text, pw.Font font) => pw.SizedBox(
       width: 64,
       child: pw.Text(text,
           textAlign: pw.TextAlign.right,
-          style: const pw.TextStyle(fontSize: 10)),
+          style: pw.TextStyle(fontSize: 10, font: font)),
     );

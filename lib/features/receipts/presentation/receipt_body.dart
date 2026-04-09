@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 import 'package:pos_app/core/database/app_database.dart';
@@ -34,13 +35,14 @@ class ReceiptBody extends StatelessWidget {
     final dateFmt = DateFormat('MM/dd/yyyy hh:mm:ss a');
     final customerName = data.customer?.name ?? 'Walk-in';
 
-    const bodyStyle = TextStyle(fontSize: 13.5, height: 1.5);
-    const labelStyle = TextStyle(
-        fontSize: 13.5, height: 1.5, color: Color(0xFF666666));
-    const boldStyle = TextStyle(
-        fontSize: 13.5, height: 1.5, fontWeight: FontWeight.w700);
-    const headerStyle = TextStyle(
-        fontSize: 14, fontWeight: FontWeight.w700, height: 1.6);
+    final monoFamily = GoogleFonts.jetBrainsMono().fontFamily;
+    final bodyStyle = TextStyle(fontSize: 13.5, height: 1.5, fontFamily: monoFamily);
+    final labelStyle = TextStyle(
+        fontSize: 13.5, height: 1.5, color: const Color(0xFF666666), fontFamily: monoFamily);
+    final boldStyle = TextStyle(
+        fontSize: 13.5, height: 1.5, fontWeight: FontWeight.w700, fontFamily: monoFamily);
+    final headerStyle = TextStyle(
+        fontSize: 14, fontWeight: FontWeight.w700, height: 1.6, fontFamily: monoFamily);
 
     final divider = Divider(height: 20, thickness: 0.8, color: cs.outlineVariant);
 
@@ -239,7 +241,7 @@ class _HeaderCell extends StatelessWidget {
       child: Text(
         text,
         textAlign: TextAlign.right,
-        style: TextStyle(
+        style: GoogleFonts.jetBrainsMono(
           fontSize: 13,
           fontWeight: FontWeight.w600,
           decoration: TextDecoration.underline,
@@ -262,7 +264,7 @@ class _DataCell extends StatelessWidget {
       child: Text(
         text,
         textAlign: TextAlign.right,
-        style: TextStyle(fontSize: 13.5, color: cs.onSurface),
+        style: GoogleFonts.jetBrainsMono(fontSize: 13.5, color: cs.onSurface),
       ),
     );
   }

@@ -178,32 +178,32 @@ abstract final class AppTheme {
     final base = brightness == Brightness.dark
         ? ThemeData.dark().textTheme
         : ThemeData.light().textTheme;
-    return GoogleFonts.interTextTheme(base).copyWith(
-      displayLarge: GoogleFonts.inter(
+    return GoogleFonts.jetBrainsMonoTextTheme(base).copyWith(
+      displayLarge: GoogleFonts.jetBrainsMono(
         fontSize: 57,
         fontWeight: FontWeight.w300,
         letterSpacing: -1.0,
       ),
-      headlineLarge: GoogleFonts.inter(
+      headlineLarge: GoogleFonts.jetBrainsMono(
         fontSize: 32,
         fontWeight: FontWeight.w700,
         letterSpacing: -0.5,
       ),
-      titleLarge: GoogleFonts.inter(
+      titleLarge: GoogleFonts.jetBrainsMono(
         fontSize: 22,
         fontWeight: FontWeight.w700,
         letterSpacing: -0.3,
       ),
-      titleMedium: GoogleFonts.inter(
+      titleMedium: GoogleFonts.jetBrainsMono(
         fontSize: 16,
         fontWeight: FontWeight.w600,
         letterSpacing: -0.1,
       ),
-      titleSmall: GoogleFonts.inter(
+      titleSmall: GoogleFonts.jetBrainsMono(
         fontSize: 14,
         fontWeight: FontWeight.w600,
       ),
-      labelLarge: GoogleFonts.inter(
+      labelLarge: GoogleFonts.jetBrainsMono(
         fontSize: 14,
         fontWeight: FontWeight.w700,
         letterSpacing: 0.1,
