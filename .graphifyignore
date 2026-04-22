@@ -1,0 +1,12 @@
+.dart_tool/
+.idea/
+.vscode/
+ios/Pods/
+ios/Flutter/ephemeral/
+android/.gradle/
+macos/Pods/
+macos/Flutter/ephemeral/
+windows/flutter/ephemeral/
+linux/flutter/ephemeral/
+**/*.freezed.dart
+**/*.mocks.dart

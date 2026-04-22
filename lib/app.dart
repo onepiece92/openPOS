@@ -66,10 +66,21 @@ class POSApp extends ConsumerWidget {
           ),
           child: CallbackShortcuts(
             bindings: {
+              const SingleActivator(LogicalKeyboardKey.keyS, meta: true): () {
+                final loc = router.routerDelegate.currentConfiguration.uri
+                    .toString();
+                if (loc != '/help/shortcuts') router.push('/help/shortcuts');
+              },
+              const SingleActivator(LogicalKeyboardKey.slash,
+                  meta: true, shift: true): () {
+                final loc = router.routerDelegate.currentConfiguration.uri
+                    .toString();
+                if (loc != '/help/shortcuts') router.push('/help/shortcuts');
+              },
               const SingleActivator(LogicalKeyboardKey.keyH, meta: true): () =>
                   router.go('/pos'),
               const SingleActivator(LogicalKeyboardKey.keyP, meta: true): () =>
-                  router.go('/pos'),
+                  router.go('/products'),
               const SingleActivator(LogicalKeyboardKey.keyO, meta: true): () =>
                   router.go('/orders'),
               const SingleActivator(LogicalKeyboardKey.keyU, meta: true): () =>
@@ -80,6 +91,8 @@ class POSApp extends ConsumerWidget {
                   router.go('/settings'),
               const SingleActivator(LogicalKeyboardKey.keyN, meta: true): () =>
                   router.push('/products/add'),
+              const SingleActivator(LogicalKeyboardKey.keyI, meta: true): () =>
+                  router.push('/inventory'),
               const SingleActivator(LogicalKeyboardKey.keyW, meta: true): () {
                 if (router.canPop()) router.pop();
               },

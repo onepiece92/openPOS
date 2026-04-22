@@ -74,9 +74,12 @@ class ProductsDao extends DatabaseAccessor<AppDatabase>
   }
 
   /// Deduct stock on sale. Caller is responsible for audit logging.
+  /// Only deducts when stock tracking is active (stock_quantity > 0).
+  /// A value of 0 means "unlimited / not tracked" — never touch it.
   Future<void> deductStock(int productId, int quantity) async {
     await customUpdate(
-      'UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ?',
+      'UPDATE products SET stock_quantity = stock_quantity - ? '
+      'WHERE id = ? AND stock_quantity > 0',
       variables: [Variable(quantity), Variable(productId)],
       updates: {products},
     );

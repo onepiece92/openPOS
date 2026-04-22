@@ -6,6 +6,7 @@ import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/services/demo_data_service.dart';
 import 'package:pos_app/features/cart/domain/cart_item.dart';
 import 'package:pos_app/features/cart/domain/cart_notifier.dart';
+import 'package:pos_app/features/cart/domain/pos_filter_provider.dart';
 import 'package:pos_app/features/cart/presentation/widgets/grid_product_tile.dart';
 import 'package:pos_app/features/cart/presentation/widgets/checkout_bar.dart';
 import 'package:pos_app/features/cart/presentation/widgets/held_tickets_bar.dart';
@@ -21,13 +22,7 @@ class CartScreen extends ConsumerStatefulWidget {
   ConsumerState<CartScreen> createState() => _CartScreenState();
 }
 
-enum _SortMode { mostSold, nameAZ, nameZA, priceLH, priceHL }
-
 class _CartScreenState extends ConsumerState<CartScreen> {
-  int? _selectedCategoryId;
-  String _search = '';
-  bool _isGrid = true;
-  _SortMode _sortMode = _SortMode.mostSold;
   final _searchCtrl = TextEditingController();
   final _searchFocus = FocusNode();
   final _shortcutsFocus = FocusNode();
@@ -35,6 +30,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
   @override
   void initState() {
     super.initState();
+    _searchCtrl.text = ref.read(posFilterProvider).search;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _shortcutsFocus.requestFocus();
     });
@@ -48,29 +44,33 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     super.dispose();
   }
 
-  List<Product> _applyFilter(List<Product> all, Map<int, int> salesCounts) {
-    var list = _selectedCategoryId == null
+  List<Product> _applyFilter(
+    List<Product> all,
+    Map<int, int> salesCounts,
+    PosFilterState f,
+  ) {
+    var list = f.selectedCategoryId == null
         ? all
-        : all.where((p) => p.categoryId == _selectedCategoryId).toList();
-    if (_search.isNotEmpty) {
-      final q = _search.toLowerCase();
+        : all.where((p) => p.categoryId == f.selectedCategoryId).toList();
+    if (f.search.isNotEmpty) {
+      final q = f.search.toLowerCase();
       list = list
           .where((p) =>
               p.name.toLowerCase().contains(q) ||
               p.sku.toLowerCase().contains(q))
           .toList();
     }
-    switch (_sortMode) {
-      case _SortMode.mostSold:
+    switch (f.sortMode) {
+      case PosSortMode.mostSold:
         list.sort((a, b) =>
             (salesCounts[b.id] ?? 0).compareTo(salesCounts[a.id] ?? 0));
-      case _SortMode.nameAZ:
+      case PosSortMode.nameAZ:
         list.sort((a, b) => a.name.compareTo(b.name));
-      case _SortMode.nameZA:
+      case PosSortMode.nameZA:
         list.sort((a, b) => b.name.compareTo(a.name));
-      case _SortMode.priceLH:
+      case PosSortMode.priceLH:
         list.sort((a, b) => a.price.compareTo(b.price));
-      case _SortMode.priceHL:
+      case PosSortMode.priceHL:
         list.sort((a, b) => b.price.compareTo(a.price));
     }
     return list;
@@ -86,6 +86,13 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     final cs = Theme.of(context).colorScheme;
     final salesCounts = salesCountsAsync.valueOrNull ?? {};
     final assignedCustomerId = ref.watch(cartSessionProvider).customerId;
+    final filter = ref.watch(posFilterProvider);
+    final filterN = ref.read(posFilterProvider.notifier);
+    if (_searchCtrl.text != filter.search) {
+      _searchCtrl.text = filter.search;
+      _searchCtrl.selection =
+          TextSelection.collapsed(offset: _searchCtrl.text.length);
+    }
 
     return Scaffold(
           drawer: const PosDrawer(),
@@ -173,10 +180,8 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                 _searchFocus.requestFocus();
               },
               const SingleActivator(LogicalKeyboardKey.escape): () {
-                setState(() {
-                  _search = '';
-                  _searchCtrl.clear();
-                });
+                filterN.clearSearch();
+                _searchCtrl.clear();
                 _searchFocus.unfocus();
               },
               const SingleActivator(LogicalKeyboardKey.enter, meta: true): () {
@@ -186,7 +191,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                 ref.read(cartProvider.notifier).clear();
               },
               const SingleActivator(LogicalKeyboardKey.keyG, meta: true): () {
-                setState(() => _isGrid = !_isGrid);
+                filterN.toggleView();
               },
             },
             child: Focus(
@@ -206,14 +211,14 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                           hintText: 'Search products...',
                           prefixIcon:
                               const Icon(Icons.search_rounded, size: 20),
-                          suffixIcon: _search.isNotEmpty
+                          suffixIcon: filter.search.isNotEmpty
                               ? IconButton(
                                   icon:
                                       const Icon(Icons.close_rounded, size: 18),
-                                  onPressed: () => setState(() {
-                                    _search = '';
+                                  onPressed: () {
+                                    filterN.clearSearch();
                                     _searchCtrl.clear();
-                                  }),
+                                  },
                                 )
                               : null,
                           filled: true,
@@ -226,22 +231,22 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                               horizontal: 12, vertical: 10),
                           isDense: true,
                         ),
-                        onChanged: (v) => setState(() => _search = v),
+                        onChanged: filterN.setSearch,
                       ),
                     ),
-                    PopupMenuButton<_SortMode>(
+                    PopupMenuButton<PosSortMode>(
                       icon: Icon(
                         Icons.sort_rounded,
-                        color: _sortMode == _SortMode.mostSold
+                        color: filter.sortMode == PosSortMode.mostSold
                             ? cs.onSurfaceVariant
                             : cs.primary,
                       ),
                       tooltip: 'Sort',
-                      initialValue: _sortMode,
-                      onSelected: (m) => setState(() => _sortMode = m),
+                      initialValue: filter.sortMode,
+                      onSelected: filterN.setSortMode,
                       itemBuilder: (_) => const [
                         PopupMenuItem(
-                          value: _SortMode.mostSold,
+                          value: PosSortMode.mostSold,
                           child: ListTile(
                             leading: Icon(Icons.trending_up_rounded),
                             title: Text('Most sold'),
@@ -249,7 +254,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                           ),
                         ),
                         PopupMenuItem(
-                          value: _SortMode.nameAZ,
+                          value: PosSortMode.nameAZ,
                           child: ListTile(
                             leading: Icon(Icons.sort_by_alpha_rounded),
                             title: Text('Name A → Z'),
@@ -257,7 +262,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                           ),
                         ),
                         PopupMenuItem(
-                          value: _SortMode.nameZA,
+                          value: PosSortMode.nameZA,
                           child: ListTile(
                             leading: Icon(Icons.sort_by_alpha_rounded),
                             title: Text('Name Z → A'),
@@ -265,7 +270,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                           ),
                         ),
                         PopupMenuItem(
-                          value: _SortMode.priceLH,
+                          value: PosSortMode.priceLH,
                           child: ListTile(
                             leading: Icon(Icons.arrow_upward_rounded),
                             title: Text('Price low → high'),
@@ -273,7 +278,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                           ),
                         ),
                         PopupMenuItem(
-                          value: _SortMode.priceHL,
+                          value: PosSortMode.priceHL,
                           child: ListTile(
                             leading: Icon(Icons.arrow_downward_rounded),
                             title: Text('Price high → low'),
@@ -283,11 +288,11 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                       ],
                     ),
                     IconButton(
-                      icon: Icon(_isGrid
+                      icon: Icon(filter.isGrid
                           ? Icons.view_list_rounded
                           : Icons.grid_view_rounded),
-                      tooltip: _isGrid ? 'List view' : 'Grid view',
-                      onPressed: () => setState(() => _isGrid = !_isGrid),
+                      tooltip: filter.isGrid ? 'List view' : 'Grid view',
+                      onPressed: filterN.toggleView,
                     ),
                   ],
                 ),
@@ -296,8 +301,8 @@ class _CartScreenState extends ConsumerState<CartScreen> {
               categoriesAsync.when(
                 data: (cats) => _CategoryRow(
                   categories: cats,
-                  selected: _selectedCategoryId,
-                  onSelect: (id) => setState(() => _selectedCategoryId = id),
+                  selected: filter.selectedCategoryId,
+                  onSelect: filterN.setCategory,
                 ),
                 loading: () => const SizedBox(height: 44),
                 error: (_, __) => const SizedBox.shrink(),
@@ -306,7 +311,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
               Expanded(
                 child: productsAsync.when(
                   data: (all) {
-                    final filtered = _applyFilter(all, salesCounts);
+                    final filtered = _applyFilter(all, salesCounts, filter);
                     if (all.isEmpty) {
                       return _EmptyProductsState(
                         onAddProduct: () => context.push('/products/add'),
@@ -318,7 +323,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                             style: TextStyle(color: cs.onSurfaceVariant)),
                       );
                     }
-                    if (_isGrid) {
+                    if (filter.isGrid) {
                       return _PosProductGrid(
                         products: filtered,
                         cart: cart,

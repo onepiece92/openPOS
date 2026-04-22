@@ -29,10 +29,11 @@ extension on _Period {
     };
   }
 
-  // Truncated to the minute so _Query equality is stable across rebuilds.
+  // Truncated to the hour so _Query equality is stable across rebuilds and
+  // the provider cache isn't invalidated every minute.
   DateTime get to {
     final n = DateTime.now();
-    return DateTime(n.year, n.month, n.day, n.hour, n.minute);
+    return DateTime(n.year, n.month, n.day, n.hour);
   }
 }
 
@@ -99,10 +100,13 @@ class _ReportData {
 // ── Provider ──────────────────────────────────────────────────────────────────
 
 String _hourLabel(int h) {
+  if (h == 0) return '12am';
   if (h < 12) return '${h}am';
   if (h == 12) return '12pm';
   return '${h - 12}pm';
 }
+
+final _moneyFmt = NumberFormat('#,##0.00');
 
 final _reportProvider =
     FutureProvider.family<_ReportData, _Query>((ref, query) async {
@@ -113,13 +117,7 @@ final _reportProvider =
   final revenue = await db.ordersDao.totalRevenueForPeriod(from, to);
   final expenses = await db.expensesDao.totalForPeriod(from, to);
 
-  final allOrders = await db.ordersDao.watchRecent(limit: 1000).first;
-  final periodOrders = allOrders
-      .where((o) =>
-          o.status == 'completed' &&
-          !o.createdAt.isBefore(from) &&
-          o.createdAt.isBefore(to.add(const Duration(seconds: 1))))
-      .toList();
+  final periodOrders = await db.ordersDao.completedOrdersInPeriod(from, to);
 
   final topRaw =
       await db.ordersDao.topSellingProductsForPeriod(from, to, limit: 5);
@@ -148,21 +146,16 @@ final _reportProvider =
   int chartHighlightIndex;
 
   if (days < 2) {
-    // ── Hourly (2-hour slots 6am → 8pm) ──────────────────────────────────
+    // ── Hourly (2-hour slots, full 24h) ──────────────────────────────────
     chartTitle = 'Hourly Sales';
-    const startH = 6;
-    const slotCount = 8;
+    const slotCount = 12;
     final totals = List<double>.filled(slotCount, 0.0);
     for (final o in periodOrders) {
-      final idx = ((o.createdAt.hour - startH) ~/ 2).clamp(0, slotCount - 1);
-      totals[idx] += o.total;
+      totals[o.createdAt.hour ~/ 2] += o.total;
     }
-    chartDates = [
-      for (int i = 0; i < slotCount; i++) _hourLabel(startH + i * 2)
-    ];
+    chartDates = [for (int i = 0; i < slotCount; i++) _hourLabel(i * 2)];
     chartTotals = totals;
-    chartHighlightIndex =
-        ((DateTime.now().hour - startH) ~/ 2).clamp(0, slotCount - 1);
+    chartHighlightIndex = DateTime.now().hour ~/ 2;
   } else if (days <= 14) {
     // ── Daily ─────────────────────────────────────────────────────────────
     chartTitle = 'Daily Sales';
@@ -360,11 +353,29 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             ),
           const SizedBox(height: 12),
           Expanded(
-            child: reportAsync.when(
-              data: (data) => _Body(
-                  data: data, symbol: symbol, cs: cs, periodLabel: query.label),
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('Error: $e')),
+            child: RefreshIndicator(
+              onRefresh: () async {
+                ref.invalidate(_reportProvider(query));
+                await ref.read(_reportProvider(query).future);
+              },
+              child: reportAsync.when(
+                data: (data) => _Body(
+                  data: data,
+                  symbol: symbol,
+                  cs: cs,
+                  periodLabel: query.label,
+                  isCustomRange: _customRange != null,
+                ),
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, _) => ListView(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Center(child: Text('Error: $e')),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ],
@@ -381,11 +392,13 @@ class _Body extends StatelessWidget {
     required this.symbol,
     required this.cs,
     required this.periodLabel,
+    required this.isCustomRange,
   });
   final _ReportData data;
   final String symbol;
   final ColorScheme cs;
   final String periodLabel;
+  final bool isCustomRange;
 
   @override
   Widget build(BuildContext context) {
@@ -394,6 +407,7 @@ class _Body extends StatelessWidget {
 
     if (empty) {
       return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
         children: [
           ...kpiRows,
@@ -420,6 +434,7 @@ class _Body extends StatelessWidget {
     }
 
     return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
       children: [
         ...kpiRows,
@@ -431,7 +446,7 @@ class _Body extends StatelessWidget {
           _MiniBarChart(
             labels: data.chartDates,
             values: data.chartTotals,
-            highlightIndex: data.chartHighlightIndex,
+            highlightIndex: isCustomRange ? -1 : data.chartHighlightIndex,
             cs: cs,
           ),
           const SizedBox(height: 22),
@@ -613,7 +628,7 @@ class _Body extends StatelessWidget {
         ),
       ];
 
-  String _fmt(double v) => v.toStringAsFixed(2);
+  String _fmt(double v) => _moneyFmt.format(v);
 }
 
 // ── Mini bar chart ────────────────────────────────────────────────────────────

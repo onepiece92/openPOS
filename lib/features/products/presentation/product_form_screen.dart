@@ -32,6 +32,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
   final _skuCtrl = TextEditingController();
   final _priceCtrl = TextEditingController();
   final _stockCtrl = TextEditingController(); // empty = unlimited (saves as 0)
+  bool _trackStock = false;
 
   int? _categoryId;
   bool _isTaxable = true;
@@ -69,6 +70,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
         _skuCtrl.text = p.sku;
         _priceCtrl.text = p.price.toStringAsFixed(2);
         // Show empty when 0 (= unlimited); show actual value when > 0
+        _trackStock = p.stockQuantity > 0;
         _stockCtrl.text =
             p.stockQuantity > 0 ? p.stockQuantity.toString() : '';
         _categoryId = p.categoryId;
@@ -112,7 +114,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
           ? const Uuid().v4().substring(0, 8).toUpperCase()
           : _skuCtrl.text.trim();
       final stockQty =
-          _isComposite ? 0 : (int.tryParse(_stockCtrl.text) ?? 0);
+          (_isComposite || !_trackStock) ? 0 : (int.tryParse(_stockCtrl.text) ?? 0);
 
       int compositeId;
       if (_isEdit) {
@@ -380,19 +382,52 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
             // ── Inventory ────────────────────────────────────────────────
             _sectionLabel('Inventory', tt, cs),
             Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: TextFormField(
-                  controller: _stockCtrl,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  decoration: InputDecoration(
-                    labelText: _isEdit ? 'Stock quantity' : 'Opening stock',
-                    hintText: 'Leave blank for unlimited',
-                    prefixIcon: const Icon(Icons.inventory_2_outlined),
-                    border: const OutlineInputBorder(),
+              child: Column(
+                children: [
+                  SwitchListTile(
+                    secondary: const Icon(Icons.inventory_2_outlined),
+                    title: const Text('Track stock'),
+                    subtitle: Text(
+                      _trackStock
+                          ? 'Stock will be deducted on each sale'
+                          : 'Unlimited — stock is not tracked',
+                    ),
+                    value: _trackStock,
+                    onChanged: _isComposite
+                        ? null
+                        : (v) => setState(() {
+                              _trackStock = v;
+                              if (!v) _stockCtrl.clear();
+                            }),
                   ),
-                ),
+                  AnimatedCrossFade(
+                    duration: const Duration(milliseconds: 220),
+                    firstCurve: Curves.easeOut,
+                    secondCurve: Curves.easeIn,
+                    crossFadeState: (_trackStock && !_isComposite)
+                        ? CrossFadeState.showFirst
+                        : CrossFadeState.showSecond,
+                    firstChild: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      child: TextFormField(
+                        controller: _stockCtrl,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly
+                        ],
+                        decoration: InputDecoration(
+                          labelText:
+                              _isEdit ? 'Stock quantity' : 'Opening stock',
+                          hintText: '0',
+                          prefixIcon:
+                              const Icon(Icons.numbers_rounded),
+                          border: const OutlineInputBorder(),
+                        ),
+                      ),
+                    ),
+                    secondChild: const SizedBox.shrink(),
+                  ),
+                ],
               ),
             ),
 

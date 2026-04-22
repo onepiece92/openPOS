@@ -39,3 +39,54 @@ final currencySymbolProvider = Provider<String>((ref) {
   final box = ref.watch(settingsBoxProvider);
   return box.get(kCurrencySymbol, defaultValue: 'Rs') as String;
 });
+
+// ── Products screen filter state ──────────────────────────────────────────────
+// Kept in a provider (not widget state) so navigating away and back
+// preserves the user's chosen sort / filter / search preferences.
+
+class ProductsFilterState {
+  const ProductsFilterState({
+    this.sortAZ = true,
+    this.outOfStockOnly = false,
+    this.selectedCategoryId,
+    this.search = '',
+  });
+
+  final bool sortAZ;
+  final bool outOfStockOnly;
+  final int? selectedCategoryId;
+  final String search;
+
+  ProductsFilterState copyWith({
+    bool? sortAZ,
+    bool? outOfStockOnly,
+    int? selectedCategoryId,
+    bool clearCategory = false,
+    String? search,
+  }) =>
+      ProductsFilterState(
+        sortAZ: sortAZ ?? this.sortAZ,
+        outOfStockOnly: outOfStockOnly ?? this.outOfStockOnly,
+        selectedCategoryId:
+            clearCategory ? null : (selectedCategoryId ?? this.selectedCategoryId),
+        search: search ?? this.search,
+      );
+}
+
+class ProductsFilterNotifier extends StateNotifier<ProductsFilterState> {
+  ProductsFilterNotifier() : super(const ProductsFilterState());
+
+  void toggleSort() => state = state.copyWith(sortAZ: !state.sortAZ);
+  void toggleOutOfStock() =>
+      state = state.copyWith(outOfStockOnly: !state.outOfStockOnly);
+  void setCategory(int? id) => id == null
+      ? state = state.copyWith(clearCategory: true)
+      : state = state.copyWith(selectedCategoryId: id);
+  void setSearch(String q) => state = state.copyWith(search: q);
+  void clearSearch() => state = state.copyWith(search: '');
+}
+
+final productsFilterProvider =
+    StateNotifierProvider<ProductsFilterNotifier, ProductsFilterState>(
+  (_) => ProductsFilterNotifier(),
+);

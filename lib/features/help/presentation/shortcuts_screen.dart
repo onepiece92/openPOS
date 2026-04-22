@@ -17,24 +17,45 @@ class ShortcutsScreen extends StatelessWidget {
         children: [
           _SectionHeader('Navigation', tt, cs),
           _ShortcutRow(keys: const ['⌘', 'H'], label: 'Home', tt: tt, cs: cs),
-          _ShortcutRow(keys: const ['⌘', 'P'], label: 'Open POS', tt: tt, cs: cs),
+          _ShortcutRow(
+              keys: const ['⌘', 'P'],
+              label: 'Open product page',
+              tt: tt,
+              cs: cs),
           _ShortcutRow(keys: const ['⌘', 'O'], label: 'Orders', tt: tt, cs: cs),
-          _ShortcutRow(keys: const ['⌘', 'U'], label: 'Customers', tt: tt, cs: cs),
-          _ShortcutRow(keys: const ['⌘', 'E'], label: 'Expenses', tt: tt, cs: cs),
-          _ShortcutRow(keys: const ['⌘', ','], label: 'Settings', tt: tt, cs: cs),
+          _ShortcutRow(
+              keys: const ['⌘', 'U'], label: 'Customers', tt: tt, cs: cs),
+          _ShortcutRow(
+              keys: const ['⌘', 'E'], label: 'Expenses', tt: tt, cs: cs),
+          _ShortcutRow(
+              keys: const ['⌘', 'I'], label: 'Inventory', tt: tt, cs: cs),
+          _ShortcutRow(
+              keys: const ['⌘', ','], label: 'Settings', tt: tt, cs: cs),
           const SizedBox(height: 20),
           _SectionHeader('POS / Cart', tt, cs),
-          _ShortcutRow(keys: const ['⌘', 'F'], label: 'Focus search', tt: tt, cs: cs),
-          _ShortcutRow(keys: const ['Esc'], label: 'Clear search', tt: tt, cs: cs),
-          _ShortcutRow(keys: const ['⌘', 'Enter'], label: 'Checkout', tt: tt, cs: cs),
-          _ShortcutRow(keys: const ['⌘', 'K'], label: 'Clear cart', tt: tt, cs: cs),
-          _ShortcutRow(keys: const ['⌘', 'G'], label: 'Toggle grid / list', tt: tt, cs: cs),
+          _ShortcutRow(
+              keys: const ['⌘', 'F'], label: 'Focus search', tt: tt, cs: cs),
+          _ShortcutRow(
+              keys: const ['Esc'], label: 'Clear search', tt: tt, cs: cs),
+          _ShortcutRow(
+              keys: const ['⌘', 'Enter'], label: 'Checkout', tt: tt, cs: cs),
+          _ShortcutRow(
+              keys: const ['⌘', 'K'], label: 'Clear cart', tt: tt, cs: cs),
+          _ShortcutRow(
+              keys: const ['⌘', 'G'],
+              label: 'Toggle grid / list',
+              tt: tt,
+              cs: cs),
           const SizedBox(height: 20),
           _SectionHeader('Products', tt, cs),
-          _ShortcutRow(keys: const ['⌘', 'N'], label: 'New product', tt: tt, cs: cs),
+          _ShortcutRow(
+              keys: const ['⌘', 'N'], label: 'New product', tt: tt, cs: cs),
           const SizedBox(height: 20),
           _SectionHeader('General', tt, cs),
-          _ShortcutRow(keys: const ['⌘', 'W'], label: 'Close / Back', tt: tt, cs: cs),
+          _ShortcutRow(
+              keys: const ['⌘', 'W'], label: 'Close / Back', tt: tt, cs: cs),
+          _ShortcutRow(
+              keys: const ['⌘', 'S'], label: 'Keyboard Shortcuts', tt: tt, cs: cs),
           const SizedBox(height: 20),
           Container(
             padding: const EdgeInsets.all(14),
@@ -44,7 +65,8 @@ class ShortcutsScreen extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Icon(Icons.info_outline_rounded, size: 16, color: cs.onSurfaceVariant),
+                Icon(Icons.info_outline_rounded,
+                    size: 16, color: cs.onSurfaceVariant),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -103,9 +125,7 @@ class _ShortcutRow extends StatelessWidget {
             ),
             Row(
               mainAxisSize: MainAxisSize.min,
-              children: keys
-                  .map((k) => _KeyChip(k, cs, tt))
-                  .toList(),
+              children: keys.map((k) => _KeyChip(k, cs, tt)).toList(),
             ),
           ],
         ),

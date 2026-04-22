@@ -77,6 +77,24 @@ class OrdersDao extends DatabaseAccessor<AppDatabase> with _$OrdersDaoMixin {
     return result.read<double>('revenue');
   }
 
+  /// Lightweight projection of completed orders in a period, for chart bucketing.
+  Future<List<({DateTime createdAt, double total})>> completedOrdersInPeriod(
+      DateTime from, DateTime to) async {
+    final rows = await customSelect(
+      "SELECT created_at, total FROM orders "
+      "WHERE status = 'completed' AND created_at >= ? AND created_at <= ? "
+      'ORDER BY created_at ASC',
+      variables: [Variable(from), Variable(to)],
+      readsFrom: {orders},
+    ).get();
+    return rows
+        .map((r) => (
+              createdAt: r.read<DateTime>('created_at'),
+              total: r.read<double>('total'),
+            ))
+        .toList();
+  }
+
   /// Top-selling products by qty for a period. Returns [{name, qty, revenue}].
   Future<List<Map<String, dynamic>>> topSellingProductsForPeriod(
       DateTime from, DateTime to,

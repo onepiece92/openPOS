@@ -1,0 +1,10 @@
+{
+  "dependencies": {
+    "get-shit-done-cc": "^1.38.1"
+  },
+  "_npx": {
+    "packages": [
+      "get-shit-done-cc@latest"
+    ]
+  }
+}

@@ -14,11 +14,9 @@ class ProductsScreen extends ConsumerStatefulWidget {
 }
 
 class _ProductsScreenState extends ConsumerState<ProductsScreen> {
-  int? _selectedCategoryId;
-  String _search = '';
+  // Only the search bar visibility is local — it's a transient affordance
+  // that makes sense to reset when the user leaves.
   bool _showSearch = false;
-  bool _outOfStockOnly = false;
-  bool _sortAZ = true;
   final _searchCtrl = TextEditingController();
 
   @override
@@ -27,15 +25,16 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     super.dispose();
   }
 
-  List<Product> _applyFilter(List<Product> all) {
-    var list = _selectedCategoryId == null
+  List<Product> _applyFilter(List<Product> all, ProductsFilterState f) {
+    var list = f.selectedCategoryId == null
         ? all
-        : all.where((p) => p.categoryId == _selectedCategoryId).toList();
-    if (_outOfStockOnly) {
-      list = list.where((p) => p.stockQuantity <= 0).toList();
+        : all.where((p) => p.categoryId == f.selectedCategoryId).toList();
+    if (f.outOfStockOnly) {
+      // < 0 means genuinely out of stock; 0 means unlimited (not tracked)
+      list = list.where((p) => p.stockQuantity < 0).toList();
     }
-    if (_search.isNotEmpty) {
-      final q = _search.toLowerCase();
+    if (f.search.isNotEmpty) {
+      final q = f.search.toLowerCase();
       list = list
           .where((p) =>
               p.name.toLowerCase().contains(q) ||
@@ -43,7 +42,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
           .toList();
     }
     list.sort((a, b) =>
-        _sortAZ ? a.name.compareTo(b.name) : b.name.compareTo(a.name));
+        f.sortAZ ? a.name.compareTo(b.name) : b.name.compareTo(a.name));
     return list;
   }
 
@@ -52,6 +51,8 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     final productsAsync = ref.watch(productsStreamProvider);
     final categoriesAsync = ref.watch(categoriesStreamProvider);
     final symbol = ref.watch(currencySymbolProvider);
+    final f = ref.watch(productsFilterProvider);
+    final filter = ref.read(productsFilterProvider.notifier);
     final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
@@ -65,7 +66,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                   hintText: 'Search products...',
                   border: InputBorder.none,
                 ),
-                onChanged: (v) => setState(() => _search = v),
+                onChanged: filter.setSearch,
               )
             : const Text('Products'),
         actions: [
@@ -77,8 +78,8 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
             onPressed: () => setState(() {
               _showSearch = !_showSearch;
               if (!_showSearch) {
-                _search = '';
                 _searchCtrl.clear();
+                filter.clearSearch();
               }
             }),
           ),
@@ -90,9 +91,9 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                 case 'tax':
                   context.push('/tax');
                 case 'sort':
-                  setState(() => _sortAZ = !_sortAZ);
+                  filter.toggleSort();
                 case 'outofstock':
-                  setState(() => _outOfStockOnly = !_outOfStockOnly);
+                  filter.toggleOutOfStock();
               }
             },
             itemBuilder: (_) => [
@@ -117,11 +118,11 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                 value: 'sort',
                 child: ListTile(
                   leading: Icon(
-                    _sortAZ
+                    f.sortAZ
                         ? Icons.sort_by_alpha_rounded
                         : Icons.sort_rounded,
                   ),
-                  title: Text(_sortAZ ? 'Sort: A → Z' : 'Sort: Z → A'),
+                  title: Text(f.sortAZ ? 'Sort: A → Z' : 'Sort: Z → A'),
                   contentPadding: EdgeInsets.zero,
                 ),
               ),
@@ -129,13 +130,13 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                 value: 'outofstock',
                 child: ListTile(
                   leading: Icon(
-                    _outOfStockOnly
+                    f.outOfStockOnly
                         ? Icons.inventory_2_rounded
                         : Icons.warning_amber_rounded,
-                    color: _outOfStockOnly ? null : cs.error,
+                    color: f.outOfStockOnly ? null : cs.error,
                   ),
                   title: Text(
-                    _outOfStockOnly
+                    f.outOfStockOnly
                         ? 'Show All Products'
                         : 'Out of Stock Only',
                   ),
@@ -152,14 +153,14 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
           categoriesAsync.when(
             data: (cats) => _CategoryChips(
               categories: cats,
-              selected: _selectedCategoryId,
-              onSelect: (id) => setState(() => _selectedCategoryId = id),
+              selected: f.selectedCategoryId,
+              onSelect: filter.setCategory,
             ),
             loading: () => const SizedBox(height: 48),
             error: (_, __) => const SizedBox.shrink(),
           ),
           // ── Active filter indicator ──────────────────────────────────────
-          if (_outOfStockOnly)
+          if (f.outOfStockOnly)
             Container(
               width: double.infinity,
               color: cs.errorContainer.withValues(alpha: 0.5),
@@ -179,8 +180,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                   ),
                   const Spacer(),
                   GestureDetector(
-                    onTap: () =>
-                        setState(() => _outOfStockOnly = false),
+                    onTap: filter.toggleOutOfStock,
                     child: Icon(Icons.close_rounded,
                         size: 14, color: cs.onErrorContainer),
                   ),
@@ -195,7 +195,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                   for (final c in categoriesAsync.valueOrNull ?? [])
                     c.id: c.name
                 };
-                final filtered = _applyFilter(all);
+                final filtered = _applyFilter(all, f);
 
                 if (all.isEmpty) {
                   return _EmptyState(
@@ -241,6 +241,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
 }
 
 // ── Category filter chips ─────────────────────────────────────────────────────
+
 
 class _CategoryChips extends StatelessWidget {
   const _CategoryChips({
@@ -313,8 +314,9 @@ class _ProductTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
-    final outOfStock = product.stockQuantity <= 0;
-    final lowStock = product.stockQuantity <= 5 && !outOfStock;
+    // 0 = unlimited/not tracked; < 0 = out of stock; > 0 = tracked
+    final outOfStock = product.stockQuantity < 0;
+    final lowStock = product.stockQuantity > 0 && product.stockQuantity <= 5;
 
     return ListTile(
       onTap: onTap,
@@ -419,6 +421,10 @@ class _StockBadge extends StatelessWidget {
       bg = cs.errorContainer;
       fg = cs.onErrorContainer;
       label = 'Out of stock';
+    } else if (qty == 0) {
+      bg = cs.surfaceContainerHighest;
+      fg = cs.onSurfaceVariant;
+      label = 'Unlimited';
     } else if (lowStock) {
       bg = cs.tertiaryContainer;
       fg = cs.onTertiaryContainer;
