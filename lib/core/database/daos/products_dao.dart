@@ -75,7 +75,7 @@ class ProductsDao extends DatabaseAccessor<AppDatabase>
 
   /// Deduct stock on sale. Caller is responsible for audit logging.
   /// Only deducts when stock tracking is active (stock_quantity > 0).
-  /// A value of 0 means "unlimited / not tracked" — never touch it.
+  /// A value of 0 means "unlimited" — never touch it.
   Future<void> deductStock(int productId, int quantity) async {
     await customUpdate(
       'UPDATE products SET stock_quantity = stock_quantity - ? '
@@ -90,6 +90,20 @@ class ProductsDao extends DatabaseAccessor<AppDatabase>
         'UPDATE products SET stock_quantity = ? WHERE id = ?',
         variables: [Variable(quantity), Variable(productId)],
         updates: {products},
+      );
+
+  /// Combined qty + out-of-stock write — single UPDATE, single stream emission.
+  /// Use for stepper transitions that change both at once.
+  Future<void> setStockState(
+    int productId, {
+    required int stockQuantity,
+    required bool isOutOfStock,
+  }) =>
+      (update(products)..where((p) => p.id.equals(productId))).write(
+        ProductsCompanion(
+          stockQuantity: Value(stockQuantity),
+          isOutOfStock: Value(isOutOfStock),
+        ),
       );
 
   /// Adjust stock by delta (positive = add, negative = remove).

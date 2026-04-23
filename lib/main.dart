@@ -12,9 +12,6 @@ Future<void> main() async {
   // Open Hive boxes before ProviderScope so providers can read synchronously
   await Hive.initFlutter();
   await Hive.openBox<dynamic>('settings');
-  await Hive.openBox<dynamic>('brand');
-  await Hive.openBox<dynamic>('printer');
-  await Hive.openBox<dynamic>('checklist');
   await Hive.openBox<dynamic>('held_orders');
 
   final database = AppDatabase();

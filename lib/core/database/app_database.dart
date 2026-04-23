@@ -9,7 +9,6 @@ import 'daos/expenses_dao.dart';
 import 'daos/inventory_dao.dart';
 import 'daos/orders_dao.dart';
 import 'daos/products_dao.dart';
-import 'daos/sync_dao.dart';
 import 'daos/tax_dao.dart';
 import 'tables/audit_log_table.dart';
 import 'tables/categories_table.dart';
@@ -20,7 +19,6 @@ import 'tables/order_items_table.dart';
 import 'tables/order_tax_override_table.dart';
 import 'tables/order_taxes_table.dart';
 import 'tables/orders_table.dart';
-import 'tables/outbox_queue_table.dart';
 import 'tables/product_components_table.dart';
 import 'tables/product_modifiers_table.dart';
 import 'tables/product_taxes_table.dart';
@@ -60,9 +58,8 @@ part 'app_database.g.dart';
     Expenses,
     // Inventory
     StockAdjustments,
-    // Audit & Sync
+    // Audit
     AuditLog,
-    OutboxQueue,
   ],
   daos: [
     ProductsDao,
@@ -72,7 +69,6 @@ part 'app_database.g.dart';
     TaxDao,
     ExpensesDao,
     AuditDao,
-    SyncDao,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -80,7 +76,7 @@ class AppDatabase extends _$AppDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -114,6 +110,15 @@ class AppDatabase extends _$AppDatabase {
             await customStatement(
               'ALTER TABLE products ADD COLUMN is_hidden_in_pos INTEGER NOT NULL DEFAULT 0',
             );
+          }
+          if (from < 5) {
+            await customStatement(
+              'ALTER TABLE products ADD COLUMN is_out_of_stock INTEGER NOT NULL DEFAULT 0',
+            );
+          }
+          if (from < 6) {
+            // Drop deprecated outbox queue (online sync removed — app is offline-only).
+            await customStatement('DROP TABLE IF EXISTS outbox_queue');
           }
         },
         beforeOpen: (details) async {

@@ -1,4 +1,3 @@
-import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,9 +7,13 @@ import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/audit_service_provider.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
+import 'package:pos_app/core/utils/async_feedback.dart';
+import 'package:pos_app/core/utils/currency_formatter.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
 import 'package:pos_app/features/receipts/presentation/receipt_body.dart';
 import 'package:pos_app/features/receipts/presentation/receipt_pdf_service.dart';
+import 'package:pos_app/features/returns/domain/process_return.dart';
+import 'package:pos_app/features/returns/domain/void_order.dart' as void_svc;
 
 // ─── Data bundle ──────────────────────────────────────────────────────────────
 
@@ -58,7 +61,7 @@ class OrderDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final detailAsync = ref.watch(_orderDetailProvider(orderId));
-    final symbol = ref.watch(currencySymbolProvider);
+    final fmt = ref.watch(currencyFormatterProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -70,7 +73,7 @@ class OrderDetailScreen extends ConsumerWidget {
               if (data == null) return;
               switch (v) {
                 case 'pdf':
-                  await downloadReceiptPdf(context, data.receipt, symbol);
+                  await downloadReceiptPdf(context, data.receipt, fmt);
               }
             },
             itemBuilder: (_) => const [
@@ -104,7 +107,7 @@ class OrderDetailScreen extends ConsumerWidget {
       ),
       body: detailAsync.when(
         data: (data) => _DetailBody(
-            data: data, symbol: symbol, orderId: orderId, ref: ref),
+            data: data, fmt: fmt, orderId: orderId, ref: ref),
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
       ),
@@ -117,12 +120,12 @@ class OrderDetailScreen extends ConsumerWidget {
 class _DetailBody extends StatelessWidget {
   const _DetailBody({
     required this.data,
-    required this.symbol,
+    required this.fmt,
     required this.orderId,
     required this.ref,
   });
   final _DetailData data;
-  final String symbol;
+  final CurrencyFormatter fmt;
   final int orderId;
   final WidgetRef ref;
 
@@ -169,7 +172,7 @@ class _DetailBody extends StatelessWidget {
 
         // ── Receipt body ──────────────────────────────────────────────────
         Expanded(
-          child: ReceiptBody(data: data.receipt, symbol: symbol),
+          child: ReceiptBody(data: data.receipt, fmt: fmt),
         ),
 
         // ── Action bar ────────────────────────────────────────────────────
@@ -221,7 +224,7 @@ class _DetailBody extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-                'This will mark the order as voided. Stock will NOT be restocked automatically.'),
+                'This marks the order as voided and reverses every stock deduction. Composite components are restocked automatically.'),
             const SizedBox(height: 16),
             TextField(
               controller: reasonCtrl,
@@ -250,13 +253,25 @@ class _DetailBody extends StatelessWidget {
 
     final db = ref.read(databaseProvider);
     final audit = ref.read(auditServiceProvider);
-    await db.ordersDao.voidOrder(orderId);
-    await audit.orderVoided(
-      orderId,
-      reason: reasonCtrl.text.trim().isEmpty ? null : reasonCtrl.text.trim(),
+    final reason = reasonCtrl.text.trim();
+
+    final ok = await withErrorSnackbar(
+      context,
+      () async {
+        await void_svc.voidOrder(
+          db,
+          audit,
+          orderId: orderId,
+          reason: reason.isEmpty ? '(no reason given)' : reason,
+        );
+        return true;
+      },
+      failurePrefix: 'Void failed',
     );
+    if (ok != true) return;
 
     if (context.mounted) {
+      ref.invalidate(_orderDetailProvider(orderId));
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Order voided')),
       );
@@ -333,36 +348,29 @@ class _DetailBody extends StatelessWidget {
     final db = ref.read(databaseProvider);
     final audit = ref.read(auditServiceProvider);
 
-    await db.ordersDao.insertReturn(
-      ReturnsCompanion.insert(
-        orderId: orderId,
-        amount: amount,
-        restock: Value(restock),
-        reason: Value(reason),
-      ),
+    final ok = await withErrorSnackbar(
+      context,
+      () async {
+        await processReturn(
+          db,
+          audit,
+          orderId: orderId,
+          amount: amount,
+          restock: restock,
+          reason: reason,
+        );
+        return true;
+      },
+      failurePrefix: 'Refund failed',
     );
-    await db.ordersDao.refundOrder(orderId);
-
-    if (restock) {
-      for (final item in data.receipt.items) {
-        await db.productsDao.adjustStock(item.productId, item.quantity);
-      }
-    }
-
-    await audit.log(
-      entityType: 'order',
-      entityId: orderId,
-      action: 'refund',
-      newValue: {'amount': amount, 'restock': restock},
-      metadata: reason != null ? {'reason': reason} : null,
-    );
+    if (ok != true) return;
 
     if (context.mounted) {
       ref.invalidate(_orderDetailProvider(orderId));
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
             content: Text(
-                'Refund of ${amount.toStringAsFixed(2)} recorded')),
+                'Refund of ${fmt.format(amount)} recorded')),
       );
       Navigator.pop(context);
     }

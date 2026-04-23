@@ -8,10 +8,12 @@ class ProductComponents extends Table {
   IntColumn get id => integer().autoIncrement()();
 
   /// The composite (bundle) product that owns this component.
+  @ReferenceName('compositeComponents')
   IntColumn get compositeProductId =>
       integer().references(Products, #id, onDelete: KeyAction.cascade)();
 
   /// The component product being consumed.
+  @ReferenceName('usedInComponents')
   IntColumn get componentProductId =>
       integer().references(Products, #id, onDelete: KeyAction.restrict)();
 

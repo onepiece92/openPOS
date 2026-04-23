@@ -8,12 +8,14 @@ class PosFilterState {
     this.selectedCategoryId,
     this.isGrid = true,
     this.search = '',
+    this.favoritesOnly = false,
   });
 
   final PosSortMode sortMode;
   final int? selectedCategoryId;
   final bool isGrid;
   final String search;
+  final bool favoritesOnly;
 
   PosFilterState copyWith({
     PosSortMode? sortMode,
@@ -21,6 +23,7 @@ class PosFilterState {
     bool clearCategory = false,
     bool? isGrid,
     String? search,
+    bool? favoritesOnly,
   }) =>
       PosFilterState(
         sortMode: sortMode ?? this.sortMode,
@@ -29,6 +32,7 @@ class PosFilterState {
             : (selectedCategoryId ?? this.selectedCategoryId),
         isGrid: isGrid ?? this.isGrid,
         search: search ?? this.search,
+        favoritesOnly: favoritesOnly ?? this.favoritesOnly,
       );
 }
 
@@ -42,6 +46,8 @@ class PosFilterNotifier extends StateNotifier<PosFilterState> {
   void toggleView() => state = state.copyWith(isGrid: !state.isGrid);
   void setSearch(String q) => state = state.copyWith(search: q);
   void clearSearch() => state = state.copyWith(search: '');
+  void toggleFavoritesOnly() =>
+      state = state.copyWith(favoritesOnly: !state.favoritesOnly);
 }
 
 final posFilterProvider =

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/services/demo_data_service.dart';
+import 'package:pos_app/core/utils/currency_formatter.dart';
 import 'package:pos_app/features/cart/domain/cart_item.dart';
 import 'package:pos_app/features/cart/domain/cart_notifier.dart';
 import 'package:pos_app/features/cart/domain/pos_filter_provider.dart';
@@ -11,6 +12,7 @@ import 'package:pos_app/features/cart/presentation/widgets/grid_product_tile.dar
 import 'package:pos_app/features/cart/presentation/widgets/checkout_bar.dart';
 import 'package:pos_app/features/cart/presentation/widgets/held_tickets_bar.dart';
 import 'package:pos_app/features/cart/presentation/widgets/product_tile.dart';
+import 'package:pos_app/features/products/domain/favorites_provider.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
 import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
 
@@ -48,10 +50,14 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     List<Product> all,
     Map<int, int> salesCounts,
     PosFilterState f,
+    Set<int> favorites,
   ) {
     var list = f.selectedCategoryId == null
         ? all
         : all.where((p) => p.categoryId == f.selectedCategoryId).toList();
+    if (f.favoritesOnly) {
+      list = list.where((p) => favorites.contains(p.id)).toList();
+    }
     if (f.search.isNotEmpty) {
       final q = f.search.toLowerCase();
       list = list
@@ -62,8 +68,11 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     }
     switch (f.sortMode) {
       case PosSortMode.mostSold:
-        list.sort((a, b) =>
-            (salesCounts[b.id] ?? 0).compareTo(salesCounts[a.id] ?? 0));
+        list.sort((a, b) {
+          final diff =
+              (salesCounts[b.id] ?? 0).compareTo(salesCounts[a.id] ?? 0);
+          return diff != 0 ? diff : a.name.compareTo(b.name);
+        });
       case PosSortMode.nameAZ:
         list.sort((a, b) => a.name.compareTo(b.name));
       case PosSortMode.nameZA:
@@ -82,12 +91,28 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     final categoriesAsync = ref.watch(categoriesStreamProvider);
     final salesCountsAsync = ref.watch(productSalesCountProvider);
     final cart = ref.watch(cartProvider);
-    final symbol = ref.watch(currencySymbolProvider);
+    final fmt = ref.watch(currencyFormatterProvider);
     final cs = Theme.of(context).colorScheme;
     final salesCounts = salesCountsAsync.valueOrNull ?? {};
-    final assignedCustomerId = ref.watch(cartSessionProvider).customerId;
     final filter = ref.watch(posFilterProvider);
     final filterN = ref.read(posFilterProvider.notifier);
+    final favorites = ref.watch(favoritesProvider);
+    final favoritesN = ref.read(favoritesProvider.notifier);
+
+    // Cap cart qty at stock for tracked products.
+    // Unlimited (qty=0) and flagged out-of-stock are untouched here —
+    // out-of-stock tiles are already blocked upstream.
+    bool allowQty(Product p, int desiredQty) {
+      if (p.stockQuantity <= 0) return true;
+      if (desiredQty <= p.stockQuantity) return true;
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(
+          content: Text('Only ${p.stockQuantity} in stock for ${p.name}'),
+          duration: const Duration(seconds: 2),
+        ));
+      return false;
+    }
     if (_searchCtrl.text != filter.search) {
       _searchCtrl.text = filter.search;
       _searchCtrl.selection =
@@ -100,16 +125,11 @@ class _CartScreenState extends ConsumerState<CartScreen> {
             title: const Text('POS'),
             actions: [
               IconButton(
-                icon: Icon(
-                  assignedCustomerId != null
-                      ? Icons.person_rounded
-                      : Icons.person_outline_rounded,
-                  color: assignedCustomerId != null ? cs.primary : null,
-                ),
-                tooltip: assignedCustomerId != null
-                    ? 'Customer assigned'
-                    : 'Assign customer',
-                onPressed: () => context.push('/customers'),
+                icon: const Icon(Icons.remove_shopping_cart_rounded),
+                tooltip: 'Clear cart',
+                onPressed: cart.isEmpty
+                    ? null
+                    : () => ref.read(cartProvider.notifier).clear(),
               ),
               PopupMenuButton<String>(
                 onSelected: (v) async {
@@ -303,6 +323,12 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                   categories: cats,
                   selected: filter.selectedCategoryId,
                   onSelect: filterN.setCategory,
+                  favoritesOnly: filter.favoritesOnly,
+                  onToggleFavoritesOnly: filterN.toggleFavoritesOnly,
+                  onSelectAll: () {
+                    filterN.setCategory(null);
+                    if (filter.favoritesOnly) filterN.toggleFavoritesOnly();
+                  },
                 ),
                 loading: () => const SizedBox(height: 44),
                 error: (_, __) => const SizedBox.shrink(),
@@ -311,7 +337,8 @@ class _CartScreenState extends ConsumerState<CartScreen> {
               Expanded(
                 child: productsAsync.when(
                   data: (all) {
-                    final filtered = _applyFilter(all, salesCounts, filter);
+                    final filtered =
+                        _applyFilter(all, salesCounts, filter, favorites);
                     if (all.isEmpty) {
                       return _EmptyProductsState(
                         onAddProduct: () => context.push('/products/add'),
@@ -319,30 +346,48 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                     }
                     if (filtered.isEmpty) {
                       return Center(
-                        child: Text('No results',
-                            style: TextStyle(color: cs.onSurfaceVariant)),
+                        child: Text(
+                          filter.favoritesOnly
+                              ? 'No favorites yet — tap the star on any product'
+                              : 'No results',
+                          style: TextStyle(color: cs.onSurfaceVariant),
+                          textAlign: TextAlign.center,
+                        ),
                       );
+                    }
+                    final productsById = {for (final p in all) p.id: p};
+                    final cartMap = {
+                      for (final i in cart) i.productId: i.quantity,
+                    };
+                    void tryAdd(Product p) {
+                      final current = cartMap[p.id] ?? 0;
+                      if (!allowQty(p, current + 1)) return;
+                      ref.read(cartProvider.notifier).addProduct(p);
+                    }
+                    void trySetQty(int id, int qty) {
+                      final p = productsById[id];
+                      if (p != null && qty > 0 && !allowQty(p, qty)) return;
+                      ref.read(cartProvider.notifier).setQuantity(id, qty);
                     }
                     if (filter.isGrid) {
                       return _PosProductGrid(
                         products: filtered,
                         cart: cart,
-                        currencySymbol: symbol,
-                        onTap: (p) =>
-                            ref.read(cartProvider.notifier).addProduct(p),
-                        onSetQuantity: (id, qty) => ref
-                            .read(cartProvider.notifier)
-                            .setQuantity(id, qty),
+                        fmt: fmt,
+                        favorites: favorites,
+                        onToggleFavorite: favoritesN.toggle,
+                        onTap: tryAdd,
+                        onSetQuantity: trySetQty,
                       );
                     }
                     return _PosProductList(
                       products: filtered,
                       cart: cart,
-                      currencySymbol: symbol,
-                      onTap: (p) =>
-                          ref.read(cartProvider.notifier).addProduct(p),
-                      onSetQuantity: (id, qty) =>
-                          ref.read(cartProvider.notifier).setQuantity(id, qty),
+                      fmt: fmt,
+                      favorites: favorites,
+                      onToggleFavorite: favoritesN.toggle,
+                      onTap: tryAdd,
+                      onSetQuantity: trySetQty,
                     );
                   },
                   loading: () =>
@@ -445,30 +490,43 @@ class _CategoryRow extends StatelessWidget {
     required this.categories,
     required this.selected,
     required this.onSelect,
+    required this.favoritesOnly,
+    required this.onToggleFavoritesOnly,
+    required this.onSelectAll,
   });
   final List<Category> categories;
   final int? selected;
   final ValueChanged<int?> onSelect;
+  final bool favoritesOnly;
+  final VoidCallback onToggleFavoritesOnly;
+  final VoidCallback onSelectAll;
 
   @override
   Widget build(BuildContext context) {
-    if (categories.isEmpty) return const SizedBox.shrink();
     return SizedBox(
-      height: 44,
-      child: ListView(
+      height: 48,
+      child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        children: [
-          _Chip(
+        child: Row(
+          children: [
+            _Chip(
+              label: '★',
+              selected: favoritesOnly,
+              onTap: onToggleFavoritesOnly,
+            ),
+            _Chip(
               label: 'All',
-              selected: selected == null,
-              onTap: () => onSelect(null)),
-          ...categories.map((c) => _Chip(
-                label: c.name,
-                selected: selected == c.id,
-                onTap: () => onSelect(c.id),
-              )),
-        ],
+              selected: selected == null && !favoritesOnly,
+              onTap: onSelectAll,
+            ),
+            ...categories.map((c) => _Chip(
+                  label: c.name,
+                  selected: selected == c.id,
+                  onTap: () => onSelect(selected == c.id ? null : c.id),
+                )),
+          ],
+        ),
       ),
     );
   }
@@ -490,6 +548,7 @@ class _Chip extends StatelessWidget {
           onSelected: (_) => onTap(),
           showCheckmark: false,
           visualDensity: VisualDensity.compact,
+          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
         ),
       );
 }
@@ -500,15 +559,19 @@ class _PosProductGrid extends StatelessWidget {
   const _PosProductGrid({
     required this.products,
     required this.cart,
-    required this.currencySymbol,
+    required this.fmt,
     required this.onTap,
     required this.onSetQuantity,
+    required this.favorites,
+    required this.onToggleFavorite,
   });
   final List<Product> products;
   final List<CartItem> cart;
-  final String currencySymbol;
+  final CurrencyFormatter fmt;
   final ValueChanged<Product> onTap;
   final void Function(int productId, int qty) onSetQuantity;
+  final Set<int> favorites;
+  final ValueChanged<int> onToggleFavorite;
 
   @override
   Widget build(BuildContext context) {
@@ -527,8 +590,10 @@ class _PosProductGrid extends StatelessWidget {
         final qty = cartMap[p.id] ?? 0;
         return GridProductTile(
           product: p,
-          currencySymbol: currencySymbol,
+          fmt: fmt,
           qtyInCart: qty,
+          isFavorite: favorites.contains(p.id),
+          onToggleFavorite: () => onToggleFavorite(p.id),
           onTap: () => onTap(p),
           onIncrement: () => onSetQuantity(p.id, qty + 1),
           onDecrement: () => onSetQuantity(p.id, qty - 1),
@@ -544,15 +609,19 @@ class _PosProductList extends StatelessWidget {
   const _PosProductList({
     required this.products,
     required this.cart,
-    required this.currencySymbol,
+    required this.fmt,
     required this.onTap,
     required this.onSetQuantity,
+    required this.favorites,
+    required this.onToggleFavorite,
   });
   final List<Product> products;
   final List<CartItem> cart;
-  final String currencySymbol;
+  final CurrencyFormatter fmt;
   final ValueChanged<Product> onTap;
   final void Function(int productId, int qty) onSetQuantity;
+  final Set<int> favorites;
+  final ValueChanged<int> onToggleFavorite;
 
   @override
   Widget build(BuildContext context) {
@@ -579,8 +648,10 @@ class _PosProductList extends StatelessWidget {
         final qty = cartMap[p.id] ?? 0;
         return PosProductTile(
           product: p,
-          currencySymbol: currencySymbol,
+          fmt: fmt,
           qtyInCart: qty,
+          isFavorite: favorites.contains(p.id),
+          onToggleFavorite: () => onToggleFavorite(p.id),
           onTap: () => onTap(p),
           onIncrement: () => onSetQuantity(p.id, qty + 1),
           onDecrement: () => onSetQuantity(p.id, qty - 1),

@@ -1,14 +1,21 @@
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
+import 'package:pos_app/core/providers/hive_provider.dart';
 
 class DemoDataService {
-  DemoDataService(this._db);
+  DemoDataService(this._db, this._settings);
   final AppDatabase _db;
+  final Box<dynamic> _settings;
 
   Future<void> seed() async {
+    // ── Store profile ─────────────────────────────────────────────────────
+    await saveBusinessName(_settings, 'Rebuzz POS');
+    await saveBusinessPhone(_settings, '9826189697');
+
     // ── Categories ────────────────────────────────────────────────────────
     final catIds = <String, int>{};
     final catRows = [
@@ -112,11 +119,11 @@ class DemoDataService {
     // ── Customers ─────────────────────────────────────────────────────────
     // (name, phone, email, loyaltyPts, defaultDiscount, isPercent)
     final customerDefs = [
-      ('Anita Sharma',   '9841000001', 'anita@gmail.com',   350, 10.0, true),
-      ('Bikash Thapa',   '9851000002', null,                120,  0.0, false),
-      ('Sushma Karki',   '9861000003', 'sushma@gmail.com',  560, 15.0, true),
-      ('Dipak Rai',      '9841000004', null,                 80, 50.0, false),
-      ('Priya Maharjan', '9851000005', 'priya@outlook.com', 200,  5.0, true),
+      ('Sujan Sales Lead',   '9826189697', 'support@gmail.com',   350, 20.0, true),
+      ('Deepace AI Agent',   '9802856675', 'mail@brandbuilder.com.np', 12000,  20.0, true),
+      ('Soniya Support',   '9841000002', null,  560, 0.0, false),
+      ('Bishesh CMO',   '9804177364', null,   80000, 40.0, true),
+      ('G Rocks', '9814178314', 'godvinG@gmail.com', 6769,  36.0, true),
     ];
     final customerIds = <int>[];
     for (final (name, phone, email, pts, disc, isPct) in customerDefs) {
@@ -242,5 +249,8 @@ class DemoDataService {
 }
 
 final demoDataServiceProvider = Provider<DemoDataService>((ref) {
-  return DemoDataService(ref.watch(databaseProvider));
+  return DemoDataService(
+    ref.watch(databaseProvider),
+    ref.watch(settingsBoxProvider),
+  );
 });

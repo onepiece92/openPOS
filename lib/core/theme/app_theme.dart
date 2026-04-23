@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
+
+import 'package:pos_app/core/theme/tokens.dart';
 
 /// iOS 26 / iPhone 17 "Liquid Glass" inspired theme.
 ///
@@ -57,17 +58,37 @@ abstract final class AppTheme {
     final dark = cs.brightness == Brightness.dark;
     return BoxDecoration(
       color: dark
-          ? const Color(0xFF0E0E1E).withValues(alpha: 0.82)
+          ? const Color(0xFF0E0E1E).withValues(alpha: AppOpacity.heavy)
           : Colors.white.withValues(alpha: 0.80),
       border: Border(
         top: BorderSide(
           color: dark
               ? Colors.white.withValues(alpha: 0.09)
-              : Colors.black.withValues(alpha: 0.07),
+              : Colors.black.withValues(alpha: AppOpacity.subtle),
         ),
       ),
     );
   }
+
+  // ── Semantic text-style helpers ───────────────────────────────────────────
+  //
+  // Pre-composed styles that match recurring patterns (section headers,
+  // subtle captions). Prefer these over `textTheme.x.copyWith(...)` at call
+  // sites so the look stays consistent across screens.
+
+  static TextStyle sectionLabel(BuildContext ctx) => Theme.of(ctx)
+      .textTheme
+      .labelSmall!
+      .copyWith(
+        color: Theme.of(ctx).colorScheme.primary,
+        fontWeight: FontWeight.bold,
+        letterSpacing: 1.2,
+      );
+
+  static TextStyle subtleCaption(BuildContext ctx) => Theme.of(ctx)
+      .textTheme
+      .bodySmall!
+      .copyWith(color: Theme.of(ctx).colorScheme.onSurfaceVariant);
 
   // ── Glass decoration helpers ──────────────────────────────────────────────
 
@@ -174,36 +195,44 @@ abstract final class AppTheme {
 
   // ── Text theme ────────────────────────────────────────────────────────────
 
+  static const _fontFamily = 'JetBrainsMono';
+
   static TextTheme _textTheme(Brightness brightness) {
     final base = brightness == Brightness.dark
         ? ThemeData.dark().textTheme
         : ThemeData.light().textTheme;
-    return GoogleFonts.jetBrainsMonoTextTheme(base).copyWith(
-      displayLarge: GoogleFonts.jetBrainsMono(
+    return base.apply(fontFamily: _fontFamily).copyWith(
+      displayLarge: const TextStyle(
+        fontFamily: _fontFamily,
         fontSize: 57,
         fontWeight: FontWeight.w300,
         letterSpacing: -1.0,
       ),
-      headlineLarge: GoogleFonts.jetBrainsMono(
+      headlineLarge: const TextStyle(
+        fontFamily: _fontFamily,
         fontSize: 32,
         fontWeight: FontWeight.w700,
         letterSpacing: -0.5,
       ),
-      titleLarge: GoogleFonts.jetBrainsMono(
+      titleLarge: const TextStyle(
+        fontFamily: _fontFamily,
         fontSize: 22,
         fontWeight: FontWeight.w700,
         letterSpacing: -0.3,
       ),
-      titleMedium: GoogleFonts.jetBrainsMono(
+      titleMedium: const TextStyle(
+        fontFamily: _fontFamily,
         fontSize: 16,
         fontWeight: FontWeight.w600,
         letterSpacing: -0.1,
       ),
-      titleSmall: GoogleFonts.jetBrainsMono(
+      titleSmall: const TextStyle(
+        fontFamily: _fontFamily,
         fontSize: 14,
         fontWeight: FontWeight.w600,
       ),
-      labelLarge: GoogleFonts.jetBrainsMono(
+      labelLarge: const TextStyle(
+        fontFamily: _fontFamily,
         fontSize: 14,
         fontWeight: FontWeight.w700,
         letterSpacing: 0.1,

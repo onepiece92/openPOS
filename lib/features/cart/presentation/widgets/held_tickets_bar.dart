@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import 'package:pos_app/core/theme/tron_border.dart';
+import 'package:pos_app/core/utils/currency_formatter.dart';
 import 'package:pos_app/core/widgets/customer_avatar.dart';
 import 'package:pos_app/features/cart/domain/cart_notifier.dart';
 import 'package:pos_app/features/cart/domain/held_order.dart';
@@ -140,7 +141,7 @@ class _HeldTicketsSheetState extends ConsumerState<_HeldTicketsSheet>
   Widget build(BuildContext context) {
     final active = ref.watch(activeHeldOrdersProvider);
     final archived = ref.watch(archivedHeldOrdersProvider);
-    final symbol = ref.watch(currencySymbolProvider);
+    final fmt = ref.watch(currencyFormatterProvider);
     final cs = Theme.of(context).colorScheme;
     final dateFmt = DateFormat('dd MMM  HH:mm');
 
@@ -167,9 +168,9 @@ class _HeldTicketsSheetState extends ConsumerState<_HeldTicketsSheet>
               controller: _tabCtrl,
               children: [
                 // ── Active tab ──────────────────────────────────────
-                _buildActiveList(ctx, active, symbol, cs, dateFmt),
+                _buildActiveList(ctx, active, fmt, cs, dateFmt),
                 // ── Archived tab ────────────────────────────────────
-                _buildArchivedList(ctx, archived, symbol, cs, dateFmt),
+                _buildArchivedList(ctx, archived, fmt, cs, dateFmt),
               ],
             ),
           ),
@@ -179,7 +180,7 @@ class _HeldTicketsSheetState extends ConsumerState<_HeldTicketsSheet>
   }
 
   Widget _buildActiveList(BuildContext ctx, List<HeldOrder> active,
-      String symbol, ColorScheme cs, DateFormat dateFmt) {
+      CurrencyFormatter fmt, ColorScheme cs, DateFormat dateFmt) {
     if (active.isEmpty) {
       return Center(
         child: Text('No held tickets',
@@ -211,7 +212,7 @@ class _HeldTicketsSheetState extends ConsumerState<_HeldTicketsSheet>
           title: Text(ticket.label),
           subtitle: Text(
             '${ticket.itemCount} items · '
-            '$symbol ${ticket.subtotal.toStringAsFixed(2)} · '
+            '${fmt.format(ticket.subtotal)} · '
             '${dateFmt.format(ticket.createdAt)}',
           ),
           trailing: IconButton(
@@ -227,7 +228,7 @@ class _HeldTicketsSheetState extends ConsumerState<_HeldTicketsSheet>
   }
 
   Widget _buildArchivedList(BuildContext ctx, List<HeldOrder> archived,
-      String symbol, ColorScheme cs, DateFormat dateFmt) {
+      CurrencyFormatter fmt, ColorScheme cs, DateFormat dateFmt) {
     if (archived.isEmpty) {
       return Center(
         child: Text('No archived tickets',
@@ -284,7 +285,7 @@ class _HeldTicketsSheetState extends ConsumerState<_HeldTicketsSheet>
           title: Text(ticket.label),
           subtitle: Text(
             '${ticket.itemCount} items · '
-            '$symbol ${ticket.subtotal.toStringAsFixed(2)} · '
+            '${fmt.format(ticket.subtotal)} · '
             '${dateFmt.format(ticket.createdAt)}',
           ),
           trailing: Row(

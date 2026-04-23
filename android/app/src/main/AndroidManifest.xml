@@ -1,9 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Internet & Network (connectivity_plus, google_fonts) -->
-    <uses-permission android:name="android.permission.INTERNET"/>
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
-
     <!-- Camera (mobile_scanner, image_picker) -->
     <uses-permission android:name="android.permission.CAMERA"/>
 
@@ -25,7 +21,7 @@
     <!-- Notifications (flutter_local_notifications, Android 13+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 
-    <!-- Background work (workmanager, flutter_local_notifications) -->
+    <!-- Background work (flutter_local_notifications) -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>

@@ -1,21 +1,30 @@
 import 'package:flutter/material.dart' show BuildContext;
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
+import 'package:pos_app/core/utils/currency_formatter.dart';
 import 'package:pos_app/features/receipts/presentation/receipt_body.dart';
+
+Future<pw.Font> _loadFont(String path) async {
+  final data = await rootBundle.load(path);
+  return pw.Font.ttf(data);
+}
 
 // ─── PDF builder ──────────────────────────────────────────────────────────────
 
-Future<pw.Document> buildReceiptPdf(ReceiptBodyData data, String symbol) async {
+Future<pw.Document> buildReceiptPdf(
+    ReceiptBodyData data, CurrencyFormatter fmt) async {
   final doc = pw.Document();
   final dateFmt = DateFormat('MM/dd/yyyy hh:mm:ss a');
+  final symbolLabel = fmt.symbol.trim();
 
-  // Load JetBrains Mono for PDF
-  final font = await PdfGoogleFonts.jetBrainsMonoRegular();
-  final fontBold = await PdfGoogleFonts.jetBrainsMonoBold();
-  final fontItalic = await PdfGoogleFonts.jetBrainsMonoItalic();
+  // Load JetBrains Mono for PDF (bundled, offline)
+  final font = await _loadFont('assets/fonts/JetBrainsMono-Regular.ttf');
+  final fontBold = await _loadFont('assets/fonts/JetBrainsMono-Bold.ttf');
+  final fontItalic = await _loadFont('assets/fonts/JetBrainsMono-Italic.ttf');
 
   // Styles
   final baseStyle = pw.TextStyle(fontSize: 10, font: font);
@@ -79,8 +88,8 @@ Future<pw.Document> buildReceiptPdf(ReceiptBodyData data, String symbol) async {
                         decoration: pw.TextDecoration.underline)),
               ),
               _headerCell('Qty', fontBold),
-              _headerCell('Rate ($symbol)', fontBold),
-              _headerCell('Amt ($symbol)', fontBold),
+              _headerCell('Rate ($symbolLabel)', fontBold),
+              _headerCell('Amt ($symbolLabel)', fontBold),
             ],
           ),
           pw.SizedBox(height: 2),
@@ -95,8 +104,8 @@ Future<pw.Document> buildReceiptPdf(ReceiptBodyData data, String symbol) async {
                         flex: 5,
                         child: pw.Text(item.productName, style: baseStyle)),
                     _dataCell('x ${item.quantity}', font),
-                    _dataCell(item.unitPrice.toStringAsFixed(2), font),
-                    _dataCell(item.lineTotal.toStringAsFixed(2), font),
+                    _dataCell(fmt.formatPlain(item.unitPrice), font),
+                    _dataCell(fmt.formatPlain(item.lineTotal), font),
                   ],
                 ),
               )),
@@ -104,16 +113,14 @@ Future<pw.Document> buildReceiptPdf(ReceiptBodyData data, String symbol) async {
           divider(),
 
           // ── Subtotals ───────────────────────────────────────────────────
-          billRow('Total', '$symbol ${order.subtotal.toStringAsFixed(2)}'),
-          billRow(
-              'Discount', '$symbol ${order.discountTotal.toStringAsFixed(2)}'),
+          billRow('Total', fmt.format(order.subtotal)),
+          billRow('Discount', fmt.format(order.discountTotal)),
           ...data.taxes.map((t) => billRow(
                 '${t.taxRateName} (${(t.taxRatePercent * 100).toStringAsFixed(1)}%)',
-                '$symbol ${t.taxAmount.toStringAsFixed(2)}',
+                fmt.format(t.taxAmount),
               )),
           divider(),
-          billRow('Grand Total', '$symbol ${order.total.toStringAsFixed(2)}',
-              bold: true),
+          billRow('Grand Total', fmt.format(order.total), bold: true),
           divider(),
 
           // ── Payment info ────────────────────────────────────────────────
@@ -132,10 +139,8 @@ Future<pw.Document> buildReceiptPdf(ReceiptBodyData data, String symbol) async {
           ),
           if (order.tenderedAmount != null) ...[
             pw.SizedBox(height: 2),
-            billRow('Cash Tendered',
-                '$symbol ${order.tenderedAmount!.toStringAsFixed(2)}'),
-            billRow('Change',
-                '$symbol ${(order.changeAmount ?? 0).toStringAsFixed(2)}'),
+            billRow('Cash Tendered', fmt.format(order.tenderedAmount!)),
+            billRow('Change', fmt.format(order.changeAmount ?? 0)),
           ],
           divider(),
 
@@ -169,8 +174,8 @@ Future<pw.Document> buildReceiptPdf(ReceiptBodyData data, String symbol) async {
 // ─── Action: save / share PDF ─────────────────────────────────────────────────
 
 Future<void> downloadReceiptPdf(
-    BuildContext context, ReceiptBodyData data, String symbol) async {
-  final doc = await buildReceiptPdf(data, symbol);
+    BuildContext context, ReceiptBodyData data, CurrencyFormatter fmt) async {
+  final doc = await buildReceiptPdf(data, fmt);
   final bytes = await doc.save();
   final fileName = 'receipt_order_${data.order.id}.pdf';
 

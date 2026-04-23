@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 import 'package:pos_app/core/database/app_database.dart';
+import 'package:pos_app/core/theme/tokens.dart';
+import 'package:pos_app/core/utils/currency_formatter.dart';
 
 // ─── Data bundle (public) ─────────────────────────────────────────────────────
 
@@ -24,9 +25,9 @@ class ReceiptBodyData {
 // ─── Reusable receipt body ────────────────────────────────────────────────────
 
 class ReceiptBody extends StatelessWidget {
-  const ReceiptBody({super.key, required this.data, required this.symbol});
+  const ReceiptBody({super.key, required this.data, required this.fmt});
   final ReceiptBodyData data;
-  final String symbol;
+  final CurrencyFormatter fmt;
 
   @override
   Widget build(BuildContext context) {
@@ -34,15 +35,15 @@ class ReceiptBody extends StatelessWidget {
     final order = data.order;
     final dateFmt = DateFormat('MM/dd/yyyy hh:mm:ss a');
     final customerName = data.customer?.name ?? 'Walk-in';
+    final symbolLabel = fmt.symbol.trim();
 
-    final monoFamily = GoogleFonts.jetBrainsMono().fontFamily;
-    final bodyStyle = TextStyle(fontSize: 13.5, height: 1.5, fontFamily: monoFamily);
-    final labelStyle = TextStyle(
-        fontSize: 13.5, height: 1.5, color: const Color(0xFF666666), fontFamily: monoFamily);
-    final boldStyle = TextStyle(
-        fontSize: 13.5, height: 1.5, fontWeight: FontWeight.w700, fontFamily: monoFamily);
-    final headerStyle = TextStyle(
-        fontSize: 14, fontWeight: FontWeight.w700, height: 1.6, fontFamily: monoFamily);
+    const bodyStyle = TextStyle(fontSize: 13.5, height: 1.5, fontFamily: AppFonts.mono);
+    const labelStyle = TextStyle(
+        fontSize: 13.5, height: 1.5, color: Color(0xFF666666), fontFamily: AppFonts.mono);
+    const boldStyle = TextStyle(
+        fontSize: 13.5, height: 1.5, fontWeight: FontWeight.w700, fontFamily: AppFonts.mono);
+    const headerStyle = TextStyle(
+        fontSize: 14, fontWeight: FontWeight.w700, height: 1.6, fontFamily: AppFonts.mono);
 
     final divider = Divider(height: 20, thickness: 0.8, color: cs.outlineVariant);
 
@@ -98,8 +99,8 @@ class ReceiptBody extends StatelessWidget {
                               color: cs.onSurface)),
                     ),
                     _HeaderCell('Qty'),
-                    _HeaderCell('Rate ($symbol)'),
-                    _HeaderCell('Amt ($symbol)'),
+                    _HeaderCell('Rate ($symbolLabel)'),
+                    _HeaderCell('Amt ($symbolLabel)'),
                   ],
                 ),
                 const SizedBox(height: 4),
@@ -115,8 +116,8 @@ class ReceiptBody extends StatelessWidget {
                                 style: bodyStyle.copyWith(color: cs.onSurface)),
                           ),
                           _DataCell('x ${item.quantity}'),
-                          _DataCell(item.unitPrice.toStringAsFixed(2)),
-                          _DataCell(item.lineTotal.toStringAsFixed(2)),
+                          _DataCell(fmt.formatPlain(item.unitPrice)),
+                          _DataCell(fmt.formatPlain(item.lineTotal)),
                         ],
                       ),
                     )),
@@ -126,13 +127,13 @@ class ReceiptBody extends StatelessWidget {
                 // ── Subtotals block ───────────────────────────────────────
                 _BillRow(
                   label: 'Total',
-                  value: '$symbol ${order.subtotal.toStringAsFixed(2)}',
+                  value: fmt.format(order.subtotal),
                   labelStyle: labelStyle.copyWith(color: cs.onSurface),
                   valueStyle: bodyStyle.copyWith(color: cs.onSurface),
                 ),
                 _BillRow(
                   label: 'Discount',
-                  value: '$symbol ${order.discountTotal.toStringAsFixed(2)}',
+                  value: fmt.format(order.discountTotal),
                   labelStyle: labelStyle.copyWith(color: cs.onSurface),
                   valueStyle: bodyStyle.copyWith(color: cs.onSurface),
                 ),
@@ -140,7 +141,7 @@ class ReceiptBody extends StatelessWidget {
                   ...data.taxes.map((t) => _BillRow(
                         label:
                             '${t.taxRateName} (${(t.taxRatePercent * 100).toStringAsFixed(1)}%)',
-                        value: '$symbol ${t.taxAmount.toStringAsFixed(2)}',
+                        value: fmt.format(t.taxAmount),
                         labelStyle: labelStyle.copyWith(color: cs.onSurface),
                         valueStyle: bodyStyle.copyWith(color: cs.onSurface),
                       )),
@@ -150,7 +151,7 @@ class ReceiptBody extends StatelessWidget {
                 // ── Grand total ───────────────────────────────────────────
                 _BillRow(
                   label: 'Grand Total',
-                  value: '$symbol ${order.total.toStringAsFixed(2)}',
+                  value: fmt.format(order.total),
                   labelStyle: boldStyle.copyWith(color: cs.onSurface),
                   valueStyle: boldStyle.copyWith(color: cs.onSurface),
                 ),
@@ -178,14 +179,13 @@ class ReceiptBody extends StatelessWidget {
                   const SizedBox(height: 4),
                   _BillRow(
                     label: 'Cash Tendered',
-                    value: '$symbol ${order.tenderedAmount!.toStringAsFixed(2)}',
+                    value: fmt.format(order.tenderedAmount!),
                     labelStyle: labelStyle.copyWith(color: cs.onSurface),
                     valueStyle: bodyStyle.copyWith(color: cs.onSurface),
                   ),
                   _BillRow(
                     label: 'Change',
-                    value:
-                        '$symbol ${(order.changeAmount ?? 0).toStringAsFixed(2)}',
+                    value: fmt.format(order.changeAmount ?? 0),
                     labelStyle: labelStyle.copyWith(color: cs.onSurface),
                     valueStyle: bodyStyle.copyWith(color: cs.onSurface),
                   ),
@@ -241,7 +241,8 @@ class _HeaderCell extends StatelessWidget {
       child: Text(
         text,
         textAlign: TextAlign.right,
-        style: GoogleFonts.jetBrainsMono(
+        style: TextStyle(
+          fontFamily: AppFonts.mono,
           fontSize: 13,
           fontWeight: FontWeight.w600,
           decoration: TextDecoration.underline,
@@ -264,7 +265,7 @@ class _DataCell extends StatelessWidget {
       child: Text(
         text,
         textAlign: TextAlign.right,
-        style: GoogleFonts.jetBrainsMono(fontSize: 13.5, color: cs.onSurface),
+        style: TextStyle(fontFamily: AppFonts.mono, fontSize: 13.5, color: cs.onSurface),
       ),
     );
   }

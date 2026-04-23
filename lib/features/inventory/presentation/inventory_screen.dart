@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
+import 'package:pos_app/core/utils/async_feedback.dart';
+import 'package:pos_app/core/widgets/app_empty_state.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
 import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
 
@@ -33,9 +35,15 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
 
   List<Product> _filtered(List<Product> all, int threshold) {
     var list = switch (_filter) {
-      'out' => all.where((p) => p.stockQuantity <= 0).toList(),
-      'low' =>
-        all.where((p) => p.stockQuantity > 0 && p.stockQuantity <= threshold).toList(),
+      'out' => all
+          .where((p) => p.isOutOfStock || p.stockQuantity < 0)
+          .toList(),
+      'low' => all
+          .where((p) =>
+              !p.isOutOfStock &&
+              p.stockQuantity > 0 &&
+              p.stockQuantity <= threshold)
+          .toList(),
       _ => all,
     };
     if (_search.isNotEmpty) {
@@ -96,12 +104,21 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
       ),
       body: productsAsync.when(
         data: (all) {
-          if (all.isEmpty) return const _EmptyState();
+          if (all.isEmpty) {
+            return const AppEmptyState(
+              icon: Icons.inventory_2_outlined,
+              title: 'No products yet',
+            );
+          }
 
-          final outCount = all.where((p) => p.stockQuantity <= 0).length;
+          final outCount = all
+              .where((p) => p.isOutOfStock || p.stockQuantity < 0)
+              .length;
           final lowCount = all
-              .where(
-                  (p) => p.stockQuantity > 0 && p.stockQuantity <= threshold)
+              .where((p) =>
+                  !p.isOutOfStock &&
+                  p.stockQuantity > 0 &&
+                  p.stockQuantity <= threshold)
               .length;
           final filtered = _filtered(all, threshold);
 
@@ -122,15 +139,13 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
                     ? Center(
                         child: Text(
                           'No products match.',
-                          style:
-                              TextStyle(color: cs.onSurfaceVariant),
+                          style: TextStyle(color: cs.onSurfaceVariant),
                         ),
                       )
                     : ListView.separated(
                         padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
                         itemCount: filtered.length,
-                        separatorBuilder: (_, __) =>
-                            const SizedBox(height: 8),
+                        separatorBuilder: (_, __) => const SizedBox(height: 8),
                         itemBuilder: (_, i) => _InventoryCard(
                           product: filtered[i],
                           threshold: threshold,
@@ -252,29 +267,117 @@ class _InventoryCard extends ConsumerWidget {
   final int threshold;
 
   Color _badgeColor(ColorScheme cs) {
-    if (product.stockQuantity <= 0) return cs.error;
-    if (product.stockQuantity <= threshold) return const Color(0xFFD97706);
+    if (product.isOutOfStock || product.stockQuantity < 0) return cs.error;
+    if (product.stockQuantity > 0 && product.stockQuantity <= threshold) {
+      return const Color(0xFFD97706);
+    }
     return cs.primary;
   }
 
-  Future<void> _nudge(WidgetRef ref, int delta) async {
+  String _qtyLabel() {
+    if (product.isOutOfStock || product.stockQuantity < 0) return 'Out';
+    if (product.stockQuantity == 0) return '∞';
+    return '${product.stockQuantity}';
+  }
+
+  /// Stepper state machine for TRACKED products only: Out ↔ 1 ↔ 2 ↔ 3 ↔ …
+  ///
+  /// Unlimited products (qty=0, !isOutOfStock) disable the stepper entirely —
+  /// the only way in/out of unlimited is the overflow menu's "Track stock" toggle.
+  ///
+  /// All writes batched in one transaction → single stream emission per tap.
+  Future<void> _increment(BuildContext context, WidgetRef ref) async {
+    final qty = product.stockQuantity;
+    final isOut = product.isOutOfStock;
+
+    final int newQty;
+    final bool newIsOut;
+    final int delta;
+    final String reason;
+
+    if (isOut) {
+      // Out → 1
+      newQty = 1;
+      newIsOut = false;
+      delta = 1;
+      reason = 'manual_add';
+    } else if (qty > 0) {
+      // N → N+1
+      newQty = qty + 1;
+      newIsOut = false;
+      delta = 1;
+      reason = 'manual_add';
+    } else {
+      // Unlimited — shouldn't fire (button disabled)
+      return;
+    }
+
+    await _apply(context, ref,
+        newQty: newQty, newIsOut: newIsOut, delta: delta, reason: reason);
+  }
+
+  Future<void> _decrement(BuildContext context, WidgetRef ref) async {
+    final qty = product.stockQuantity;
+
+    final int newQty;
+    final bool newIsOut;
+    final int delta;
+    final String reason;
+
+    if (qty > 1) {
+      // N → N-1
+      newQty = qty - 1;
+      newIsOut = false;
+      delta = -1;
+      reason = 'manual_remove';
+    } else if (qty == 1) {
+      // 1 → Out
+      newQty = 0;
+      newIsOut = true;
+      delta = -1;
+      reason = 'manual_remove';
+    } else {
+      // Out or unlimited — shouldn't fire (button disabled)
+      return;
+    }
+
+    await _apply(context, ref,
+        newQty: newQty, newIsOut: newIsOut, delta: delta, reason: reason);
+  }
+
+  Future<void> _apply(
+    BuildContext context,
+    WidgetRef ref, {
+    required int newQty,
+    required bool newIsOut,
+    required int delta,
+    required String reason,
+  }) async {
     final db = ref.read(databaseProvider);
-    final newQty = (product.stockQuantity + delta).clamp(0, 999999);
-    await db.productsDao.setStock(product.id, newQty);
-    await db.inventoryDao.logAdjustment(
-      StockAdjustmentsCompanion.insert(
-        productId: product.id,
-        delta: delta,
-        reasonCode: delta > 0 ? 'manual_add' : 'manual_remove',
-      ),
+    await withErrorSnackbar(
+      context,
+      () => db.transaction(() async {
+        await db.productsDao.setStockState(
+          product.id,
+          stockQuantity: newQty,
+          isOutOfStock: newIsOut,
+        );
+        await db.inventoryDao.logAdjustment(
+          StockAdjustmentsCompanion.insert(
+            productId: product.id,
+            delta: delta,
+            reasonCode: reason,
+          ),
+        );
+      }),
+      failurePrefix: 'Stock update failed',
     );
   }
 
   Future<void> _setAbsolute(BuildContext context, WidgetRef ref) async {
     final ctrl = TextEditingController(
-        text: product.stockQuantity > 0
-            ? product.stockQuantity.toString()
-            : '');
+        text:
+            product.stockQuantity > 0 ? product.stockQuantity.toString() : '');
     final result = await showDialog<int>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -286,6 +389,7 @@ class _InventoryCard extends ConsumerWidget {
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           decoration: const InputDecoration(
             labelText: 'New stock quantity',
+            helperText: '0 = out of stock',
             border: OutlineInputBorder(),
             suffixText: 'units',
           ),
@@ -296,28 +400,27 @@ class _InventoryCard extends ConsumerWidget {
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () =>
-                Navigator.pop(ctx, int.tryParse(ctrl.text)),
+            onPressed: () => Navigator.pop(ctx, int.tryParse(ctrl.text)),
             child: const Text('Set'),
           ),
         ],
       ),
     );
     ctrl.dispose();
-    if (result == null) return;
+    if (result == null || !context.mounted) return;
 
-    final db = ref.read(databaseProvider);
+    // Tracked product entering 0 → Out (qty=0, isOutOfStock=true).
+    // Entering N > 0 → tracked N, clear out-of-stock flag.
+    // Unlimited products use the overflow menu's Track Stock toggle instead.
     final delta = result - product.stockQuantity;
-    await db.productsDao.setStock(product.id, result);
-    if (delta != 0) {
-      await db.inventoryDao.logAdjustment(
-        StockAdjustmentsCompanion.insert(
-          productId: product.id,
-          delta: delta,
-          reasonCode: 'manual_set',
-        ),
-      );
-    }
+    await _apply(
+      context,
+      ref,
+      newQty: result,
+      newIsOut: result == 0,
+      delta: delta,
+      reason: 'manual_set',
+    );
   }
 
   @override
@@ -360,15 +463,13 @@ class _InventoryCard extends ConsumerWidget {
                 children: [
                   Text(
                     product.name,
-                    style: tt.bodyMedium
-                        ?.copyWith(fontWeight: FontWeight.w600),
+                    style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(
                     product.sku,
-                    style: tt.labelSmall
-                        ?.copyWith(color: cs.onSurfaceVariant),
+                    style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant),
                   ),
                 ],
               ),
@@ -376,11 +477,90 @@ class _InventoryCard extends ConsumerWidget {
             const SizedBox(width: 8),
             // Inline stepper ── [−] [qty] [+]
             _StepperRow(
-              qty: qty,
+              qtyLabel: _qtyLabel(),
               badgeColor: badgeColor,
-              onDecrement: () => _nudge(ref, -1),
-              onIncrement: () => _nudge(ref, 1),
+              canDecrement: qty > 0,
+              canIncrement: product.isOutOfStock || qty > 0,
+              onDecrement: () => _decrement(context, ref),
+              onIncrement: () => _increment(context, ref),
               onQtyTap: () => _setAbsolute(context, ref),
+            ),
+            // Overflow menu
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert_rounded, size: 20),
+              tooltip: 'More',
+              onSelected: (v) async {
+                if (v == 'mark_out') {
+                  await _apply(context, ref,
+                      newQty: product.stockQuantity,
+                      newIsOut: true,
+                      delta: 0,
+                      reason: 'mark_out_of_stock');
+                } else if (v == 'mark_in') {
+                  await _apply(context, ref,
+                      newQty: product.stockQuantity,
+                      newIsOut: false,
+                      delta: 0,
+                      reason: 'mark_back_in_stock');
+                } else if (v == 'stop_tracking') {
+                  await _apply(context, ref,
+                      newQty: 0,
+                      newIsOut: false,
+                      delta: 0,
+                      reason: 'stop_tracking');
+                } else if (v == 'start_tracking') {
+                  await _apply(context, ref,
+                      newQty: 1,
+                      newIsOut: false,
+                      delta: 1,
+                      reason: 'start_tracking');
+                }
+              },
+              itemBuilder: (_) {
+                final isUnlimited =
+                    product.stockQuantity == 0 && !product.isOutOfStock;
+                return [
+                  if (isUnlimited)
+                    const PopupMenuItem(
+                      value: 'start_tracking',
+                      child: ListTile(
+                        leading: Icon(Icons.analytics_outlined),
+                        title: Text('Track stock'),
+                        subtitle: Text('Start counting inventory'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    )
+                  else ...[
+                    if (!product.isOutOfStock)
+                      const PopupMenuItem(
+                        value: 'mark_out',
+                        child: ListTile(
+                          leading: Icon(Icons.block_rounded),
+                          title: Text('Mark out of stock'),
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                      )
+                    else
+                      const PopupMenuItem(
+                        value: 'mark_in',
+                        child: ListTile(
+                          leading: Icon(Icons.check_circle_outline_rounded),
+                          title: Text('Back in stock'),
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                      ),
+                    const PopupMenuItem(
+                      value: 'stop_tracking',
+                      child: ListTile(
+                        leading: Icon(Icons.all_inclusive_rounded),
+                        title: Text('Don\'t track stock'),
+                        subtitle: Text('Mark as unlimited'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                  ],
+                ];
+              },
             ),
           ],
         ),
@@ -393,15 +573,19 @@ class _InventoryCard extends ConsumerWidget {
 
 class _StepperRow extends StatelessWidget {
   const _StepperRow({
-    required this.qty,
+    required this.qtyLabel,
     required this.badgeColor,
+    required this.canDecrement,
+    required this.canIncrement,
     required this.onDecrement,
     required this.onIncrement,
     required this.onQtyTap,
   });
 
-  final int qty;
+  final String qtyLabel;
   final Color badgeColor;
+  final bool canDecrement;
+  final bool canIncrement;
   final VoidCallback onDecrement;
   final VoidCallback onIncrement;
   final VoidCallback onQtyTap;
@@ -415,7 +599,7 @@ class _StepperRow extends StatelessWidget {
         // Decrement
         _StepBtn(
           icon: Icons.remove_rounded,
-          onTap: qty > 0 ? onDecrement : null,
+          onTap: canDecrement ? onDecrement : null,
           cs: cs,
         ),
         // Quantity tappable badge
@@ -423,8 +607,7 @@ class _StepperRow extends StatelessWidget {
           onTap: onQtyTap,
           child: Container(
             constraints: const BoxConstraints(minWidth: 44),
-            padding:
-                const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
             decoration: BoxDecoration(
               color: badgeColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
@@ -433,7 +616,7 @@ class _StepperRow extends StatelessWidget {
             ),
             alignment: Alignment.center,
             child: Text(
-              qty <= 0 ? 'Out' : '$qty',
+              qtyLabel,
               style: TextStyle(
                 fontWeight: FontWeight.w700,
                 fontSize: 13,
@@ -445,7 +628,7 @@ class _StepperRow extends StatelessWidget {
         // Increment
         _StepBtn(
           icon: Icons.add_rounded,
-          onTap: onIncrement,
+          onTap: canIncrement ? onIncrement : null,
           cs: cs,
         ),
       ],
@@ -471,37 +654,12 @@ class _StepBtn extends StatelessWidget {
       child: IconButton(
         padding: EdgeInsets.zero,
         icon: Icon(icon, size: 16),
-        color: onTap == null ? cs.onSurfaceVariant.withValues(alpha: 0.3) : cs.primary,
+        color: onTap == null
+            ? cs.onSurfaceVariant.withValues(alpha: 0.3)
+            : cs.primary,
         onPressed: onTap,
       ),
     );
   }
 }
 
-// ─── Empty state ──────────────────────────────────────────────────────────────
-
-class _EmptyState extends StatelessWidget {
-  const _EmptyState();
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.inventory_2_outlined,
-              size: 72, color: cs.onSurfaceVariant.withValues(alpha: 0.4)),
-          const SizedBox(height: 16),
-          Text(
-            'No products yet',
-            style: Theme.of(context)
-                .textTheme
-                .titleMedium
-                ?.copyWith(color: cs.onSurfaceVariant),
-          ),
-        ],
-      ),
-    );
-  }
-}

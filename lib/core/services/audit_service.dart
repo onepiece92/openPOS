@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:drift/drift.dart' show Value;
 
 import '../database/app_database.dart';
-import '../database/tables/audit_log_table.dart';
 
 /// Convenience wrapper for writing to the append-only audit log.
 /// Call from DAOs or notifiers after any state-changing operation.
@@ -34,10 +33,36 @@ class AuditService {
 
   // ── Convenience methods for common audit events ───────────────────────
 
+  Future<void> orderPlaced(
+    int orderId, {
+    required double total,
+    required String paymentMethod,
+  }) =>
+      log(
+        entityType: 'order',
+        entityId: orderId,
+        action: 'place',
+        newValue: {'total': total, 'payment_method': paymentMethod},
+      );
+
   Future<void> orderVoided(int orderId, {String? reason}) => log(
         entityType: 'order',
         entityId: orderId,
         action: 'void',
+        metadata: reason != null ? {'reason': reason} : null,
+      );
+
+  Future<void> orderRefunded(
+    int orderId, {
+    required double amount,
+    required bool restocked,
+    String? reason,
+  }) =>
+      log(
+        entityType: 'order',
+        entityId: orderId,
+        action: 'refund',
+        newValue: {'amount': amount, 'restocked': restocked},
         metadata: reason != null ? {'reason': reason} : null,
       );
 

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import 'package:pos_app/core/providers/database_provider.dart';
+import 'package:pos_app/core/theme/tokens.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
 import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
 
@@ -317,6 +318,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   .map((p) => ButtonSegment(value: p, label: Text(p.label)))
                   .toList(),
               emptySelectionAllowed: true,
+              showSelectedIcon: false,
               selected: _customRange != null ? {} : {_period},
               onSelectionChanged: (s) {
                 if (s.isEmpty) return;
@@ -466,7 +468,8 @@ class _Body extends StatelessWidget {
                     style: TextStyle(
                         fontWeight: FontWeight.bold,
                         color: cs.primary,
-                        fontSize: 15),
+                        fontSize: 15,
+                        fontFamily: AppFonts.mono),
                   ),
                 ),
                 if (data.payBreakdown.isNotEmpty) ...[
@@ -486,7 +489,9 @@ class _Body extends StatelessWidget {
                         trailing: Text(
                           '$symbol ${_fmt(p.total)}',
                           style: TextStyle(
-                              fontWeight: FontWeight.w600, color: cs.secondary),
+                              fontWeight: FontWeight.w600,
+                              color: cs.secondary,
+                              fontFamily: AppFonts.mono),
                         ),
                       )),
                 ],
@@ -543,14 +548,17 @@ class _Body extends StatelessWidget {
                               Text(
                                 '${p.qty} sold',
                                 style: TextStyle(
-                                    fontSize: 12, color: cs.onSurfaceVariant),
+                                    fontSize: 12,
+                                    color: cs.onSurfaceVariant,
+                                    fontFamily: AppFonts.mono),
                               ),
                               const SizedBox(width: 8),
                               Text(
                                 '$symbol ${_fmt(p.revenue)}',
                                 style: TextStyle(
                                     fontWeight: FontWeight.w600,
-                                    color: cs.primary),
+                                    color: cs.primary,
+                                    fontFamily: AppFonts.mono),
                               ),
                             ],
                           ),
@@ -682,6 +690,7 @@ class _MiniBarChart extends StatelessWidget {
                                 fontSize: 9,
                                 fontWeight: FontWeight.bold,
                                 color: cs.primary,
+                                fontFamily: AppFonts.mono,
                               ),
                             ),
                           ),
@@ -770,7 +779,10 @@ class _KpiCard extends StatelessWidget {
             const SizedBox(height: 2),
             Text(value,
                 style: TextStyle(
-                    fontSize: 17, fontWeight: FontWeight.bold, color: color),
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                    fontFamily: AppFonts.mono),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis),
           ],

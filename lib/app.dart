@@ -19,6 +19,7 @@ import 'package:pos_app/features/inventory/presentation/inventory_screen.dart';
 import 'package:pos_app/features/onboarding/presentation/onboarding_screen.dart';
 import 'package:pos_app/features/orders/presentation/order_detail_screen.dart';
 import 'package:pos_app/features/orders/presentation/orders_screen.dart';
+import 'package:pos_app/features/printing/presentation/printer_setup_screen.dart';
 import 'package:pos_app/features/products/presentation/categories_screen.dart';
 import 'package:pos_app/features/products/presentation/product_form_screen.dart';
 import 'package:pos_app/features/products/presentation/products_screen.dart';
@@ -67,14 +68,14 @@ class POSApp extends ConsumerWidget {
           child: CallbackShortcuts(
             bindings: {
               const SingleActivator(LogicalKeyboardKey.keyS, meta: true): () {
-                final loc = router.routerDelegate.currentConfiguration.uri
-                    .toString();
+                final loc =
+                    router.routerDelegate.currentConfiguration.uri.toString();
                 if (loc != '/help/shortcuts') router.push('/help/shortcuts');
               },
               const SingleActivator(LogicalKeyboardKey.slash,
                   meta: true, shift: true): () {
-                final loc = router.routerDelegate.currentConfiguration.uri
-                    .toString();
+                final loc =
+                    router.routerDelegate.currentConfiguration.uri.toString();
                 if (loc != '/help/shortcuts') router.push('/help/shortcuts');
               },
               const SingleActivator(LogicalKeyboardKey.keyH, meta: true): () =>
@@ -217,6 +218,11 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: 'backup',
             pageBuilder: (_, state) => _slide(state, const BackupScreen()),
+          ),
+          GoRoute(
+            path: 'printer',
+            pageBuilder: (_, state) =>
+                _slide(state, const PrinterSetupScreen()),
           ),
         ],
       ),

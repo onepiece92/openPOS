@@ -1,16 +1,18 @@
 import 'package:drift/drift.dart';
 
 import '../app_database.dart';
+import '../tables/customers_table.dart';
 import '../tables/order_items_table.dart';
-import '../tables/order_tax_override_table.dart';
 import '../tables/order_taxes_table.dart';
 import '../tables/orders_table.dart';
 import '../tables/returns_table.dart';
 
 part 'orders_dao.g.dart';
 
+// OrderTaxOverrides table stays in @DriftDatabase for v2 (tax override feature);
+// not exposed here because no method on this DAO touches it.
 @DriftAccessor(
-  tables: [Orders, OrderItems, OrderTaxes, OrderTaxOverrides, Returns],
+  tables: [Orders, OrderItems, OrderTaxes, Returns, Customers],
 )
 class OrdersDao extends DatabaseAccessor<AppDatabase> with _$OrdersDaoMixin {
   OrdersDao(super.db);
@@ -62,9 +64,6 @@ class OrdersDao extends DatabaseAccessor<AppDatabase> with _$OrdersDaoMixin {
 
   Future<int> insertReturn(ReturnsCompanion entry) =>
       into(returns).insert(entry);
-
-  Future<int> insertTaxOverride(OrderTaxOverridesCompanion entry) =>
-      into(orderTaxOverrides).insert(entry);
 
   // ── Aggregates (for reports) ───────────────────────────────────────────
 
@@ -141,12 +140,17 @@ class OrdersDao extends DatabaseAccessor<AppDatabase> with _$OrdersDaoMixin {
         .toList();
   }
 
-  /// Streams a map of productId → total units sold across all completed orders.
+  /// Streams a map of productId → total units sold across completed orders.
+  /// Voided / refunded / held orders are excluded so popularity rankings
+  /// reflect realised sales only.
   Stream<Map<int, int>> watchProductSalesCounts() {
     return customSelect(
-      'SELECT product_id, CAST(SUM(quantity) AS INTEGER) as total_sold '
-      'FROM order_items GROUP BY product_id',
-      readsFrom: {orderItems},
+      'SELECT oi.product_id, CAST(SUM(oi.quantity) AS INTEGER) as total_sold '
+      'FROM order_items oi '
+      'JOIN orders o ON o.id = oi.order_id '
+      "WHERE o.status = 'completed' "
+      'GROUP BY oi.product_id',
+      readsFrom: {orderItems, orders},
     ).watch().map((rows) => {
           for (final row in rows)
             row.read<int>('product_id'): row.read<int>('total_sold'),

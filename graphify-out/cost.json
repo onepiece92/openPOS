@@ -5,6 +5,20 @@
       "input_tokens": 0,
       "output_tokens": 0,
       "files": 101
+    },
+    {
+      "date": "2026-04-22T16:47:43.476235+00:00",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "files": 6,
+      "mode": "ast-only-update"
+    },
+    {
+      "date": "2026-04-22T17:00:50.622643+00:00",
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "files": 105,
+      "mode": "ast-only-full"
     }
   ],
   "total_input_tokens": 0,

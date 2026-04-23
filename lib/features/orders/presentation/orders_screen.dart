@@ -5,6 +5,9 @@ import 'package:intl/intl.dart';
 
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
+import 'package:pos_app/core/theme/tokens.dart';
+import 'package:pos_app/core/utils/currency_formatter.dart';
+import 'package:pos_app/core/widgets/app_empty_state.dart';
 import 'package:pos_app/features/customers/domain/customers_provider.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
 import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
@@ -28,7 +31,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
   @override
   Widget build(BuildContext context) {
     final ordersAsync = ref.watch(_recentOrdersProvider);
-    final symbol = ref.watch(currencySymbolProvider);
+    final fmt = ref.watch(currencyFormatterProvider);
     final customers = ref.watch(customersStreamProvider).valueOrNull ?? [];
     final customerNames = {for (final c in customers) c.id: c.name};
 
@@ -60,7 +63,13 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
       body: ordersAsync.when(
         data: (all) {
           final filtered = _filter(all, _query);
-          if (all.isEmpty) return const _EmptyState();
+          if (all.isEmpty) {
+            return const AppEmptyState(
+              icon: Icons.receipt_long_outlined,
+              title: 'No orders yet',
+              subtitle: 'Completed sales will appear here.',
+            );
+          }
           if (filtered.isEmpty) {
             return Center(
               child: Text(
@@ -87,7 +96,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                   child: _SummaryBar(
                     orderCount: today.length,
                     revenue: todayRevenue,
-                    symbol: symbol,
+                    fmt: fmt,
                   ),
                 ),
               for (final entry in grouped.entries) ...[
@@ -111,7 +120,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                     separatorBuilder: (_, __) => const SizedBox(height: 8),
                     itemBuilder: (_, i) => _OrderCard(
                       order: entry.value[i],
-                      symbol: symbol,
+                      fmt: fmt,
                       customerName: entry.value[i].customerId != null
                           ? customerNames[entry.value[i].customerId]
                           : null,
@@ -176,11 +185,11 @@ class _SummaryBar extends StatelessWidget {
   const _SummaryBar({
     required this.orderCount,
     required this.revenue,
-    required this.symbol,
+    required this.fmt,
   });
   final int orderCount;
   final double revenue;
-  final String symbol;
+  final CurrencyFormatter fmt;
 
   @override
   Widget build(BuildContext context) {
@@ -208,7 +217,7 @@ class _SummaryBar extends StatelessWidget {
           Expanded(
             child: _StatCell(
               label: "Today's revenue",
-              value: '$symbol ${revenue.toStringAsFixed(2)}',
+              value: fmt.format(revenue),
               icon: Icons.attach_money_rounded,
               cs: cs,
               tt: tt,
@@ -240,7 +249,8 @@ class _StatCell extends StatelessWidget {
           Icon(icon, size: 18, color: cs.primary),
           const SizedBox(height: 4),
           Text(value,
-              style: tt.titleSmall?.copyWith(fontWeight: FontWeight.w800)),
+              style: tt.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w800, fontFamily: AppFonts.mono)),
           Text(label,
               style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
         ],
@@ -252,11 +262,11 @@ class _StatCell extends StatelessWidget {
 class _OrderCard extends StatelessWidget {
   const _OrderCard({
     required this.order,
-    required this.symbol,
+    required this.fmt,
     this.customerName,
   });
   final Order order;
-  final String symbol;
+  final CurrencyFormatter fmt;
   final String? customerName;
 
   @override
@@ -357,14 +367,17 @@ class _OrderCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    '$symbol ${order.total.toStringAsFixed(2)}',
-                    style: tt.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                    fmt.format(order.total),
+                    style: tt.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        fontFamily: AppFonts.mono),
                   ),
                   if (order.discountTotal > 0)
                     Text(
-                      '−$symbol ${order.discountTotal.toStringAsFixed(2)} off',
-                      style: tt.labelSmall
-                          ?.copyWith(color: cs.onSurfaceVariant),
+                      '−${fmt.format(order.discountTotal)} off',
+                      style: tt.labelSmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                          fontFamily: AppFonts.mono),
                     ),
                 ],
               ),
@@ -443,39 +456,3 @@ class _StatusDot extends StatelessWidget {
   }
 }
 
-// ─── Empty state ──────────────────────────────────────────────────────────────
-
-class _EmptyState extends StatelessWidget {
-  const _EmptyState();
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: cs.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: Icon(Icons.receipt_long_outlined,
-                size: 40, color: cs.onSurfaceVariant),
-          ),
-          const SizedBox(height: 20),
-          Text('No orders yet',
-              style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-          const SizedBox(height: 6),
-          Text(
-            'Completed sales will appear here.',
-            style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-          ),
-        ],
-      ),
-    );
-  }
-}

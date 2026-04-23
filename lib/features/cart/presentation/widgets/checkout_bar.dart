@@ -22,7 +22,7 @@ class CheckoutBar extends ConsumerWidget {
     if (itemCount == 0) return const SizedBox.shrink();
 
     final summary = ref.watch(cartSummaryProvider);
-    final symbol = ref.watch(currencySymbolProvider);
+    final fmt = ref.watch(currencyFormatterProvider);
     final tt = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
     final assignedCustomerId = ref.watch(cartSessionProvider).customerId;
@@ -105,7 +105,7 @@ class CheckoutBar extends ConsumerWidget {
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Text(
-                            '$symbol ${summary.total.toStringAsFixed(2)}',
+                            fmt.format(summary.total),
                             style: tt.labelLarge?.copyWith(
                               color: cs.onPrimary,
                               fontWeight: FontWeight.w800,

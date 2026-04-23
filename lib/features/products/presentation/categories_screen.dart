@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
+import 'package:pos_app/core/widgets/app_empty_state.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
 import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
 
@@ -52,7 +53,16 @@ class CategoriesScreen extends ConsumerWidget {
       ),
       body: categoriesAsync.when(
         data: (cats) => cats.isEmpty
-            ? _EmptyState(onAdd: () => _showForm(context, ref, null))
+            ? AppEmptyState(
+                icon: Icons.category_rounded,
+                title: 'No categories yet',
+                subtitle: 'Group your products for faster searching.',
+                action: FilledButton.icon(
+                  onPressed: () => _showForm(context, ref, null),
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text('Add Category'),
+                ),
+              )
             : ReorderableListView.builder(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
                 itemCount: cats.length,
@@ -296,46 +306,3 @@ class _CategoryCard extends ConsumerWidget {
   }
 }
 
-// ─── Empty state ───────────────────────────────────────────────────────────────
-
-class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.onAdd});
-  final VoidCallback onAdd;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: cs.primaryContainer,
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: Icon(Icons.category_rounded,
-                size: 40, color: cs.onPrimaryContainer),
-          ),
-          const SizedBox(height: 20),
-          Text('No categories yet',
-              style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-          const SizedBox(height: 6),
-          Text(
-            'Group your products for faster searching.',
-            style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-          ),
-          const SizedBox(height: 28),
-          FilledButton.icon(
-            onPressed: onAdd,
-            icon: const Icon(Icons.add_rounded),
-            label: const Text('Add Category'),
-          ),
-        ],
-      ),
-    );
-  }
-}

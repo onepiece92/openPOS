@@ -21,6 +21,8 @@ class Products extends Table {
       boolean().withDefault(const Constant(false))();
   BoolColumn get isHiddenInPos =>
       boolean().withDefault(const Constant(false))();
+  BoolColumn get isOutOfStock =>
+      boolean().withDefault(const Constant(false))();
   BoolColumn get isActive =>
       boolean().withDefault(const Constant(true))();
   DateTimeColumn get createdAt =>

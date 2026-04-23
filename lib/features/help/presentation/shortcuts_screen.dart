@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import 'package:pos_app/core/theme/tokens.dart';
 import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
 
 class ShortcutsScreen extends StatelessWidget {
@@ -151,7 +153,7 @@ class _KeyChip extends StatelessWidget {
           key_,
           style: tt.labelMedium?.copyWith(
             fontWeight: FontWeight.w700,
-            fontFamily: 'monospace',
+            fontFamily: AppFonts.mono,
           ),
         ),
       );

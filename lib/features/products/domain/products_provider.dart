@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
+import 'package:pos_app/core/utils/currency_formatter.dart';
 
 /// All active products, reactively updated.
 /// POS catalog — excludes hidden-in-pos products.
@@ -38,6 +39,14 @@ final productSalesCountProvider = StreamProvider<Map<int, int>>((ref) {
 final currencySymbolProvider = Provider<String>((ref) {
   final box = ref.watch(settingsBoxProvider);
   return box.get(kCurrencySymbol, defaultValue: 'Rs') as String;
+});
+
+/// Shared [CurrencyFormatter] that reads the active currency symbol from
+/// settings. Use this in UI code instead of inline `toStringAsFixed(2)`
+/// concatenation so the symbol, grouping, and decimal count stay consistent.
+final currencyFormatterProvider = Provider<CurrencyFormatter>((ref) {
+  final symbol = ref.watch(currencySymbolProvider);
+  return CurrencyFormatter(symbol: '$symbol ', locale: 'en_US');
 });
 
 // ── Products screen filter state ──────────────────────────────────────────────

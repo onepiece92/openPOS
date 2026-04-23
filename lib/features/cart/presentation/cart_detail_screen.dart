@@ -5,7 +5,10 @@ import 'package:intl/intl.dart';
 
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/theme/app_theme.dart';
+import 'package:pos_app/core/theme/tokens.dart';
+import 'package:pos_app/core/utils/currency_formatter.dart';
 import 'package:pos_app/core/widgets/customer_avatar.dart';
+import 'package:pos_app/core/widgets/summary_row.dart';
 import 'package:pos_app/features/cart/domain/cart_item.dart';
 import 'package:pos_app/features/cart/domain/cart_notifier.dart';
 import 'package:pos_app/features/customers/domain/customers_provider.dart';
@@ -18,7 +21,7 @@ class CartDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final cart = ref.watch(cartProvider);
     final summary = ref.watch(cartSummaryProvider);
-    final symbol = ref.watch(currencySymbolProvider);
+    final fmt = ref.watch(currencyFormatterProvider);
     final session = ref.watch(cartSessionProvider);
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
@@ -67,11 +70,11 @@ class CartDetailScreen extends ConsumerWidget {
                     separatorBuilder: (_, __) => const Divider(height: 1),
                     itemBuilder: (_, i) => _CartLineItem(
                       item: cart[i],
-                      currencySymbol: symbol,
+                      fmt: fmt,
                     ),
                   ),
                 ),
-                _OrderSummary(summary: summary, currencySymbol: symbol),
+                _OrderSummary(summary: summary, fmt: fmt),
               ],
             ),
       bottomNavigationBar: cart.isEmpty
@@ -86,7 +89,7 @@ class CartDetailScreen extends ConsumerWidget {
                     onPressed: () => context.push('/payment'),
                     style: AppTheme.ctaButtonStyle(cs),
                     child: Text(
-                      'Checkout  •  $symbol ${summary.total.toStringAsFixed(2)}',
+                      'Checkout  •  ${fmt.format(summary.total)}',
                     ),
                   ),
                 ),
@@ -326,9 +329,9 @@ class _CustomerPickerSheetState extends State<_CustomerPickerSheet> {
 // ─── Cart line item ────────────────────────────────────────────────────────────
 
 class _CartLineItem extends ConsumerWidget {
-  const _CartLineItem({required this.item, required this.currencySymbol});
+  const _CartLineItem({required this.item, required this.fmt});
   final CartItem item;
-  final String currencySymbol;
+  final CurrencyFormatter fmt;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -351,7 +354,7 @@ class _CartLineItem extends ConsumerWidget {
                     overflow: TextOverflow.ellipsis),
                 const SizedBox(height: 2),
                 Text(
-                  '${item.unitPrice.toStringAsFixed(2)} each',
+                  '${fmt.formatPlain(item.unitPrice)} each',
                   style: tt.labelSmall
                       ?.copyWith(color: cs.onSurfaceVariant),
                 ),
@@ -388,7 +391,7 @@ class _CartLineItem extends ConsumerWidget {
           SizedBox(
             width: 72,
             child: Text(
-              item.lineSubtotal.toStringAsFixed(2),
+              fmt.formatPlain(item.lineSubtotal),
               textAlign: TextAlign.end,
               style: tt.bodyMedium
                   ?.copyWith(fontWeight: FontWeight.w600),
@@ -436,9 +439,9 @@ class _QtyButton extends StatelessWidget {
 
 class _OrderSummary extends ConsumerWidget {
   const _OrderSummary(
-      {required this.summary, required this.currencySymbol});
+      {required this.summary, required this.fmt});
   final CartSummary summary;
-  final String currencySymbol;
+  final CurrencyFormatter fmt;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -454,11 +457,9 @@ class _OrderSummary extends ConsumerWidget {
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
       child: Column(
         children: [
-          _SummaryRow(
+          SummaryRow(
             label: 'Subtotal',
-            value: '$currencySymbol ${summary.subtotal.toStringAsFixed(2)}',
-            tt: tt,
-            cs: cs,
+            value: fmt.format(summary.subtotal),
           ),
           const SizedBox(height: 6),
           // ── Discount row ─────────────────────────────────────────────
@@ -467,7 +468,7 @@ class _OrderSummary extends ConsumerWidget {
                 ? 'Discount${session.orderDiscountIsPercent ? ' (${session.orderDiscount.toStringAsFixed(1)}%)' : ''}'
                 : '+ Add Discount',
             value: summary.orderDiscount > 0
-                ? '− $currencySymbol ${summary.orderDiscount.toStringAsFixed(2)}'
+                ? '− ${fmt.format(summary.orderDiscount)}'
                 : null,
             valueColor: cs.error,
             addColor: cs.primary,
@@ -496,7 +497,7 @@ class _OrderSummary extends ConsumerWidget {
                     ),
                   ),
                   Text(
-                    '$currencySymbol ${line.amount.toStringAsFixed(2)}',
+                    fmt.format(line.amount),
                     style: tt.bodyMedium?.copyWith(
                       color: session.taxEnabled
                           ? cs.onSurfaceVariant
@@ -504,6 +505,7 @@ class _OrderSummary extends ConsumerWidget {
                       decoration: session.taxEnabled
                           ? null
                           : TextDecoration.lineThrough,
+                      fontFamily: AppFonts.mono,
                     ),
                   ),
                   const SizedBox(width: 4),
@@ -538,12 +540,10 @@ class _OrderSummary extends ConsumerWidget {
             onTap: () => _showTaxPicker(context, ref),
           ),
           const Divider(height: 16),
-          _SummaryRow(
+          SummaryRow(
             label: 'Total',
-            value: '$currencySymbol ${summary.total.toStringAsFixed(2)}',
-            tt: tt,
-            cs: cs,
-            bold: true,
+            value: fmt.format(summary.total),
+            emphasis: SummaryEmphasis.bold,
           ),
           const SizedBox(height: 4),
         ],
@@ -850,34 +850,3 @@ class _TappableRow extends StatelessWidget {
   }
 }
 
-class _SummaryRow extends StatelessWidget {
-  const _SummaryRow({
-    required this.label,
-    required this.value,
-    required this.tt,
-    required this.cs,
-    this.bold = false,
-  });
-  final String label;
-  final String value;
-  final TextTheme tt;
-  final ColorScheme cs;
-  final bool bold;
-
-  @override
-  Widget build(BuildContext context) {
-    final style = bold
-        ? tt.titleMedium?.copyWith(fontWeight: FontWeight.bold)
-        : tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant);
-    return Row(
-      children: [
-        Text(label, style: style),
-        const Spacer(),
-        Text(value,
-            style: style?.copyWith(
-                color: bold ? cs.primary : null,
-                fontWeight: bold ? FontWeight.bold : null)),
-      ],
-    );
-  }
-}

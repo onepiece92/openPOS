@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:pos_app/core/database/app_database.dart';
+import 'package:pos_app/core/utils/currency_formatter.dart';
+import 'package:pos_app/core/widgets/app_empty_state.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
 import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
 
@@ -30,8 +32,10 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
         ? all
         : all.where((p) => p.categoryId == f.selectedCategoryId).toList();
     if (f.outOfStockOnly) {
-      // < 0 means genuinely out of stock; 0 means unlimited (not tracked)
-      list = list.where((p) => p.stockQuantity < 0).toList();
+      // is_out_of_stock flag OR qty < 0 (over-sold). 0 = unlimited.
+      list = list
+          .where((p) => p.isOutOfStock || p.stockQuantity < 0)
+          .toList();
     }
     if (f.search.isNotEmpty) {
       final q = f.search.toLowerCase();
@@ -50,7 +54,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
   Widget build(BuildContext context) {
     final productsAsync = ref.watch(productsStreamProvider);
     final categoriesAsync = ref.watch(categoriesStreamProvider);
-    final symbol = ref.watch(currencySymbolProvider);
+    final fmt = ref.watch(currencyFormatterProvider);
     final f = ref.watch(productsFilterProvider);
     final filter = ref.read(productsFilterProvider.notifier);
     final cs = Theme.of(context).colorScheme;
@@ -198,8 +202,16 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                 final filtered = _applyFilter(all, f);
 
                 if (all.isEmpty) {
-                  return _EmptyState(
-                      onAdd: () => context.push('/products/add'));
+                  return AppEmptyState(
+                    icon: Icons.inventory_2_outlined,
+                    title: 'No products yet',
+                    subtitle: 'Add your first product to get started.',
+                    action: FilledButton.icon(
+                      onPressed: () => context.push('/products/add'),
+                      icon: const Icon(Icons.add_rounded),
+                      label: const Text('Add Product'),
+                    ),
+                  );
                 }
                 if (filtered.isEmpty) {
                   return Center(
@@ -218,7 +230,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                   itemBuilder: (_, i) => _ProductTile(
                     product: filtered[i],
                     categoryName: catMap[filtered[i].categoryId],
-                    currencySymbol: symbol,
+                    fmt: fmt,
                     onTap: () =>
                         context.push('/products/${filtered[i].id}'),
                   ),
@@ -301,22 +313,24 @@ class _Chip extends StatelessWidget {
 class _ProductTile extends StatelessWidget {
   const _ProductTile({
     required this.product,
-    required this.currencySymbol,
+    required this.fmt,
     required this.onTap,
     this.categoryName,
   });
   final Product product;
   final String? categoryName;
-  final String currencySymbol;
+  final CurrencyFormatter fmt;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
-    // 0 = unlimited/not tracked; < 0 = out of stock; > 0 = tracked
-    final outOfStock = product.stockQuantity < 0;
-    final lowStock = product.stockQuantity > 0 && product.stockQuantity <= 5;
+    // 0 = unlimited; < 0 = out of stock; > 0 = tracked
+    final outOfStock = product.isOutOfStock || product.stockQuantity < 0;
+    final lowStock = !outOfStock &&
+        product.stockQuantity > 0 &&
+        product.stockQuantity <= 5;
 
     return ListTile(
       onTap: onTap,
@@ -370,7 +384,7 @@ class _ProductTile extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                '$currencySymbol ${product.price.toStringAsFixed(2)}',
+                fmt.format(product.price),
                 style: tt.bodyMedium?.copyWith(
                   color: cs.primary,
                   fontWeight: FontWeight.bold,
@@ -446,39 +460,3 @@ class _StockBadge extends StatelessWidget {
   }
 }
 
-// ── Empty state ───────────────────────────────────────────────────────────────
-
-class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.onAdd});
-  final VoidCallback onAdd;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.inventory_2_outlined,
-              size: 72,
-              color: cs.onSurfaceVariant.withValues(alpha: 0.31)),
-          const SizedBox(height: 16),
-          Text('No products yet',
-              style:
-                  tt.titleMedium?.copyWith(color: cs.onSurfaceVariant)),
-          const SizedBox(height: 8),
-          Text('Add your first product to get started.',
-              style:
-                  tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
-          const SizedBox(height: 24),
-          FilledButton.icon(
-            onPressed: onAdd,
-            icon: const Icon(Icons.add_rounded),
-            label: const Text('Add Product'),
-          ),
-        ],
-      ),
-    );
-  }
-}

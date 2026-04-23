@@ -14,6 +14,10 @@ import 'package:uuid/uuid.dart';
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/theme/app_theme.dart';
+import 'package:pos_app/core/theme/tokens.dart';
+import 'package:pos_app/core/utils/async_feedback.dart';
+import 'package:pos_app/core/utils/currency_formatter.dart';
+import 'package:pos_app/core/widgets/app_empty_state.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
 import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
 
@@ -53,7 +57,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
   Widget build(BuildContext context) {
     final expensesAsync = ref.watch(_expensesStreamProvider);
     final categoriesAsync = ref.watch(_expenseCategoriesStreamProvider);
-    final symbol = ref.watch(currencySymbolProvider);
+    final fmt = ref.watch(currencyFormatterProvider);
     final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
@@ -88,7 +92,16 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
                     filtered.fold(0.0, (sum, e) => sum + e.amount);
 
                 if (all.isEmpty) {
-                  return _EmptyState(onAdd: () => _openForm());
+                  return AppEmptyState(
+                    icon: Icons.receipt_long_outlined,
+                    title: 'No expenses yet',
+                    subtitle: 'Track your business expenses here.',
+                    action: FilledButton.icon(
+                      onPressed: () => _openForm(),
+                      icon: const Icon(Icons.add_rounded),
+                      label: const Text('Add Expense'),
+                    ),
+                  );
                 }
 
                 if (filtered.isEmpty) {
@@ -102,7 +115,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
 
                 return Column(
                   children: [
-                    _TotalBar(total: total, symbol: symbol, cs: cs),
+                    _TotalBar(total: total, fmt: fmt, cs: cs),
                     Expanded(
                       child: ListView.separated(
                         padding: const EdgeInsets.symmetric(vertical: 8),
@@ -112,7 +125,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
                         itemBuilder: (_, i) => _ExpenseTile(
                           expense: filtered[i],
                           category: catMap[filtered[i].categoryId],
-                          symbol: symbol,
+                          fmt: fmt,
                           onTap: () => _openForm(expense: filtered[i]),
                         ),
                       ),
@@ -222,11 +235,11 @@ class _Chip extends StatelessWidget {
 class _TotalBar extends StatelessWidget {
   const _TotalBar({
     required this.total,
-    required this.symbol,
+    required this.fmt,
     required this.cs,
   });
   final double total;
-  final String symbol;
+  final CurrencyFormatter fmt;
   final ColorScheme cs;
 
   @override
@@ -242,11 +255,12 @@ class _TotalBar extends StatelessWidget {
           ),
           const Spacer(),
           Text(
-            '$symbol ${total.toStringAsFixed(2)}',
+            fmt.format(total),
             style: TextStyle(
               fontWeight: FontWeight.bold,
               color: cs.error,
               fontSize: 15,
+              fontFamily: AppFonts.mono,
             ),
           ),
         ],
@@ -260,14 +274,14 @@ class _TotalBar extends StatelessWidget {
 class _ExpenseTile extends StatelessWidget {
   const _ExpenseTile({
     required this.expense,
-    required this.symbol,
+    required this.fmt,
     required this.onTap,
     this.category,
   });
 
   final Expense expense;
   final ExpenseCategory? category;
-  final String symbol;
+  final CurrencyFormatter fmt;
   final VoidCallback onTap;
 
   @override
@@ -308,10 +322,11 @@ class _ExpenseTile extends StatelessWidget {
         ],
       ),
       trailing: Text(
-        '$symbol ${expense.amount.toStringAsFixed(2)}',
+        fmt.format(expense.amount),
         style: tt.bodyMedium?.copyWith(
           fontWeight: FontWeight.bold,
           color: cs.error,
+          fontFamily: AppFonts.mono,
         ),
       ),
     );
@@ -528,16 +543,22 @@ class _ExpenseFormState extends ConsumerState<_ExpenseForm> {
       receiptImagePath: Value(_imagePath),
     );
 
-    if (_isEdit) {
-      await db.expensesDao.updateExpense(entry);
-    } else {
-      await db.expensesDao.insert(entry);
-    }
+    final saved = await withErrorSnackbar(
+      context,
+      () async {
+        if (_isEdit) {
+          await db.expensesDao.updateExpense(entry);
+        } else {
+          await db.expensesDao.insert(entry);
+        }
+        return true;
+      },
+      failurePrefix: 'Save failed',
+    );
 
-    if (mounted) {
-      setState(() => _loading = false);
-      Navigator.pop(context);
-    }
+    if (!mounted) return;
+    setState(() => _loading = false);
+    if (saved == true) Navigator.pop(context);
   }
 
   Future<void> _delete() async {
@@ -769,43 +790,3 @@ class _ExpenseFormState extends ConsumerState<_ExpenseForm> {
   }
 }
 
-// ── Empty state ────────────────────────────────────────────────────────────────
-
-class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.onAdd});
-  final VoidCallback onAdd;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.receipt_long_outlined,
-            size: 72,
-            color: cs.onSurfaceVariant.withValues(alpha: 0.4),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No expenses yet',
-            style: tt.titleMedium?.copyWith(color: cs.onSurfaceVariant),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Track your business expenses here.',
-            style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
-          ),
-          const SizedBox(height: 24),
-          FilledButton.icon(
-            onPressed: onAdd,
-            icon: const Icon(Icons.add_rounded),
-            label: const Text('Add Expense'),
-          ),
-        ],
-      ),
-    );
-  }
-}

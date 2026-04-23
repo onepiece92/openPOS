@@ -8,12 +8,14 @@ const _kOnboardingComplete = 'onboarding_complete';
 const _kThemeMode = 'theme_mode'; // 'dark' | 'light' | 'system'
 const _kDefaultTaxId = 'default_tax_id';
 const _kLowStockThreshold = 'low_stock_threshold';
-const _kPrinterConfig = 'printer_config'; // JSON
-const _kBrandConfig = 'brand_config'; // JSON
-const _kChecklistState = 'checklist_state'; // JSON
 const kLoyaltyEnabled = 'loyalty_enabled';
 const kLoyaltyEarnRate = 'loyalty_earn_rate'; // pts earned per 1 currency unit spent
 const kLoyaltyPointValue = 'loyalty_point_value'; // currency value of 1 pt
+
+// Printer keys
+const kPrinterDeviceAddress = 'printer_device_address';
+const kPrinterDeviceName = 'printer_device_name';
+const kPrinterPaperWidth = 'printer_paper_width'; // '58' | '80'
 
 // Store profile keys
 const kBusinessName = 'business_name';
@@ -29,14 +31,6 @@ const kCurrencyCode = 'currency_code';
 /// The 'settings' box must be opened in main() before ProviderScope starts.
 final settingsBoxProvider = Provider<Box<dynamic>>((ref) {
   return Hive.box<dynamic>('settings');
-});
-
-final brandBoxProvider = Provider<Box<dynamic>>((ref) {
-  return Hive.box<dynamic>('brand');
-});
-
-final printerBoxProvider = Provider<Box<dynamic>>((ref) {
-  return Hive.box<dynamic>('printer');
 });
 
 // ── Derived preference providers ──────────────────────────────────────────────
@@ -150,3 +144,41 @@ final loyaltyPointValueProvider = Provider<double>((ref) {
   final box = ref.watch(settingsBoxProvider);
   return (box.get(kLoyaltyPointValue, defaultValue: 1.0) as num).toDouble();
 });
+
+// ── Printer providers + helpers ──────────────────────────────────────────────
+
+/// MAC address (BLE) or USB device id of the saved thermal printer, if any.
+final printerDeviceAddressProvider = Provider<String?>((ref) {
+  final box = ref.watch(settingsBoxProvider);
+  return box.get(kPrinterDeviceAddress) as String?;
+});
+
+/// Human-readable name of the saved thermal printer, if any.
+final printerDeviceNameProvider = Provider<String?>((ref) {
+  final box = ref.watch(settingsBoxProvider);
+  return box.get(kPrinterDeviceName) as String?;
+});
+
+/// Paper width in millimetres. Defaults to 80 (most common countertop roll).
+final printerPaperWidthProvider = Provider<int>((ref) {
+  final box = ref.watch(settingsBoxProvider);
+  final raw = box.get(kPrinterPaperWidth, defaultValue: '80') as String;
+  return int.tryParse(raw) ?? 80;
+});
+
+Future<void> savePrinterDevice(
+  Box<dynamic> box, {
+  required String address,
+  required String name,
+}) async {
+  await box.put(kPrinterDeviceAddress, address);
+  await box.put(kPrinterDeviceName, name);
+}
+
+Future<void> clearPrinterDevice(Box<dynamic> box) async {
+  await box.delete(kPrinterDeviceAddress);
+  await box.delete(kPrinterDeviceName);
+}
+
+Future<void> savePrinterPaperWidth(Box<dynamic> box, int mm) =>
+    box.put(kPrinterPaperWidth, mm.toString());

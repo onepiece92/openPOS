@@ -1424,6 +1424,16 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
       defaultConstraints: GeneratedColumn.constraintIsAlways(
           'CHECK ("is_hidden_in_pos" IN (0, 1))'),
       defaultValue: const Constant(false));
+  static const VerificationMeta _isOutOfStockMeta =
+      const VerificationMeta('isOutOfStock');
+  @override
+  late final GeneratedColumn<bool> isOutOfStock = GeneratedColumn<bool>(
+      'is_out_of_stock', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("is_out_of_stock" IN (0, 1))'),
+      defaultValue: const Constant(false));
   static const VerificationMeta _isActiveMeta =
       const VerificationMeta('isActive');
   @override
@@ -1462,6 +1472,7 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
         imagePath,
         isComposite,
         isHiddenInPos,
+        isOutOfStock,
         isActive,
         createdAt,
         updatedAt
@@ -1529,6 +1540,12 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
           isHiddenInPos.isAcceptableOrUnknown(
               data['is_hidden_in_pos']!, _isHiddenInPosMeta));
     }
+    if (data.containsKey('is_out_of_stock')) {
+      context.handle(
+          _isOutOfStockMeta,
+          isOutOfStock.isAcceptableOrUnknown(
+              data['is_out_of_stock']!, _isOutOfStockMeta));
+    }
     if (data.containsKey('is_active')) {
       context.handle(_isActiveMeta,
           isActive.isAcceptableOrUnknown(data['is_active']!, _isActiveMeta));
@@ -1570,6 +1587,8 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
           .read(DriftSqlType.bool, data['${effectivePrefix}is_composite'])!,
       isHiddenInPos: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}is_hidden_in_pos'])!,
+      isOutOfStock: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}is_out_of_stock'])!,
       isActive: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}is_active'])!,
       createdAt: attachedDatabase.typeMapping
@@ -1596,6 +1615,7 @@ class Product extends DataClass implements Insertable<Product> {
   final String? imagePath;
   final bool isComposite;
   final bool isHiddenInPos;
+  final bool isOutOfStock;
   final bool isActive;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -1610,6 +1630,7 @@ class Product extends DataClass implements Insertable<Product> {
       this.imagePath,
       required this.isComposite,
       required this.isHiddenInPos,
+      required this.isOutOfStock,
       required this.isActive,
       required this.createdAt,
       required this.updatedAt});
@@ -1630,6 +1651,7 @@ class Product extends DataClass implements Insertable<Product> {
     }
     map['is_composite'] = Variable<bool>(isComposite);
     map['is_hidden_in_pos'] = Variable<bool>(isHiddenInPos);
+    map['is_out_of_stock'] = Variable<bool>(isOutOfStock);
     map['is_active'] = Variable<bool>(isActive);
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
@@ -1652,6 +1674,7 @@ class Product extends DataClass implements Insertable<Product> {
           : Value(imagePath),
       isComposite: Value(isComposite),
       isHiddenInPos: Value(isHiddenInPos),
+      isOutOfStock: Value(isOutOfStock),
       isActive: Value(isActive),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
@@ -1672,6 +1695,7 @@ class Product extends DataClass implements Insertable<Product> {
       imagePath: serializer.fromJson<String?>(json['imagePath']),
       isComposite: serializer.fromJson<bool>(json['isComposite']),
       isHiddenInPos: serializer.fromJson<bool>(json['isHiddenInPos']),
+      isOutOfStock: serializer.fromJson<bool>(json['isOutOfStock']),
       isActive: serializer.fromJson<bool>(json['isActive']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
@@ -1691,6 +1715,7 @@ class Product extends DataClass implements Insertable<Product> {
       'imagePath': serializer.toJson<String?>(imagePath),
       'isComposite': serializer.toJson<bool>(isComposite),
       'isHiddenInPos': serializer.toJson<bool>(isHiddenInPos),
+      'isOutOfStock': serializer.toJson<bool>(isOutOfStock),
       'isActive': serializer.toJson<bool>(isActive),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
@@ -1708,6 +1733,7 @@ class Product extends DataClass implements Insertable<Product> {
           Value<String?> imagePath = const Value.absent(),
           bool? isComposite,
           bool? isHiddenInPos,
+          bool? isOutOfStock,
           bool? isActive,
           DateTime? createdAt,
           DateTime? updatedAt}) =>
@@ -1722,6 +1748,7 @@ class Product extends DataClass implements Insertable<Product> {
         imagePath: imagePath.present ? imagePath.value : this.imagePath,
         isComposite: isComposite ?? this.isComposite,
         isHiddenInPos: isHiddenInPos ?? this.isHiddenInPos,
+        isOutOfStock: isOutOfStock ?? this.isOutOfStock,
         isActive: isActive ?? this.isActive,
         createdAt: createdAt ?? this.createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
@@ -1744,6 +1771,9 @@ class Product extends DataClass implements Insertable<Product> {
       isHiddenInPos: data.isHiddenInPos.present
           ? data.isHiddenInPos.value
           : this.isHiddenInPos,
+      isOutOfStock: data.isOutOfStock.present
+          ? data.isOutOfStock.value
+          : this.isOutOfStock,
       isActive: data.isActive.present ? data.isActive.value : this.isActive,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
@@ -1763,6 +1793,7 @@ class Product extends DataClass implements Insertable<Product> {
           ..write('imagePath: $imagePath, ')
           ..write('isComposite: $isComposite, ')
           ..write('isHiddenInPos: $isHiddenInPos, ')
+          ..write('isOutOfStock: $isOutOfStock, ')
           ..write('isActive: $isActive, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
@@ -1782,6 +1813,7 @@ class Product extends DataClass implements Insertable<Product> {
       imagePath,
       isComposite,
       isHiddenInPos,
+      isOutOfStock,
       isActive,
       createdAt,
       updatedAt);
@@ -1799,6 +1831,7 @@ class Product extends DataClass implements Insertable<Product> {
           other.imagePath == this.imagePath &&
           other.isComposite == this.isComposite &&
           other.isHiddenInPos == this.isHiddenInPos &&
+          other.isOutOfStock == this.isOutOfStock &&
           other.isActive == this.isActive &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
@@ -1815,6 +1848,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
   final Value<String?> imagePath;
   final Value<bool> isComposite;
   final Value<bool> isHiddenInPos;
+  final Value<bool> isOutOfStock;
   final Value<bool> isActive;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
@@ -1829,6 +1863,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     this.imagePath = const Value.absent(),
     this.isComposite = const Value.absent(),
     this.isHiddenInPos = const Value.absent(),
+    this.isOutOfStock = const Value.absent(),
     this.isActive = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -1844,6 +1879,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     this.imagePath = const Value.absent(),
     this.isComposite = const Value.absent(),
     this.isHiddenInPos = const Value.absent(),
+    this.isOutOfStock = const Value.absent(),
     this.isActive = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -1861,6 +1897,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     Expression<String>? imagePath,
     Expression<bool>? isComposite,
     Expression<bool>? isHiddenInPos,
+    Expression<bool>? isOutOfStock,
     Expression<bool>? isActive,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
@@ -1876,6 +1913,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
       if (imagePath != null) 'image_path': imagePath,
       if (isComposite != null) 'is_composite': isComposite,
       if (isHiddenInPos != null) 'is_hidden_in_pos': isHiddenInPos,
+      if (isOutOfStock != null) 'is_out_of_stock': isOutOfStock,
       if (isActive != null) 'is_active': isActive,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -1893,6 +1931,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
       Value<String?>? imagePath,
       Value<bool>? isComposite,
       Value<bool>? isHiddenInPos,
+      Value<bool>? isOutOfStock,
       Value<bool>? isActive,
       Value<DateTime>? createdAt,
       Value<DateTime>? updatedAt}) {
@@ -1907,6 +1946,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
       imagePath: imagePath ?? this.imagePath,
       isComposite: isComposite ?? this.isComposite,
       isHiddenInPos: isHiddenInPos ?? this.isHiddenInPos,
+      isOutOfStock: isOutOfStock ?? this.isOutOfStock,
       isActive: isActive ?? this.isActive,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -1946,6 +1986,9 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     if (isHiddenInPos.present) {
       map['is_hidden_in_pos'] = Variable<bool>(isHiddenInPos.value);
     }
+    if (isOutOfStock.present) {
+      map['is_out_of_stock'] = Variable<bool>(isOutOfStock.value);
+    }
     if (isActive.present) {
       map['is_active'] = Variable<bool>(isActive.value);
     }
@@ -1971,6 +2014,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
           ..write('imagePath: $imagePath, ')
           ..write('isComposite: $isComposite, ')
           ..write('isHiddenInPos: $isHiddenInPos, ')
+          ..write('isOutOfStock: $isOutOfStock, ')
           ..write('isActive: $isActive, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
@@ -7579,385 +7623,6 @@ class AuditLogCompanion extends UpdateCompanion<AuditLogData> {
   }
 }
 
-class $OutboxQueueTable extends OutboxQueue
-    with TableInfo<$OutboxQueueTable, OutboxQueueData> {
-  @override
-  final GeneratedDatabase attachedDatabase;
-  final String? _alias;
-  $OutboxQueueTable(this.attachedDatabase, [this._alias]);
-  static const VerificationMeta _idMeta = const VerificationMeta('id');
-  @override
-  late final GeneratedColumn<int> id = GeneratedColumn<int>(
-      'id', aliasedName, false,
-      hasAutoIncrement: true,
-      type: DriftSqlType.int,
-      requiredDuringInsert: false,
-      defaultConstraints:
-          GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
-  static const VerificationMeta _createdAtMeta =
-      const VerificationMeta('createdAt');
-  @override
-  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
-      'created_at', aliasedName, false,
-      type: DriftSqlType.dateTime,
-      requiredDuringInsert: false,
-      defaultValue: currentDateAndTime);
-  static const VerificationMeta _endpointMeta =
-      const VerificationMeta('endpoint');
-  @override
-  late final GeneratedColumn<String> endpoint = GeneratedColumn<String>(
-      'endpoint', aliasedName, false,
-      type: DriftSqlType.string, requiredDuringInsert: true);
-  static const VerificationMeta _payloadMeta =
-      const VerificationMeta('payload');
-  @override
-  late final GeneratedColumn<String> payload = GeneratedColumn<String>(
-      'payload', aliasedName, false,
-      type: DriftSqlType.string, requiredDuringInsert: true);
-  static const VerificationMeta _retryCountMeta =
-      const VerificationMeta('retryCount');
-  @override
-  late final GeneratedColumn<int> retryCount = GeneratedColumn<int>(
-      'retry_count', aliasedName, false,
-      type: DriftSqlType.int,
-      requiredDuringInsert: false,
-      defaultValue: const Constant(0));
-  static const VerificationMeta _lastAttemptAtMeta =
-      const VerificationMeta('lastAttemptAt');
-  @override
-  late final GeneratedColumn<DateTime> lastAttemptAt =
-      GeneratedColumn<DateTime>('last_attempt_at', aliasedName, true,
-          type: DriftSqlType.dateTime, requiredDuringInsert: false);
-  static const VerificationMeta _statusMeta = const VerificationMeta('status');
-  @override
-  late final GeneratedColumn<String> status = GeneratedColumn<String>(
-      'status', aliasedName, false,
-      type: DriftSqlType.string,
-      requiredDuringInsert: false,
-      defaultValue: const Constant('pending'));
-  @override
-  List<GeneratedColumn> get $columns =>
-      [id, createdAt, endpoint, payload, retryCount, lastAttemptAt, status];
-  @override
-  String get aliasedName => _alias ?? actualTableName;
-  @override
-  String get actualTableName => $name;
-  static const String $name = 'outbox_queue';
-  @override
-  VerificationContext validateIntegrity(Insertable<OutboxQueueData> instance,
-      {bool isInserting = false}) {
-    final context = VerificationContext();
-    final data = instance.toColumns(true);
-    if (data.containsKey('id')) {
-      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
-    }
-    if (data.containsKey('created_at')) {
-      context.handle(_createdAtMeta,
-          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
-    }
-    if (data.containsKey('endpoint')) {
-      context.handle(_endpointMeta,
-          endpoint.isAcceptableOrUnknown(data['endpoint']!, _endpointMeta));
-    } else if (isInserting) {
-      context.missing(_endpointMeta);
-    }
-    if (data.containsKey('payload')) {
-      context.handle(_payloadMeta,
-          payload.isAcceptableOrUnknown(data['payload']!, _payloadMeta));
-    } else if (isInserting) {
-      context.missing(_payloadMeta);
-    }
-    if (data.containsKey('retry_count')) {
-      context.handle(
-          _retryCountMeta,
-          retryCount.isAcceptableOrUnknown(
-              data['retry_count']!, _retryCountMeta));
-    }
-    if (data.containsKey('last_attempt_at')) {
-      context.handle(
-          _lastAttemptAtMeta,
-          lastAttemptAt.isAcceptableOrUnknown(
-              data['last_attempt_at']!, _lastAttemptAtMeta));
-    }
-    if (data.containsKey('status')) {
-      context.handle(_statusMeta,
-          status.isAcceptableOrUnknown(data['status']!, _statusMeta));
-    }
-    return context;
-  }
-
-  @override
-  Set<GeneratedColumn> get $primaryKey => {id};
-  @override
-  OutboxQueueData map(Map<String, dynamic> data, {String? tablePrefix}) {
-    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return OutboxQueueData(
-      id: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
-      createdAt: attachedDatabase.typeMapping
-          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
-      endpoint: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}endpoint'])!,
-      payload: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}payload'])!,
-      retryCount: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}retry_count'])!,
-      lastAttemptAt: attachedDatabase.typeMapping.read(
-          DriftSqlType.dateTime, data['${effectivePrefix}last_attempt_at']),
-      status: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}status'])!,
-    );
-  }
-
-  @override
-  $OutboxQueueTable createAlias(String alias) {
-    return $OutboxQueueTable(attachedDatabase, alias);
-  }
-}
-
-class OutboxQueueData extends DataClass implements Insertable<OutboxQueueData> {
-  final int id;
-  final DateTime createdAt;
-  final String endpoint;
-  final String payload;
-  final int retryCount;
-  final DateTime? lastAttemptAt;
-  final String status;
-  const OutboxQueueData(
-      {required this.id,
-      required this.createdAt,
-      required this.endpoint,
-      required this.payload,
-      required this.retryCount,
-      this.lastAttemptAt,
-      required this.status});
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    map['id'] = Variable<int>(id);
-    map['created_at'] = Variable<DateTime>(createdAt);
-    map['endpoint'] = Variable<String>(endpoint);
-    map['payload'] = Variable<String>(payload);
-    map['retry_count'] = Variable<int>(retryCount);
-    if (!nullToAbsent || lastAttemptAt != null) {
-      map['last_attempt_at'] = Variable<DateTime>(lastAttemptAt);
-    }
-    map['status'] = Variable<String>(status);
-    return map;
-  }
-
-  OutboxQueueCompanion toCompanion(bool nullToAbsent) {
-    return OutboxQueueCompanion(
-      id: Value(id),
-      createdAt: Value(createdAt),
-      endpoint: Value(endpoint),
-      payload: Value(payload),
-      retryCount: Value(retryCount),
-      lastAttemptAt: lastAttemptAt == null && nullToAbsent
-          ? const Value.absent()
-          : Value(lastAttemptAt),
-      status: Value(status),
-    );
-  }
-
-  factory OutboxQueueData.fromJson(Map<String, dynamic> json,
-      {ValueSerializer? serializer}) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return OutboxQueueData(
-      id: serializer.fromJson<int>(json['id']),
-      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
-      endpoint: serializer.fromJson<String>(json['endpoint']),
-      payload: serializer.fromJson<String>(json['payload']),
-      retryCount: serializer.fromJson<int>(json['retryCount']),
-      lastAttemptAt: serializer.fromJson<DateTime?>(json['lastAttemptAt']),
-      status: serializer.fromJson<String>(json['status']),
-    );
-  }
-  @override
-  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return <String, dynamic>{
-      'id': serializer.toJson<int>(id),
-      'createdAt': serializer.toJson<DateTime>(createdAt),
-      'endpoint': serializer.toJson<String>(endpoint),
-      'payload': serializer.toJson<String>(payload),
-      'retryCount': serializer.toJson<int>(retryCount),
-      'lastAttemptAt': serializer.toJson<DateTime?>(lastAttemptAt),
-      'status': serializer.toJson<String>(status),
-    };
-  }
-
-  OutboxQueueData copyWith(
-          {int? id,
-          DateTime? createdAt,
-          String? endpoint,
-          String? payload,
-          int? retryCount,
-          Value<DateTime?> lastAttemptAt = const Value.absent(),
-          String? status}) =>
-      OutboxQueueData(
-        id: id ?? this.id,
-        createdAt: createdAt ?? this.createdAt,
-        endpoint: endpoint ?? this.endpoint,
-        payload: payload ?? this.payload,
-        retryCount: retryCount ?? this.retryCount,
-        lastAttemptAt:
-            lastAttemptAt.present ? lastAttemptAt.value : this.lastAttemptAt,
-        status: status ?? this.status,
-      );
-  OutboxQueueData copyWithCompanion(OutboxQueueCompanion data) {
-    return OutboxQueueData(
-      id: data.id.present ? data.id.value : this.id,
-      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
-      endpoint: data.endpoint.present ? data.endpoint.value : this.endpoint,
-      payload: data.payload.present ? data.payload.value : this.payload,
-      retryCount:
-          data.retryCount.present ? data.retryCount.value : this.retryCount,
-      lastAttemptAt: data.lastAttemptAt.present
-          ? data.lastAttemptAt.value
-          : this.lastAttemptAt,
-      status: data.status.present ? data.status.value : this.status,
-    );
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('OutboxQueueData(')
-          ..write('id: $id, ')
-          ..write('createdAt: $createdAt, ')
-          ..write('endpoint: $endpoint, ')
-          ..write('payload: $payload, ')
-          ..write('retryCount: $retryCount, ')
-          ..write('lastAttemptAt: $lastAttemptAt, ')
-          ..write('status: $status')
-          ..write(')'))
-        .toString();
-  }
-
-  @override
-  int get hashCode => Object.hash(
-      id, createdAt, endpoint, payload, retryCount, lastAttemptAt, status);
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      (other is OutboxQueueData &&
-          other.id == this.id &&
-          other.createdAt == this.createdAt &&
-          other.endpoint == this.endpoint &&
-          other.payload == this.payload &&
-          other.retryCount == this.retryCount &&
-          other.lastAttemptAt == this.lastAttemptAt &&
-          other.status == this.status);
-}
-
-class OutboxQueueCompanion extends UpdateCompanion<OutboxQueueData> {
-  final Value<int> id;
-  final Value<DateTime> createdAt;
-  final Value<String> endpoint;
-  final Value<String> payload;
-  final Value<int> retryCount;
-  final Value<DateTime?> lastAttemptAt;
-  final Value<String> status;
-  const OutboxQueueCompanion({
-    this.id = const Value.absent(),
-    this.createdAt = const Value.absent(),
-    this.endpoint = const Value.absent(),
-    this.payload = const Value.absent(),
-    this.retryCount = const Value.absent(),
-    this.lastAttemptAt = const Value.absent(),
-    this.status = const Value.absent(),
-  });
-  OutboxQueueCompanion.insert({
-    this.id = const Value.absent(),
-    this.createdAt = const Value.absent(),
-    required String endpoint,
-    required String payload,
-    this.retryCount = const Value.absent(),
-    this.lastAttemptAt = const Value.absent(),
-    this.status = const Value.absent(),
-  })  : endpoint = Value(endpoint),
-        payload = Value(payload);
-  static Insertable<OutboxQueueData> custom({
-    Expression<int>? id,
-    Expression<DateTime>? createdAt,
-    Expression<String>? endpoint,
-    Expression<String>? payload,
-    Expression<int>? retryCount,
-    Expression<DateTime>? lastAttemptAt,
-    Expression<String>? status,
-  }) {
-    return RawValuesInsertable({
-      if (id != null) 'id': id,
-      if (createdAt != null) 'created_at': createdAt,
-      if (endpoint != null) 'endpoint': endpoint,
-      if (payload != null) 'payload': payload,
-      if (retryCount != null) 'retry_count': retryCount,
-      if (lastAttemptAt != null) 'last_attempt_at': lastAttemptAt,
-      if (status != null) 'status': status,
-    });
-  }
-
-  OutboxQueueCompanion copyWith(
-      {Value<int>? id,
-      Value<DateTime>? createdAt,
-      Value<String>? endpoint,
-      Value<String>? payload,
-      Value<int>? retryCount,
-      Value<DateTime?>? lastAttemptAt,
-      Value<String>? status}) {
-    return OutboxQueueCompanion(
-      id: id ?? this.id,
-      createdAt: createdAt ?? this.createdAt,
-      endpoint: endpoint ?? this.endpoint,
-      payload: payload ?? this.payload,
-      retryCount: retryCount ?? this.retryCount,
-      lastAttemptAt: lastAttemptAt ?? this.lastAttemptAt,
-      status: status ?? this.status,
-    );
-  }
-
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    if (id.present) {
-      map['id'] = Variable<int>(id.value);
-    }
-    if (createdAt.present) {
-      map['created_at'] = Variable<DateTime>(createdAt.value);
-    }
-    if (endpoint.present) {
-      map['endpoint'] = Variable<String>(endpoint.value);
-    }
-    if (payload.present) {
-      map['payload'] = Variable<String>(payload.value);
-    }
-    if (retryCount.present) {
-      map['retry_count'] = Variable<int>(retryCount.value);
-    }
-    if (lastAttemptAt.present) {
-      map['last_attempt_at'] = Variable<DateTime>(lastAttemptAt.value);
-    }
-    if (status.present) {
-      map['status'] = Variable<String>(status.value);
-    }
-    return map;
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('OutboxQueueCompanion(')
-          ..write('id: $id, ')
-          ..write('createdAt: $createdAt, ')
-          ..write('endpoint: $endpoint, ')
-          ..write('payload: $payload, ')
-          ..write('retryCount: $retryCount, ')
-          ..write('lastAttemptAt: $lastAttemptAt, ')
-          ..write('status: $status')
-          ..write(')'))
-        .toString();
-  }
-}
-
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -7987,7 +7652,6 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $StockAdjustmentsTable stockAdjustments =
       $StockAdjustmentsTable(this);
   late final $AuditLogTable auditLog = $AuditLogTable(this);
-  late final $OutboxQueueTable outboxQueue = $OutboxQueueTable(this);
   late final ProductsDao productsDao = ProductsDao(this as AppDatabase);
   late final OrdersDao ordersDao = OrdersDao(this as AppDatabase);
   late final CustomersDao customersDao = CustomersDao(this as AppDatabase);
@@ -7995,7 +7659,6 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final TaxDao taxDao = TaxDao(this as AppDatabase);
   late final ExpensesDao expensesDao = ExpensesDao(this as AppDatabase);
   late final AuditDao auditDao = AuditDao(this as AppDatabase);
-  late final SyncDao syncDao = SyncDao(this as AppDatabase);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -8019,8 +7682,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         expenseCategories,
         expenses,
         stockAdjustments,
-        auditLog,
-        outboxQueue
+        auditLog
       ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules(
@@ -9510,6 +9172,7 @@ typedef $$ProductsTableCreateCompanionBuilder = ProductsCompanion Function({
   Value<String?> imagePath,
   Value<bool> isComposite,
   Value<bool> isHiddenInPos,
+  Value<bool> isOutOfStock,
   Value<bool> isActive,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
@@ -9525,6 +9188,7 @@ typedef $$ProductsTableUpdateCompanionBuilder = ProductsCompanion Function({
   Value<String?> imagePath,
   Value<bool> isComposite,
   Value<bool> isHiddenInPos,
+  Value<bool> isOutOfStock,
   Value<bool> isActive,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
@@ -9547,6 +9211,41 @@ final class $$ProductsTableReferences
     if (item == null) return manager;
     return ProcessedTableManager(
         manager.$state.copyWith(prefetchedData: [item]));
+  }
+
+  static MultiTypedResultKey<$ProductComponentsTable, List<ProductComponent>>
+      _compositeComponentsTable(_$AppDatabase db) =>
+          MultiTypedResultKey.fromTable(db.productComponents,
+              aliasName: $_aliasNameGenerator(
+                  db.products.id, db.productComponents.compositeProductId));
+
+  $$ProductComponentsTableProcessedTableManager get compositeComponents {
+    final manager = $$ProductComponentsTableTableManager(
+            $_db, $_db.productComponents)
+        .filter(
+            (f) => f.compositeProductId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache =
+        $_typedResult.readTableOrNull(_compositeComponentsTable($_db));
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: cache));
+  }
+
+  static MultiTypedResultKey<$ProductComponentsTable, List<ProductComponent>>
+      _usedInComponentsTable(_$AppDatabase db) =>
+          MultiTypedResultKey.fromTable(db.productComponents,
+              aliasName: $_aliasNameGenerator(
+                  db.products.id, db.productComponents.componentProductId));
+
+  $$ProductComponentsTableProcessedTableManager get usedInComponents {
+    final manager = $$ProductComponentsTableTableManager(
+            $_db, $_db.productComponents)
+        .filter(
+            (f) => f.componentProductId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_usedInComponentsTable($_db));
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: cache));
   }
 
   static MultiTypedResultKey<$ProductVariantsTable, List<ProductVariant>>
@@ -9667,6 +9366,9 @@ class $$ProductsTableFilterComposer
   ColumnFilters<bool> get isHiddenInPos => $composableBuilder(
       column: $table.isHiddenInPos, builder: (column) => ColumnFilters(column));
 
+  ColumnFilters<bool> get isOutOfStock => $composableBuilder(
+      column: $table.isOutOfStock, builder: (column) => ColumnFilters(column));
+
   ColumnFilters<bool> get isActive => $composableBuilder(
       column: $table.isActive, builder: (column) => ColumnFilters(column));
 
@@ -9694,6 +9396,48 @@ class $$ProductsTableFilterComposer
                   $removeJoinBuilderFromRootComposer,
             ));
     return composer;
+  }
+
+  Expression<bool> compositeComponents(
+      Expression<bool> Function($$ProductComponentsTableFilterComposer f) f) {
+    final $$ProductComponentsTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.productComponents,
+        getReferencedColumn: (t) => t.compositeProductId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$ProductComponentsTableFilterComposer(
+              $db: $db,
+              $table: $db.productComponents,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
+
+  Expression<bool> usedInComponents(
+      Expression<bool> Function($$ProductComponentsTableFilterComposer f) f) {
+    final $$ProductComponentsTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.productComponents,
+        getReferencedColumn: (t) => t.componentProductId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$ProductComponentsTableFilterComposer(
+              $db: $db,
+              $table: $db.productComponents,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
   }
 
   Expression<bool> productVariantsRefs(
@@ -9840,6 +9584,10 @@ class $$ProductsTableOrderingComposer
       column: $table.isHiddenInPos,
       builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<bool> get isOutOfStock => $composableBuilder(
+      column: $table.isOutOfStock,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<bool> get isActive => $composableBuilder(
       column: $table.isActive, builder: (column) => ColumnOrderings(column));
 
@@ -9906,6 +9654,9 @@ class $$ProductsTableAnnotationComposer
   GeneratedColumn<bool> get isHiddenInPos => $composableBuilder(
       column: $table.isHiddenInPos, builder: (column) => column);
 
+  GeneratedColumn<bool> get isOutOfStock => $composableBuilder(
+      column: $table.isOutOfStock, builder: (column) => column);
+
   GeneratedColumn<bool> get isActive =>
       $composableBuilder(column: $table.isActive, builder: (column) => column);
 
@@ -9933,6 +9684,50 @@ class $$ProductsTableAnnotationComposer
                   $removeJoinBuilderFromRootComposer,
             ));
     return composer;
+  }
+
+  Expression<T> compositeComponents<T extends Object>(
+      Expression<T> Function($$ProductComponentsTableAnnotationComposer a) f) {
+    final $$ProductComponentsTableAnnotationComposer composer =
+        $composerBuilder(
+            composer: this,
+            getCurrentColumn: (t) => t.id,
+            referencedTable: $db.productComponents,
+            getReferencedColumn: (t) => t.compositeProductId,
+            builder: (joinBuilder,
+                    {$addJoinBuilderToRootComposer,
+                    $removeJoinBuilderFromRootComposer}) =>
+                $$ProductComponentsTableAnnotationComposer(
+                  $db: $db,
+                  $table: $db.productComponents,
+                  $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                  joinBuilder: joinBuilder,
+                  $removeJoinBuilderFromRootComposer:
+                      $removeJoinBuilderFromRootComposer,
+                ));
+    return f(composer);
+  }
+
+  Expression<T> usedInComponents<T extends Object>(
+      Expression<T> Function($$ProductComponentsTableAnnotationComposer a) f) {
+    final $$ProductComponentsTableAnnotationComposer composer =
+        $composerBuilder(
+            composer: this,
+            getCurrentColumn: (t) => t.id,
+            referencedTable: $db.productComponents,
+            getReferencedColumn: (t) => t.componentProductId,
+            builder: (joinBuilder,
+                    {$addJoinBuilderToRootComposer,
+                    $removeJoinBuilderFromRootComposer}) =>
+                $$ProductComponentsTableAnnotationComposer(
+                  $db: $db,
+                  $table: $db.productComponents,
+                  $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                  joinBuilder: joinBuilder,
+                  $removeJoinBuilderFromRootComposer:
+                      $removeJoinBuilderFromRootComposer,
+                ));
+    return f(composer);
   }
 
   Expression<T> productVariantsRefs<T extends Object>(
@@ -10054,6 +9849,8 @@ class $$ProductsTableTableManager extends RootTableManager<
     Product,
     PrefetchHooks Function(
         {bool categoryId,
+        bool compositeComponents,
+        bool usedInComponents,
         bool productVariantsRefs,
         bool productModifiersRefs,
         bool productTaxesRefs,
@@ -10080,6 +9877,7 @@ class $$ProductsTableTableManager extends RootTableManager<
             Value<String?> imagePath = const Value.absent(),
             Value<bool> isComposite = const Value.absent(),
             Value<bool> isHiddenInPos = const Value.absent(),
+            Value<bool> isOutOfStock = const Value.absent(),
             Value<bool> isActive = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<DateTime> updatedAt = const Value.absent(),
@@ -10095,6 +9893,7 @@ class $$ProductsTableTableManager extends RootTableManager<
             imagePath: imagePath,
             isComposite: isComposite,
             isHiddenInPos: isHiddenInPos,
+            isOutOfStock: isOutOfStock,
             isActive: isActive,
             createdAt: createdAt,
             updatedAt: updatedAt,
@@ -10110,6 +9909,7 @@ class $$ProductsTableTableManager extends RootTableManager<
             Value<String?> imagePath = const Value.absent(),
             Value<bool> isComposite = const Value.absent(),
             Value<bool> isHiddenInPos = const Value.absent(),
+            Value<bool> isOutOfStock = const Value.absent(),
             Value<bool> isActive = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<DateTime> updatedAt = const Value.absent(),
@@ -10125,6 +9925,7 @@ class $$ProductsTableTableManager extends RootTableManager<
             imagePath: imagePath,
             isComposite: isComposite,
             isHiddenInPos: isHiddenInPos,
+            isOutOfStock: isOutOfStock,
             isActive: isActive,
             createdAt: createdAt,
             updatedAt: updatedAt,
@@ -10135,6 +9936,8 @@ class $$ProductsTableTableManager extends RootTableManager<
               .toList(),
           prefetchHooksCallback: (
               {categoryId = false,
+              compositeComponents = false,
+              usedInComponents = false,
               productVariantsRefs = false,
               productModifiersRefs = false,
               productTaxesRefs = false,
@@ -10143,6 +9946,8 @@ class $$ProductsTableTableManager extends RootTableManager<
             return PrefetchHooks(
               db: db,
               explicitlyWatchedTables: [
+                if (compositeComponents) db.productComponents,
+                if (usedInComponents) db.productComponents,
                 if (productVariantsRefs) db.productVariants,
                 if (productModifiersRefs) db.productModifiers,
                 if (productTaxesRefs) db.productTaxes,
@@ -10177,6 +9982,32 @@ class $$ProductsTableTableManager extends RootTableManager<
               },
               getPrefetchedDataCallback: (items) async {
                 return [
+                  if (compositeComponents)
+                    await $_getPrefetchedData<Product, $ProductsTable,
+                            ProductComponent>(
+                        currentTable: table,
+                        referencedTable: $$ProductsTableReferences
+                            ._compositeComponentsTable(db),
+                        managerFromTypedResult: (p0) =>
+                            $$ProductsTableReferences(db, table, p0)
+                                .compositeComponents,
+                        referencedItemsForCurrentItem:
+                            (item, referencedItems) => referencedItems
+                                .where((e) => e.compositeProductId == item.id),
+                        typedResults: items),
+                  if (usedInComponents)
+                    await $_getPrefetchedData<Product, $ProductsTable,
+                            ProductComponent>(
+                        currentTable: table,
+                        referencedTable: $$ProductsTableReferences
+                            ._usedInComponentsTable(db),
+                        managerFromTypedResult: (p0) =>
+                            $$ProductsTableReferences(db, table, p0)
+                                .usedInComponents,
+                        referencedItemsForCurrentItem:
+                            (item, referencedItems) => referencedItems
+                                .where((e) => e.componentProductId == item.id),
+                        typedResults: items),
                   if (productVariantsRefs)
                     await $_getPrefetchedData<Product, $ProductsTable,
                             ProductVariant>(
@@ -10262,6 +10093,8 @@ typedef $$ProductsTableProcessedTableManager = ProcessedTableManager<
     Product,
     PrefetchHooks Function(
         {bool categoryId,
+        bool compositeComponents,
+        bool usedInComponents,
         bool productVariantsRefs,
         bool productModifiersRefs,
         bool productTaxesRefs,
@@ -15124,204 +14957,6 @@ typedef $$AuditLogTableProcessedTableManager = ProcessedTableManager<
     (AuditLogData, BaseReferences<_$AppDatabase, $AuditLogTable, AuditLogData>),
     AuditLogData,
     PrefetchHooks Function()>;
-typedef $$OutboxQueueTableCreateCompanionBuilder = OutboxQueueCompanion
-    Function({
-  Value<int> id,
-  Value<DateTime> createdAt,
-  required String endpoint,
-  required String payload,
-  Value<int> retryCount,
-  Value<DateTime?> lastAttemptAt,
-  Value<String> status,
-});
-typedef $$OutboxQueueTableUpdateCompanionBuilder = OutboxQueueCompanion
-    Function({
-  Value<int> id,
-  Value<DateTime> createdAt,
-  Value<String> endpoint,
-  Value<String> payload,
-  Value<int> retryCount,
-  Value<DateTime?> lastAttemptAt,
-  Value<String> status,
-});
-
-class $$OutboxQueueTableFilterComposer
-    extends Composer<_$AppDatabase, $OutboxQueueTable> {
-  $$OutboxQueueTableFilterComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnFilters<int> get id => $composableBuilder(
-      column: $table.id, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<DateTime> get createdAt => $composableBuilder(
-      column: $table.createdAt, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<String> get endpoint => $composableBuilder(
-      column: $table.endpoint, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<String> get payload => $composableBuilder(
-      column: $table.payload, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<int> get retryCount => $composableBuilder(
-      column: $table.retryCount, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<DateTime> get lastAttemptAt => $composableBuilder(
-      column: $table.lastAttemptAt, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<String> get status => $composableBuilder(
-      column: $table.status, builder: (column) => ColumnFilters(column));
-}
-
-class $$OutboxQueueTableOrderingComposer
-    extends Composer<_$AppDatabase, $OutboxQueueTable> {
-  $$OutboxQueueTableOrderingComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  ColumnOrderings<int> get id => $composableBuilder(
-      column: $table.id, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
-      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<String> get endpoint => $composableBuilder(
-      column: $table.endpoint, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<String> get payload => $composableBuilder(
-      column: $table.payload, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<int> get retryCount => $composableBuilder(
-      column: $table.retryCount, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<DateTime> get lastAttemptAt => $composableBuilder(
-      column: $table.lastAttemptAt,
-      builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<String> get status => $composableBuilder(
-      column: $table.status, builder: (column) => ColumnOrderings(column));
-}
-
-class $$OutboxQueueTableAnnotationComposer
-    extends Composer<_$AppDatabase, $OutboxQueueTable> {
-  $$OutboxQueueTableAnnotationComposer({
-    required super.$db,
-    required super.$table,
-    super.joinBuilder,
-    super.$addJoinBuilderToRootComposer,
-    super.$removeJoinBuilderFromRootComposer,
-  });
-  GeneratedColumn<int> get id =>
-      $composableBuilder(column: $table.id, builder: (column) => column);
-
-  GeneratedColumn<DateTime> get createdAt =>
-      $composableBuilder(column: $table.createdAt, builder: (column) => column);
-
-  GeneratedColumn<String> get endpoint =>
-      $composableBuilder(column: $table.endpoint, builder: (column) => column);
-
-  GeneratedColumn<String> get payload =>
-      $composableBuilder(column: $table.payload, builder: (column) => column);
-
-  GeneratedColumn<int> get retryCount => $composableBuilder(
-      column: $table.retryCount, builder: (column) => column);
-
-  GeneratedColumn<DateTime> get lastAttemptAt => $composableBuilder(
-      column: $table.lastAttemptAt, builder: (column) => column);
-
-  GeneratedColumn<String> get status =>
-      $composableBuilder(column: $table.status, builder: (column) => column);
-}
-
-class $$OutboxQueueTableTableManager extends RootTableManager<
-    _$AppDatabase,
-    $OutboxQueueTable,
-    OutboxQueueData,
-    $$OutboxQueueTableFilterComposer,
-    $$OutboxQueueTableOrderingComposer,
-    $$OutboxQueueTableAnnotationComposer,
-    $$OutboxQueueTableCreateCompanionBuilder,
-    $$OutboxQueueTableUpdateCompanionBuilder,
-    (
-      OutboxQueueData,
-      BaseReferences<_$AppDatabase, $OutboxQueueTable, OutboxQueueData>
-    ),
-    OutboxQueueData,
-    PrefetchHooks Function()> {
-  $$OutboxQueueTableTableManager(_$AppDatabase db, $OutboxQueueTable table)
-      : super(TableManagerState(
-          db: db,
-          table: table,
-          createFilteringComposer: () =>
-              $$OutboxQueueTableFilterComposer($db: db, $table: table),
-          createOrderingComposer: () =>
-              $$OutboxQueueTableOrderingComposer($db: db, $table: table),
-          createComputedFieldComposer: () =>
-              $$OutboxQueueTableAnnotationComposer($db: db, $table: table),
-          updateCompanionCallback: ({
-            Value<int> id = const Value.absent(),
-            Value<DateTime> createdAt = const Value.absent(),
-            Value<String> endpoint = const Value.absent(),
-            Value<String> payload = const Value.absent(),
-            Value<int> retryCount = const Value.absent(),
-            Value<DateTime?> lastAttemptAt = const Value.absent(),
-            Value<String> status = const Value.absent(),
-          }) =>
-              OutboxQueueCompanion(
-            id: id,
-            createdAt: createdAt,
-            endpoint: endpoint,
-            payload: payload,
-            retryCount: retryCount,
-            lastAttemptAt: lastAttemptAt,
-            status: status,
-          ),
-          createCompanionCallback: ({
-            Value<int> id = const Value.absent(),
-            Value<DateTime> createdAt = const Value.absent(),
-            required String endpoint,
-            required String payload,
-            Value<int> retryCount = const Value.absent(),
-            Value<DateTime?> lastAttemptAt = const Value.absent(),
-            Value<String> status = const Value.absent(),
-          }) =>
-              OutboxQueueCompanion.insert(
-            id: id,
-            createdAt: createdAt,
-            endpoint: endpoint,
-            payload: payload,
-            retryCount: retryCount,
-            lastAttemptAt: lastAttemptAt,
-            status: status,
-          ),
-          withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
-              .toList(),
-          prefetchHooksCallback: null,
-        ));
-}
-
-typedef $$OutboxQueueTableProcessedTableManager = ProcessedTableManager<
-    _$AppDatabase,
-    $OutboxQueueTable,
-    OutboxQueueData,
-    $$OutboxQueueTableFilterComposer,
-    $$OutboxQueueTableOrderingComposer,
-    $$OutboxQueueTableAnnotationComposer,
-    $$OutboxQueueTableCreateCompanionBuilder,
-    $$OutboxQueueTableUpdateCompanionBuilder,
-    (
-      OutboxQueueData,
-      BaseReferences<_$AppDatabase, $OutboxQueueTable, OutboxQueueData>
-    ),
-    OutboxQueueData,
-    PrefetchHooks Function()>;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -15364,6 +14999,4 @@ class $AppDatabaseManager {
       $$StockAdjustmentsTableTableManager(_db, _db.stockAdjustments);
   $$AuditLogTableTableManager get auditLog =>
       $$AuditLogTableTableManager(_db, _db.auditLog);
-  $$OutboxQueueTableTableManager get outboxQueue =>
-      $$OutboxQueueTableTableManager(_db, _db.outboxQueue);
 }

@@ -6,6 +6,8 @@ import 'package:go_router/go_router.dart';
 
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
+import 'package:pos_app/core/utils/async_feedback.dart';
+import 'package:pos_app/core/widgets/app_empty_state.dart';
 import 'package:pos_app/features/cart/domain/cart_notifier.dart';
 import 'package:pos_app/features/customers/domain/customers_provider.dart';
 import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
@@ -170,7 +172,18 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
       ),
       body: customersAsync.when(
         data: (all) {
-          if (all.isEmpty) return _EmptyState(onAdd: () => _openForm());
+          if (all.isEmpty) {
+            return AppEmptyState(
+              icon: Icons.people_rounded,
+              title: 'No customers yet',
+              subtitle: 'Add customers to track loyalty and apply discounts.',
+              action: FilledButton.icon(
+                onPressed: () => _openForm(),
+                icon: const Icon(Icons.person_add_rounded),
+                label: const Text('Add Customer'),
+              ),
+            );
+          }
 
           final filtered = _filterAndSort(all);
           if (filtered.isEmpty) {
@@ -428,22 +441,25 @@ class _CustomerFormState extends ConsumerState<_CustomerForm> {
     setState(() => _loading = true);
     final db = ref.read(databaseProvider);
     final discountVal = double.tryParse(_discountCtrl.text) ?? 0.0;
-    await db.customersDao.upsert(CustomersCompanion(
-      id: _isEdit ? Value(widget.customer!.id) : const Value.absent(),
-      name: Value(_nameCtrl.text.trim()),
-      phone: Value(
-          _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim()),
-      email: Value(
-          _emailCtrl.text.trim().isEmpty ? null : _emailCtrl.text.trim()),
-      address: Value(
-          _addressCtrl.text.trim().isEmpty ? null : _addressCtrl.text.trim()),
-      defaultDiscount: Value(discountVal),
-      defaultDiscountIsPercent: Value(_discountIsPercent),
-    ));
-    if (mounted) {
-      setState(() => _loading = false);
-      Navigator.pop(context);
-    }
+    final saved = await withErrorSnackbar(
+      context,
+      () => db.customersDao.upsert(CustomersCompanion(
+        id: _isEdit ? Value(widget.customer!.id) : const Value.absent(),
+        name: Value(_nameCtrl.text.trim()),
+        phone: Value(
+            _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim()),
+        email: Value(
+            _emailCtrl.text.trim().isEmpty ? null : _emailCtrl.text.trim()),
+        address: Value(
+            _addressCtrl.text.trim().isEmpty ? null : _addressCtrl.text.trim()),
+        defaultDiscount: Value(discountVal),
+        defaultDiscountIsPercent: Value(_discountIsPercent),
+      )),
+      failurePrefix: 'Save failed',
+    );
+    if (!mounted) return;
+    setState(() => _loading = false);
+    if (saved != null) Navigator.pop(context);
   }
 
   Future<void> _delete() async {
@@ -618,47 +634,3 @@ class _CustomerFormState extends ConsumerState<_CustomerForm> {
   }
 }
 
-// ── Empty state ───────────────────────────────────────────────────────────────
-
-class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.onAdd});
-  final VoidCallback onAdd;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: cs.primaryContainer,
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: Icon(Icons.people_rounded,
-                size: 40, color: cs.onPrimaryContainer),
-          ),
-          const SizedBox(height: 20),
-          Text('No customers yet',
-              style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-          const SizedBox(height: 6),
-          Text(
-            'Add customers to track loyalty and apply discounts.',
-            style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 28),
-          FilledButton.icon(
-            onPressed: onAdd,
-            icon: const Icon(Icons.person_add_rounded),
-            label: const Text('Add Customer'),
-          ),
-        ],
-      ),
-    );
-  }
-}

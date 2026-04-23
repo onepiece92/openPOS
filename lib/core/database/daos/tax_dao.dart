@@ -2,14 +2,14 @@ import 'package:drift/drift.dart';
 
 import '../app_database.dart';
 import '../tables/product_taxes_table.dart';
-import '../tables/tax_group_members_table.dart';
-import '../tables/tax_groups_table.dart';
 import '../tables/tax_rates_table.dart';
 
 part 'tax_dao.g.dart';
 
+// TaxGroups + TaxGroupMembers stay in @DriftDatabase for v2 (compound tax);
+// not exposed here because no method on this DAO touches them.
 @DriftAccessor(
-  tables: [TaxRates, TaxGroups, TaxGroupMembers, ProductTaxes],
+  tables: [TaxRates, ProductTaxes],
 )
 class TaxDao extends DatabaseAccessor<AppDatabase> with _$TaxDaoMixin {
   TaxDao(super.db);

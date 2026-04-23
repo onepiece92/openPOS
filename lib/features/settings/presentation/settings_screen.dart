@@ -62,6 +62,8 @@ class SettingsScreen extends ConsumerWidget {
           _LoyaltySection(),
           const _SectionHeader('Appearance'),
           _AppearanceSection(),
+          const _SectionHeader('Hardware'),
+          _PrinterSection(),
           const _SectionHeader('Data Management'),
           _BackupSection(),
           const _SectionHeader('Danger Zone'),
@@ -528,6 +530,29 @@ class _AppearanceSection extends ConsumerWidget {
   }
 }
 
+// ── Printer ───────────────────────────────────────────────────────────────────
+
+class _PrinterSection extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final name = ref.watch(printerDeviceNameProvider);
+    final paper = ref.watch(printerPaperWidthProvider);
+    final subtitle = name == null
+        ? 'No printer paired · ${paper}mm'
+        : '$name · ${paper}mm';
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: ListTile(
+        leading: const Icon(Icons.print_outlined),
+        title: const Text('Thermal Printer'),
+        subtitle: Text(subtitle),
+        trailing: const Icon(Icons.chevron_right_rounded),
+        onTap: () => context.push('/settings/printer'),
+      ),
+    );
+  }
+}
+
 // ── Backup & Restore ──────────────────────────────────────────────────────────
 
 class _BackupSection extends StatelessWidget {
@@ -873,7 +898,6 @@ class _DangerSection extends ConsumerWidget {
         await db.delete(db.taxRates).go();
         await db.delete(db.expenseCategories).go();
         await db.delete(db.auditLog).go();
-        await db.delete(db.outboxQueue).go();
       });
 
       await box.clear();

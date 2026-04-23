@@ -1,35 +1,49 @@
 import 'package:flutter/material.dart';
 
 import 'package:pos_app/core/database/app_database.dart';
+import 'package:pos_app/core/theme/tokens.dart';
+import 'package:pos_app/core/utils/currency_formatter.dart';
+import 'package:pos_app/core/widgets/step_button.dart';
 
 class GridProductTile extends StatelessWidget {
   const GridProductTile({
     super.key,
     required this.product,
-    required this.currencySymbol,
+    required this.fmt,
     required this.qtyInCart,
     required this.onTap,
     required this.onIncrement,
     required this.onDecrement,
+    required this.isFavorite,
+    required this.onToggleFavorite,
   });
 
   final Product product;
-  final String currencySymbol;
+  final CurrencyFormatter fmt;
   final int qtyInCart;
   final VoidCallback onTap;       // add to cart (not in cart)
   final VoidCallback onIncrement; // qty++
   final VoidCallback onDecrement; // qty-- / remove
+  final bool isFavorite;
+  final VoidCallback onToggleFavorite;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
     final inCart = qtyInCart > 0;
-    // 0  = unlimited (no stock set) — always tappable
-    // <0 = depleted after over-selling — blocked
-    final outOfStock = product.stockQuantity < 0;
+    // is_out_of_stock flag OR negative qty (over-sold) → blocked.
+    // 0 = unlimited — tappable.
+    final outOfStock = product.isOutOfStock || product.stockQuantity < 0;
+    // Tracked product already at its stock cap in the cart.
+    final atCap = !outOfStock &&
+        product.stockQuantity > 0 &&
+        qtyInCart >= product.stockQuantity;
 
     return GestureDetector(
+      // Root tile stays tappable at cap — home.dart's allowQty surfaces
+      // the "Only N in stock" snackbar. The greyed `+` button is the
+      // visual cap indicator.
       onTap: outOfStock ? null : (inCart ? onIncrement : onTap),
       child: Stack(
         clipBehavior: Clip.none,
@@ -66,8 +80,8 @@ class GridProductTile extends StatelessWidget {
               boxShadow: [
                 BoxShadow(
                   color: inCart
-                      ? cs.primary.withValues(alpha: 0.30)
-                      : Colors.black.withValues(alpha: 0.10),
+                      ? cs.primary.withValues(alpha: AppOpacity.strong)
+                      : Colors.black.withValues(alpha: AppOpacity.soft),
                   blurRadius: inCart ? 12 : 6,
                   spreadRadius: inCart ? 1 : 0,
                   offset: const Offset(0, 2),
@@ -98,7 +112,7 @@ class GridProductTile extends StatelessWidget {
                 Text(
                   outOfStock
                       ? 'Out of stock'
-                      : '$currencySymbol ${product.price.toStringAsFixed(2)}',
+                      : fmt.format(product.price),
                   style: tt.bodySmall?.copyWith(
                     fontWeight: FontWeight.w500,
                     color: outOfStock
@@ -119,19 +133,17 @@ class GridProductTile extends StatelessWidget {
                         ),
                       ),
                       const Spacer(),
-                      _StepBtn(
+                      StepButton(
                         icon: qtyInCart == 1
                             ? Icons.delete_outline_rounded
                             : Icons.remove_rounded,
                         onTap: onDecrement,
                         isDestructive: qtyInCart == 1,
-                        cs: cs,
                       ),
                       const SizedBox(width: 4),
-                      _StepBtn(
+                      StepButton(
                         icon: Icons.add_rounded,
-                        onTap: onIncrement,
-                        cs: cs,
+                        onTap: atCap ? null : onIncrement,
                       ),
                     ],
                   ),
@@ -139,6 +151,30 @@ class GridProductTile extends StatelessWidget {
               ],
             ),
           ),
+          // ── Favorite star (bottom-right, hidden when in cart) ─────────
+          if (!inCart)
+            Positioned(
+              bottom: 4,
+              right: 4,
+              child: GestureDetector(
+                onTap: onToggleFavorite,
+                behavior: HitTestBehavior.opaque,
+                child: Container(
+                  width: 24,
+                  height: 24,
+                  alignment: Alignment.center,
+                  child: Icon(
+                    isFavorite
+                        ? Icons.star_rounded
+                        : Icons.star_border_rounded,
+                    size: 14,
+                    color: isFavorite
+                        ? cs.tertiary
+                        : cs.onSurface.withValues(alpha: 0.3),
+                  ),
+                ),
+              ),
+            ),
           // ── Badge ─────────────────────────────────────────────────────
           if (inCart)
             Positioned(
@@ -170,39 +206,3 @@ class GridProductTile extends StatelessWidget {
   }
 }
 
-// ─── Step button ──────────────────────────────────────────────────────────────
-
-class _StepBtn extends StatelessWidget {
-  const _StepBtn({
-    required this.icon,
-    required this.onTap,
-    required this.cs,
-    this.isDestructive = false,
-  });
-  final IconData icon;
-  final VoidCallback onTap;
-  final ColorScheme cs;
-  final bool isDestructive;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 26,
-        height: 26,
-        decoration: BoxDecoration(
-          color: isDestructive
-              ? cs.errorContainer.withValues(alpha: 0.6)
-              : cs.onSurface.withValues(alpha: 0.10),
-          borderRadius: BorderRadius.circular(7),
-        ),
-        child: Icon(
-          icon,
-          size: 14,
-          color: isDestructive ? cs.error : cs.onSurface,
-        ),
-      ),
-    );
-  }
-}

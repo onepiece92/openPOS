@@ -1,35 +1,47 @@
 import 'package:flutter/material.dart';
 
 import 'package:pos_app/core/database/app_database.dart';
+import 'package:pos_app/core/utils/currency_formatter.dart';
 
 class PosProductTile extends StatelessWidget {
   const PosProductTile({
     super.key,
     required this.product,
-    required this.currencySymbol,
+    required this.fmt,
     required this.qtyInCart,
     required this.onTap,
     required this.onIncrement,
     required this.onDecrement,
+    required this.isFavorite,
+    required this.onToggleFavorite,
   });
 
   final Product product;
-  final String currencySymbol;
+  final CurrencyFormatter fmt;
   final int qtyInCart;
   final VoidCallback onTap;       // add to cart (not in cart)
   final VoidCallback onIncrement; // qty++
   final VoidCallback onDecrement; // qty-- / remove
+  final bool isFavorite;
+  final VoidCallback onToggleFavorite;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
     final inCart = qtyInCart > 0;
-    // 0  = unlimited (no stock set) — always tappable
-    // <0 = depleted after over-selling — blocked
-    final outOfStock = product.stockQuantity < 0;
+    // is_out_of_stock flag OR negative qty (over-sold) → blocked.
+    // 0 = unlimited — tappable.
+    final outOfStock = product.isOutOfStock || product.stockQuantity < 0;
+    // Tracked product already at its stock cap in the cart.
+    final atCap = !outOfStock &&
+        product.stockQuantity > 0 &&
+        qtyInCart >= product.stockQuantity;
 
     return GestureDetector(
+      // Root tile stays tappable at cap — home.dart's allowQty surfaces
+      // the "Only N in stock" snackbar. The greyed `+` button is the
+      // visual cap indicator.
       onTap: outOfStock ? null : (inCart ? onIncrement : onTap),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
@@ -44,6 +56,26 @@ class PosProductTile extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Row(
           children: [
+            // ── Favorite star ───────────────────────────────────────────
+            GestureDetector(
+              onTap: onToggleFavorite,
+              behavior: HitTestBehavior.opaque,
+              child: Padding(
+                padding: const EdgeInsets.only(right: 10),
+                child: Icon(
+                  isFavorite
+                      ? Icons.star_rounded
+                      : Icons.star_border_rounded,
+                  size: 20,
+                  color: isFavorite
+                      ? cs.tertiary
+                      : (inCart
+                              ? cs.onPrimaryContainer
+                              : cs.onSurface)
+                          .withValues(alpha: isFavorite ? 1.0 : 0.35),
+                ),
+              ),
+            ),
             // ── Name ────────────────────────────────────────────────────
             Expanded(
               child: Text(
@@ -72,7 +104,7 @@ class PosProductTile extends StatelessWidget {
               )
             else
               Text(
-                product.price.toStringAsFixed(2),
+                fmt.formatPlain(product.price),
                 style: tt.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w600,
                   color: inCart ? cs.onPrimaryContainer : cs.onSurfaceVariant,
@@ -83,7 +115,7 @@ class PosProductTile extends StatelessWidget {
             if (inCart)
               _Stepper(
                 qty: qtyInCart,
-                onIncrement: onIncrement,
+                onIncrement: atCap ? null : onIncrement,
                 onDecrement: onDecrement,
                 cs: cs,
                 tt: tt,
@@ -108,7 +140,7 @@ class _Stepper extends StatelessWidget {
     required this.tt,
   });
   final int qty;
-  final VoidCallback onIncrement;
+  final VoidCallback? onIncrement;
   final VoidCallback onDecrement;
   final ColorScheme cs;
   final TextTheme tt;
@@ -116,6 +148,7 @@ class _Stepper extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isLast = qty == 1;
+    final incDisabled = onIncrement == null;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -141,8 +174,10 @@ class _Stepper extends StatelessWidget {
         _StepBtn(
           icon: Icons.add_rounded,
           onTap: onIncrement,
-          color: cs.onPrimaryContainer,
-          bg: cs.onPrimaryContainer.withValues(alpha: 0.15),
+          color: cs.onPrimaryContainer
+              .withValues(alpha: incDisabled ? 0.25 : 1.0),
+          bg: cs.onPrimaryContainer
+              .withValues(alpha: incDisabled ? 0.04 : 0.15),
         ),
       ],
     );
@@ -157,7 +192,7 @@ class _StepBtn extends StatelessWidget {
     required this.bg,
   });
   final IconData icon;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final Color color;
   final Color bg;
 

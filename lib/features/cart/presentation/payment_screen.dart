@@ -1,15 +1,21 @@
-import 'package:drift/drift.dart' show Value;
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:pos_app/core/database/app_database.dart';
+import 'package:pos_app/core/providers/audit_service_provider.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/core/theme/app_theme.dart';
+import 'package:pos_app/core/theme/tokens.dart';
+import 'package:pos_app/core/utils/currency_formatter.dart';
 import 'package:pos_app/features/cart/domain/cart_notifier.dart';
+import 'package:pos_app/features/cart/domain/place_order.dart';
 import 'package:pos_app/features/customers/domain/customers_provider.dart';
+import 'package:pos_app/features/printing/domain/auto_print.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
 
 // ─── Payment screen (/checkout/payment) ──────────────────────────────────────
@@ -60,83 +66,39 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
 
     setState(() => _placing = true);
     final db = ref.read(databaseProvider);
-
+    final audit = ref.read(auditServiceProvider);
     final session = ref.read(cartSessionProvider);
-    final orderId = await db.ordersDao.insertOrder(
-      OrdersCompanion.insert(
-        subtotal: summary.subtotal,
-        taxTotal: Value(summary.taxAmount),
-        discountTotal: Value(summary.orderDiscount),
-        total: summary.total,
+    final messenger = ScaffoldMessenger.of(context);
+
+    final int orderId;
+    try {
+      orderId = await placeOrder(
+        db,
+        audit,
+        cart: cart,
+        summary: summary,
+        session: session,
         paymentMethod: _paymentMethod,
-        tenderedAmount: _paymentMethod == 'cash'
-            ? Value(_tendered)
-            : const Value.absent(),
-        changeAmount: _paymentMethod == 'cash'
-            ? Value((_tendered - summary.total).clamp(0, double.infinity))
-            : const Value.absent(),
-        customerId: session.customerId != null
-            ? Value(session.customerId!)
-            : const Value.absent(),
-      ),
-    );
-
-    await db.ordersDao.insertItems([
-      for (final item in cart)
-        OrderItemsCompanion.insert(
-          orderId: orderId,
-          productId: item.productId,
-          productName: item.name,
-          unitPrice: item.unitPrice,
-          quantity: item.quantity,
-          discount: Value(item.lineDiscount),
-          lineTotal: item.lineSubtotal,
-        ),
-    ]);
-
-    if (summary.taxEnabled && summary.taxLines.isNotEmpty) {
-      await db.ordersDao.insertTaxLines([
-        for (final line in summary.taxLines)
-          if (line.amount > 0)
-            OrderTaxesCompanion.insert(
-              orderId: orderId,
-              taxRateId: line.taxRateId,
-              taxRateName: line.name,
-              taxRatePercent: line.rate,
-              taxableAmount: line.taxableAmount,
-              taxAmount: line.amount,
-            ),
-      ]);
-    }
-
-    for (final item in cart) {
-      final product = await db.productsDao.getById(item.productId);
-      if (product != null && product.isComposite) {
-        // Deduct each component's stock instead of the composite itself
-        final components =
-            await db.productsDao.getComponents(item.productId);
-        for (final comp in components) {
-          await db.productsDao
-              .deductStock(comp.componentProductId, comp.quantity * item.quantity);
-        }
-      } else {
-        await db.productsDao.deductStock(item.productId, item.quantity);
-      }
-    }
-
-    // Loyalty: redeem then earn
-    if (session.customerId != null) {
-      if (session.loyaltyPointsToRedeem > 0) {
-        await db.customersDao.redeemLoyaltyPoints(
-            session.customerId!, session.loyaltyPointsToRedeem);
-      }
-      if (summary.pointsToEarn > 0) {
-        await db.customersDao
-            .addLoyaltyPoints(session.customerId!, summary.pointsToEarn);
-      }
+        tenderedAmount: _tendered,
+      );
+    } catch (e) {
+      if (mounted) setState(() => _placing = false);
+      messenger.showSnackBar(
+        SnackBar(content: Text('Order failed: $e')),
+      );
+      return;
     }
 
     ref.read(cartProvider.notifier).clear();
+
+    // Fire-and-forget print. Failures surface via snackbar but don't block
+    // navigation to the receipt screen — receipts work paperless too.
+    unawaited(autoPrintOrder(ref, orderId).then((err) {
+      if (err != null && mounted) {
+        messenger.showSnackBar(SnackBar(content: Text(err)));
+      }
+    }));
+
     if (mounted) {
       setState(() => _placing = false);
       context.go('/receipt/$orderId');
@@ -147,6 +109,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   Widget build(BuildContext context) {
     final summary = ref.watch(cartSummaryProvider);
     final symbol = ref.watch(currencySymbolProvider);
+    final fmt = ref.watch(currencyFormatterProvider);
     final loyaltyEnabled = ref.watch(loyaltyEnabledProvider);
     final customer = ref.watch(cartCustomerProvider);
     final cs = Theme.of(context).colorScheme;
@@ -219,10 +182,11 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                           ?.copyWith(color: cs.onSecondaryContainer),
                     ),
                     Text(
-                      '$symbol ${change.toStringAsFixed(2)}',
+                      fmt.format(change),
                       style: tt.headlineSmall?.copyWith(
                         color: cs.onSecondaryContainer,
                         fontWeight: FontWeight.bold,
+                        fontFamily: AppFonts.mono,
                       ),
                     ),
                   ],
@@ -235,7 +199,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
             _LoyaltySection(
               customer: customer,
               summary: summary,
-              symbol: symbol,
+              fmt: fmt,
               loyaltyCtrl: _loyaltyCtrl,
               onChanged: (pts) {
                 ref
@@ -266,7 +230,7 @@ class _PaymentActionBar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final cart = ref.watch(cartProvider);
     final summary = ref.watch(cartSummaryProvider);
-    final symbol = ref.watch(currencySymbolProvider);
+    final fmt = ref.watch(currencyFormatterProvider);
     final cs = Theme.of(context).colorScheme;
     final bottomInset = MediaQuery.of(context).padding.bottom;
 
@@ -287,7 +251,7 @@ class _PaymentActionBar extends ConsumerWidget {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : Text(
-                    'Confirm & Charge  $symbol ${summary.total.toStringAsFixed(2)}',
+                    'Confirm & Charge  ${fmt.format(summary.total)}',
                   ),
           ),
         ),
@@ -332,14 +296,14 @@ class _LoyaltySection extends StatelessWidget {
   const _LoyaltySection({
     required this.customer,
     required this.summary,
-    required this.symbol,
+    required this.fmt,
     required this.loyaltyCtrl,
     required this.onChanged,
   });
 
   final Customer customer;
   final CartSummary summary;
-  final String symbol;
+  final CurrencyFormatter fmt;
   final TextEditingController loyaltyCtrl;
   final ValueChanged<int> onChanged;
 
@@ -397,7 +361,7 @@ class _LoyaltySection extends StatelessWidget {
               prefixIcon: const Icon(Icons.redeem_rounded),
               border: const OutlineInputBorder(),
               helperText: summary.loyaltyDiscount > 0
-                  ? 'Discount: $symbol ${summary.loyaltyDiscount.toStringAsFixed(2)}'
+                  ? 'Discount: ${fmt.format(summary.loyaltyDiscount)}'
                   : null,
             ),
             onChanged: (v) {
