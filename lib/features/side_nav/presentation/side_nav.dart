@@ -67,6 +67,10 @@ class PosDrawer extends StatelessWidget {
           icon: Icon(Icons.people_rounded),
           label: Text('Customers'),
         ),
+        const NavigationDrawerDestination(
+          icon: Icon(Icons.table_restaurant_rounded),
+          label: Text('Tables'),
+        ),
 
         const SizedBox(height: 4),
         const Divider(indent: 20, endIndent: 20, height: 8),
@@ -148,6 +152,7 @@ const List<String> _routes = [
   '/pos',
   '/orders',
   '/customers',
+  '/tables',
   '/products',
   '/categories',
   '/inventory',

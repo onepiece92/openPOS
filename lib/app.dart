@@ -20,6 +20,7 @@ import 'package:pos_app/features/onboarding/presentation/onboarding_screen.dart'
 import 'package:pos_app/features/orders/presentation/order_detail_screen.dart';
 import 'package:pos_app/features/orders/presentation/orders_screen.dart';
 import 'package:pos_app/features/printing/presentation/printer_setup_screen.dart';
+import 'package:pos_app/features/tables/presentation/tables_screen.dart';
 import 'package:pos_app/features/products/presentation/categories_screen.dart';
 import 'package:pos_app/features/products/presentation/product_form_screen.dart';
 import 'package:pos_app/features/products/presentation/products_screen.dart';
@@ -86,6 +87,8 @@ class POSApp extends ConsumerWidget {
                   router.go('/orders'),
               const SingleActivator(LogicalKeyboardKey.keyU, meta: true): () =>
                   router.go('/customers'),
+              const SingleActivator(LogicalKeyboardKey.keyT, meta: true): () =>
+                  router.go('/tables'),
               const SingleActivator(LogicalKeyboardKey.keyE, meta: true): () =>
                   router.go('/expenses'),
               const SingleActivator(LogicalKeyboardKey.comma, meta: true): () =>
@@ -174,6 +177,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/customers',
         pageBuilder: (_, state) => _slide(state, const CustomersScreen()),
+      ),
+      GoRoute(
+        path: '/tables',
+        pageBuilder: (_, state) => _slide(state, const TablesScreen()),
       ),
       GoRoute(
         path: '/expenses',

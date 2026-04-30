@@ -27,12 +27,17 @@ final _receiptProvider =
   if (order.customerId != null) {
     customer = await db.customersDao.getById(order.customerId!);
   }
+  PosTable? table;
+  if (order.tableId != null) {
+    table = await db.tablesDao.getById(order.tableId!);
+  }
   return ReceiptBodyData(
     order: order,
     items: items,
     taxes: taxes,
     businessName: businessName,
     customer: customer,
+    table: table,
   );
 });
 

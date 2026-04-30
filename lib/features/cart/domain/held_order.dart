@@ -8,6 +8,7 @@ class HeldOrder {
     required this.items,
     this.customerName,
     this.customerId,
+    this.tableId,
     this.orderDiscount = 0.0,
     this.orderDiscountIsPercent = false,
     this.archivedAt,
@@ -19,6 +20,7 @@ class HeldOrder {
   final List<CartItem> items;
   final String? customerName;
   final int? customerId;
+  final int? tableId;
   final double orderDiscount;
   final bool orderDiscountIsPercent;
   final DateTime? archivedAt;
@@ -33,6 +35,7 @@ class HeldOrder {
         items: items,
         customerName: customerName,
         customerId: customerId,
+        tableId: tableId,
         orderDiscount: orderDiscount,
         orderDiscountIsPercent: orderDiscountIsPercent,
         archivedAt: clearArchived ? null : (archivedAt ?? this.archivedAt),
@@ -47,6 +50,7 @@ class HeldOrder {
         'createdAt': createdAt.toIso8601String(),
         if (customerName != null) 'customerName': customerName,
         if (customerId != null) 'customerId': customerId,
+        if (tableId != null) 'tableId': tableId,
         if (orderDiscount != 0.0) 'orderDiscount': orderDiscount,
         if (orderDiscountIsPercent) 'orderDiscountIsPercent': true,
         if (archivedAt != null) 'archivedAt': archivedAt!.toIso8601String(),
@@ -68,6 +72,7 @@ class HeldOrder {
         createdAt: DateTime.parse(json['createdAt'] as String),
         customerName: json['customerName'] as String?,
         customerId: json['customerId'] as int?,
+        tableId: json['tableId'] as int?,
         orderDiscount: (json['orderDiscount'] as num?)?.toDouble() ?? 0.0,
         orderDiscountIsPercent:
             json['orderDiscountIsPercent'] as bool? ?? false,

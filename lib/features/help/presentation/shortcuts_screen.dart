@@ -28,6 +28,8 @@ class ShortcutsScreen extends StatelessWidget {
           _ShortcutRow(
               keys: const ['⌘', 'U'], label: 'Customers', tt: tt, cs: cs),
           _ShortcutRow(
+              keys: const ['⌘', 'T'], label: 'Tables', tt: tt, cs: cs),
+          _ShortcutRow(
               keys: const ['⌘', 'E'], label: 'Expenses', tt: tt, cs: cs),
           _ShortcutRow(
               keys: const ['⌘', 'I'], label: 'Inventory', tt: tt, cs: cs),

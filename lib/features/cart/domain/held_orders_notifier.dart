@@ -43,6 +43,7 @@ class HeldOrdersNotifier extends Notifier<List<HeldOrder>> {
     String? label,
     String? customerName,
     int? customerId,
+    int? tableId,
     double orderDiscount = 0.0,
     bool orderDiscountIsPercent = false,
   }) {
@@ -55,6 +56,7 @@ class HeldOrdersNotifier extends Notifier<List<HeldOrder>> {
       items: items,
       customerName: customerName,
       customerId: customerId,
+      tableId: tableId,
       orderDiscount: orderDiscount,
       orderDiscountIsPercent: orderDiscountIsPercent,
     );
@@ -72,6 +74,7 @@ class HeldOrdersNotifier extends Notifier<List<HeldOrder>> {
       cart,
       customerName: customerName,
       customerId: session.customerId,
+      tableId: session.tableId,
       orderDiscount: session.orderDiscount,
       orderDiscountIsPercent: session.orderDiscountIsPercent,
     );

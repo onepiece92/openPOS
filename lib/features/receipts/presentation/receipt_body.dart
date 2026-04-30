@@ -14,12 +14,14 @@ class ReceiptBodyData {
     required this.taxes,
     required this.businessName,
     this.customer,
+    this.table,
   });
   final Order order;
   final List<OrderItem> items;
   final List<OrderTaxe> taxes;
   final String businessName;
   final Customer? customer;
+  final PosTable? table;
 }
 
 // ─── Reusable receipt body ────────────────────────────────────────────────────
@@ -80,6 +82,14 @@ class ReceiptBody extends StatelessWidget {
                     ),
                   ],
                 ),
+                if (data.table != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      'Table: ${data.table!.name}',
+                      style: bodyStyle.copyWith(color: cs.onSurface),
+                    ),
+                  ),
                 divider,
 
                 // ── Items section ─────────────────────────────────────────

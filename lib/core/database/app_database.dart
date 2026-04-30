@@ -9,6 +9,7 @@ import 'daos/expenses_dao.dart';
 import 'daos/inventory_dao.dart';
 import 'daos/orders_dao.dart';
 import 'daos/products_dao.dart';
+import 'daos/tables_dao.dart';
 import 'daos/tax_dao.dart';
 import 'tables/audit_log_table.dart';
 import 'tables/categories_table.dart';
@@ -26,6 +27,7 @@ import 'tables/product_variants_table.dart';
 import 'tables/products_table.dart';
 import 'tables/returns_table.dart';
 import 'tables/stock_adjustments_table.dart';
+import 'tables/tables_table.dart';
 import 'tables/tax_group_members_table.dart';
 import 'tables/tax_groups_table.dart';
 import 'tables/tax_rates_table.dart';
@@ -47,6 +49,8 @@ part 'app_database.g.dart';
     ProductTaxes,
     // Customers
     Customers,
+    // Front of House
+    Tables,
     // Orders
     Orders,
     OrderItems,
@@ -69,6 +73,7 @@ part 'app_database.g.dart';
     TaxDao,
     ExpensesDao,
     AuditDao,
+    TablesDao,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -76,7 +81,7 @@ class AppDatabase extends _$AppDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -119,6 +124,22 @@ class AppDatabase extends _$AppDatabase {
           if (from < 6) {
             // Drop deprecated outbox queue (online sync removed — app is offline-only).
             await customStatement('DROP TABLE IF EXISTS outbox_queue');
+          }
+          if (from < 7) {
+            // Front-of-house tables + nullable FK from orders.
+            await customStatement('''
+              CREATE TABLE IF NOT EXISTS tables (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                capacity INTEGER NOT NULL DEFAULT 4,
+                notes TEXT,
+                created_at INTEGER NOT NULL DEFAULT (CAST(strftime('%s','now') AS INTEGER)),
+                updated_at INTEGER NOT NULL DEFAULT (CAST(strftime('%s','now') AS INTEGER))
+              )
+            ''');
+            await customStatement(
+              'ALTER TABLE orders ADD COLUMN table_id INTEGER REFERENCES tables(id)',
+            );
           }
         },
         beforeOpen: (details) async {

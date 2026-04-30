@@ -367,6 +367,9 @@ class _HeldTicketsSheetState extends ConsumerState<_HeldTicketsSheet>
     if (ticket.customerId != null) {
       sessionNotifier.setCustomer(ticket.customerId);
     }
+    if (ticket.tableId != null) {
+      sessionNotifier.setTable(ticket.tableId);
+    }
     if (ticket.orderDiscount > 0) {
       sessionNotifier.setOrderDiscount(
         ticket.orderDiscount,

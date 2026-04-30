@@ -36,6 +36,9 @@ Future<int> placeOrder(
         customerId: session.customerId != null
             ? Value(session.customerId!)
             : const Value.absent(),
+        tableId: session.tableId != null
+            ? Value(session.tableId!)
+            : const Value.absent(),
       ),
     );
 

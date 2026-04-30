@@ -33,6 +33,9 @@ Future<String?> autoPrintOrder(WidgetRef ref, int orderId) async {
     final customer = order.customerId == null
         ? null
         : await db.customersDao.getById(order.customerId!);
+    final table = order.tableId == null
+        ? null
+        : await db.tablesDao.getById(order.tableId!);
 
     final data = ReceiptBodyData(
       order: order,
@@ -40,6 +43,7 @@ Future<String?> autoPrintOrder(WidgetRef ref, int orderId) async {
       taxes: taxes,
       businessName: businessName,
       customer: customer,
+      table: table,
     );
 
     final bytes = await renderReceiptBytes(data, fmt, paper);

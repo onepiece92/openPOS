@@ -43,6 +43,9 @@ Future<List<int>> renderReceiptBytes(
       styles: const PosStyles(align: PosAlign.right),
     ),
   ]));
+  if (data.table != null) {
+    bytes.addAll(g.text('Table: ${data.table!.name}'));
+  }
   bytes.addAll(g.hr());
 
   // ── Items header ───────────────────────────────────────────────────────

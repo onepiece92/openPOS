@@ -13,6 +13,7 @@ class CartSession {
     required this.ticketNumber,
     required this.openedAt,
     this.customerId,
+    this.tableId,
     this.orderDiscount = 0.0,
     this.orderDiscountIsPercent = false,
     this.taxEnabled = true,
@@ -22,6 +23,7 @@ class CartSession {
   final String ticketNumber;
   final DateTime openedAt;
   final int? customerId;
+  final int? tableId;
   final double orderDiscount;
   final bool orderDiscountIsPercent;
   final bool taxEnabled;
@@ -29,16 +31,19 @@ class CartSession {
 
   CartSession copyWith({
     int? customerId,
+    int? tableId,
     double? orderDiscount,
     bool? orderDiscountIsPercent,
     bool? taxEnabled,
     int? loyaltyPointsToRedeem,
     bool clearCustomer = false,
+    bool clearTable = false,
   }) =>
       CartSession(
         ticketNumber: ticketNumber,
         openedAt: openedAt,
         customerId: clearCustomer ? null : (customerId ?? this.customerId),
+        tableId: clearTable ? null : (tableId ?? this.tableId),
         orderDiscount: orderDiscount ?? this.orderDiscount,
         orderDiscountIsPercent:
             orderDiscountIsPercent ?? this.orderDiscountIsPercent,
@@ -64,6 +69,9 @@ class CartSessionNotifier extends Notifier<CartSession> {
   void setCustomer(int? id) => id == null
       ? state = state.copyWith(clearCustomer: true)
       : state = state.copyWith(customerId: id);
+  void setTable(int? id) => id == null
+      ? state = state.copyWith(clearTable: true)
+      : state = state.copyWith(tableId: id);
   void setOrderDiscount(double amount, {required bool isPercent}) =>
       state = state.copyWith(
           orderDiscount: amount, orderDiscountIsPercent: isPercent);

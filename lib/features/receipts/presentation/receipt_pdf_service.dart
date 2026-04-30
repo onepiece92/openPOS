@@ -71,6 +71,11 @@ Future<pw.Document> buildReceiptPdf(
               pw.Text('Paid Bill No.: ${order.id}', style: baseStyle),
             ],
           ),
+          if (data.table != null)
+            pw.Padding(
+              padding: const pw.EdgeInsets.only(top: 2),
+              child: pw.Text('Table: ${data.table!.name}', style: baseStyle),
+            ),
           divider(),
 
           // ── Items header ────────────────────────────────────────────────

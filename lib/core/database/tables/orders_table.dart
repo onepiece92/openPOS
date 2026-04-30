@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import 'customers_table.dart';
+import 'tables_table.dart';
 
 /// Completed (or held/voided) sales transactions.
 ///
@@ -23,6 +24,8 @@ class Orders extends Table {
       real().nullable()(); // change due to customer
   IntColumn get customerId =>
       integer().nullable().references(Customers, #id)();
+  IntColumn get tableId =>
+      integer().nullable().references(Tables, #id)();
   TextColumn get notes => text().nullable()();
   DateTimeColumn get createdAt =>
       dateTime().withDefault(currentDateAndTime)();

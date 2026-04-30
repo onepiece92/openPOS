@@ -40,6 +40,10 @@ final _orderDetailProvider =
   if (order.customerId != null) {
     customer = await db.customersDao.getById(order.customerId!);
   }
+  PosTable? table;
+  if (order.tableId != null) {
+    table = await db.tablesDao.getById(order.tableId!);
+  }
   return _DetailData(
     receipt: ReceiptBodyData(
       order: order,
@@ -47,6 +51,7 @@ final _orderDetailProvider =
       taxes: taxes,
       businessName: businessName,
       customer: customer,
+      table: table,
     ),
     order: order,
   );

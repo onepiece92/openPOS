@@ -25,7 +25,9 @@ class CheckoutBar extends ConsumerWidget {
     final fmt = ref.watch(currencyFormatterProvider);
     final tt = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
-    final assignedCustomerId = ref.watch(cartSessionProvider).customerId;
+    final session = ref.watch(cartSessionProvider);
+    final assignedCustomerId = session.customerId;
+    final assignedTableId = session.tableId;
 
     final bottomInset = MediaQuery.of(context).padding.bottom;
 
@@ -71,6 +73,32 @@ class CheckoutBar extends ConsumerWidget {
                           ? Icons.person_rounded
                           : Icons.person_outline_rounded,
                       color: assignedCustomerId != null ? cs.primary : null,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              // ── Table button ───────────────────────────────────────────
+              SizedBox(
+                height: 56,
+                width: 56,
+                child: Tooltip(
+                  message: assignedTableId != null
+                      ? 'Table assigned'
+                      : 'Assign table',
+                  child: OutlinedButton(
+                    onPressed: () => context.push('/tables'),
+                    style: OutlinedButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      side: assignedTableId != null
+                          ? BorderSide(color: cs.primary, width: 2)
+                          : null,
+                    ),
+                    child: Icon(
+                      assignedTableId != null
+                          ? Icons.table_restaurant_rounded
+                          : Icons.table_restaurant_outlined,
+                      color: assignedTableId != null ? cs.primary : null,
                     ),
                   ),
                 ),
