@@ -15,8 +15,8 @@
     <!-- Storage (file_picker, share_plus, image_picker — pre-Android 13) -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
-    <!-- Scoped storage media access (Android 13+) -->
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
+    <!-- Android 13+: image_picker uses the system Photo Picker, which requires no permission. -->
+    <!-- READ_MEDIA_IMAGES intentionally NOT declared (Google Play photo & video permissions policy). -->
 
     <!-- Notifications (flutter_local_notifications, Android 13+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>

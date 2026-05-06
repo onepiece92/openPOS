@@ -423,16 +423,16 @@ class _ExpenseFormState extends ConsumerState<_ExpenseForm> {
   }
 
   Future<void> _pickImage(ImageSource source) async {
-    if (!kIsWeb) {
-      final permission =
-          source == ImageSource.camera ? Permission.camera : Permission.photos;
-      final status = await permission.request();
+    // Camera needs an explicit runtime permission. Gallery uses the Android
+    // system Photo Picker (image_picker ^1.x default on Android 13+) and
+    // ACTION_GET_CONTENT on older Android — neither requires a permission.
+    if (!kIsWeb && source == ImageSource.camera) {
+      final status = await Permission.camera.request();
       if (!status.isGranted) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(
-                  '${source == ImageSource.camera ? 'Camera' : 'Photo library'} permission denied'),
+              content: const Text('Camera permission denied'),
               action: SnackBarAction(
                 label: 'Settings',
                 onPressed: openAppSettings,

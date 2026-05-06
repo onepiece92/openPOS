@@ -113,6 +113,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
         ));
       return false;
     }
+
     if (_searchCtrl.text != filter.search) {
       _searchCtrl.text = filter.search;
       _searchCtrl.selection =
@@ -120,103 +121,103 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     }
 
     return Scaffold(
-          drawer: const PosDrawer(),
-          appBar: AppBar(
-            title: const Text('POS'),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.remove_shopping_cart_rounded),
-                tooltip: 'Clear cart',
-                onPressed: cart.isEmpty
-                    ? null
-                    : () => ref.read(cartProvider.notifier).clear(),
-              ),
-              PopupMenuButton<String>(
-                onSelected: (v) async {
-                  switch (v) {
-                    case 'products':
-                      await context.push('/products');
-                    case 'orders':
-                      await context.push('/orders');
-                    case 'customers':
-                      await context.push('/customers');
-                    case 'clear_cart':
-                      ref.read(cartProvider.notifier).clear();
-                  }
-                },
-                itemBuilder: (_) {
-                  final cartEmpty = ref.read(cartProvider).isEmpty;
-                  return [
-                    const PopupMenuItem(
-                      value: 'products',
-                      child: ListTile(
-                        leading: Icon(Icons.inventory_2_outlined),
-                        title: Text('Products'),
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'orders',
-                      child: ListTile(
-                        leading: Icon(Icons.receipt_long_outlined),
-                        title: Text('Order History'),
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'customers',
-                      child: ListTile(
-                        leading: Icon(Icons.people_outline_rounded),
-                        title: Text('Customers'),
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                    ),
-                    if (!cartEmpty) ...[
-                      const PopupMenuDivider(),
-                      const PopupMenuItem(
-                        value: 'clear_cart',
-                        child: ListTile(
-                          leading: Icon(Icons.remove_shopping_cart_outlined),
-                          title: Text('Clear Cart'),
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                      ),
-                    ],
-                  ];
-                },
-              ),
-            ],
+      drawer: const PosDrawer(),
+      appBar: AppBar(
+        title: const Text('POS'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.remove_shopping_cart_rounded),
+            tooltip: 'Clear cart',
+            onPressed: cart.isEmpty
+                ? null
+                : () => ref.read(cartProvider.notifier).clear(),
           ),
-          bottomNavigationBar: const Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              HeldTicketsBar(),
-              CheckoutBar(),
-            ],
-          ),
-          body: CallbackShortcuts(
-            bindings: {
-              const SingleActivator(LogicalKeyboardKey.keyF, meta: true): () {
-                _searchFocus.requestFocus();
-              },
-              const SingleActivator(LogicalKeyboardKey.escape): () {
-                filterN.clearSearch();
-                _searchCtrl.clear();
-                _searchFocus.unfocus();
-              },
-              const SingleActivator(LogicalKeyboardKey.enter, meta: true): () {
-                if (cart.isNotEmpty) context.push('/cart');
-              },
-              const SingleActivator(LogicalKeyboardKey.keyK, meta: true): () {
-                ref.read(cartProvider.notifier).clear();
-              },
-              const SingleActivator(LogicalKeyboardKey.keyG, meta: true): () {
-                filterN.toggleView();
-              },
+          PopupMenuButton<String>(
+            onSelected: (v) async {
+              switch (v) {
+                case 'products':
+                  await context.push('/products');
+                case 'orders':
+                  await context.push('/orders');
+                case 'customers':
+                  await context.push('/customers');
+                case 'clear_cart':
+                  ref.read(cartProvider.notifier).clear();
+              }
             },
-            child: Focus(
-              focusNode: _shortcutsFocus,
-              child: Column(
+            itemBuilder: (_) {
+              final cartEmpty = ref.read(cartProvider).isEmpty;
+              return [
+                const PopupMenuItem(
+                  value: 'products',
+                  child: ListTile(
+                    leading: Icon(Icons.inventory_2_outlined),
+                    title: Text('Products'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'orders',
+                  child: ListTile(
+                    leading: Icon(Icons.receipt_long_outlined),
+                    title: Text('Order History'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'customers',
+                  child: ListTile(
+                    leading: Icon(Icons.people_outline_rounded),
+                    title: Text('Customers'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+                if (!cartEmpty) ...[
+                  const PopupMenuDivider(),
+                  const PopupMenuItem(
+                    value: 'clear_cart',
+                    child: ListTile(
+                      leading: Icon(Icons.remove_shopping_cart_outlined),
+                      title: Text('Clear Cart'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                ],
+              ];
+            },
+          ),
+        ],
+      ),
+      bottomNavigationBar: const Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          HeldTicketsBar(),
+          CheckoutBar(),
+        ],
+      ),
+      body: CallbackShortcuts(
+        bindings: {
+          const SingleActivator(LogicalKeyboardKey.keyF, meta: true): () {
+            _searchFocus.requestFocus();
+          },
+          const SingleActivator(LogicalKeyboardKey.escape): () {
+            filterN.clearSearch();
+            _searchCtrl.clear();
+            _searchFocus.unfocus();
+          },
+          const SingleActivator(LogicalKeyboardKey.enter, meta: true): () {
+            if (cart.isNotEmpty) context.push('/cart');
+          },
+          const SingleActivator(LogicalKeyboardKey.keyK, meta: true): () {
+            ref.read(cartProvider.notifier).clear();
+          },
+          const SingleActivator(LogicalKeyboardKey.keyG, meta: true): () {
+            filterN.toggleView();
+          },
+        },
+        child: Focus(
+          focusNode: _shortcutsFocus,
+          child: Column(
             children: [
               // ── Search bar ─────────────────────────────────────────────────
               Padding(
@@ -364,11 +365,13 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                       if (!allowQty(p, current + 1)) return;
                       ref.read(cartProvider.notifier).addProduct(p);
                     }
+
                     void trySetQty(int id, int qty) {
                       final p = productsById[id];
                       if (p != null && qty > 0 && !allowQty(p, qty)) return;
                       ref.read(cartProvider.notifier).setQuantity(id, qty);
                     }
+
                     if (filter.isGrid) {
                       return _PosProductGrid(
                         products: filtered,
@@ -397,8 +400,8 @@ class _CartScreenState extends ConsumerState<CartScreen> {
               ),
             ],
           ),
-            ),
-          ),
+        ),
+      ),
     );
   }
 }
