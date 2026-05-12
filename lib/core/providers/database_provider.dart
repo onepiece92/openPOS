@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../database/app_database.dart';
+import 'package:pos_app/core/database/app_database.dart';
 
 /// Singleton database instance. Overridden in main() so the same
 /// AppDatabase is shared across the entire app.

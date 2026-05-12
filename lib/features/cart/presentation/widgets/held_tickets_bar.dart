@@ -5,10 +5,11 @@ import 'package:intl/intl.dart';
 
 import 'package:pos_app/core/theme/tron_border.dart';
 import 'package:pos_app/core/utils/currency_formatter.dart';
-import 'package:pos_app/core/widgets/customer_avatar.dart';
-import 'package:pos_app/features/cart/domain/cart_notifier.dart';
+import 'package:pos_app/shared/widgets/app_sheet.dart';
+import 'package:pos_app/shared/widgets/customer_avatar.dart';
+import 'package:pos_app/features/cart/presentation/providers/cart_notifier.dart';
 import 'package:pos_app/features/cart/domain/held_order.dart';
-import 'package:pos_app/features/cart/domain/held_orders_notifier.dart';
+import 'package:pos_app/features/cart/presentation/providers/held_orders_notifier.dart';
 import 'package:pos_app/features/customers/domain/customers_provider.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
 
@@ -57,9 +58,10 @@ class _HeldTicketsBarState extends ConsumerState<HeldTicketsBar>
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
         child: InkWell(
-          onTap: () => showModalBottomSheet(
+          onTap: () => showAppSheet(
             context: context,
-            isScrollControlled: true,
+            draggable: true,
+            initialSize: 0.5,
             builder: (_) => const _HeldTicketsSheet(),
           ),
           borderRadius: BorderRadius.circular(12),
@@ -145,37 +147,32 @@ class _HeldTicketsSheetState extends ConsumerState<_HeldTicketsSheet>
     final cs = Theme.of(context).colorScheme;
     final dateFmt = DateFormat('dd MMM  HH:mm');
 
-    return DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: 0.5,
-      maxChildSize: 0.9,
-      builder: (ctx, scrollCtrl) => Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-            child: Text('Held Tickets',
-                style: Theme.of(ctx).textTheme.titleLarge),
-          ),
-          TabBar(
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+          child: Text('Held Tickets',
+              style: Theme.of(context).textTheme.titleLarge),
+        ),
+        TabBar(
+          controller: _tabCtrl,
+          tabs: [
+            Tab(text: 'Active (${active.length})'),
+            Tab(text: 'Archived (${archived.length})'),
+          ],
+        ),
+        Expanded(
+          child: TabBarView(
             controller: _tabCtrl,
-            tabs: [
-              Tab(text: 'Active (${active.length})'),
-              Tab(text: 'Archived (${archived.length})'),
+            children: [
+              // ── Active tab ──────────────────────────────────────
+              _buildActiveList(context, active, fmt, cs, dateFmt),
+              // ── Archived tab ────────────────────────────────────
+              _buildArchivedList(context, archived, fmt, cs, dateFmt),
             ],
           ),
-          Expanded(
-            child: TabBarView(
-              controller: _tabCtrl,
-              children: [
-                // ── Active tab ──────────────────────────────────────
-                _buildActiveList(ctx, active, fmt, cs, dateFmt),
-                // ── Archived tab ────────────────────────────────────
-                _buildArchivedList(ctx, archived, fmt, cs, dateFmt),
-              ],
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 

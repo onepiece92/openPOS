@@ -1,11 +1,11 @@
 import 'package:drift/drift.dart';
 
-import '../app_database.dart';
-import '../tables/customers_table.dart';
-import '../tables/order_items_table.dart';
-import '../tables/order_taxes_table.dart';
-import '../tables/orders_table.dart';
-import '../tables/returns_table.dart';
+import 'package:pos_app/core/database/app_database.dart';
+import 'package:pos_app/core/database/tables/customers_table.dart';
+import 'package:pos_app/core/database/tables/order_items_table.dart';
+import 'package:pos_app/core/database/tables/order_taxes_table.dart';
+import 'package:pos_app/core/database/tables/orders_table.dart';
+import 'package:pos_app/core/database/tables/returns_table.dart';
 
 part 'orders_dao.g.dart';
 

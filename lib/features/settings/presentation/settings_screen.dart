@@ -6,6 +6,7 @@ import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/core/theme/app_theme.dart';
+import 'package:pos_app/shared/widgets/app_sheet.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
 import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
 
@@ -237,9 +238,10 @@ class _CurrencySection extends ConsumerWidget {
   }
 
   void _showCurrencyPicker(BuildContext context, WidgetRef ref, String current) {
-    showModalBottomSheet(
+    showAppSheet(
       context: context,
-      isScrollControlled: true,
+      draggable: true,
+      initialSize: 0.6,
       builder: (_) => _CurrencyPickerSheet(current: current),
     );
   }
@@ -294,7 +296,7 @@ class _TaxSection extends ConsumerWidget {
     List<TaxRate> rates,
     int? currentId,
   ) {
-    showModalBottomSheet(
+    showAppSheet(
       context: context,
       builder: (_) => _TaxPickerSheet(rates: rates, currentId: currentId),
     );
@@ -321,9 +323,8 @@ class _InventorySection extends ConsumerWidget {
   }
 
   void _editThreshold(BuildContext context, WidgetRef ref, int current) {
-    showModalBottomSheet(
+    showAppSheet(
       context: context,
-      isScrollControlled: true,
       builder: (_) => _LowStockSheet(current: current),
     );
   }
@@ -385,9 +386,8 @@ class _LoyaltySection extends ConsumerWidget {
     double earnRate,
     double pointValue,
   ) {
-    showModalBottomSheet(
+    showAppSheet(
       context: context,
-      isScrollControlled: true,
       builder: (_) => _LoyaltyRateSheet(
         earnRate: earnRate,
         pointValue: pointValue,
@@ -426,12 +426,7 @@ class _LoyaltyRateSheetState extends ConsumerState<_LoyaltyRateSheet> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(
-        left: 24,
-        right: 24,
-        top: 24,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-      ),
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -523,7 +518,7 @@ class _AppearanceSection extends ConsumerWidget {
   }
 
   void _showThemePicker(BuildContext context, WidgetRef ref, ThemeMode current) {
-    showModalBottomSheet(
+    showAppSheet(
       context: context,
       builder: (_) => _ThemePickerSheet(current: current),
     );
@@ -727,10 +722,7 @@ class _LowStockSheetState extends ConsumerState<_LowStockSheet> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(
-        left: 24, right: 24, top: 24,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-      ),
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,

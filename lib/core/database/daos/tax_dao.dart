@@ -1,8 +1,8 @@
 import 'package:drift/drift.dart';
 
-import '../app_database.dart';
-import '../tables/product_taxes_table.dart';
-import '../tables/tax_rates_table.dart';
+import 'package:pos_app/core/database/app_database.dart';
+import 'package:pos_app/core/database/tables/product_taxes_table.dart';
+import 'package:pos_app/core/database/tables/tax_rates_table.dart';
 
 part 'tax_dao.g.dart';
 

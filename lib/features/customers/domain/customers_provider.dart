@@ -2,7 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
-import 'package:pos_app/features/cart/domain/cart_notifier.dart';
+import 'package:pos_app/features/cart/presentation/providers/cart_notifier.dart';
 
 final customersStreamProvider = StreamProvider<List<Customer>>((ref) {
   return ref.watch(databaseProvider).customersDao.watchAll();

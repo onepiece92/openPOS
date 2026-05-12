@@ -1,6 +1,6 @@
 import 'package:drift/drift.dart';
 
-import 'orders_table.dart';
+import 'package:pos_app/core/database/tables/orders_table.dart';
 
 /// Partial or full refunds linked to the original order.
 /// restock = true means inventory is incremented back on the returned items.

@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import 'package:pos_app/features/cart/domain/cart_item.dart';
-import 'package:pos_app/features/cart/domain/cart_notifier.dart';
+import 'package:pos_app/features/cart/presentation/providers/cart_notifier.dart';
 import 'package:pos_app/features/cart/domain/held_order.dart';
 import 'package:pos_app/features/customers/domain/customers_provider.dart';
 

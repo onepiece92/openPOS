@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/services.dart';
-import '../domain/country_default.dart';
+import 'package:pos_app/features/onboarding/domain/country_default.dart';
 
 class CountryRepository {
   static List<CountryDefault>? _cache;

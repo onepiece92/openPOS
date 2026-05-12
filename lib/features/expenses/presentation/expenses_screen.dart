@@ -17,7 +17,8 @@ import 'package:pos_app/core/theme/app_theme.dart';
 import 'package:pos_app/core/theme/tokens.dart';
 import 'package:pos_app/core/utils/async_feedback.dart';
 import 'package:pos_app/core/utils/currency_formatter.dart';
-import 'package:pos_app/core/widgets/app_empty_state.dart';
+import 'package:pos_app/shared/widgets/app_empty_state.dart';
+import 'package:pos_app/shared/widgets/app_sheet.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
 import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
 
@@ -45,10 +46,8 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
   int? _selectedCategoryId; // null = All
 
   void _openForm({Expense? expense}) {
-    showModalBottomSheet(
+    showAppSheet(
       context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
       builder: (_) => _ExpenseForm(expense: expense),
     );
   }
@@ -394,7 +393,7 @@ class _ExpenseFormState extends ConsumerState<_ExpenseForm> {
   // ── Image helpers ─────────────────────────────────────────────────────────
 
   void _showImageSourceSheet() {
-    showModalBottomSheet(
+    showAppSheet(
       context: context,
       builder: (_) => SafeArea(
         child: Column(
@@ -431,8 +430,8 @@ class _ExpenseFormState extends ConsumerState<_ExpenseForm> {
       if (!status.isGranted) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Camera permission denied'),
+            const SnackBar(
+              content: Text('Camera permission denied'),
               action: SnackBarAction(
                 label: 'Settings',
                 onPressed: openAppSettings,
@@ -605,12 +604,7 @@ class _ExpenseFormState extends ConsumerState<_ExpenseForm> {
     final cs = Theme.of(context).colorScheme;
 
     return Padding(
-      padding: EdgeInsets.only(
-        left: 24,
-        right: 24,
-        top: 24,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-      ),
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
       child: Form(
         key: _formKey,
         child: SingleChildScrollView(

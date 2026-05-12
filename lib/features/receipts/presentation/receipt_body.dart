@@ -108,7 +108,7 @@ class ReceiptBody extends StatelessWidget {
                               decoration: TextDecoration.underline,
                               color: cs.onSurface)),
                     ),
-                    _HeaderCell('Qty'),
+                    const _HeaderCell('Qty'),
                     _HeaderCell('Rate ($symbolLabel)'),
                     _HeaderCell('Amt ($symbolLabel)'),
                   ],
@@ -156,6 +156,14 @@ class ReceiptBody extends StatelessWidget {
                         valueStyle: bodyStyle.copyWith(color: cs.onSurface),
                       )),
                 ],
+                if (order.loyaltyDiscount > 0)
+                  _BillRow(
+                    label:
+                        'Loyalty Redeemed (${order.pointsRedeemed} pts)',
+                    value: '- ${fmt.format(order.loyaltyDiscount)}',
+                    labelStyle: labelStyle.copyWith(color: cs.onSurface),
+                    valueStyle: bodyStyle.copyWith(color: cs.onSurface),
+                  ),
                 divider,
 
                 // ── Grand total ───────────────────────────────────────────
@@ -207,9 +215,24 @@ class ReceiptBody extends StatelessWidget {
                   Text('Loyalty Points',
                       style: headerStyle.copyWith(color: cs.onSurface)),
                   const SizedBox(height: 6),
+                  if (order.pointsRedeemed > 0)
+                    _BillRow(
+                      label: 'Redeemed (this sale)',
+                      value:
+                          '${order.pointsRedeemed} pts (${fmt.format(order.loyaltyDiscount)})',
+                      labelStyle: labelStyle.copyWith(color: cs.onSurface),
+                      valueStyle: bodyStyle.copyWith(color: cs.onSurface),
+                    ),
+                  if (order.pointsEarned > 0)
+                    _BillRow(
+                      label: 'Earned (this sale)',
+                      value: '+${order.pointsEarned} pts',
+                      labelStyle: labelStyle.copyWith(color: cs.onSurface),
+                      valueStyle: bodyStyle.copyWith(color: cs.onSurface),
+                    ),
                   _BillRow(
-                    label: 'Current',
-                    value: '${data.customer!.loyaltyPoints}',
+                    label: 'Balance',
+                    value: '${data.customer!.loyaltyPoints} pts',
                     labelStyle: labelStyle.copyWith(color: cs.onSurface),
                     valueStyle: bodyStyle.copyWith(color: cs.onSurface),
                   ),

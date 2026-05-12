@@ -4,7 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
-import 'package:pos_app/core/widgets/app_empty_state.dart';
+import 'package:pos_app/shared/widgets/app_empty_state.dart';
+import 'package:pos_app/shared/widgets/app_sheet.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
 import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
 
@@ -118,16 +119,10 @@ class CategoriesScreen extends ConsumerWidget {
 
   void _showForm(BuildContext context, WidgetRef ref, Category? existing) {
     final nameCtrl = TextEditingController(text: existing?.name ?? '');
-    showModalBottomSheet(
+    showAppSheet(
       context: context,
-      isScrollControlled: true,
       builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          left: 24,
-          right: 24,
-          top: 24,
-          bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
-        ),
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,

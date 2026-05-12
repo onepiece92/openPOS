@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:drift/drift.dart' show Value;
 
-import '../database/app_database.dart';
+import 'package:pos_app/core/database/app_database.dart';
 
 /// Convenience wrapper for writing to the append-only audit log.
 /// Call from DAOs or notifiers after any state-changing operation.

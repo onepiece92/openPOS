@@ -1,7 +1,7 @@
 import 'package:drift/drift.dart';
 
-import 'customers_table.dart';
-import 'tables_table.dart';
+import 'package:pos_app/core/database/tables/customers_table.dart';
+import 'package:pos_app/core/database/tables/tables_table.dart';
 
 /// Completed (or held/voided) sales transactions.
 ///
@@ -26,6 +26,12 @@ class Orders extends Table {
       integer().nullable().references(Customers, #id)();
   IntColumn get tableId =>
       integer().nullable().references(Tables, #id)();
+  IntColumn get pointsRedeemed =>
+      integer().withDefault(const Constant(0))();
+  RealColumn get loyaltyDiscount =>
+      real().withDefault(const Constant(0.0))();
+  IntColumn get pointsEarned =>
+      integer().withDefault(const Constant(0))();
   TextColumn get notes => text().nullable()();
   DateTimeColumn get createdAt =>
       dateTime().withDefault(currentDateAndTime)();

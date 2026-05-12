@@ -1,6 +1,6 @@
 import 'package:drift/drift.dart';
 
-import 'orders_table.dart';
+import 'package:pos_app/core/database/tables/orders_table.dart';
 
 /// Records when a manager manually overrides the computed tax on an order.
 /// Every row here must also have a corresponding audit_log entry.

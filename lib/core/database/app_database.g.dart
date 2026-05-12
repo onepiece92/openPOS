@@ -4225,6 +4225,30 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
       requiredDuringInsert: false,
       defaultConstraints:
           GeneratedColumn.constraintIsAlways('REFERENCES tables (id)'));
+  static const VerificationMeta _pointsRedeemedMeta =
+      const VerificationMeta('pointsRedeemed');
+  @override
+  late final GeneratedColumn<int> pointsRedeemed = GeneratedColumn<int>(
+      'points_redeemed', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
+  static const VerificationMeta _loyaltyDiscountMeta =
+      const VerificationMeta('loyaltyDiscount');
+  @override
+  late final GeneratedColumn<double> loyaltyDiscount = GeneratedColumn<double>(
+      'loyalty_discount', aliasedName, false,
+      type: DriftSqlType.double,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0.0));
+  static const VerificationMeta _pointsEarnedMeta =
+      const VerificationMeta('pointsEarned');
+  @override
+  late final GeneratedColumn<int> pointsEarned = GeneratedColumn<int>(
+      'points_earned', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
   static const VerificationMeta _notesMeta = const VerificationMeta('notes');
   @override
   late final GeneratedColumn<String> notes = GeneratedColumn<String>(
@@ -4259,6 +4283,9 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
         changeAmount,
         customerId,
         tableId,
+        pointsRedeemed,
+        loyaltyDiscount,
+        pointsEarned,
         notes,
         createdAt,
         updatedAt
@@ -4332,6 +4359,24 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
       context.handle(_tableIdMeta,
           tableId.isAcceptableOrUnknown(data['table_id']!, _tableIdMeta));
     }
+    if (data.containsKey('points_redeemed')) {
+      context.handle(
+          _pointsRedeemedMeta,
+          pointsRedeemed.isAcceptableOrUnknown(
+              data['points_redeemed']!, _pointsRedeemedMeta));
+    }
+    if (data.containsKey('loyalty_discount')) {
+      context.handle(
+          _loyaltyDiscountMeta,
+          loyaltyDiscount.isAcceptableOrUnknown(
+              data['loyalty_discount']!, _loyaltyDiscountMeta));
+    }
+    if (data.containsKey('points_earned')) {
+      context.handle(
+          _pointsEarnedMeta,
+          pointsEarned.isAcceptableOrUnknown(
+              data['points_earned']!, _pointsEarnedMeta));
+    }
     if (data.containsKey('notes')) {
       context.handle(
           _notesMeta, notes.isAcceptableOrUnknown(data['notes']!, _notesMeta));
@@ -4375,6 +4420,12 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
           .read(DriftSqlType.int, data['${effectivePrefix}customer_id']),
       tableId: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}table_id']),
+      pointsRedeemed: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}points_redeemed'])!,
+      loyaltyDiscount: attachedDatabase.typeMapping.read(
+          DriftSqlType.double, data['${effectivePrefix}loyalty_discount'])!,
+      pointsEarned: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}points_earned'])!,
       notes: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}notes']),
       createdAt: attachedDatabase.typeMapping
@@ -4402,6 +4453,9 @@ class Order extends DataClass implements Insertable<Order> {
   final double? changeAmount;
   final int? customerId;
   final int? tableId;
+  final int pointsRedeemed;
+  final double loyaltyDiscount;
+  final int pointsEarned;
   final String? notes;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -4417,6 +4471,9 @@ class Order extends DataClass implements Insertable<Order> {
       this.changeAmount,
       this.customerId,
       this.tableId,
+      required this.pointsRedeemed,
+      required this.loyaltyDiscount,
+      required this.pointsEarned,
       this.notes,
       required this.createdAt,
       required this.updatedAt});
@@ -4442,6 +4499,9 @@ class Order extends DataClass implements Insertable<Order> {
     if (!nullToAbsent || tableId != null) {
       map['table_id'] = Variable<int>(tableId);
     }
+    map['points_redeemed'] = Variable<int>(pointsRedeemed);
+    map['loyalty_discount'] = Variable<double>(loyaltyDiscount);
+    map['points_earned'] = Variable<int>(pointsEarned);
     if (!nullToAbsent || notes != null) {
       map['notes'] = Variable<String>(notes);
     }
@@ -4471,6 +4531,9 @@ class Order extends DataClass implements Insertable<Order> {
       tableId: tableId == null && nullToAbsent
           ? const Value.absent()
           : Value(tableId),
+      pointsRedeemed: Value(pointsRedeemed),
+      loyaltyDiscount: Value(loyaltyDiscount),
+      pointsEarned: Value(pointsEarned),
       notes:
           notes == null && nullToAbsent ? const Value.absent() : Value(notes),
       createdAt: Value(createdAt),
@@ -4493,6 +4556,9 @@ class Order extends DataClass implements Insertable<Order> {
       changeAmount: serializer.fromJson<double?>(json['changeAmount']),
       customerId: serializer.fromJson<int?>(json['customerId']),
       tableId: serializer.fromJson<int?>(json['tableId']),
+      pointsRedeemed: serializer.fromJson<int>(json['pointsRedeemed']),
+      loyaltyDiscount: serializer.fromJson<double>(json['loyaltyDiscount']),
+      pointsEarned: serializer.fromJson<int>(json['pointsEarned']),
       notes: serializer.fromJson<String?>(json['notes']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
@@ -4513,6 +4579,9 @@ class Order extends DataClass implements Insertable<Order> {
       'changeAmount': serializer.toJson<double?>(changeAmount),
       'customerId': serializer.toJson<int?>(customerId),
       'tableId': serializer.toJson<int?>(tableId),
+      'pointsRedeemed': serializer.toJson<int>(pointsRedeemed),
+      'loyaltyDiscount': serializer.toJson<double>(loyaltyDiscount),
+      'pointsEarned': serializer.toJson<int>(pointsEarned),
       'notes': serializer.toJson<String?>(notes),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
@@ -4531,6 +4600,9 @@ class Order extends DataClass implements Insertable<Order> {
           Value<double?> changeAmount = const Value.absent(),
           Value<int?> customerId = const Value.absent(),
           Value<int?> tableId = const Value.absent(),
+          int? pointsRedeemed,
+          double? loyaltyDiscount,
+          int? pointsEarned,
           Value<String?> notes = const Value.absent(),
           DateTime? createdAt,
           DateTime? updatedAt}) =>
@@ -4548,6 +4620,9 @@ class Order extends DataClass implements Insertable<Order> {
             changeAmount.present ? changeAmount.value : this.changeAmount,
         customerId: customerId.present ? customerId.value : this.customerId,
         tableId: tableId.present ? tableId.value : this.tableId,
+        pointsRedeemed: pointsRedeemed ?? this.pointsRedeemed,
+        loyaltyDiscount: loyaltyDiscount ?? this.loyaltyDiscount,
+        pointsEarned: pointsEarned ?? this.pointsEarned,
         notes: notes.present ? notes.value : this.notes,
         createdAt: createdAt ?? this.createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
@@ -4574,6 +4649,15 @@ class Order extends DataClass implements Insertable<Order> {
       customerId:
           data.customerId.present ? data.customerId.value : this.customerId,
       tableId: data.tableId.present ? data.tableId.value : this.tableId,
+      pointsRedeemed: data.pointsRedeemed.present
+          ? data.pointsRedeemed.value
+          : this.pointsRedeemed,
+      loyaltyDiscount: data.loyaltyDiscount.present
+          ? data.loyaltyDiscount.value
+          : this.loyaltyDiscount,
+      pointsEarned: data.pointsEarned.present
+          ? data.pointsEarned.value
+          : this.pointsEarned,
       notes: data.notes.present ? data.notes.value : this.notes,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
@@ -4594,6 +4678,9 @@ class Order extends DataClass implements Insertable<Order> {
           ..write('changeAmount: $changeAmount, ')
           ..write('customerId: $customerId, ')
           ..write('tableId: $tableId, ')
+          ..write('pointsRedeemed: $pointsRedeemed, ')
+          ..write('loyaltyDiscount: $loyaltyDiscount, ')
+          ..write('pointsEarned: $pointsEarned, ')
           ..write('notes: $notes, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
@@ -4614,6 +4701,9 @@ class Order extends DataClass implements Insertable<Order> {
       changeAmount,
       customerId,
       tableId,
+      pointsRedeemed,
+      loyaltyDiscount,
+      pointsEarned,
       notes,
       createdAt,
       updatedAt);
@@ -4632,6 +4722,9 @@ class Order extends DataClass implements Insertable<Order> {
           other.changeAmount == this.changeAmount &&
           other.customerId == this.customerId &&
           other.tableId == this.tableId &&
+          other.pointsRedeemed == this.pointsRedeemed &&
+          other.loyaltyDiscount == this.loyaltyDiscount &&
+          other.pointsEarned == this.pointsEarned &&
           other.notes == this.notes &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
@@ -4649,6 +4742,9 @@ class OrdersCompanion extends UpdateCompanion<Order> {
   final Value<double?> changeAmount;
   final Value<int?> customerId;
   final Value<int?> tableId;
+  final Value<int> pointsRedeemed;
+  final Value<double> loyaltyDiscount;
+  final Value<int> pointsEarned;
   final Value<String?> notes;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
@@ -4664,6 +4760,9 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     this.changeAmount = const Value.absent(),
     this.customerId = const Value.absent(),
     this.tableId = const Value.absent(),
+    this.pointsRedeemed = const Value.absent(),
+    this.loyaltyDiscount = const Value.absent(),
+    this.pointsEarned = const Value.absent(),
     this.notes = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -4680,6 +4779,9 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     this.changeAmount = const Value.absent(),
     this.customerId = const Value.absent(),
     this.tableId = const Value.absent(),
+    this.pointsRedeemed = const Value.absent(),
+    this.loyaltyDiscount = const Value.absent(),
+    this.pointsEarned = const Value.absent(),
     this.notes = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -4698,6 +4800,9 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     Expression<double>? changeAmount,
     Expression<int>? customerId,
     Expression<int>? tableId,
+    Expression<int>? pointsRedeemed,
+    Expression<double>? loyaltyDiscount,
+    Expression<int>? pointsEarned,
     Expression<String>? notes,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
@@ -4714,6 +4819,9 @@ class OrdersCompanion extends UpdateCompanion<Order> {
       if (changeAmount != null) 'change_amount': changeAmount,
       if (customerId != null) 'customer_id': customerId,
       if (tableId != null) 'table_id': tableId,
+      if (pointsRedeemed != null) 'points_redeemed': pointsRedeemed,
+      if (loyaltyDiscount != null) 'loyalty_discount': loyaltyDiscount,
+      if (pointsEarned != null) 'points_earned': pointsEarned,
       if (notes != null) 'notes': notes,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -4732,6 +4840,9 @@ class OrdersCompanion extends UpdateCompanion<Order> {
       Value<double?>? changeAmount,
       Value<int?>? customerId,
       Value<int?>? tableId,
+      Value<int>? pointsRedeemed,
+      Value<double>? loyaltyDiscount,
+      Value<int>? pointsEarned,
       Value<String?>? notes,
       Value<DateTime>? createdAt,
       Value<DateTime>? updatedAt}) {
@@ -4747,6 +4858,9 @@ class OrdersCompanion extends UpdateCompanion<Order> {
       changeAmount: changeAmount ?? this.changeAmount,
       customerId: customerId ?? this.customerId,
       tableId: tableId ?? this.tableId,
+      pointsRedeemed: pointsRedeemed ?? this.pointsRedeemed,
+      loyaltyDiscount: loyaltyDiscount ?? this.loyaltyDiscount,
+      pointsEarned: pointsEarned ?? this.pointsEarned,
       notes: notes ?? this.notes,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -4789,6 +4903,15 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     if (tableId.present) {
       map['table_id'] = Variable<int>(tableId.value);
     }
+    if (pointsRedeemed.present) {
+      map['points_redeemed'] = Variable<int>(pointsRedeemed.value);
+    }
+    if (loyaltyDiscount.present) {
+      map['loyalty_discount'] = Variable<double>(loyaltyDiscount.value);
+    }
+    if (pointsEarned.present) {
+      map['points_earned'] = Variable<int>(pointsEarned.value);
+    }
     if (notes.present) {
       map['notes'] = Variable<String>(notes.value);
     }
@@ -4815,6 +4938,9 @@ class OrdersCompanion extends UpdateCompanion<Order> {
           ..write('changeAmount: $changeAmount, ')
           ..write('customerId: $customerId, ')
           ..write('tableId: $tableId, ')
+          ..write('pointsRedeemed: $pointsRedeemed, ')
+          ..write('loyaltyDiscount: $loyaltyDiscount, ')
+          ..write('pointsEarned: $pointsEarned, ')
           ..write('notes: $notes, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
@@ -12392,6 +12518,9 @@ typedef $$OrdersTableCreateCompanionBuilder = OrdersCompanion Function({
   Value<double?> changeAmount,
   Value<int?> customerId,
   Value<int?> tableId,
+  Value<int> pointsRedeemed,
+  Value<double> loyaltyDiscount,
+  Value<int> pointsEarned,
   Value<String?> notes,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
@@ -12408,6 +12537,9 @@ typedef $$OrdersTableUpdateCompanionBuilder = OrdersCompanion Function({
   Value<double?> changeAmount,
   Value<int?> customerId,
   Value<int?> tableId,
+  Value<int> pointsRedeemed,
+  Value<double> loyaltyDiscount,
+  Value<int> pointsEarned,
   Value<String?> notes,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
@@ -12541,6 +12673,17 @@ class $$OrdersTableFilterComposer
 
   ColumnFilters<double> get changeAmount => $composableBuilder(
       column: $table.changeAmount, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get pointsRedeemed => $composableBuilder(
+      column: $table.pointsRedeemed,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get loyaltyDiscount => $composableBuilder(
+      column: $table.loyaltyDiscount,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get pointsEarned => $composableBuilder(
+      column: $table.pointsEarned, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get notes => $composableBuilder(
       column: $table.notes, builder: (column) => ColumnFilters(column));
@@ -12716,6 +12859,18 @@ class $$OrdersTableOrderingComposer
       column: $table.changeAmount,
       builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<int> get pointsRedeemed => $composableBuilder(
+      column: $table.pointsRedeemed,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get loyaltyDiscount => $composableBuilder(
+      column: $table.loyaltyDiscount,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get pointsEarned => $composableBuilder(
+      column: $table.pointsEarned,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<String> get notes => $composableBuilder(
       column: $table.notes, builder: (column) => ColumnOrderings(column));
 
@@ -12801,6 +12956,15 @@ class $$OrdersTableAnnotationComposer
 
   GeneratedColumn<double> get changeAmount => $composableBuilder(
       column: $table.changeAmount, builder: (column) => column);
+
+  GeneratedColumn<int> get pointsRedeemed => $composableBuilder(
+      column: $table.pointsRedeemed, builder: (column) => column);
+
+  GeneratedColumn<double> get loyaltyDiscount => $composableBuilder(
+      column: $table.loyaltyDiscount, builder: (column) => column);
+
+  GeneratedColumn<int> get pointsEarned => $composableBuilder(
+      column: $table.pointsEarned, builder: (column) => column);
 
   GeneratedColumn<String> get notes =>
       $composableBuilder(column: $table.notes, builder: (column) => column);
@@ -12977,6 +13141,9 @@ class $$OrdersTableTableManager extends RootTableManager<
             Value<double?> changeAmount = const Value.absent(),
             Value<int?> customerId = const Value.absent(),
             Value<int?> tableId = const Value.absent(),
+            Value<int> pointsRedeemed = const Value.absent(),
+            Value<double> loyaltyDiscount = const Value.absent(),
+            Value<int> pointsEarned = const Value.absent(),
             Value<String?> notes = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<DateTime> updatedAt = const Value.absent(),
@@ -12993,6 +13160,9 @@ class $$OrdersTableTableManager extends RootTableManager<
             changeAmount: changeAmount,
             customerId: customerId,
             tableId: tableId,
+            pointsRedeemed: pointsRedeemed,
+            loyaltyDiscount: loyaltyDiscount,
+            pointsEarned: pointsEarned,
             notes: notes,
             createdAt: createdAt,
             updatedAt: updatedAt,
@@ -13009,6 +13179,9 @@ class $$OrdersTableTableManager extends RootTableManager<
             Value<double?> changeAmount = const Value.absent(),
             Value<int?> customerId = const Value.absent(),
             Value<int?> tableId = const Value.absent(),
+            Value<int> pointsRedeemed = const Value.absent(),
+            Value<double> loyaltyDiscount = const Value.absent(),
+            Value<int> pointsEarned = const Value.absent(),
             Value<String?> notes = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<DateTime> updatedAt = const Value.absent(),
@@ -13025,6 +13198,9 @@ class $$OrdersTableTableManager extends RootTableManager<
             changeAmount: changeAmount,
             customerId: customerId,
             tableId: tableId,
+            pointsRedeemed: pointsRedeemed,
+            loyaltyDiscount: loyaltyDiscount,
+            pointsEarned: pointsEarned,
             notes: notes,
             createdAt: createdAt,
             updatedAt: updatedAt,

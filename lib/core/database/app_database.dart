@@ -1,36 +1,36 @@
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
-import 'connection/native.dart' if (dart.library.html) 'connection/web.dart';
+import 'package:pos_app/core/database/connection/native.dart' if (dart.library.html) 'connection/web.dart';
 
-import 'daos/audit_dao.dart';
-import 'daos/customers_dao.dart';
-import 'daos/expenses_dao.dart';
-import 'daos/inventory_dao.dart';
-import 'daos/orders_dao.dart';
-import 'daos/products_dao.dart';
-import 'daos/tables_dao.dart';
-import 'daos/tax_dao.dart';
-import 'tables/audit_log_table.dart';
-import 'tables/categories_table.dart';
-import 'tables/customers_table.dart';
-import 'tables/expense_categories_table.dart';
-import 'tables/expenses_table.dart';
-import 'tables/order_items_table.dart';
-import 'tables/order_tax_override_table.dart';
-import 'tables/order_taxes_table.dart';
-import 'tables/orders_table.dart';
-import 'tables/product_components_table.dart';
-import 'tables/product_modifiers_table.dart';
-import 'tables/product_taxes_table.dart';
-import 'tables/product_variants_table.dart';
-import 'tables/products_table.dart';
-import 'tables/returns_table.dart';
-import 'tables/stock_adjustments_table.dart';
-import 'tables/tables_table.dart';
-import 'tables/tax_group_members_table.dart';
-import 'tables/tax_groups_table.dart';
-import 'tables/tax_rates_table.dart';
+import 'package:pos_app/core/database/daos/audit_dao.dart';
+import 'package:pos_app/core/database/daos/customers_dao.dart';
+import 'package:pos_app/core/database/daos/expenses_dao.dart';
+import 'package:pos_app/core/database/daos/inventory_dao.dart';
+import 'package:pos_app/core/database/daos/orders_dao.dart';
+import 'package:pos_app/core/database/daos/products_dao.dart';
+import 'package:pos_app/core/database/daos/tables_dao.dart';
+import 'package:pos_app/core/database/daos/tax_dao.dart';
+import 'package:pos_app/core/database/tables/audit_log_table.dart';
+import 'package:pos_app/core/database/tables/categories_table.dart';
+import 'package:pos_app/core/database/tables/customers_table.dart';
+import 'package:pos_app/core/database/tables/expense_categories_table.dart';
+import 'package:pos_app/core/database/tables/expenses_table.dart';
+import 'package:pos_app/core/database/tables/order_items_table.dart';
+import 'package:pos_app/core/database/tables/order_tax_override_table.dart';
+import 'package:pos_app/core/database/tables/order_taxes_table.dart';
+import 'package:pos_app/core/database/tables/orders_table.dart';
+import 'package:pos_app/core/database/tables/product_components_table.dart';
+import 'package:pos_app/core/database/tables/product_modifiers_table.dart';
+import 'package:pos_app/core/database/tables/product_taxes_table.dart';
+import 'package:pos_app/core/database/tables/product_variants_table.dart';
+import 'package:pos_app/core/database/tables/products_table.dart';
+import 'package:pos_app/core/database/tables/returns_table.dart';
+import 'package:pos_app/core/database/tables/stock_adjustments_table.dart';
+import 'package:pos_app/core/database/tables/tables_table.dart';
+import 'package:pos_app/core/database/tables/tax_group_members_table.dart';
+import 'package:pos_app/core/database/tables/tax_groups_table.dart';
+import 'package:pos_app/core/database/tables/tax_rates_table.dart';
 
 part 'app_database.g.dart';
 
@@ -81,7 +81,7 @@ class AppDatabase extends _$AppDatabase {
       : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -139,6 +139,19 @@ class AppDatabase extends _$AppDatabase {
             ''');
             await customStatement(
               'ALTER TABLE orders ADD COLUMN table_id INTEGER REFERENCES tables(id)',
+            );
+          }
+          if (from < 8) {
+            // Persist loyalty redemption + earn on the order row so receipts
+            // can be re-printed and audited without re-deriving from settings.
+            await customStatement(
+              'ALTER TABLE orders ADD COLUMN points_redeemed INTEGER NOT NULL DEFAULT 0',
+            );
+            await customStatement(
+              'ALTER TABLE orders ADD COLUMN loyalty_discount REAL NOT NULL DEFAULT 0.0',
+            );
+            await customStatement(
+              'ALTER TABLE orders ADD COLUMN points_earned INTEGER NOT NULL DEFAULT 0',
             );
           }
         },

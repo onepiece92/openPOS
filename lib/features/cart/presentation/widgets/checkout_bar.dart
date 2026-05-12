@@ -6,9 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:pos_app/core/theme/app_theme.dart';
-import 'package:pos_app/features/cart/domain/cart_notifier.dart';
-import 'package:pos_app/features/cart/domain/held_orders_notifier.dart';
-import 'package:pos_app/features/products/domain/products_provider.dart';
+import 'package:pos_app/features/cart/presentation/providers/cart_notifier.dart';
+import 'package:pos_app/features/cart/presentation/providers/held_orders_notifier.dart';
 
 // ─── Checkout bar (bottomNavigationBar slot) ──────────────────────────────────
 
@@ -21,8 +20,6 @@ class CheckoutBar extends ConsumerWidget {
     final itemCount = cart.fold(0, (s, i) => s + i.quantity);
     if (itemCount == 0) return const SizedBox.shrink();
 
-    final summary = ref.watch(cartSummaryProvider);
-    final fmt = ref.watch(currencyFormatterProvider);
     final tt = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
     final session = ref.watch(cartSessionProvider);
@@ -47,7 +44,8 @@ class CheckoutBar extends ConsumerWidget {
                     ref.read(heldOrdersProvider.notifier).holdCurrentCart();
                     ref.read(cartProvider.notifier).clear();
                   },
-                  icon: const Icon(Icons.pause_circle_outline_rounded, size: 18),
+                  icon:
+                      const Icon(Icons.pause_circle_outline_rounded, size: 18),
                   label: const Text('Save'),
                 ),
               ),
@@ -62,11 +60,9 @@ class CheckoutBar extends ConsumerWidget {
                       : 'Assign customer',
                   child: OutlinedButton(
                     onPressed: () => context.push('/customers'),
-                    style: OutlinedButton.styleFrom(
-                      padding: EdgeInsets.zero,
-                      side: assignedCustomerId != null
-                          ? BorderSide(color: cs.primary, width: 2)
-                          : null,
+                    style: AppTheme.iconButtonStyle(
+                      cs,
+                      isActive: assignedCustomerId != null,
                     ),
                     child: Icon(
                       assignedCustomerId != null
@@ -88,11 +84,9 @@ class CheckoutBar extends ConsumerWidget {
                       : 'Assign table',
                   child: OutlinedButton(
                     onPressed: () => context.push('/tables'),
-                    style: OutlinedButton.styleFrom(
-                      padding: EdgeInsets.zero,
-                      side: assignedTableId != null
-                          ? BorderSide(color: cs.primary, width: 2)
-                          : null,
+                    style: AppTheme.iconButtonStyle(
+                      cs,
+                      isActive: assignedTableId != null,
                     ),
                     child: Icon(
                       assignedTableId != null
@@ -121,23 +115,6 @@ class CheckoutBar extends ConsumerWidget {
                           style: tt.titleSmall?.copyWith(
                             color: cs.onPrimary.withValues(alpha: 0.8),
                             fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: cs.onPrimary.withValues(alpha: 0.18),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            fmt.format(summary.total),
-                            style: tt.labelLarge?.copyWith(
-                              color: cs.onPrimary,
-                              fontWeight: FontWeight.w800,
-                            ),
                           ),
                         ),
                       ],

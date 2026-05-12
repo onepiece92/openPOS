@@ -487,8 +487,9 @@ class BackupRepository {
             productId = p?.id;
           }
 
-          if (productId == null)
+          if (productId == null) {
             continue; // Skip if product doesn't exist? Or allow null?
+          }
 
           items.add(OrderItemsCompanion.insert(
             orderId: orderId,

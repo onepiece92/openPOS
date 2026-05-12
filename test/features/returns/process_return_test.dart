@@ -4,8 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/services/audit_service.dart';
 import 'package:pos_app/features/cart/domain/cart_item.dart';
-import 'package:pos_app/features/cart/domain/cart_notifier.dart';
-import 'package:pos_app/features/cart/domain/place_order.dart';
+import 'package:pos_app/features/cart/presentation/providers/cart_notifier.dart';
+import 'package:pos_app/features/cart/data/place_order.dart';
 import 'package:pos_app/features/returns/domain/process_return.dart';
 
 import '../../_support/test_db.dart';
@@ -174,11 +174,11 @@ void main() {
           isTaxable: false,
         ),
       ],
-      summary: CartSummary(
+      summary: const CartSummary(
         subtotal: 20.0,
         orderDiscount: 0,
         loyaltyDiscount: 0,
-        taxLines: const [],
+        taxLines: [],
         taxAmount: 0,
         total: 20.0,
         taxEnabled: false,

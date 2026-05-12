@@ -1,6 +1,6 @@
 import 'package:drift/drift.dart';
 
-import 'tax_rates_table.dart';
+import 'package:pos_app/core/database/tables/tax_rates_table.dart';
 
 /// Hierarchical product categories.
 /// parent_id is a self-reference; enforced at the app level, not via FK

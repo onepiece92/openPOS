@@ -1,6 +1,6 @@
 import 'package:drift/drift.dart';
 
-import 'products_table.dart';
+import 'package:pos_app/core/database/tables/products_table.dart';
 
 /// Optional add-ons for a product (e.g. burger toppings, coffee shots).
 /// is_required = true means the cashier must pick at least one before adding to cart.

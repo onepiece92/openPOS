@@ -1,4 +1,4 @@
-import 'country_default.dart';
+import 'package:pos_app/features/onboarding/domain/country_default.dart';
 
 class OnboardingState {
   final int step; // 0–3

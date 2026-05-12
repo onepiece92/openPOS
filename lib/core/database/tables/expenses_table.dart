@@ -1,6 +1,6 @@
 import 'package:drift/drift.dart';
 
-import 'expense_categories_table.dart';
+import 'package:pos_app/core/database/tables/expense_categories_table.dart';
 
 /// Business expense records.
 ///

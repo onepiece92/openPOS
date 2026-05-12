@@ -92,6 +92,13 @@ Future<List<int>> renderReceiptBytes(
     final pct = (t.taxRatePercent * 100).toStringAsFixed(1);
     bytes.addAll(_kv(g, '${t.taxRateName} ($pct%)', fmt.format(t.taxAmount)));
   }
+  if (data.order.loyaltyDiscount > 0) {
+    bytes.addAll(_kv(
+      g,
+      'Loyalty (${data.order.pointsRedeemed} pts)',
+      '- ${fmt.format(data.order.loyaltyDiscount)}',
+    ));
+  }
   bytes.addAll(g.hr(ch: '='));
   bytes.addAll(_kv(
     g,
@@ -115,7 +122,17 @@ Future<List<int>> renderReceiptBytes(
   // ── Loyalty (optional) ─────────────────────────────────────────────────
   if (data.customer != null) {
     bytes.addAll(g.hr());
-    bytes.addAll(_kv(g, 'Loyalty Points', '${data.customer!.loyaltyPoints}'));
+    if (data.order.pointsRedeemed > 0) {
+      bytes.addAll(_kv(
+        g,
+        'Pts Redeemed',
+        '${data.order.pointsRedeemed} (${fmt.format(data.order.loyaltyDiscount)})',
+      ));
+    }
+    if (data.order.pointsEarned > 0) {
+      bytes.addAll(_kv(g, 'Pts Earned', '+${data.order.pointsEarned}'));
+    }
+    bytes.addAll(_kv(g, 'Balance', '${data.customer!.loyaltyPoints} pts'));
   }
 
   // ── Footer ─────────────────────────────────────────────────────────────

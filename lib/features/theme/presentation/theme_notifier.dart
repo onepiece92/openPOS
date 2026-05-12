@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/providers/hive_provider.dart';
+import 'package:pos_app/core/providers/hive_provider.dart';
 
 /// Controls the app-wide ThemeMode.
 /// Reads initial value from Hive; persists changes back to Hive.

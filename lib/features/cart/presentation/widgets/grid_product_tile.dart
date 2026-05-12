@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/theme/tokens.dart';
 import 'package:pos_app/core/utils/currency_formatter.dart';
-import 'package:pos_app/core/widgets/step_button.dart';
+import 'package:pos_app/shared/widgets/step_button.dart';
 
 class GridProductTile extends StatelessWidget {
   const GridProductTile({

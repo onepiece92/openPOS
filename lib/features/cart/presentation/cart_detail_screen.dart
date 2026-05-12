@@ -7,10 +7,11 @@ import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/theme/app_theme.dart';
 import 'package:pos_app/core/theme/tokens.dart';
 import 'package:pos_app/core/utils/currency_formatter.dart';
-import 'package:pos_app/core/widgets/customer_avatar.dart';
-import 'package:pos_app/core/widgets/summary_row.dart';
+import 'package:pos_app/shared/widgets/app_sheet.dart';
+import 'package:pos_app/shared/widgets/customer_avatar.dart';
+import 'package:pos_app/shared/widgets/summary_row.dart';
 import 'package:pos_app/features/cart/domain/cart_item.dart';
-import 'package:pos_app/features/cart/domain/cart_notifier.dart';
+import 'package:pos_app/features/cart/presentation/providers/cart_notifier.dart';
 import 'package:pos_app/features/customers/domain/customers_provider.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
 import 'package:pos_app/features/tables/domain/tables_provider.dart';
@@ -218,9 +219,10 @@ class _TicketHeader extends ConsumerWidget {
 
   void _pickCustomer(BuildContext context, WidgetRef ref,
       List<Customer> customers, int? currentId) {
-    showModalBottomSheet(
+    showAppSheet(
       context: context,
-      isScrollControlled: true,
+      draggable: true,
+      initialSize: 0.5,
       builder: (_) => _CustomerPickerSheet(
         customers: customers,
         selectedId: currentId,
@@ -309,9 +311,11 @@ class _TableSelectorRow extends ConsumerWidget {
     Set<int> occupied,
     int? currentId,
   ) {
-    showModalBottomSheet(
+    showAppSheet(
       context: context,
-      isScrollControlled: true,
+      draggable: true,
+      initialSize: 0.55,
+      minSize: 0.3,
       builder: (_) => _TablePickerSheet(
         tables: tables,
         occupied: occupied,
@@ -340,35 +344,28 @@ class _TablePickerSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
-    return SafeArea(
-      child: DraggableScrollableSheet(
-        initialChildSize: 0.55,
-        minChildSize: 0.3,
-        maxChildSize: 0.92,
-        expand: false,
-        builder: (_, controller) => Column(
-          children: [
-            const SizedBox(height: 8),
-            Container(
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color: cs.outlineVariant,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Select table', style: tt.titleMedium),
-              ),
-            ),
-            const Divider(height: 1),
-            Expanded(
-              child: ListView.builder(
-                controller: controller,
-                itemCount: tables.length,
+    return Column(
+      children: [
+        const SizedBox(height: 8),
+        Container(
+          width: 36,
+          height: 4,
+          decoration: BoxDecoration(
+            color: cs.outlineVariant,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text('Select table', style: tt.titleMedium),
+          ),
+        ),
+        const Divider(height: 1),
+        Expanded(
+          child: ListView.builder(
+            itemCount: tables.length,
                 itemBuilder: (_, i) {
                   final t = tables[i];
                   final isOccupied =
@@ -400,9 +397,7 @@ class _TablePickerSheet extends StatelessWidget {
                 },
               ),
             ),
-          ],
-        ),
-      ),
+      ],
     );
   }
 }
@@ -438,63 +433,58 @@ class _CustomerPickerSheetState extends State<_CustomerPickerSheet> {
                     false))
             .toList();
 
-    return DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: 0.5,
-      maxChildSize: 0.85,
-      builder: (ctx, scrollCtrl) => Column(
-        children: [
-          const SizedBox(height: 8),
-          Container(
-            width: 36,
-            height: 4,
-            decoration: BoxDecoration(
-              color: cs.outlineVariant,
-              borderRadius: BorderRadius.circular(2),
-            ),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const SizedBox(height: 8),
+        Container(
+          width: 36,
+          height: 4,
+          decoration: BoxDecoration(
+            color: cs.outlineVariant,
+            borderRadius: BorderRadius.circular(2),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: TextField(
-              autofocus: true,
-              decoration: InputDecoration(
-                hintText: 'Search customers...',
-                prefixIcon: const Icon(Icons.search_rounded, size: 20),
-                filled: true,
-                fillColor: cs.surfaceContainerHighest,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-                isDense: true,
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: TextField(
+            autofocus: true,
+            decoration: InputDecoration(
+              hintText: 'Search customers...',
+              prefixIcon: const Icon(Icons.search_rounded, size: 20),
+              filled: true,
+              fillColor: cs.surfaceContainerHighest,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
               ),
-              onChanged: (v) => setState(() => _search = v),
+              isDense: true,
             ),
+            onChanged: (v) => setState(() => _search = v),
           ),
-          Expanded(
-            child: ListView.builder(
-              controller: scrollCtrl,
-              itemCount: filtered.length,
-              itemBuilder: (_, i) {
-                final c = filtered[i];
-                final selected = c.id == widget.selectedId;
-                return ListTile(
-                  leading: CustomerAvatar(name: c.name),
-                  title: Text(c.name),
-                  subtitle: c.phone != null ? Text(c.phone!) : null,
-                  trailing: selected
-                      ? Icon(Icons.check_circle_rounded, color: cs.primary)
-                      : null,
-                  onTap: () {
-                    widget.onSelect(c);
-                    Navigator.pop(ctx);
-                  },
-                );
-              },
-            ),
+        ),
+        Flexible(
+          child: ListView.builder(
+            itemCount: filtered.length,
+            itemBuilder: (_, i) {
+              final c = filtered[i];
+              final selected = c.id == widget.selectedId;
+              return ListTile(
+                leading: CustomerAvatar(name: c.name),
+                title: Text(c.name),
+                subtitle: c.phone != null ? Text(c.phone!) : null,
+                trailing: selected
+                    ? Icon(Icons.check_circle_rounded, color: cs.primary)
+                    : null,
+                onTap: () {
+                  widget.onSelect(c);
+                  Navigator.pop(context);
+                },
+              );
+            },
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -725,18 +715,18 @@ class _OrderSummary extends ConsumerWidget {
   }
 
   void _showTaxPicker(BuildContext context, WidgetRef ref) {
-    showModalBottomSheet(
+    showAppSheet(
       context: context,
-      isScrollControlled: true,
+      draggable: true,
+      initialSize: 0.4,
       builder: (_) => _TaxPickerSheet(ref: ref),
     );
   }
 
   void _showDiscountSheet(BuildContext context, WidgetRef ref,
       CartSession session, double subtotal) {
-    showModalBottomSheet(
+    showAppSheet(
       context: context,
-      isScrollControlled: true,
       builder: (_) => _DiscountSheet(
         currentDiscount: session.orderDiscount,
         isPercent: session.orderDiscountIsPercent,
@@ -802,10 +792,7 @@ class _DiscountSheetState extends State<_DiscountSheet> {
     final tt = Theme.of(context).textTheme;
 
     return Padding(
-      padding: EdgeInsets.only(
-        left: 24, right: 24, top: 24,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-      ),
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -905,70 +892,64 @@ class _TaxPickerSheet extends ConsumerWidget {
     final selectedIds = innerRef.watch(selectedTaxRatesProvider);
     final allRates = allRatesAsync.valueOrNull ?? [];
 
-    return DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: 0.4,
-      maxChildSize: 0.7,
-      builder: (ctx, scrollCtrl) => Column(
-        children: [
-          const SizedBox(height: 8),
-          Container(
-            width: 36,
-            height: 4,
-            decoration: BoxDecoration(
-              color: cs.outlineVariant,
-              borderRadius: BorderRadius.circular(2),
+    return Column(
+      children: [
+        const SizedBox(height: 8),
+        Container(
+          width: 36,
+          height: 4,
+          decoration: BoxDecoration(
+            color: cs.outlineVariant,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+          child: Text('Select Tax Rates', style: tt.titleMedium),
+        ),
+        Expanded(
+          child: allRates.isEmpty
+              ? Center(
+                  child: Text('No tax rates configured',
+                      style: tt.bodyMedium
+                          ?.copyWith(color: cs.onSurfaceVariant)),
+                )
+              : ListView.builder(
+                  itemCount: allRates.length,
+                  itemBuilder: (_, i) {
+                    final rate = allRates[i];
+                    final selected = selectedIds.contains(rate.id);
+                    final label =
+                        '${rate.name} (${(rate.rate * 100).toStringAsFixed(1)}%'
+                        '${rate.inclusionType == 'inclusive' ? ', incl.' : ''})';
+                    return CheckboxListTile(
+                      value: selected,
+                      title: Text(label),
+                      onChanged: (v) {
+                        final notifier = innerRef
+                            .read(selectedTaxRatesProvider.notifier);
+                        if (v == true) {
+                          notifier.add(rate.id);
+                        } else {
+                          notifier.remove(rate.id);
+                        }
+                      },
+                    );
+                  },
+                ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          child: SizedBox(
+            height: 44,
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Done'),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-            child: Text('Select Tax Rates', style: tt.titleMedium),
-          ),
-          Expanded(
-            child: allRates.isEmpty
-                ? Center(
-                    child: Text('No tax rates configured',
-                        style: tt.bodyMedium
-                            ?.copyWith(color: cs.onSurfaceVariant)),
-                  )
-                : ListView.builder(
-                    controller: scrollCtrl,
-                    itemCount: allRates.length,
-                    itemBuilder: (_, i) {
-                      final rate = allRates[i];
-                      final selected = selectedIds.contains(rate.id);
-                      final label =
-                          '${rate.name} (${(rate.rate * 100).toStringAsFixed(1)}%'
-                          '${rate.inclusionType == 'inclusive' ? ', incl.' : ''})';
-                      return CheckboxListTile(
-                        value: selected,
-                        title: Text(label),
-                        onChanged: (v) {
-                          final notifier = innerRef
-                              .read(selectedTaxRatesProvider.notifier);
-                          if (v == true) {
-                            notifier.add(rate.id);
-                          } else {
-                            notifier.remove(rate.id);
-                          }
-                        },
-                      );
-                    },
-                  ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-            child: SizedBox(
-              height: 44,
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Done'),
-              ),
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

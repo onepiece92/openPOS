@@ -1,6 +1,6 @@
 import 'package:drift/drift.dart';
 
-import 'categories_table.dart';
+import 'package:pos_app/core/database/tables/categories_table.dart';
 
 /// Core product record.
 /// stock_quantity is the single source of truth for available stock.

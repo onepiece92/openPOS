@@ -1,6 +1,6 @@
 import 'package:drift/drift.dart';
 
-import 'products_table.dart';
+import 'package:pos_app/core/database/tables/products_table.dart';
 
 /// Manual stock adjustment log.
 /// delta > 0 = stock added, delta < 0 = stock removed.

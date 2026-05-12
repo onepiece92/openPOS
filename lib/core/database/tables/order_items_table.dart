@@ -1,8 +1,8 @@
 import 'package:drift/drift.dart';
 
-import 'orders_table.dart';
-import 'product_variants_table.dart';
-import 'products_table.dart';
+import 'package:pos_app/core/database/tables/orders_table.dart';
+import 'package:pos_app/core/database/tables/product_variants_table.dart';
+import 'package:pos_app/core/database/tables/products_table.dart';
 
 /// Line items within an order.
 /// product_name is a snapshot of the name at time of sale

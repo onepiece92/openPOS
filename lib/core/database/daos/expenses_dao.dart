@@ -1,8 +1,8 @@
 import 'package:drift/drift.dart';
 
-import '../app_database.dart';
-import '../tables/expense_categories_table.dart';
-import '../tables/expenses_table.dart';
+import 'package:pos_app/core/database/app_database.dart';
+import 'package:pos_app/core/database/tables/expense_categories_table.dart';
+import 'package:pos_app/core/database/tables/expenses_table.dart';
 
 part 'expenses_dao.g.dart';
 

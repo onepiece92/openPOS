@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
+import 'package:pos_app/shared/widgets/app_sheet.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
 import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
 
@@ -133,9 +134,8 @@ class TaxSettingsScreen extends ConsumerWidget {
   }
 
   void _showForm(BuildContext context, WidgetRef ref, TaxRate? existing) {
-    showModalBottomSheet(
+    showAppSheet(
       context: context,
-      isScrollControlled: true,
       builder: (ctx) => _TaxForm(existing: existing),
     );
   }
@@ -190,12 +190,7 @@ class _TaxFormState extends ConsumerState<_TaxForm> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(
-        left: 24,
-        right: 24,
-        top: 24,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-      ),
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
       child: Form(
         key: _formKey,
         child: Column(
@@ -238,7 +233,7 @@ class _TaxFormState extends ConsumerState<_TaxForm> {
             ),
             const SizedBox(height: 14),
             DropdownButtonFormField<String>(
-              value: _inclusionType,
+              initialValue: _inclusionType,
               decoration: const InputDecoration(
                 labelText: 'Inclusion type',
                 border: OutlineInputBorder(),
@@ -254,7 +249,7 @@ class _TaxFormState extends ConsumerState<_TaxForm> {
             ),
             const SizedBox(height: 14),
             DropdownButtonFormField<String>(
-              value: _roundingMode,
+              initialValue: _roundingMode,
               decoration: const InputDecoration(
                 labelText: 'Rounding mode',
                 border: OutlineInputBorder(),

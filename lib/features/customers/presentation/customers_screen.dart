@@ -7,8 +7,9 @@ import 'package:go_router/go_router.dart';
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/utils/async_feedback.dart';
-import 'package:pos_app/core/widgets/app_empty_state.dart';
-import 'package:pos_app/features/cart/domain/cart_notifier.dart';
+import 'package:pos_app/shared/widgets/app_empty_state.dart';
+import 'package:pos_app/shared/widgets/app_sheet.dart';
+import 'package:pos_app/features/cart/presentation/providers/cart_notifier.dart';
 import 'package:pos_app/features/customers/domain/customers_provider.dart';
 import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
 
@@ -52,7 +53,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
   }
 
   List<Customer> _filterAndSort(List<Customer> all) {
-    var list = _search.isEmpty
+    final list = _search.isEmpty
         ? [...all]
         : all
             .where((c) =>
@@ -78,7 +79,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
   }
 
   void _showSortSheet() {
-    showModalBottomSheet(
+    showAppSheet(
       context: context,
       builder: (ctx) => SafeArea(
         child: Column(
@@ -122,10 +123,8 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
   }
 
   void _openForm({Customer? customer}) {
-    showModalBottomSheet(
+    showAppSheet(
       context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
       builder: (_) => _CustomerForm(customer: customer),
     );
   }
@@ -499,12 +498,7 @@ class _CustomerFormState extends ConsumerState<_CustomerForm> {
     final tt = Theme.of(context).textTheme;
 
     return Padding(
-      padding: EdgeInsets.only(
-        left: 24,
-        right: 24,
-        top: 24,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-      ),
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
       child: Form(
         key: _formKey,
         child: SingleChildScrollView(

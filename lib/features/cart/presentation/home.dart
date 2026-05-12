@@ -6,7 +6,7 @@ import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/services/demo_data_service.dart';
 import 'package:pos_app/core/utils/currency_formatter.dart';
 import 'package:pos_app/features/cart/domain/cart_item.dart';
-import 'package:pos_app/features/cart/domain/cart_notifier.dart';
+import 'package:pos_app/features/cart/presentation/providers/cart_notifier.dart';
 import 'package:pos_app/features/cart/domain/pos_filter_provider.dart';
 import 'package:pos_app/features/cart/presentation/widgets/grid_product_tile.dart';
 import 'package:pos_app/features/cart/presentation/widgets/checkout_bar.dart';

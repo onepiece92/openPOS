@@ -2,8 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
-import 'package:pos_app/features/cart/domain/cart_notifier.dart';
-import 'package:pos_app/features/cart/domain/held_orders_notifier.dart';
+import 'package:pos_app/features/cart/presentation/providers/cart_notifier.dart';
+import 'package:pos_app/features/cart/presentation/providers/held_orders_notifier.dart';
 
 /// Stream of every defined table, ordered by name.
 final tablesStreamProvider = StreamProvider<List<PosTable>>((ref) {

@@ -63,7 +63,7 @@ class _Article {
 }
 
 final _articles = <_Article>[
-  _Article(
+  const _Article(
     category: 'Getting Started',
     title: 'Setting up your store',
     description:
@@ -103,7 +103,7 @@ final _articles = <_Article>[
       ),
     ],
   ),
-  _Article(
+  const _Article(
     category: 'Getting Started',
     title: 'Adding your first product',
     description:
@@ -143,7 +143,7 @@ final _articles = <_Article>[
       ),
     ],
   ),
-  _Article(
+  const _Article(
     category: 'Sales',
     title: 'Making a sale',
     description:
@@ -192,7 +192,7 @@ final _articles = <_Article>[
       ),
     ],
   ),
-  _Article(
+  const _Article(
     category: 'Sales',
     title: 'Held tickets',
     description:
@@ -231,7 +231,7 @@ final _articles = <_Article>[
       ),
     ],
   ),
-  _Article(
+  const _Article(
     category: 'Inventory',
     title: 'Stock tracking',
     description:
@@ -277,7 +277,7 @@ final _articles = <_Article>[
       ),
     ],
   ),
-  _Article(
+  const _Article(
     category: 'Inventory',
     title: 'Composite / bundle products',
     description:
@@ -315,7 +315,7 @@ final _articles = <_Article>[
       ),
     ],
   ),
-  _Article(
+  const _Article(
     category: 'Reports',
     title: 'Understanding your reports',
     description:

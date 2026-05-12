@@ -1,12 +1,12 @@
 import 'package:drift/drift.dart';
 
-import '../app_database.dart';
-import '../tables/categories_table.dart';
-import '../tables/product_components_table.dart';
-import '../tables/product_modifiers_table.dart';
-import '../tables/product_taxes_table.dart';
-import '../tables/product_variants_table.dart';
-import '../tables/products_table.dart';
+import 'package:pos_app/core/database/app_database.dart';
+import 'package:pos_app/core/database/tables/categories_table.dart';
+import 'package:pos_app/core/database/tables/product_components_table.dart';
+import 'package:pos_app/core/database/tables/product_modifiers_table.dart';
+import 'package:pos_app/core/database/tables/product_taxes_table.dart';
+import 'package:pos_app/core/database/tables/product_variants_table.dart';
+import 'package:pos_app/core/database/tables/products_table.dart';
 
 part 'products_dao.g.dart';
 

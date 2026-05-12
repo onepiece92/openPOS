@@ -49,6 +49,14 @@ abstract final class AppTheme {
         ),
       );
 
+  // ── Icon button style (checkout bar) ──────────────────────────────────────
+
+  static ButtonStyle iconButtonStyle(ColorScheme cs, {bool isActive = false}) =>
+      OutlinedButton.styleFrom(
+        padding: EdgeInsets.zero,
+        side: isActive ? BorderSide(color: cs.primary, width: 2) : null,
+      );
+
   // ── Frosted glass bottom bar decoration ───────────────────────────────────
   //
   // Applied to the container that holds checkout / payment bars at the bottom.

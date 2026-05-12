@@ -3,7 +3,7 @@ import 'package:drift/drift.dart' show Value;
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/services/audit_service.dart';
 import 'package:pos_app/features/cart/domain/cart_item.dart';
-import 'package:pos_app/features/cart/domain/cart_notifier.dart';
+import 'package:pos_app/features/cart/presentation/providers/cart_notifier.dart';
 
 /// Atomically commits a completed sale. Returns the new order ID.
 ///
@@ -39,6 +39,9 @@ Future<int> placeOrder(
         tableId: session.tableId != null
             ? Value(session.tableId!)
             : const Value.absent(),
+        pointsRedeemed: Value(session.loyaltyPointsToRedeem),
+        loyaltyDiscount: Value(summary.loyaltyDiscount),
+        pointsEarned: Value(summary.pointsToEarn),
       ),
     );
 

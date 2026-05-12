@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/theme/app_theme.dart';
+import 'package:pos_app/shared/widgets/app_sheet.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
 
 /// Pass [productId] for edit mode; omit (null) for add mode.
@@ -219,9 +220,10 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
         !_components.any((c) => c.product.id == p.id)).toList();
 
     if (!mounted) return;
-    final picked = await showModalBottomSheet<Product>(
+    final picked = await showAppSheet<Product>(
       context: context,
-      isScrollControlled: true,
+      draggable: true,
+      initialSize: 0.5,
       builder: (_) => _ComponentPickerSheet(products: eligible),
     );
     if (picked == null) return;

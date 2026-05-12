@@ -1,7 +1,7 @@
 import 'package:drift/drift.dart';
 
-import 'orders_table.dart';
-import 'tax_rates_table.dart';
+import 'package:pos_app/core/database/tables/orders_table.dart';
+import 'package:pos_app/core/database/tables/tax_rates_table.dart';
 
 /// Per-tax-rate breakdown for an order.
 /// Snapshots the rate name and percent so receipts remain accurate

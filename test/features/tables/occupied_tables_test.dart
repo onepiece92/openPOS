@@ -2,9 +2,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:pos_app/features/cart/domain/cart_item.dart';
-import 'package:pos_app/features/cart/domain/cart_notifier.dart';
+import 'package:pos_app/features/cart/presentation/providers/cart_notifier.dart';
 import 'package:pos_app/features/cart/domain/held_order.dart';
-import 'package:pos_app/features/cart/domain/held_orders_notifier.dart';
+import 'package:pos_app/features/cart/presentation/providers/held_orders_notifier.dart';
 import 'package:pos_app/features/tables/domain/tables_provider.dart';
 
 ProviderContainer _container({

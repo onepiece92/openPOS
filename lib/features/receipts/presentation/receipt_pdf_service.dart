@@ -124,6 +124,11 @@ Future<pw.Document> buildReceiptPdf(
                 '${t.taxRateName} (${(t.taxRatePercent * 100).toStringAsFixed(1)}%)',
                 fmt.format(t.taxAmount),
               )),
+          if (order.loyaltyDiscount > 0)
+            billRow(
+              'Loyalty Redeemed (${order.pointsRedeemed} pts)',
+              '- ${fmt.format(order.loyaltyDiscount)}',
+            ),
           divider(),
           billRow('Grand Total', fmt.format(order.total), bold: true),
           divider(),
@@ -153,7 +158,14 @@ Future<pw.Document> buildReceiptPdf(
           if (data.customer != null) ...[
             pw.Text('Loyalty Points', style: headerStyle),
             pw.SizedBox(height: 4),
-            billRow('Current', '${data.customer!.loyaltyPoints}'),
+            if (order.pointsRedeemed > 0)
+              billRow(
+                'Redeemed (this sale)',
+                '${order.pointsRedeemed} pts (${fmt.format(order.loyaltyDiscount)})',
+              ),
+            if (order.pointsEarned > 0)
+              billRow('Earned (this sale)', '+${order.pointsEarned} pts'),
+            billRow('Balance', '${data.customer!.loyaltyPoints} pts'),
             pw.SizedBox(height: 20),
           ] else
             pw.SizedBox(height: 12),

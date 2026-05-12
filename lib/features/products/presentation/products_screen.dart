@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/utils/currency_formatter.dart';
-import 'package:pos_app/core/widgets/app_empty_state.dart';
+import 'package:pos_app/shared/widgets/app_empty_state.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
 import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
 

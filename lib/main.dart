@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
-import 'app.dart';
-import 'core/database/app_database.dart';
-import 'core/providers/database_provider.dart';
+import 'package:pos_app/app.dart';
+import 'package:pos_app/core/database/app_database.dart';
+import 'package:pos_app/core/providers/database_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();

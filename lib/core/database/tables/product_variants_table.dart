@@ -1,6 +1,6 @@
 import 'package:drift/drift.dart';
 
-import 'products_table.dart';
+import 'package:pos_app/core/database/tables/products_table.dart';
 
 /// Size/colour/type variants for a product.
 /// price_delta is added to (or subtracted from) the base product price.

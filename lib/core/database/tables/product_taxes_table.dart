@@ -1,7 +1,7 @@
 import 'package:drift/drift.dart';
 
-import 'products_table.dart';
-import 'tax_rates_table.dart';
+import 'package:pos_app/core/database/tables/products_table.dart';
+import 'package:pos_app/core/database/tables/tax_rates_table.dart';
 
 /// Many-to-many: specific tax rates assigned directly to a product.
 /// Overrides the category-level and store-level default tax assignment.

@@ -7,8 +7,9 @@ import 'package:go_router/go_router.dart';
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/utils/async_feedback.dart';
-import 'package:pos_app/features/cart/domain/cart_notifier.dart';
-import 'package:pos_app/features/cart/domain/held_orders_notifier.dart';
+import 'package:pos_app/shared/widgets/app_sheet.dart';
+import 'package:pos_app/features/cart/presentation/providers/cart_notifier.dart';
+import 'package:pos_app/features/cart/presentation/providers/held_orders_notifier.dart';
 import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
 import 'package:pos_app/features/tables/domain/tables_provider.dart';
 
@@ -136,15 +137,9 @@ class TablesScreen extends ConsumerWidget {
     WidgetRef ref, {
     PosTable? existing,
   }) async {
-    await showModalBottomSheet<void>(
+    await showAppSheet<void>(
       context: context,
-      isScrollControlled: true,
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(ctx).viewInsets.bottom,
-        ),
-        child: _TableForm(existing: existing),
-      ),
+      builder: (_) => _TableForm(existing: existing),
     );
   }
 

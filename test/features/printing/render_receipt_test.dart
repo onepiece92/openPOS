@@ -17,11 +17,14 @@ ReceiptBodyData _sampleData() {
     tenderedAmount: 120.0,
     changeAmount: 7.0,
     customerId: null,
+    pointsRedeemed: 0,
+    loyaltyDiscount: 0.0,
+    pointsEarned: 0,
     notes: null,
     createdAt: DateTime(2026, 4, 22, 14, 30),
     updatedAt: DateTime(2026, 4, 22, 14, 30),
   );
-  final item = OrderItem(
+  const item = OrderItem(
     id: 1,
     orderId: 42,
     productId: 7,
@@ -32,7 +35,7 @@ ReceiptBodyData _sampleData() {
     taxAmount: 13.0,
     lineTotal: 100.0,
   );
-  final tax = OrderTaxe(
+  const tax = OrderTaxe(
     id: 1,
     orderId: 42,
     taxRateId: 1,

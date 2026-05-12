@@ -1,8 +1,8 @@
 import 'package:drift/drift.dart';
 
-import '../app_database.dart';
-import '../tables/products_table.dart';
-import '../tables/stock_adjustments_table.dart';
+import 'package:pos_app/core/database/app_database.dart';
+import 'package:pos_app/core/database/tables/products_table.dart';
+import 'package:pos_app/core/database/tables/stock_adjustments_table.dart';
 
 part 'inventory_dao.g.dart';
 

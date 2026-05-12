@@ -1,7 +1,7 @@
 import 'package:drift/drift.dart';
 
-import '../app_database.dart';
-import '../tables/audit_log_table.dart';
+import 'package:pos_app/core/database/app_database.dart';
+import 'package:pos_app/core/database/tables/audit_log_table.dart';
 
 part 'audit_dao.g.dart';
 
