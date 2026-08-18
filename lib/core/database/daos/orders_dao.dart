@@ -52,15 +52,17 @@ class OrdersDao extends DatabaseAccessor<AppDatabase> with _$OrdersDaoMixin {
   Future<void> insertTaxLines(List<OrderTaxesCompanion> lines) =>
       batch((b) => b.insertAll(orderTaxes, lines));
 
-  Future<void> voidOrder(int id) async {
-    await (update(orders)..where((o) => o.id.equals(id)))
-        .write(const OrdersCompanion(status: Value('voided')));
-  }
+  Future<void> voidOrder(int id) => _setStatus(id, 'voided');
 
-  Future<void> refundOrder(int id) async {
-    await (update(orders)..where((o) => o.id.equals(id)))
-        .write(const OrdersCompanion(status: Value('refunded')));
-  }
+  Future<void> refundOrder(int id) => _setStatus(id, 'refunded');
+
+  Future<void> _setStatus(int id, String status) =>
+      (update(orders)..where((o) => o.id.equals(id))).write(
+        OrdersCompanion(
+          status: Value(status),
+          updatedAt: Value(DateTime.now()),
+        ),
+      );
 
   Future<int> insertReturn(ReturnsCompanion entry) =>
       into(returns).insert(entry);

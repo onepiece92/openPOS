@@ -77,13 +77,20 @@ void main() {
 
     expect((await db.productsDao.getById(productId))!.stockQuantity, 7);
 
+    // Age the row an hour so a same-second void still shows a later updated_at.
+    await db.customStatement(
+      'UPDATE orders SET created_at = created_at - 3600, updated_at = updated_at - 3600',
+    );
     await voidOrder(db, audit, orderId: orderId, reason: 'wrong order');
 
     // Stock fully restored
     expect((await db.productsDao.getById(productId))!.stockQuantity, 10);
 
     // Status flipped
-    expect((await db.ordersDao.getById(orderId))!.status, 'voided');
+    final voided = (await db.ordersDao.getById(orderId))!;
+    expect(voided.status, 'voided');
+    expect(voided.updatedAt.isAfter(voided.createdAt), isTrue,
+        reason: 'status change must bump updated_at');
 
     // Audit log: place + void
     final auditRows = await db.select(db.auditLog).get();
