@@ -33,13 +33,18 @@ class OnboardingNotifier extends Notifier<OnboardingState> {
 
     final box = ref.read(settingsBoxProvider);
     final db = ref.read(databaseProvider);
+    final settings = ref.read(settingsProvider.notifier);
 
     // Save store profile
-    await box.put('business_name', state.businessName);
-    await box.put('country_code', state.country?.code ?? '');
-    await box.put('currency_code', state.country?.currency ?? 'USD');
-    await box.put('currency_symbol', state.country?.symbol ?? '\$');
-    await box.put('timezone', state.country?.timezone ?? 'UTC');
+    await settings.setStoreProfile(name: state.businessName);
+    await settings.setCurrency(
+      symbol: state.country?.symbol ?? '\$',
+      code: state.country?.currency ?? 'USD',
+    );
+    await settings.setLocale(
+      countryCode: state.country?.code ?? '',
+      timezone: state.country?.timezone ?? 'UTC',
+    );
 
     // Insert default tax rate (rate stored as decimal: 13% → 0.13)
     final taxId = await db.taxDao.upsertRate(
@@ -50,7 +55,7 @@ class OnboardingNotifier extends Notifier<OnboardingState> {
         roundingMode: const Value('half_up'),
       ),
     );
-    await saveDefaultTaxId(box, taxId);
+    await settings.setDefaultTaxId(taxId);
 
     // Seed checklist state
     await box.put('checklist_state', {
@@ -60,16 +65,13 @@ class OnboardingNotifier extends Notifier<OnboardingState> {
       'backup': false,
     });
 
-    await saveOnboardingComplete(box);
-    ref.invalidate(onboardingCompleteProvider);
+    await settings.setOnboardingComplete(true);
     state = state.copyWith(saving: false);
   }
 
   Future<void> skip() async {
     state = state.copyWith(saving: true);
-    final box = ref.read(settingsBoxProvider);
-    await saveOnboardingComplete(box);
-    ref.invalidate(onboardingCompleteProvider);
+    await ref.read(settingsProvider.notifier).setOnboardingComplete(true);
     state = state.copyWith(saving: false);
   }
 }

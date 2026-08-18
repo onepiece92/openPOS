@@ -2,6 +2,7 @@ import 'package:drift/drift.dart' show Value;
 
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/services/audit_service.dart';
+import 'package:pos_app/core/utils/money.dart';
 import 'package:pos_app/features/cart/domain/cart_item.dart';
 import 'package:pos_app/features/cart/presentation/providers/cart_notifier.dart';
 
@@ -20,18 +21,24 @@ Future<int> placeOrder(
   required double tenderedAmount,
 }) {
   return db.transaction(() async {
+    // Gap-free: computed inside the transaction, never reused (voids keep it).
+    final invoiceNo = await db.ordersDao.nextInvoiceNo();
     final id = await db.ordersDao.insertOrder(
       OrdersCompanion.insert(
+        invoiceNo: Value(invoiceNo),
         subtotal: summary.subtotal,
         taxTotal: Value(summary.taxAmount),
         discountTotal: Value(summary.orderDiscount),
+        discountValue: Value(session.orderDiscount),
+        discountIsPercent: Value(session.orderDiscountIsPercent),
         total: summary.total,
         paymentMethod: paymentMethod,
         tenderedAmount: paymentMethod == 'cash'
             ? Value(tenderedAmount)
             : const Value.absent(),
         changeAmount: paymentMethod == 'cash'
-            ? Value((tenderedAmount - summary.total).clamp(0, double.infinity))
+            ? Value(roundMoney(
+                (tenderedAmount - summary.total).clamp(0, double.infinity)))
             : const Value.absent(),
         customerId: session.customerId != null
             ? Value(session.customerId!)
@@ -85,7 +92,7 @@ Future<int> placeOrder(
               productId: comp.componentProductId,
               delta: -deduct,
               reasonCode: 'sale',
-              notes: Value('Order #$id (via ${item.name})'),
+              notes: Value('Order #$invoiceNo (via ${item.name})'),
             ),
           );
         }
@@ -96,7 +103,7 @@ Future<int> placeOrder(
             productId: item.productId,
             delta: -item.quantity,
             reasonCode: 'sale',
-            notes: Value('Order #$id'),
+            notes: Value('Order #$invoiceNo'),
           ),
         );
       }

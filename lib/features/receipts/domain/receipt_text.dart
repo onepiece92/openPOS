@@ -2,13 +2,14 @@ import 'package:intl/intl.dart';
 
 import 'package:pos_app/core/utils/currency_formatter.dart';
 import 'package:pos_app/features/receipts/presentation/receipt_body.dart';
+import 'package:pos_app/features/orders/domain/order_number.dart';
 
 String buildReceiptText(ReceiptBodyData data, CurrencyFormatter fmt) {
   final dateFmt = DateFormat('d MMM h:mm a');
   final o = data.order;
   final lines = <String>[
     data.businessName,
-    'Order #${o.id} · ${dateFmt.format(o.createdAt)}',
+    'Bill ${o.billNo} · ${dateFmt.format(o.createdAt)}',
     if (data.customer != null) data.customer!.name else 'Walk-in',
     '',
     for (final i in data.items)

@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import 'package:pos_app/core/providers/database_provider.dart';
+import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/core/theme/tokens.dart';
-import 'package:pos_app/features/products/domain/products_provider.dart';
 import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
 
 // ── Period ────────────────────────────────────────────────────────────────────

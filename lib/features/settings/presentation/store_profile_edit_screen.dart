@@ -49,17 +49,13 @@ class _StoreProfileEditScreenState
 
   Future<void> _save() async {
     setState(() => _loading = true);
-    final box = ref.read(settingsBoxProvider);
-    await saveBusinessName(box, _nameCtrl.text.trim());
-    await saveBusinessTagline(box, _taglineCtrl.text.trim());
-    await saveBusinessPhone(box, _phoneCtrl.text.trim());
-    await saveBusinessAddress(box, _addressCtrl.text.trim());
-    await saveBusinessPan(box, _panCtrl.text.trim());
-    ref.invalidate(businessNameProvider);
-    ref.invalidate(businessTaglineProvider);
-    ref.invalidate(businessPhoneProvider);
-    ref.invalidate(businessAddressProvider);
-    ref.invalidate(businessPanProvider);
+    await ref.read(settingsProvider.notifier).setStoreProfile(
+          name: _nameCtrl.text.trim(),
+          tagline: _taglineCtrl.text.trim(),
+          phone: _phoneCtrl.text.trim(),
+          address: _addressCtrl.text.trim(),
+          pan: _panCtrl.text.trim(),
+        );
     if (mounted) {
       setState(() => _loading = false);
       context.pop();

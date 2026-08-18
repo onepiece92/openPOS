@@ -1,6 +1,5 @@
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
@@ -9,12 +8,11 @@ import 'package:pos_app/core/providers/hive_provider.dart';
 class DemoDataService {
   DemoDataService(this._db, this._settings);
   final AppDatabase _db;
-  final Box<dynamic> _settings;
+  final SettingsNotifier _settings;
 
   Future<void> seed() async {
     // ── Store profile ─────────────────────────────────────────────────────
-    await saveBusinessName(_settings, 'Rebuzz POS');
-    await saveBusinessPhone(_settings, '9826189697');
+    await _settings.setStoreProfile(name: 'Rebuzz POS', phone: '9826189697');
 
     // ── Categories ────────────────────────────────────────────────────────
     final catIds = <String, int>{};
@@ -251,6 +249,6 @@ class DemoDataService {
 final demoDataServiceProvider = Provider<DemoDataService>((ref) {
   return DemoDataService(
     ref.watch(databaseProvider),
-    ref.watch(settingsBoxProvider),
+    ref.watch(settingsProvider.notifier),
   );
 });

@@ -80,8 +80,11 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor])
       : super(executor ?? _openConnection());
 
+  /// Bump together with a new `onUpgrade` step below.
+  static const int currentSchemaVersion = 10;
+
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => currentSchemaVersion;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -90,36 +93,23 @@ class AppDatabase extends _$AppDatabase {
           await _seedDefaultData();
         },
         onUpgrade: (m, from, to) async {
+          // Every step uses the Migrator so the DDL is exactly what Drift
+          // would generate for a fresh install (NULL / CHECK / DEFAULT text
+          // included) — test/drift/migration_test.dart verifies each shipped
+          // version upgrades to a schema identical to `createAll()`.
           if (from < 2) {
-            await customStatement(
-              'ALTER TABLE customers ADD COLUMN default_discount REAL NOT NULL DEFAULT 0.0',
-            );
-            await customStatement(
-              'ALTER TABLE customers ADD COLUMN default_discount_is_percent INTEGER NOT NULL DEFAULT 0',
-            );
+            await m.addColumn(customers, customers.defaultDiscount);
+            await m.addColumn(customers, customers.defaultDiscountIsPercent);
           }
           if (from < 3) {
-            await customStatement(
-              'ALTER TABLE products ADD COLUMN is_composite INTEGER NOT NULL DEFAULT 0',
-            );
-            await customStatement('''
-              CREATE TABLE IF NOT EXISTS product_components (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                composite_product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-                component_product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
-                quantity INTEGER NOT NULL DEFAULT 1
-              )
-            ''');
+            await m.addColumn(products, products.isComposite);
+            await m.createTable(productComponents);
           }
           if (from < 4) {
-            await customStatement(
-              'ALTER TABLE products ADD COLUMN is_hidden_in_pos INTEGER NOT NULL DEFAULT 0',
-            );
+            await m.addColumn(products, products.isHiddenInPos);
           }
           if (from < 5) {
-            await customStatement(
-              'ALTER TABLE products ADD COLUMN is_out_of_stock INTEGER NOT NULL DEFAULT 0',
-            );
+            await m.addColumn(products, products.isOutOfStock);
           }
           if (from < 6) {
             // Drop deprecated outbox queue (online sync removed — app is offline-only).
@@ -127,32 +117,30 @@ class AppDatabase extends _$AppDatabase {
           }
           if (from < 7) {
             // Front-of-house tables + nullable FK from orders.
-            await customStatement('''
-              CREATE TABLE IF NOT EXISTS tables (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                capacity INTEGER NOT NULL DEFAULT 4,
-                notes TEXT,
-                created_at INTEGER NOT NULL DEFAULT (CAST(strftime('%s','now') AS INTEGER)),
-                updated_at INTEGER NOT NULL DEFAULT (CAST(strftime('%s','now') AS INTEGER))
-              )
-            ''');
-            await customStatement(
-              'ALTER TABLE orders ADD COLUMN table_id INTEGER REFERENCES tables(id)',
-            );
+            await m.createTable(tables);
+            await m.addColumn(orders, orders.tableId);
           }
           if (from < 8) {
             // Persist loyalty redemption + earn on the order row so receipts
             // can be re-printed and audited without re-deriving from settings.
-            await customStatement(
-              'ALTER TABLE orders ADD COLUMN points_redeemed INTEGER NOT NULL DEFAULT 0',
-            );
-            await customStatement(
-              'ALTER TABLE orders ADD COLUMN loyalty_discount REAL NOT NULL DEFAULT 0.0',
-            );
-            await customStatement(
-              'ALTER TABLE orders ADD COLUMN points_earned INTEGER NOT NULL DEFAULT 0',
-            );
+            await m.addColumn(orders, orders.pointsRedeemed);
+            await m.addColumn(orders, orders.loyaltyDiscount);
+            await m.addColumn(orders, orders.pointsEarned);
+          }
+          if (from < 9) {
+            // Purchase (cost) price + main/secondary units with conversion.
+            await m.addColumn(products, products.purchasePrice);
+            await m.addColumn(products, products.unit);
+            await m.addColumn(products, products.secondaryUnit);
+            await m.addColumn(products, products.conversionRate);
+          }
+          if (from < 10) {
+            // Gap-free invoice numbers + the order discount as entered.
+            await m.addColumn(orders, orders.invoiceNo);
+            await m.addColumn(orders, orders.discountValue);
+            await m.addColumn(orders, orders.discountIsPercent);
+            await m.createIndex(idxOrdersInvoiceNo);
+            await backfillInvoiceNumbers();
           }
         },
         beforeOpen: (details) async {
@@ -164,6 +152,31 @@ class AppDatabase extends _$AppDatabase {
           await customStatement('PRAGMA foreign_keys = ON');
         },
       );
+
+  /// Numbers every non-held order that has no invoice_no yet, in
+  /// (created_at, id) order, continuing after the highest existing number.
+  /// Done row-by-row from Dart: a single UPDATE with a correlated COUNT is
+  /// evaluated per row in SQLite and would see its own earlier writes.
+  /// Idempotent; used by the v10 migration and by tests.
+  Future<void> backfillInvoiceNumbers() => transaction(() async {
+        final maxRow = await customSelect(
+          'SELECT COALESCE(MAX(invoice_no), 0) AS m FROM orders',
+        ).getSingle();
+        var next = maxRow.read<int>('m');
+        final rows = await customSelect(
+          "SELECT id FROM orders WHERE status != 'held' AND invoice_no IS NULL "
+          'ORDER BY created_at, id',
+        ).get();
+        await batch((b) {
+          for (final r in rows) {
+            next++;
+            b.customStatement(
+              'UPDATE orders SET invoice_no = ? WHERE id = ?',
+              [next, r.read<int>('id')],
+            );
+          }
+        });
+      });
 
   /// Seeds essential data on a fresh install.
   /// Wrapped in a check so it's idempotent — safe to call multiple times.

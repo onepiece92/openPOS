@@ -2,6 +2,7 @@ import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 
 import 'package:pos_app/core/utils/currency_formatter.dart';
 import 'package:pos_app/features/receipts/presentation/receipt_body.dart';
+import 'package:pos_app/features/orders/domain/order_number.dart';
 
 /// Builds the ESC/POS byte stream for a sales receipt.
 ///
@@ -38,7 +39,7 @@ Future<List<int>> renderReceiptBytes(
   bytes.addAll(g.row([
     PosColumn(text: customerName, width: 6),
     PosColumn(
-      text: 'Bill #${data.order.id}',
+      text: 'Bill ${data.order.billNo}',
       width: 6,
       styles: const PosStyles(align: PosAlign.right),
     ),

@@ -12,6 +12,7 @@ ReceiptBodyData _sampleData() {
     subtotal: 100.0,
     taxTotal: 13.0,
     discountTotal: 0.0,
+    discountIsPercent: false,
     total: 113.0,
     paymentMethod: 'cash',
     tenderedAmount: 120.0,

@@ -29,7 +29,6 @@ import 'package:pos_app/features/reports/presentation/dashboard_screen.dart';
 import 'package:pos_app/features/settings/presentation/settings_screen.dart';
 import 'package:pos_app/features/settings/presentation/store_profile_edit_screen.dart';
 import 'package:pos_app/features/tax/presentation/tax_settings_screen.dart';
-import 'package:pos_app/features/theme/presentation/theme_notifier.dart';
 import 'package:pos_app/features/theme/presentation/theme_preview_screen.dart';
 
 CustomTransitionPage<void> _slide(GoRouterState state, Widget child) =>
@@ -111,11 +110,17 @@ class POSApp extends ConsumerWidget {
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
-  final isOnboarded = ref.watch(onboardingCompleteProvider);
+  // Re-run redirects when onboarding flips instead of rebuilding the whole
+  // router (which would throw away the navigation stack).
+  final refresh = _RouterRefresh();
+  ref.listen(onboardingCompleteProvider, (_, __) => refresh.ping());
+  ref.onDispose(refresh.dispose);
 
   return GoRouter(
     initialLocation: '/pos',
+    refreshListenable: refresh,
     redirect: (context, state) {
+      final isOnboarded = ref.read(onboardingCompleteProvider);
       if (!isOnboarded && state.matchedLocation != '/onboarding') {
         return '/onboarding';
       }
@@ -252,3 +257,7 @@ final routerProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
+
+class _RouterRefresh extends ChangeNotifier {
+  void ping() => notifyListeners();
+}

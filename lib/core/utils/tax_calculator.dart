@@ -3,7 +3,9 @@
 /// penny discrepancies.
 library;
 
-enum RoundingMode { halfUp, halfEven, truncate }
+import 'package:pos_app/core/utils/money.dart';
+
+export 'package:pos_app/core/utils/money.dart' show RoundingMode;
 
 class TaxCalculator {
   const TaxCalculator._();
@@ -45,20 +47,6 @@ class TaxCalculator {
     return inclusivePrice / (1 + rate);
   }
 
-  static double _round(double value, RoundingMode mode) {
-    switch (mode) {
-      case RoundingMode.halfUp:
-        return (value * 100).roundToDouble() / 100;
-      case RoundingMode.halfEven:
-        // Banker's rounding to 2 decimal places
-        final scaled = value * 100;
-        final floor = scaled.floor();
-        final fraction = scaled - floor;
-        final rounded =
-            (fraction == 0.5 && floor.isEven) ? floor.toDouble() : scaled.roundToDouble();
-        return rounded / 100;
-      case RoundingMode.truncate:
-        return (value * 100).truncateToDouble() / 100;
-    }
-  }
+  static double _round(double value, RoundingMode mode) =>
+      roundMoney(value, mode);
 }

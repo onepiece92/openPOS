@@ -113,7 +113,7 @@ void main() {
     expect(adjustments, hasLength(1));
     expect(adjustments.first.delta, -2);
     expect(adjustments.first.reasonCode, 'sale');
-    expect(adjustments.first.notes, contains('Order #$orderId'));
+    expect(adjustments.first.notes, contains('Order #${order.invoiceNo}'));
 
     final auditRows = await db.select(db.auditLog).get();
     expect(auditRows, hasLength(1));

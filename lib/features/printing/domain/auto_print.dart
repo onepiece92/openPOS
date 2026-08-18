@@ -22,14 +22,12 @@ Future<String?> autoPrintOrder(WidgetRef ref, int orderId) async {
     final db = ref.read(databaseProvider);
     final paper = ref.read(printerPaperWidthProvider);
     final fmt = ref.read(currencyFormatterProvider);
-    final box = ref.read(settingsBoxProvider);
 
     final order = await db.ordersDao.getById(orderId);
     if (order == null) return 'Order not found for printing';
     final items = await db.ordersDao.getItems(orderId);
     final taxes = await db.ordersDao.getTaxBreakdown(orderId);
-    final businessName =
-        box.get('business_name', defaultValue: 'My Store') as String;
+    final businessName = ref.read(settingsProvider).businessNameOrDefault;
     final customer = order.customerId == null
         ? null
         : await db.customersDao.getById(order.customerId!);

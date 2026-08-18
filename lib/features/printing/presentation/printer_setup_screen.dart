@@ -62,7 +62,6 @@ class _PrinterSetupScreenState extends ConsumerState<PrinterSetupScreen> {
   }
 
   Future<void> _selectDevice(Printer device) async {
-    final box = ref.read(settingsBoxProvider);
     final address = device.address;
     final name = device.name ?? 'Unknown';
     if (address == null || address.isEmpty) {
@@ -71,9 +70,9 @@ class _PrinterSetupScreenState extends ConsumerState<PrinterSetupScreen> {
       );
       return;
     }
-    await savePrinterDevice(box, address: address, name: name);
-    ref.invalidate(printerDeviceAddressProvider);
-    ref.invalidate(printerDeviceNameProvider);
+    await ref
+        .read(settingsProvider.notifier)
+        .setPrinterDevice(address: address, name: name);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Saved "$name" as the active printer')),
@@ -81,18 +80,14 @@ class _PrinterSetupScreenState extends ConsumerState<PrinterSetupScreen> {
     }
   }
 
-  Future<void> _disconnectSavedPrinter() async {
-    final box = ref.read(settingsBoxProvider);
-    await clearPrinterDevice(box);
-    ref.invalidate(printerDeviceAddressProvider);
-    ref.invalidate(printerDeviceNameProvider);
-  }
+  Future<void> _disconnectSavedPrinter() =>
+      ref.read(settingsProvider.notifier).clearPrinterDevice();
 
   Future<void> _printTestPage() async {
     final address = ref.read(printerDeviceAddressProvider);
     final name = ref.read(printerDeviceNameProvider);
     final paper = ref.read(printerPaperWidthProvider);
-    final storeName = ref.read(businessNameProvider);
+    final storeName = ref.read(settingsProvider).businessNameOrDefault;
     if (address == null || name == null) return;
 
     setState(() => _testing = true);
@@ -100,7 +95,7 @@ class _PrinterSetupScreenState extends ConsumerState<PrinterSetupScreen> {
       context,
       () async {
         final bytes = await renderTestPageBytes(
-          storeName: storeName.isEmpty ? 'My Store' : storeName,
+          storeName: storeName,
           paperMm: paper,
         );
         await printBytesToBleAddress(
@@ -115,11 +110,8 @@ class _PrinterSetupScreenState extends ConsumerState<PrinterSetupScreen> {
     if (mounted) setState(() => _testing = false);
   }
 
-  Future<void> _setPaperWidth(int mm) async {
-    final box = ref.read(settingsBoxProvider);
-    await savePrinterPaperWidth(box, mm);
-    ref.invalidate(printerPaperWidthProvider);
-  }
+  Future<void> _setPaperWidth(int mm) =>
+      ref.read(settingsProvider.notifier).setPrinterPaperWidth(mm);
 
   @override
   Widget build(BuildContext context) {

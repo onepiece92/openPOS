@@ -17,3 +17,13 @@ Rules:
 - Before answering architecture or codebase questions, read graphify-out/GRAPH_REPORT.md for god nodes and community structure
 - If graphify-out/wiki/index.md exists, navigate it instead of reading raw files
 - After modifying code files in this session, run `graphify update .` to keep the graph current (AST-only, no API cost)
+
+## Database schema changes
+
+Schema is verified by `test/drift/migration_test.dart` (every shipped version → current must equal `createAll()`). When you change any Drift table:
+
+1. Bump `AppDatabase.currentSchemaVersion` and add an `if (from < N)` step in `onUpgrade` using the **Migrator** (`m.addColumn`, `m.createTable`, `m.createIndex`) — not hand-written `ALTER TABLE` strings, so the DDL matches what Drift generates.
+2. `dart run build_runner build --delete-conflicting-outputs`
+3. `dart run drift_dev schema dump lib/core/database/app_database.dart drift_schemas/`
+4. `dart run drift_dev schema generate drift_schemas/ test/drift/generated/`
+5. `flutter test test/drift`

@@ -2,6 +2,7 @@ import 'package:drift/drift.dart' show Value;
 
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/services/audit_service.dart';
+import 'package:pos_app/features/orders/domain/order_number.dart';
 
 /// Atomically voids a previously-completed order.
 ///
@@ -41,7 +42,7 @@ Future<void> voidOrder(
               productId: comp.componentProductId,
               delta: addBack,
               reasonCode: 'void',
-              notes: Value('Void Order #$orderId (via ${item.productName})'),
+              notes: Value('Void Order ${order.billNo} (via ${item.productName})'),
             ),
           );
         }
@@ -52,7 +53,7 @@ Future<void> voidOrder(
             productId: item.productId,
             delta: item.quantity,
             reasonCode: 'void',
-            notes: Value('Void Order #$orderId'),
+            notes: Value('Void Order ${order.billNo}'),
           ),
         );
       }

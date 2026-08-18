@@ -126,8 +126,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   Future<void> _finish() async {
     try {
       await ref.read(onboardingNotifierProvider.notifier).finish();
-      // Wait one frame so the router reacts to the invalidated provider.
-      await Future.delayed(Duration.zero);
       if (mounted) context.go('/pos');
     } catch (e) {
       ref.read(onboardingNotifierProvider.notifier).setSaving(false);
@@ -141,7 +139,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   Future<void> _skip() async {
     await ref.read(onboardingNotifierProvider.notifier).skip();
-    await Future.delayed(Duration.zero);
     if (mounted) context.go('/pos');
   }
 

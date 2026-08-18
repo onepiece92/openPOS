@@ -7,6 +7,7 @@ import 'package:printing/printing.dart';
 
 import 'package:pos_app/core/utils/currency_formatter.dart';
 import 'package:pos_app/features/receipts/presentation/receipt_body.dart';
+import 'package:pos_app/features/orders/domain/order_number.dart';
 
 Future<pw.Font> _loadFont(String path) async {
   final data = await rootBundle.load(path);
@@ -68,7 +69,7 @@ Future<pw.Document> buildReceiptPdf(
           pw.Row(
             children: [
               pw.Expanded(child: pw.Text(customerName, style: baseStyle)),
-              pw.Text('Paid Bill No.: ${order.id}', style: baseStyle),
+              pw.Text('Paid Bill No.: ${order.displayNo}', style: baseStyle),
             ],
           ),
           if (data.table != null)
@@ -194,7 +195,7 @@ Future<void> downloadReceiptPdf(
     BuildContext context, ReceiptBodyData data, CurrencyFormatter fmt) async {
   final doc = await buildReceiptPdf(data, fmt);
   final bytes = await doc.save();
-  final fileName = 'receipt_order_${data.order.id}.pdf';
+  final fileName = 'receipt_${data.order.displayNo}.pdf';
 
   await Printing.sharePdf(bytes: bytes, filename: fileName);
 }

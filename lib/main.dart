@@ -1,28 +1,18 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
-import 'package:pos_app/app.dart';
-import 'package:pos_app/core/database/app_database.dart';
-import 'package:pos_app/core/providers/database_provider.dart';
+import 'package:pos_app/app_root.dart';
+import 'package:pos_app/features/backup/data/snapshot_providers.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Open Hive boxes before ProviderScope so providers can read synchronously
+  // Open Hive boxes before the ProviderContainer exists so providers can
+  // read synchronously. The DB itself is owned by databaseProvider.
   await Hive.initFlutter();
-  await Hive.openBox<dynamic>('settings');
-  await Hive.openBox<dynamic>('held_orders');
+  for (final name in kSnapshotHiveBoxes) {
+    await Hive.openBox<dynamic>(name);
+  }
 
-  final database = AppDatabase();
-
-  runApp(
-    ProviderScope(
-      overrides: [
-        // Override so the DB singleton is shared app-wide
-        databaseProvider.overrideWithValue(database),
-      ],
-      child: const POSApp(),
-    ),
-  );
+  runApp(const AppRoot());
 }

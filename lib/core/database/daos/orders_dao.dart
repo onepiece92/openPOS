@@ -65,6 +65,15 @@ class OrdersDao extends DatabaseAccessor<AppDatabase> with _$OrdersDaoMixin {
   Future<int> insertReturn(ReturnsCompanion entry) =>
       into(returns).insert(entry);
 
+  /// Next gap-free invoice number. Call inside the placing transaction.
+  Future<int> nextInvoiceNo() async {
+    final row = await customSelect(
+      'SELECT COALESCE(MAX(invoice_no), 0) + 1 AS n FROM orders',
+      readsFrom: {orders},
+    ).getSingle();
+    return row.read<int>('n');
+  }
+
   // ── Aggregates (for reports) ───────────────────────────────────────────
 
   Future<double> totalRevenueForPeriod(DateTime from, DateTime to) async {

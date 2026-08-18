@@ -11,6 +11,7 @@ import 'package:pos_app/shared/widgets/app_empty_state.dart';
 import 'package:pos_app/features/customers/domain/customers_provider.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
 import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
+import 'package:pos_app/features/orders/domain/order_number.dart';
 
 final _recentOrdersProvider = StreamProvider<List<Order>>((ref) {
   return ref.watch(databaseProvider).ordersDao.watchRecent(limit: 500);
@@ -309,7 +310,7 @@ class _OrderCard extends StatelessWidget {
                     Row(
                       children: [
                         Text(
-                          'Order #${order.id}',
+                          'Order ${order.billNo}',
                           style: tt.bodyMedium
                               ?.copyWith(fontWeight: FontWeight.w700),
                         ),

@@ -2,11 +2,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:pos_app/core/database/app_database.dart';
 
-/// Singleton database instance. Overridden in main() so the same
-/// AppDatabase is shared across the entire app.
-/// Also overridable in tests: ProviderScope(overrides: [databaseProvider.overrideWithValue(testDb)])
+/// App-wide database instance. Owned by the ProviderContainer: created on
+/// first read, closed when the container is disposed (see `AppRoot`, which
+/// swaps containers to hot-restart after a backup restore).
+///
+/// Tests override it:
+/// `ProviderScope(overrides: [databaseProvider.overrideWithValue(testDb)])`
 final databaseProvider = Provider<AppDatabase>((ref) {
-  throw StateError(
-    'databaseProvider must be overridden in ProviderScope before use.',
-  );
+  final db = AppDatabase();
+  ref.onDispose(db.close);
+  return db;
 });

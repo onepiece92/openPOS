@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/theme/tokens.dart';
 import 'package:pos_app/core/utils/currency_formatter.dart';
+import 'package:pos_app/features/orders/domain/order_number.dart';
 
 // ─── Data bundle (public) ─────────────────────────────────────────────────────
 
@@ -77,7 +78,7 @@ class ReceiptBody extends StatelessWidget {
                           style: bodyStyle.copyWith(color: cs.onSurface)),
                     ),
                     Text(
-                      'Paid Bill No.: ${order.id}',
+                      'Paid Bill No.: ${order.displayNo}',
                       style: bodyStyle.copyWith(color: cs.onSurface),
                     ),
                   ],

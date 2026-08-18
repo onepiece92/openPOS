@@ -32,6 +32,10 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
   final _nameCtrl = TextEditingController();
   final _skuCtrl = TextEditingController();
   final _priceCtrl = TextEditingController();
+  final _purchasePriceCtrl = TextEditingController(); // empty = 0
+  final _unitCtrl = TextEditingController(text: 'pcs');
+  final _secondaryUnitCtrl = TextEditingController(); // empty = none
+  final _conversionCtrl = TextEditingController(); // main units per secondary
   final _stockCtrl = TextEditingController(); // empty = unlimited (saves as 0)
   bool _trackStock = false;
 
@@ -46,6 +50,25 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
 
   bool get _isEdit => widget.productId != null;
 
+  String get _unitLabel =>
+      _unitCtrl.text.trim().isEmpty ? 'pcs' : _unitCtrl.text.trim();
+  bool get _hasSecondaryUnit => _secondaryUnitCtrl.text.trim().isNotEmpty;
+
+  /// Live preview line under the unit fields, e.g. "1 box = 12 pcs".
+  String get _conversionHint {
+    if (!_hasSecondaryUnit) {
+      return 'Stock and prices are per $_unitLabel. '
+          'Add a secondary unit to sell in bulk (e.g. box, dozen).';
+    }
+    final rate = double.tryParse(_conversionCtrl.text);
+    final rateText = rate == null || rate <= 0 ? '?' : _fmtRate(rate);
+    return '1 ${_secondaryUnitCtrl.text.trim()} = $rateText $_unitLabel';
+  }
+
+  /// 12.0 → "12", 2.5 → "2.5"
+  static String _fmtRate(double v) =>
+      v == v.roundToDouble() ? v.toInt().toString() : v.toString();
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -57,6 +80,10 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
     _nameCtrl.dispose();
     _skuCtrl.dispose();
     _priceCtrl.dispose();
+    _purchasePriceCtrl.dispose();
+    _unitCtrl.dispose();
+    _secondaryUnitCtrl.dispose();
+    _conversionCtrl.dispose();
     _stockCtrl.dispose();
     super.dispose();
   }
@@ -70,6 +97,13 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
         _nameCtrl.text = p.name;
         _skuCtrl.text = p.sku;
         _priceCtrl.text = p.price.toStringAsFixed(2);
+        _purchasePriceCtrl.text =
+            p.purchasePrice > 0 ? p.purchasePrice.toStringAsFixed(2) : '';
+        _unitCtrl.text = p.unit;
+        _secondaryUnitCtrl.text = p.secondaryUnit ?? '';
+        _conversionCtrl.text = p.secondaryUnit == null
+            ? ''
+            : _fmtRate(p.conversionRate);
         // Show empty when 0 (= unlimited); show actual value when > 0
         _trackStock = p.stockQuantity > 0;
         _stockCtrl.text =
@@ -116,6 +150,12 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
           : _skuCtrl.text.trim();
       final stockQty =
           (_isComposite || !_trackStock) ? 0 : (int.tryParse(_stockCtrl.text) ?? 0);
+      final purchasePrice = double.tryParse(_purchasePriceCtrl.text) ?? 0.0;
+      final unit = _unitCtrl.text.trim().isEmpty ? 'pcs' : _unitCtrl.text.trim();
+      final secondaryUnit = _secondaryUnitCtrl.text.trim();
+      final hasSecondary = secondaryUnit.isNotEmpty;
+      final conversionRate =
+          hasSecondary ? (double.tryParse(_conversionCtrl.text) ?? 1.0) : 1.0;
 
       int compositeId;
       if (_isEdit) {
@@ -126,6 +166,10 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
             name: Value(_nameCtrl.text.trim()),
             sku: Value(sku),
             price: Value(double.parse(_priceCtrl.text)),
+            purchasePrice: Value(purchasePrice),
+            unit: Value(unit),
+            secondaryUnit: Value(hasSecondary ? secondaryUnit : null),
+            conversionRate: Value(conversionRate),
             categoryId: Value(_categoryId),
             isTaxable: Value(_isTaxable),
             isComposite: Value(_isComposite),
@@ -143,6 +187,10 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
             name: _nameCtrl.text.trim(),
             sku: sku,
             price: double.parse(_priceCtrl.text),
+            purchasePrice: Value(purchasePrice),
+            unit: Value(unit),
+            secondaryUnit: Value(hasSecondary ? secondaryUnit : null),
+            conversionRate: Value(conversionRate),
             stockQuantity: Value(stockQty),
             categoryId: Value(_categoryId),
             isTaxable: Value(_isTaxable),
@@ -365,6 +413,29 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                         return null;
                       },
                     ),
+                    const SizedBox(height: 14),
+                    TextFormField(
+                      controller: _purchasePriceCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(
+                            RegExp(r'^\d*\.?\d{0,2}')),
+                      ],
+                      decoration: const InputDecoration(
+                        labelText: 'Purchase price',
+                        hintText: 'Cost per unit (optional)',
+                        prefixIcon: Icon(Icons.shopping_bag_outlined),
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (v) {
+                        if (v == null || v.isEmpty) return null;
+                        if (double.tryParse(v) == null) {
+                          return 'Enter a valid price';
+                        }
+                        return null;
+                      },
+                    ),
                     const SizedBox(height: 4),
                     SwitchListTile(
                       title: const Text('Apply tax'),
@@ -373,6 +444,91 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                       value: _isTaxable,
                       onChanged: (v) => setState(() => _isTaxable = v),
                       contentPadding: const EdgeInsets.only(left: 4),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // ── Units ─────────────────────────────────────────────────────
+            _sectionLabel('Units', tt, cs),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextFormField(
+                      controller: _unitCtrl,
+                      textCapitalization: TextCapitalization.none,
+                      decoration: const InputDecoration(
+                        labelText: 'Main unit *',
+                        hintText: 'pcs, kg, ltr, m…',
+                        prefixIcon: Icon(Icons.straighten_rounded),
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (v) => (v == null || v.trim().isEmpty)
+                          ? 'Main unit is required'
+                          : null,
+                      onChanged: (_) => setState(() {}),
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          flex: 3,
+                          child: TextFormField(
+                            controller: _secondaryUnitCtrl,
+                            textCapitalization: TextCapitalization.none,
+                            decoration: const InputDecoration(
+                              labelText: 'Secondary unit',
+                              hintText: 'box, dozen…',
+                              prefixIcon: Icon(Icons.all_inbox_outlined),
+                              border: OutlineInputBorder(),
+                            ),
+                            onChanged: (_) => setState(() {}),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 2,
+                          child: TextFormField(
+                            controller: _conversionCtrl,
+                            enabled: _hasSecondaryUnit,
+                            keyboardType:
+                                const TextInputType.numberWithOptions(
+                                    decimal: true),
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(
+                                  RegExp(r'^\d*\.?\d{0,3}')),
+                            ],
+                            decoration: const InputDecoration(
+                              labelText: 'Conversion',
+                              hintText: '12',
+                              border: OutlineInputBorder(),
+                            ),
+                            validator: (v) {
+                              if (!_hasSecondaryUnit) return null;
+                              final n = double.tryParse(v ?? '');
+                              if (n == null || n <= 0) return 'Must be > 0';
+                              return null;
+                            },
+                            onChanged: (_) => setState(() {}),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4),
+                      child: Text(
+                        _conversionHint,
+                        style: tt.bodySmall
+                            ?.copyWith(color: cs.onSurfaceVariant),
+                      ),
                     ),
                   ],
                 ),
@@ -419,7 +575,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                         ],
                         decoration: InputDecoration(
                           labelText:
-                              _isEdit ? 'Stock quantity' : 'Opening stock',
+                              '${_isEdit ? 'Stock quantity' : 'Opening stock'} ($_unitLabel)',
                           hintText: '0',
                           prefixIcon:
                               const Icon(Icons.numbers_rounded),

@@ -1371,6 +1371,35 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
   late final GeneratedColumn<double> price = GeneratedColumn<double>(
       'price', aliasedName, false,
       type: DriftSqlType.double, requiredDuringInsert: true);
+  static const VerificationMeta _purchasePriceMeta =
+      const VerificationMeta('purchasePrice');
+  @override
+  late final GeneratedColumn<double> purchasePrice = GeneratedColumn<double>(
+      'purchase_price', aliasedName, false,
+      type: DriftSqlType.double,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0.0));
+  static const VerificationMeta _unitMeta = const VerificationMeta('unit');
+  @override
+  late final GeneratedColumn<String> unit = GeneratedColumn<String>(
+      'unit', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant('pcs'));
+  static const VerificationMeta _secondaryUnitMeta =
+      const VerificationMeta('secondaryUnit');
+  @override
+  late final GeneratedColumn<String> secondaryUnit = GeneratedColumn<String>(
+      'secondary_unit', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _conversionRateMeta =
+      const VerificationMeta('conversionRate');
+  @override
+  late final GeneratedColumn<double> conversionRate = GeneratedColumn<double>(
+      'conversion_rate', aliasedName, false,
+      type: DriftSqlType.double,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(1.0));
   static const VerificationMeta _stockQuantityMeta =
       const VerificationMeta('stockQuantity');
   @override
@@ -1466,6 +1495,10 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
         sku,
         name,
         price,
+        purchasePrice,
+        unit,
+        secondaryUnit,
+        conversionRate,
         stockQuantity,
         isTaxable,
         categoryId,
@@ -1507,6 +1540,28 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
           _priceMeta, price.isAcceptableOrUnknown(data['price']!, _priceMeta));
     } else if (isInserting) {
       context.missing(_priceMeta);
+    }
+    if (data.containsKey('purchase_price')) {
+      context.handle(
+          _purchasePriceMeta,
+          purchasePrice.isAcceptableOrUnknown(
+              data['purchase_price']!, _purchasePriceMeta));
+    }
+    if (data.containsKey('unit')) {
+      context.handle(
+          _unitMeta, unit.isAcceptableOrUnknown(data['unit']!, _unitMeta));
+    }
+    if (data.containsKey('secondary_unit')) {
+      context.handle(
+          _secondaryUnitMeta,
+          secondaryUnit.isAcceptableOrUnknown(
+              data['secondary_unit']!, _secondaryUnitMeta));
+    }
+    if (data.containsKey('conversion_rate')) {
+      context.handle(
+          _conversionRateMeta,
+          conversionRate.isAcceptableOrUnknown(
+              data['conversion_rate']!, _conversionRateMeta));
     }
     if (data.containsKey('stock_quantity')) {
       context.handle(
@@ -1575,6 +1630,14 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
           .read(DriftSqlType.string, data['${effectivePrefix}name'])!,
       price: attachedDatabase.typeMapping
           .read(DriftSqlType.double, data['${effectivePrefix}price'])!,
+      purchasePrice: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}purchase_price'])!,
+      unit: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}unit'])!,
+      secondaryUnit: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}secondary_unit']),
+      conversionRate: attachedDatabase.typeMapping.read(
+          DriftSqlType.double, data['${effectivePrefix}conversion_rate'])!,
       stockQuantity: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}stock_quantity'])!,
       isTaxable: attachedDatabase.typeMapping
@@ -1609,6 +1672,16 @@ class Product extends DataClass implements Insertable<Product> {
   final String sku;
   final String name;
   final double price;
+  final double purchasePrice;
+
+  /// Main unit stock & price are expressed in (e.g. 'pcs', 'kg', 'ltr').
+  final String unit;
+
+  /// Optional larger unit (e.g. 'box', 'dozen'). Null = no secondary unit.
+  final String? secondaryUnit;
+
+  /// How many main units make up one secondary unit (1 box = N pcs).
+  final double conversionRate;
   final int stockQuantity;
   final bool isTaxable;
   final int? categoryId;
@@ -1624,6 +1697,10 @@ class Product extends DataClass implements Insertable<Product> {
       required this.sku,
       required this.name,
       required this.price,
+      required this.purchasePrice,
+      required this.unit,
+      this.secondaryUnit,
+      required this.conversionRate,
       required this.stockQuantity,
       required this.isTaxable,
       this.categoryId,
@@ -1641,6 +1718,12 @@ class Product extends DataClass implements Insertable<Product> {
     map['sku'] = Variable<String>(sku);
     map['name'] = Variable<String>(name);
     map['price'] = Variable<double>(price);
+    map['purchase_price'] = Variable<double>(purchasePrice);
+    map['unit'] = Variable<String>(unit);
+    if (!nullToAbsent || secondaryUnit != null) {
+      map['secondary_unit'] = Variable<String>(secondaryUnit);
+    }
+    map['conversion_rate'] = Variable<double>(conversionRate);
     map['stock_quantity'] = Variable<int>(stockQuantity);
     map['is_taxable'] = Variable<bool>(isTaxable);
     if (!nullToAbsent || categoryId != null) {
@@ -1664,6 +1747,12 @@ class Product extends DataClass implements Insertable<Product> {
       sku: Value(sku),
       name: Value(name),
       price: Value(price),
+      purchasePrice: Value(purchasePrice),
+      unit: Value(unit),
+      secondaryUnit: secondaryUnit == null && nullToAbsent
+          ? const Value.absent()
+          : Value(secondaryUnit),
+      conversionRate: Value(conversionRate),
       stockQuantity: Value(stockQuantity),
       isTaxable: Value(isTaxable),
       categoryId: categoryId == null && nullToAbsent
@@ -1689,6 +1778,10 @@ class Product extends DataClass implements Insertable<Product> {
       sku: serializer.fromJson<String>(json['sku']),
       name: serializer.fromJson<String>(json['name']),
       price: serializer.fromJson<double>(json['price']),
+      purchasePrice: serializer.fromJson<double>(json['purchasePrice']),
+      unit: serializer.fromJson<String>(json['unit']),
+      secondaryUnit: serializer.fromJson<String?>(json['secondaryUnit']),
+      conversionRate: serializer.fromJson<double>(json['conversionRate']),
       stockQuantity: serializer.fromJson<int>(json['stockQuantity']),
       isTaxable: serializer.fromJson<bool>(json['isTaxable']),
       categoryId: serializer.fromJson<int?>(json['categoryId']),
@@ -1709,6 +1802,10 @@ class Product extends DataClass implements Insertable<Product> {
       'sku': serializer.toJson<String>(sku),
       'name': serializer.toJson<String>(name),
       'price': serializer.toJson<double>(price),
+      'purchasePrice': serializer.toJson<double>(purchasePrice),
+      'unit': serializer.toJson<String>(unit),
+      'secondaryUnit': serializer.toJson<String?>(secondaryUnit),
+      'conversionRate': serializer.toJson<double>(conversionRate),
       'stockQuantity': serializer.toJson<int>(stockQuantity),
       'isTaxable': serializer.toJson<bool>(isTaxable),
       'categoryId': serializer.toJson<int?>(categoryId),
@@ -1727,6 +1824,10 @@ class Product extends DataClass implements Insertable<Product> {
           String? sku,
           String? name,
           double? price,
+          double? purchasePrice,
+          String? unit,
+          Value<String?> secondaryUnit = const Value.absent(),
+          double? conversionRate,
           int? stockQuantity,
           bool? isTaxable,
           Value<int?> categoryId = const Value.absent(),
@@ -1742,6 +1843,11 @@ class Product extends DataClass implements Insertable<Product> {
         sku: sku ?? this.sku,
         name: name ?? this.name,
         price: price ?? this.price,
+        purchasePrice: purchasePrice ?? this.purchasePrice,
+        unit: unit ?? this.unit,
+        secondaryUnit:
+            secondaryUnit.present ? secondaryUnit.value : this.secondaryUnit,
+        conversionRate: conversionRate ?? this.conversionRate,
         stockQuantity: stockQuantity ?? this.stockQuantity,
         isTaxable: isTaxable ?? this.isTaxable,
         categoryId: categoryId.present ? categoryId.value : this.categoryId,
@@ -1759,6 +1865,16 @@ class Product extends DataClass implements Insertable<Product> {
       sku: data.sku.present ? data.sku.value : this.sku,
       name: data.name.present ? data.name.value : this.name,
       price: data.price.present ? data.price.value : this.price,
+      purchasePrice: data.purchasePrice.present
+          ? data.purchasePrice.value
+          : this.purchasePrice,
+      unit: data.unit.present ? data.unit.value : this.unit,
+      secondaryUnit: data.secondaryUnit.present
+          ? data.secondaryUnit.value
+          : this.secondaryUnit,
+      conversionRate: data.conversionRate.present
+          ? data.conversionRate.value
+          : this.conversionRate,
       stockQuantity: data.stockQuantity.present
           ? data.stockQuantity.value
           : this.stockQuantity,
@@ -1787,6 +1903,10 @@ class Product extends DataClass implements Insertable<Product> {
           ..write('sku: $sku, ')
           ..write('name: $name, ')
           ..write('price: $price, ')
+          ..write('purchasePrice: $purchasePrice, ')
+          ..write('unit: $unit, ')
+          ..write('secondaryUnit: $secondaryUnit, ')
+          ..write('conversionRate: $conversionRate, ')
           ..write('stockQuantity: $stockQuantity, ')
           ..write('isTaxable: $isTaxable, ')
           ..write('categoryId: $categoryId, ')
@@ -1807,6 +1927,10 @@ class Product extends DataClass implements Insertable<Product> {
       sku,
       name,
       price,
+      purchasePrice,
+      unit,
+      secondaryUnit,
+      conversionRate,
       stockQuantity,
       isTaxable,
       categoryId,
@@ -1825,6 +1949,10 @@ class Product extends DataClass implements Insertable<Product> {
           other.sku == this.sku &&
           other.name == this.name &&
           other.price == this.price &&
+          other.purchasePrice == this.purchasePrice &&
+          other.unit == this.unit &&
+          other.secondaryUnit == this.secondaryUnit &&
+          other.conversionRate == this.conversionRate &&
           other.stockQuantity == this.stockQuantity &&
           other.isTaxable == this.isTaxable &&
           other.categoryId == this.categoryId &&
@@ -1842,6 +1970,10 @@ class ProductsCompanion extends UpdateCompanion<Product> {
   final Value<String> sku;
   final Value<String> name;
   final Value<double> price;
+  final Value<double> purchasePrice;
+  final Value<String> unit;
+  final Value<String?> secondaryUnit;
+  final Value<double> conversionRate;
   final Value<int> stockQuantity;
   final Value<bool> isTaxable;
   final Value<int?> categoryId;
@@ -1857,6 +1989,10 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     this.sku = const Value.absent(),
     this.name = const Value.absent(),
     this.price = const Value.absent(),
+    this.purchasePrice = const Value.absent(),
+    this.unit = const Value.absent(),
+    this.secondaryUnit = const Value.absent(),
+    this.conversionRate = const Value.absent(),
     this.stockQuantity = const Value.absent(),
     this.isTaxable = const Value.absent(),
     this.categoryId = const Value.absent(),
@@ -1873,6 +2009,10 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     required String sku,
     required String name,
     required double price,
+    this.purchasePrice = const Value.absent(),
+    this.unit = const Value.absent(),
+    this.secondaryUnit = const Value.absent(),
+    this.conversionRate = const Value.absent(),
     this.stockQuantity = const Value.absent(),
     this.isTaxable = const Value.absent(),
     this.categoryId = const Value.absent(),
@@ -1891,6 +2031,10 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     Expression<String>? sku,
     Expression<String>? name,
     Expression<double>? price,
+    Expression<double>? purchasePrice,
+    Expression<String>? unit,
+    Expression<String>? secondaryUnit,
+    Expression<double>? conversionRate,
     Expression<int>? stockQuantity,
     Expression<bool>? isTaxable,
     Expression<int>? categoryId,
@@ -1907,6 +2051,10 @@ class ProductsCompanion extends UpdateCompanion<Product> {
       if (sku != null) 'sku': sku,
       if (name != null) 'name': name,
       if (price != null) 'price': price,
+      if (purchasePrice != null) 'purchase_price': purchasePrice,
+      if (unit != null) 'unit': unit,
+      if (secondaryUnit != null) 'secondary_unit': secondaryUnit,
+      if (conversionRate != null) 'conversion_rate': conversionRate,
       if (stockQuantity != null) 'stock_quantity': stockQuantity,
       if (isTaxable != null) 'is_taxable': isTaxable,
       if (categoryId != null) 'category_id': categoryId,
@@ -1925,6 +2073,10 @@ class ProductsCompanion extends UpdateCompanion<Product> {
       Value<String>? sku,
       Value<String>? name,
       Value<double>? price,
+      Value<double>? purchasePrice,
+      Value<String>? unit,
+      Value<String?>? secondaryUnit,
+      Value<double>? conversionRate,
       Value<int>? stockQuantity,
       Value<bool>? isTaxable,
       Value<int?>? categoryId,
@@ -1940,6 +2092,10 @@ class ProductsCompanion extends UpdateCompanion<Product> {
       sku: sku ?? this.sku,
       name: name ?? this.name,
       price: price ?? this.price,
+      purchasePrice: purchasePrice ?? this.purchasePrice,
+      unit: unit ?? this.unit,
+      secondaryUnit: secondaryUnit ?? this.secondaryUnit,
+      conversionRate: conversionRate ?? this.conversionRate,
       stockQuantity: stockQuantity ?? this.stockQuantity,
       isTaxable: isTaxable ?? this.isTaxable,
       categoryId: categoryId ?? this.categoryId,
@@ -1967,6 +2123,18 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     }
     if (price.present) {
       map['price'] = Variable<double>(price.value);
+    }
+    if (purchasePrice.present) {
+      map['purchase_price'] = Variable<double>(purchasePrice.value);
+    }
+    if (unit.present) {
+      map['unit'] = Variable<String>(unit.value);
+    }
+    if (secondaryUnit.present) {
+      map['secondary_unit'] = Variable<String>(secondaryUnit.value);
+    }
+    if (conversionRate.present) {
+      map['conversion_rate'] = Variable<double>(conversionRate.value);
     }
     if (stockQuantity.present) {
       map['stock_quantity'] = Variable<int>(stockQuantity.value);
@@ -2008,6 +2176,10 @@ class ProductsCompanion extends UpdateCompanion<Product> {
           ..write('sku: $sku, ')
           ..write('name: $name, ')
           ..write('price: $price, ')
+          ..write('purchasePrice: $purchasePrice, ')
+          ..write('unit: $unit, ')
+          ..write('secondaryUnit: $secondaryUnit, ')
+          ..write('conversionRate: $conversionRate, ')
           ..write('stockQuantity: $stockQuantity, ')
           ..write('isTaxable: $isTaxable, ')
           ..write('categoryId: $categoryId, ')
@@ -4155,6 +4327,12 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
       requiredDuringInsert: false,
       defaultConstraints:
           GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
+  static const VerificationMeta _invoiceNoMeta =
+      const VerificationMeta('invoiceNo');
+  @override
+  late final GeneratedColumn<int> invoiceNo = GeneratedColumn<int>(
+      'invoice_no', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
   static const VerificationMeta _statusMeta = const VerificationMeta('status');
   @override
   late final GeneratedColumn<String> status = GeneratedColumn<String>(
@@ -4184,6 +4362,22 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
       type: DriftSqlType.double,
       requiredDuringInsert: false,
       defaultValue: const Constant(0.0));
+  static const VerificationMeta _discountValueMeta =
+      const VerificationMeta('discountValue');
+  @override
+  late final GeneratedColumn<double> discountValue = GeneratedColumn<double>(
+      'discount_value', aliasedName, true,
+      type: DriftSqlType.double, requiredDuringInsert: false);
+  static const VerificationMeta _discountIsPercentMeta =
+      const VerificationMeta('discountIsPercent');
+  @override
+  late final GeneratedColumn<bool> discountIsPercent = GeneratedColumn<bool>(
+      'discount_is_percent', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("discount_is_percent" IN (0, 1))'),
+      defaultValue: const Constant(false));
   static const VerificationMeta _totalMeta = const VerificationMeta('total');
   @override
   late final GeneratedColumn<double> total = GeneratedColumn<double>(
@@ -4273,10 +4467,13 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
   @override
   List<GeneratedColumn> get $columns => [
         id,
+        invoiceNo,
         status,
         subtotal,
         taxTotal,
         discountTotal,
+        discountValue,
+        discountIsPercent,
         total,
         paymentMethod,
         tenderedAmount,
@@ -4303,6 +4500,10 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
     if (data.containsKey('id')) {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
     }
+    if (data.containsKey('invoice_no')) {
+      context.handle(_invoiceNoMeta,
+          invoiceNo.isAcceptableOrUnknown(data['invoice_no']!, _invoiceNoMeta));
+    }
     if (data.containsKey('status')) {
       context.handle(_statusMeta,
           status.isAcceptableOrUnknown(data['status']!, _statusMeta));
@@ -4322,6 +4523,18 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
           _discountTotalMeta,
           discountTotal.isAcceptableOrUnknown(
               data['discount_total']!, _discountTotalMeta));
+    }
+    if (data.containsKey('discount_value')) {
+      context.handle(
+          _discountValueMeta,
+          discountValue.isAcceptableOrUnknown(
+              data['discount_value']!, _discountValueMeta));
+    }
+    if (data.containsKey('discount_is_percent')) {
+      context.handle(
+          _discountIsPercentMeta,
+          discountIsPercent.isAcceptableOrUnknown(
+              data['discount_is_percent']!, _discountIsPercentMeta));
     }
     if (data.containsKey('total')) {
       context.handle(
@@ -4400,6 +4613,8 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
     return Order(
       id: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
+      invoiceNo: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}invoice_no']),
       status: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}status'])!,
       subtotal: attachedDatabase.typeMapping
@@ -4408,6 +4623,10 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
           .read(DriftSqlType.double, data['${effectivePrefix}tax_total'])!,
       discountTotal: attachedDatabase.typeMapping
           .read(DriftSqlType.double, data['${effectivePrefix}discount_total'])!,
+      discountValue: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}discount_value']),
+      discountIsPercent: attachedDatabase.typeMapping.read(
+          DriftSqlType.bool, data['${effectivePrefix}discount_is_percent'])!,
       total: attachedDatabase.typeMapping
           .read(DriftSqlType.double, data['${effectivePrefix}total'])!,
       paymentMethod: attachedDatabase.typeMapping
@@ -4443,10 +4662,16 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
 
 class Order extends DataClass implements Insertable<Order> {
   final int id;
+  final int? invoiceNo;
   final String status;
   final double subtotal;
   final double taxTotal;
   final double discountTotal;
+
+  /// Order-level discount as entered (e.g. 10 → 10 % or 10 flat), so a
+  /// held ticket can be resumed and a receipt can show "10 % off".
+  final double? discountValue;
+  final bool discountIsPercent;
   final double total;
   final String paymentMethod;
   final double? tenderedAmount;
@@ -4461,10 +4686,13 @@ class Order extends DataClass implements Insertable<Order> {
   final DateTime updatedAt;
   const Order(
       {required this.id,
+      this.invoiceNo,
       required this.status,
       required this.subtotal,
       required this.taxTotal,
       required this.discountTotal,
+      this.discountValue,
+      required this.discountIsPercent,
       required this.total,
       required this.paymentMethod,
       this.tenderedAmount,
@@ -4481,10 +4709,17 @@ class Order extends DataClass implements Insertable<Order> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
+    if (!nullToAbsent || invoiceNo != null) {
+      map['invoice_no'] = Variable<int>(invoiceNo);
+    }
     map['status'] = Variable<String>(status);
     map['subtotal'] = Variable<double>(subtotal);
     map['tax_total'] = Variable<double>(taxTotal);
     map['discount_total'] = Variable<double>(discountTotal);
+    if (!nullToAbsent || discountValue != null) {
+      map['discount_value'] = Variable<double>(discountValue);
+    }
+    map['discount_is_percent'] = Variable<bool>(discountIsPercent);
     map['total'] = Variable<double>(total);
     map['payment_method'] = Variable<String>(paymentMethod);
     if (!nullToAbsent || tenderedAmount != null) {
@@ -4513,10 +4748,17 @@ class Order extends DataClass implements Insertable<Order> {
   OrdersCompanion toCompanion(bool nullToAbsent) {
     return OrdersCompanion(
       id: Value(id),
+      invoiceNo: invoiceNo == null && nullToAbsent
+          ? const Value.absent()
+          : Value(invoiceNo),
       status: Value(status),
       subtotal: Value(subtotal),
       taxTotal: Value(taxTotal),
       discountTotal: Value(discountTotal),
+      discountValue: discountValue == null && nullToAbsent
+          ? const Value.absent()
+          : Value(discountValue),
+      discountIsPercent: Value(discountIsPercent),
       total: Value(total),
       paymentMethod: Value(paymentMethod),
       tenderedAmount: tenderedAmount == null && nullToAbsent
@@ -4546,10 +4788,13 @@ class Order extends DataClass implements Insertable<Order> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return Order(
       id: serializer.fromJson<int>(json['id']),
+      invoiceNo: serializer.fromJson<int?>(json['invoiceNo']),
       status: serializer.fromJson<String>(json['status']),
       subtotal: serializer.fromJson<double>(json['subtotal']),
       taxTotal: serializer.fromJson<double>(json['taxTotal']),
       discountTotal: serializer.fromJson<double>(json['discountTotal']),
+      discountValue: serializer.fromJson<double?>(json['discountValue']),
+      discountIsPercent: serializer.fromJson<bool>(json['discountIsPercent']),
       total: serializer.fromJson<double>(json['total']),
       paymentMethod: serializer.fromJson<String>(json['paymentMethod']),
       tenderedAmount: serializer.fromJson<double?>(json['tenderedAmount']),
@@ -4569,10 +4814,13 @@ class Order extends DataClass implements Insertable<Order> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
+      'invoiceNo': serializer.toJson<int?>(invoiceNo),
       'status': serializer.toJson<String>(status),
       'subtotal': serializer.toJson<double>(subtotal),
       'taxTotal': serializer.toJson<double>(taxTotal),
       'discountTotal': serializer.toJson<double>(discountTotal),
+      'discountValue': serializer.toJson<double?>(discountValue),
+      'discountIsPercent': serializer.toJson<bool>(discountIsPercent),
       'total': serializer.toJson<double>(total),
       'paymentMethod': serializer.toJson<String>(paymentMethod),
       'tenderedAmount': serializer.toJson<double?>(tenderedAmount),
@@ -4590,10 +4838,13 @@ class Order extends DataClass implements Insertable<Order> {
 
   Order copyWith(
           {int? id,
+          Value<int?> invoiceNo = const Value.absent(),
           String? status,
           double? subtotal,
           double? taxTotal,
           double? discountTotal,
+          Value<double?> discountValue = const Value.absent(),
+          bool? discountIsPercent,
           double? total,
           String? paymentMethod,
           Value<double?> tenderedAmount = const Value.absent(),
@@ -4608,10 +4859,14 @@ class Order extends DataClass implements Insertable<Order> {
           DateTime? updatedAt}) =>
       Order(
         id: id ?? this.id,
+        invoiceNo: invoiceNo.present ? invoiceNo.value : this.invoiceNo,
         status: status ?? this.status,
         subtotal: subtotal ?? this.subtotal,
         taxTotal: taxTotal ?? this.taxTotal,
         discountTotal: discountTotal ?? this.discountTotal,
+        discountValue:
+            discountValue.present ? discountValue.value : this.discountValue,
+        discountIsPercent: discountIsPercent ?? this.discountIsPercent,
         total: total ?? this.total,
         paymentMethod: paymentMethod ?? this.paymentMethod,
         tenderedAmount:
@@ -4630,12 +4885,19 @@ class Order extends DataClass implements Insertable<Order> {
   Order copyWithCompanion(OrdersCompanion data) {
     return Order(
       id: data.id.present ? data.id.value : this.id,
+      invoiceNo: data.invoiceNo.present ? data.invoiceNo.value : this.invoiceNo,
       status: data.status.present ? data.status.value : this.status,
       subtotal: data.subtotal.present ? data.subtotal.value : this.subtotal,
       taxTotal: data.taxTotal.present ? data.taxTotal.value : this.taxTotal,
       discountTotal: data.discountTotal.present
           ? data.discountTotal.value
           : this.discountTotal,
+      discountValue: data.discountValue.present
+          ? data.discountValue.value
+          : this.discountValue,
+      discountIsPercent: data.discountIsPercent.present
+          ? data.discountIsPercent.value
+          : this.discountIsPercent,
       total: data.total.present ? data.total.value : this.total,
       paymentMethod: data.paymentMethod.present
           ? data.paymentMethod.value
@@ -4668,10 +4930,13 @@ class Order extends DataClass implements Insertable<Order> {
   String toString() {
     return (StringBuffer('Order(')
           ..write('id: $id, ')
+          ..write('invoiceNo: $invoiceNo, ')
           ..write('status: $status, ')
           ..write('subtotal: $subtotal, ')
           ..write('taxTotal: $taxTotal, ')
           ..write('discountTotal: $discountTotal, ')
+          ..write('discountValue: $discountValue, ')
+          ..write('discountIsPercent: $discountIsPercent, ')
           ..write('total: $total, ')
           ..write('paymentMethod: $paymentMethod, ')
           ..write('tenderedAmount: $tenderedAmount, ')
@@ -4691,10 +4956,13 @@ class Order extends DataClass implements Insertable<Order> {
   @override
   int get hashCode => Object.hash(
       id,
+      invoiceNo,
       status,
       subtotal,
       taxTotal,
       discountTotal,
+      discountValue,
+      discountIsPercent,
       total,
       paymentMethod,
       tenderedAmount,
@@ -4712,10 +4980,13 @@ class Order extends DataClass implements Insertable<Order> {
       identical(this, other) ||
       (other is Order &&
           other.id == this.id &&
+          other.invoiceNo == this.invoiceNo &&
           other.status == this.status &&
           other.subtotal == this.subtotal &&
           other.taxTotal == this.taxTotal &&
           other.discountTotal == this.discountTotal &&
+          other.discountValue == this.discountValue &&
+          other.discountIsPercent == this.discountIsPercent &&
           other.total == this.total &&
           other.paymentMethod == this.paymentMethod &&
           other.tenderedAmount == this.tenderedAmount &&
@@ -4732,10 +5003,13 @@ class Order extends DataClass implements Insertable<Order> {
 
 class OrdersCompanion extends UpdateCompanion<Order> {
   final Value<int> id;
+  final Value<int?> invoiceNo;
   final Value<String> status;
   final Value<double> subtotal;
   final Value<double> taxTotal;
   final Value<double> discountTotal;
+  final Value<double?> discountValue;
+  final Value<bool> discountIsPercent;
   final Value<double> total;
   final Value<String> paymentMethod;
   final Value<double?> tenderedAmount;
@@ -4750,10 +5024,13 @@ class OrdersCompanion extends UpdateCompanion<Order> {
   final Value<DateTime> updatedAt;
   const OrdersCompanion({
     this.id = const Value.absent(),
+    this.invoiceNo = const Value.absent(),
     this.status = const Value.absent(),
     this.subtotal = const Value.absent(),
     this.taxTotal = const Value.absent(),
     this.discountTotal = const Value.absent(),
+    this.discountValue = const Value.absent(),
+    this.discountIsPercent = const Value.absent(),
     this.total = const Value.absent(),
     this.paymentMethod = const Value.absent(),
     this.tenderedAmount = const Value.absent(),
@@ -4769,10 +5046,13 @@ class OrdersCompanion extends UpdateCompanion<Order> {
   });
   OrdersCompanion.insert({
     this.id = const Value.absent(),
+    this.invoiceNo = const Value.absent(),
     this.status = const Value.absent(),
     required double subtotal,
     this.taxTotal = const Value.absent(),
     this.discountTotal = const Value.absent(),
+    this.discountValue = const Value.absent(),
+    this.discountIsPercent = const Value.absent(),
     required double total,
     required String paymentMethod,
     this.tenderedAmount = const Value.absent(),
@@ -4790,10 +5070,13 @@ class OrdersCompanion extends UpdateCompanion<Order> {
         paymentMethod = Value(paymentMethod);
   static Insertable<Order> custom({
     Expression<int>? id,
+    Expression<int>? invoiceNo,
     Expression<String>? status,
     Expression<double>? subtotal,
     Expression<double>? taxTotal,
     Expression<double>? discountTotal,
+    Expression<double>? discountValue,
+    Expression<bool>? discountIsPercent,
     Expression<double>? total,
     Expression<String>? paymentMethod,
     Expression<double>? tenderedAmount,
@@ -4809,10 +5092,13 @@ class OrdersCompanion extends UpdateCompanion<Order> {
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
+      if (invoiceNo != null) 'invoice_no': invoiceNo,
       if (status != null) 'status': status,
       if (subtotal != null) 'subtotal': subtotal,
       if (taxTotal != null) 'tax_total': taxTotal,
       if (discountTotal != null) 'discount_total': discountTotal,
+      if (discountValue != null) 'discount_value': discountValue,
+      if (discountIsPercent != null) 'discount_is_percent': discountIsPercent,
       if (total != null) 'total': total,
       if (paymentMethod != null) 'payment_method': paymentMethod,
       if (tenderedAmount != null) 'tendered_amount': tenderedAmount,
@@ -4830,10 +5116,13 @@ class OrdersCompanion extends UpdateCompanion<Order> {
 
   OrdersCompanion copyWith(
       {Value<int>? id,
+      Value<int?>? invoiceNo,
       Value<String>? status,
       Value<double>? subtotal,
       Value<double>? taxTotal,
       Value<double>? discountTotal,
+      Value<double?>? discountValue,
+      Value<bool>? discountIsPercent,
       Value<double>? total,
       Value<String>? paymentMethod,
       Value<double?>? tenderedAmount,
@@ -4848,10 +5137,13 @@ class OrdersCompanion extends UpdateCompanion<Order> {
       Value<DateTime>? updatedAt}) {
     return OrdersCompanion(
       id: id ?? this.id,
+      invoiceNo: invoiceNo ?? this.invoiceNo,
       status: status ?? this.status,
       subtotal: subtotal ?? this.subtotal,
       taxTotal: taxTotal ?? this.taxTotal,
       discountTotal: discountTotal ?? this.discountTotal,
+      discountValue: discountValue ?? this.discountValue,
+      discountIsPercent: discountIsPercent ?? this.discountIsPercent,
       total: total ?? this.total,
       paymentMethod: paymentMethod ?? this.paymentMethod,
       tenderedAmount: tenderedAmount ?? this.tenderedAmount,
@@ -4873,6 +5165,9 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     if (id.present) {
       map['id'] = Variable<int>(id.value);
     }
+    if (invoiceNo.present) {
+      map['invoice_no'] = Variable<int>(invoiceNo.value);
+    }
     if (status.present) {
       map['status'] = Variable<String>(status.value);
     }
@@ -4884,6 +5179,12 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     }
     if (discountTotal.present) {
       map['discount_total'] = Variable<double>(discountTotal.value);
+    }
+    if (discountValue.present) {
+      map['discount_value'] = Variable<double>(discountValue.value);
+    }
+    if (discountIsPercent.present) {
+      map['discount_is_percent'] = Variable<bool>(discountIsPercent.value);
     }
     if (total.present) {
       map['total'] = Variable<double>(total.value);
@@ -4928,10 +5229,13 @@ class OrdersCompanion extends UpdateCompanion<Order> {
   String toString() {
     return (StringBuffer('OrdersCompanion(')
           ..write('id: $id, ')
+          ..write('invoiceNo: $invoiceNo, ')
           ..write('status: $status, ')
           ..write('subtotal: $subtotal, ')
           ..write('taxTotal: $taxTotal, ')
           ..write('discountTotal: $discountTotal, ')
+          ..write('discountValue: $discountValue, ')
+          ..write('discountIsPercent: $discountIsPercent, ')
           ..write('total: $total, ')
           ..write('paymentMethod: $paymentMethod, ')
           ..write('tenderedAmount: $tenderedAmount, ')
@@ -8153,6 +8457,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $StockAdjustmentsTable stockAdjustments =
       $StockAdjustmentsTable(this);
   late final $AuditLogTable auditLog = $AuditLogTable(this);
+  late final Index idxOrdersInvoiceNo = Index('idx_orders_invoice_no',
+      'CREATE UNIQUE INDEX idx_orders_invoice_no ON orders (invoice_no)');
   late final ProductsDao productsDao = ProductsDao(this as AppDatabase);
   late final OrdersDao ordersDao = OrdersDao(this as AppDatabase);
   late final CustomersDao customersDao = CustomersDao(this as AppDatabase);
@@ -8185,7 +8491,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         expenseCategories,
         expenses,
         stockAdjustments,
-        auditLog
+        auditLog,
+        idxOrdersInvoiceNo
       ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules(
@@ -9669,6 +9976,10 @@ typedef $$ProductsTableCreateCompanionBuilder = ProductsCompanion Function({
   required String sku,
   required String name,
   required double price,
+  Value<double> purchasePrice,
+  Value<String> unit,
+  Value<String?> secondaryUnit,
+  Value<double> conversionRate,
   Value<int> stockQuantity,
   Value<bool> isTaxable,
   Value<int?> categoryId,
@@ -9685,6 +9996,10 @@ typedef $$ProductsTableUpdateCompanionBuilder = ProductsCompanion Function({
   Value<String> sku,
   Value<String> name,
   Value<double> price,
+  Value<double> purchasePrice,
+  Value<String> unit,
+  Value<String?> secondaryUnit,
+  Value<double> conversionRate,
   Value<int> stockQuantity,
   Value<bool> isTaxable,
   Value<int?> categoryId,
@@ -9853,6 +10168,19 @@ class $$ProductsTableFilterComposer
 
   ColumnFilters<double> get price => $composableBuilder(
       column: $table.price, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get purchasePrice => $composableBuilder(
+      column: $table.purchasePrice, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get unit => $composableBuilder(
+      column: $table.unit, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get secondaryUnit => $composableBuilder(
+      column: $table.secondaryUnit, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get conversionRate => $composableBuilder(
+      column: $table.conversionRate,
+      builder: (column) => ColumnFilters(column));
 
   ColumnFilters<int> get stockQuantity => $composableBuilder(
       column: $table.stockQuantity, builder: (column) => ColumnFilters(column));
@@ -10070,6 +10398,21 @@ class $$ProductsTableOrderingComposer
   ColumnOrderings<double> get price => $composableBuilder(
       column: $table.price, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<double> get purchasePrice => $composableBuilder(
+      column: $table.purchasePrice,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get unit => $composableBuilder(
+      column: $table.unit, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get secondaryUnit => $composableBuilder(
+      column: $table.secondaryUnit,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get conversionRate => $composableBuilder(
+      column: $table.conversionRate,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<int> get stockQuantity => $composableBuilder(
       column: $table.stockQuantity,
       builder: (column) => ColumnOrderings(column));
@@ -10141,6 +10484,18 @@ class $$ProductsTableAnnotationComposer
 
   GeneratedColumn<double> get price =>
       $composableBuilder(column: $table.price, builder: (column) => column);
+
+  GeneratedColumn<double> get purchasePrice => $composableBuilder(
+      column: $table.purchasePrice, builder: (column) => column);
+
+  GeneratedColumn<String> get unit =>
+      $composableBuilder(column: $table.unit, builder: (column) => column);
+
+  GeneratedColumn<String> get secondaryUnit => $composableBuilder(
+      column: $table.secondaryUnit, builder: (column) => column);
+
+  GeneratedColumn<double> get conversionRate => $composableBuilder(
+      column: $table.conversionRate, builder: (column) => column);
 
   GeneratedColumn<int> get stockQuantity => $composableBuilder(
       column: $table.stockQuantity, builder: (column) => column);
@@ -10374,6 +10729,10 @@ class $$ProductsTableTableManager extends RootTableManager<
             Value<String> sku = const Value.absent(),
             Value<String> name = const Value.absent(),
             Value<double> price = const Value.absent(),
+            Value<double> purchasePrice = const Value.absent(),
+            Value<String> unit = const Value.absent(),
+            Value<String?> secondaryUnit = const Value.absent(),
+            Value<double> conversionRate = const Value.absent(),
             Value<int> stockQuantity = const Value.absent(),
             Value<bool> isTaxable = const Value.absent(),
             Value<int?> categoryId = const Value.absent(),
@@ -10390,6 +10749,10 @@ class $$ProductsTableTableManager extends RootTableManager<
             sku: sku,
             name: name,
             price: price,
+            purchasePrice: purchasePrice,
+            unit: unit,
+            secondaryUnit: secondaryUnit,
+            conversionRate: conversionRate,
             stockQuantity: stockQuantity,
             isTaxable: isTaxable,
             categoryId: categoryId,
@@ -10406,6 +10769,10 @@ class $$ProductsTableTableManager extends RootTableManager<
             required String sku,
             required String name,
             required double price,
+            Value<double> purchasePrice = const Value.absent(),
+            Value<String> unit = const Value.absent(),
+            Value<String?> secondaryUnit = const Value.absent(),
+            Value<double> conversionRate = const Value.absent(),
             Value<int> stockQuantity = const Value.absent(),
             Value<bool> isTaxable = const Value.absent(),
             Value<int?> categoryId = const Value.absent(),
@@ -10422,6 +10789,10 @@ class $$ProductsTableTableManager extends RootTableManager<
             sku: sku,
             name: name,
             price: price,
+            purchasePrice: purchasePrice,
+            unit: unit,
+            secondaryUnit: secondaryUnit,
+            conversionRate: conversionRate,
             stockQuantity: stockQuantity,
             isTaxable: isTaxable,
             categoryId: categoryId,
@@ -12508,10 +12879,13 @@ typedef $$TablesTableProcessedTableManager = ProcessedTableManager<
     PrefetchHooks Function({bool ordersRefs})>;
 typedef $$OrdersTableCreateCompanionBuilder = OrdersCompanion Function({
   Value<int> id,
+  Value<int?> invoiceNo,
   Value<String> status,
   required double subtotal,
   Value<double> taxTotal,
   Value<double> discountTotal,
+  Value<double?> discountValue,
+  Value<bool> discountIsPercent,
   required double total,
   required String paymentMethod,
   Value<double?> tenderedAmount,
@@ -12527,10 +12901,13 @@ typedef $$OrdersTableCreateCompanionBuilder = OrdersCompanion Function({
 });
 typedef $$OrdersTableUpdateCompanionBuilder = OrdersCompanion Function({
   Value<int> id,
+  Value<int?> invoiceNo,
   Value<String> status,
   Value<double> subtotal,
   Value<double> taxTotal,
   Value<double> discountTotal,
+  Value<double?> discountValue,
+  Value<bool> discountIsPercent,
   Value<double> total,
   Value<String> paymentMethod,
   Value<double?> tenderedAmount,
@@ -12649,6 +13026,9 @@ class $$OrdersTableFilterComposer
   ColumnFilters<int> get id => $composableBuilder(
       column: $table.id, builder: (column) => ColumnFilters(column));
 
+  ColumnFilters<int> get invoiceNo => $composableBuilder(
+      column: $table.invoiceNo, builder: (column) => ColumnFilters(column));
+
   ColumnFilters<String> get status => $composableBuilder(
       column: $table.status, builder: (column) => ColumnFilters(column));
 
@@ -12660,6 +13040,13 @@ class $$OrdersTableFilterComposer
 
   ColumnFilters<double> get discountTotal => $composableBuilder(
       column: $table.discountTotal, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get discountValue => $composableBuilder(
+      column: $table.discountValue, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get discountIsPercent => $composableBuilder(
+      column: $table.discountIsPercent,
+      builder: (column) => ColumnFilters(column));
 
   ColumnFilters<double> get total => $composableBuilder(
       column: $table.total, builder: (column) => ColumnFilters(column));
@@ -12831,6 +13218,9 @@ class $$OrdersTableOrderingComposer
   ColumnOrderings<int> get id => $composableBuilder(
       column: $table.id, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<int> get invoiceNo => $composableBuilder(
+      column: $table.invoiceNo, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<String> get status => $composableBuilder(
       column: $table.status, builder: (column) => ColumnOrderings(column));
 
@@ -12842,6 +13232,14 @@ class $$OrdersTableOrderingComposer
 
   ColumnOrderings<double> get discountTotal => $composableBuilder(
       column: $table.discountTotal,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get discountValue => $composableBuilder(
+      column: $table.discountValue,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get discountIsPercent => $composableBuilder(
+      column: $table.discountIsPercent,
       builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<double> get total => $composableBuilder(
@@ -12933,6 +13331,9 @@ class $$OrdersTableAnnotationComposer
   GeneratedColumn<int> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
+  GeneratedColumn<int> get invoiceNo =>
+      $composableBuilder(column: $table.invoiceNo, builder: (column) => column);
+
   GeneratedColumn<String> get status =>
       $composableBuilder(column: $table.status, builder: (column) => column);
 
@@ -12944,6 +13345,12 @@ class $$OrdersTableAnnotationComposer
 
   GeneratedColumn<double> get discountTotal => $composableBuilder(
       column: $table.discountTotal, builder: (column) => column);
+
+  GeneratedColumn<double> get discountValue => $composableBuilder(
+      column: $table.discountValue, builder: (column) => column);
+
+  GeneratedColumn<bool> get discountIsPercent => $composableBuilder(
+      column: $table.discountIsPercent, builder: (column) => column);
 
   GeneratedColumn<double> get total =>
       $composableBuilder(column: $table.total, builder: (column) => column);
@@ -13131,10 +13538,13 @@ class $$OrdersTableTableManager extends RootTableManager<
               $$OrdersTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback: ({
             Value<int> id = const Value.absent(),
+            Value<int?> invoiceNo = const Value.absent(),
             Value<String> status = const Value.absent(),
             Value<double> subtotal = const Value.absent(),
             Value<double> taxTotal = const Value.absent(),
             Value<double> discountTotal = const Value.absent(),
+            Value<double?> discountValue = const Value.absent(),
+            Value<bool> discountIsPercent = const Value.absent(),
             Value<double> total = const Value.absent(),
             Value<String> paymentMethod = const Value.absent(),
             Value<double?> tenderedAmount = const Value.absent(),
@@ -13150,10 +13560,13 @@ class $$OrdersTableTableManager extends RootTableManager<
           }) =>
               OrdersCompanion(
             id: id,
+            invoiceNo: invoiceNo,
             status: status,
             subtotal: subtotal,
             taxTotal: taxTotal,
             discountTotal: discountTotal,
+            discountValue: discountValue,
+            discountIsPercent: discountIsPercent,
             total: total,
             paymentMethod: paymentMethod,
             tenderedAmount: tenderedAmount,
@@ -13169,10 +13582,13 @@ class $$OrdersTableTableManager extends RootTableManager<
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
+            Value<int?> invoiceNo = const Value.absent(),
             Value<String> status = const Value.absent(),
             required double subtotal,
             Value<double> taxTotal = const Value.absent(),
             Value<double> discountTotal = const Value.absent(),
+            Value<double?> discountValue = const Value.absent(),
+            Value<bool> discountIsPercent = const Value.absent(),
             required double total,
             required String paymentMethod,
             Value<double?> tenderedAmount = const Value.absent(),
@@ -13188,10 +13604,13 @@ class $$OrdersTableTableManager extends RootTableManager<
           }) =>
               OrdersCompanion.insert(
             id: id,
+            invoiceNo: invoiceNo,
             status: status,
             subtotal: subtotal,
             taxTotal: taxTotal,
             discountTotal: discountTotal,
+            discountValue: discountValue,
+            discountIsPercent: discountIsPercent,
             total: total,
             paymentMethod: paymentMethod,
             tenderedAmount: tenderedAmount,

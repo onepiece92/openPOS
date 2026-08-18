@@ -12,17 +12,16 @@ import 'package:pos_app/core/utils/currency_formatter.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
 import 'package:pos_app/features/receipts/domain/receipt_text.dart';
 import 'package:pos_app/features/receipts/presentation/receipt_body.dart';
+import 'package:pos_app/features/orders/domain/order_number.dart';
 
 final _receiptProvider =
     FutureProvider.family<ReceiptBodyData, int>((ref, orderId) async {
   final db = ref.read(databaseProvider);
-  final box = ref.read(settingsBoxProvider);
   final order = await db.ordersDao.getById(orderId);
   if (order == null) throw Exception('Order #$orderId not found');
   final items = await db.ordersDao.getItems(orderId);
   final taxes = await db.ordersDao.getTaxBreakdown(orderId);
-  final businessName =
-      box.get('business_name', defaultValue: 'My Store') as String;
+  final businessName = ref.read(settingsProvider).businessNameOrDefault;
   Customer? customer;
   if (order.customerId != null) {
     customer = await db.customersDao.getById(order.customerId!);
@@ -120,7 +119,7 @@ class _ShareMenu extends StatelessWidget {
           scheme: 'mailto',
           path: addr,
           queryParameters: {
-            'subject': '${data.businessName} — Receipt #${data.order.id}',
+            'subject': '${data.businessName} — Receipt ${data.order.billNo}',
             'body': text,
           },
         );

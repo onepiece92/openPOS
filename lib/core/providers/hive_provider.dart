@@ -1,6 +1,13 @@
+import 'package:flutter/foundation.dart' show immutable;
 import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+
+/// App settings live in the Hive `settings` box, but the app never reads the
+/// box directly: [SettingsNotifier] loads it once into an immutable
+/// [AppSettings], every setter updates state *and* persists, and the
+/// per-field providers below are plain selectors on that state — so any
+/// `ref.watch` rebuilds on change with no `ref.invalidate` choreography.
 
 // ── Box keys ─────────────────────────────────────────────────────────────────
 
@@ -17,6 +24,10 @@ const kPrinterDeviceAddress = 'printer_device_address';
 const kPrinterDeviceName = 'printer_device_name';
 const kPrinterPaperWidth = 'printer_paper_width'; // '58' | '80'
 
+// Backup keys
+const kAutoBackupEnabled = 'auto_backup_enabled';
+const kAutoBackupLastAt = 'auto_backup_last_at'; // ISO-8601
+
 // Store profile keys
 const kBusinessName = 'business_name';
 const kBusinessTagline = 'business_tagline';
@@ -25,160 +36,333 @@ const kBusinessAddress = 'business_address';
 const kBusinessPan = 'business_pan';
 const kCurrencySymbol = 'currency_symbol';
 const kCurrencyCode = 'currency_code';
+const kCountryCode = 'country_code';
+const kTimezone = 'timezone';
 
-// ── Raw box providers ─────────────────────────────────────────────────────────
+// ── Raw box provider ─────────────────────────────────────────────────────────
 
-/// The 'settings' box must be opened in main() before ProviderScope starts.
+/// The 'settings' box must be opened in main() before the container exists.
+/// Only [SettingsNotifier], the favorites store and backup touch it directly.
 final settingsBoxProvider = Provider<Box<dynamic>>((ref) {
   return Hive.box<dynamic>('settings');
 });
 
-// ── Derived preference providers ──────────────────────────────────────────────
+// ── Typed settings state ─────────────────────────────────────────────────────
+
+@immutable
+class AppSettings {
+  const AppSettings({
+    this.onboardingComplete = false,
+    this.themeMode = ThemeMode.system,
+    this.defaultTaxId,
+    this.lowStockThreshold = 5,
+    this.loyaltyEnabled = false,
+    this.loyaltyEarnRate = 1.0,
+    this.loyaltyPointValue = 1.0,
+    this.printerDeviceAddress,
+    this.printerDeviceName,
+    this.printerPaperWidth = 80,
+    this.businessName = '',
+    this.businessTagline = '',
+    this.businessPhone = '',
+    this.businessAddress = '',
+    this.businessPan = '',
+    this.currencySymbol = 'Rs',
+    this.currencyCode = 'NPR',
+    this.countryCode = '',
+    this.timezone = '',
+    this.autoBackupEnabled = true,
+    this.autoBackupLastAt,
+  });
+
+  final bool onboardingComplete;
+  final ThemeMode themeMode;
+  final int? defaultTaxId;
+  final int lowStockThreshold;
+  final bool loyaltyEnabled;
+  final double loyaltyEarnRate; // pts per 1 currency unit spent
+  final double loyaltyPointValue; // currency value of 1 pt
+  final String? printerDeviceAddress; // BLE MAC or USB id
+  final String? printerDeviceName;
+  final int printerPaperWidth; // mm
+  final String businessName;
+  final String businessTagline;
+  final String businessPhone;
+  final String businessAddress;
+  final String businessPan;
+  final String currencySymbol;
+  final String currencyCode;
+  final String countryCode;
+  final String timezone;
+  final bool autoBackupEnabled;
+  final DateTime? autoBackupLastAt;
+
+  /// Business name for receipts/print — never blank.
+  String get businessNameOrDefault =>
+      businessName.isEmpty ? 'My Store' : businessName;
+
+  /// Reads every key from the box, tolerating the loose types older builds
+  /// wrote (paper width as String, loyalty rates as int, …).
+  factory AppSettings.fromBox(Box<dynamic> box) {
+    T get<T>(String key, T fallback) {
+      final v = box.get(key);
+      return v is T ? v : fallback;
+    }
+
+    double num_(String key, double fallback) {
+      final v = box.get(key);
+      return v is num ? v.toDouble() : fallback;
+    }
+
+    final rawWidth = box.get(kPrinterPaperWidth);
+    final width = rawWidth is int
+        ? rawWidth
+        : (rawWidth is String ? int.tryParse(rawWidth) : null) ?? 80;
+    final rawLast = box.get(kAutoBackupLastAt);
+
+    return AppSettings(
+      onboardingComplete: get(_kOnboardingComplete, false),
+      themeMode: _themeModeFrom(get(_kThemeMode, 'system')),
+      defaultTaxId: box.get(_kDefaultTaxId) as int?,
+      lowStockThreshold: get(_kLowStockThreshold, 5),
+      loyaltyEnabled: get(kLoyaltyEnabled, false),
+      loyaltyEarnRate: num_(kLoyaltyEarnRate, 1.0),
+      loyaltyPointValue: num_(kLoyaltyPointValue, 1.0),
+      printerDeviceAddress: box.get(kPrinterDeviceAddress) as String?,
+      printerDeviceName: box.get(kPrinterDeviceName) as String?,
+      printerPaperWidth: width,
+      businessName: get(kBusinessName, ''),
+      businessTagline: get(kBusinessTagline, ''),
+      businessPhone: get(kBusinessPhone, ''),
+      businessAddress: get(kBusinessAddress, ''),
+      businessPan: get(kBusinessPan, ''),
+      currencySymbol: get(kCurrencySymbol, 'Rs'),
+      currencyCode: get(kCurrencyCode, 'NPR'),
+      countryCode: get(kCountryCode, ''),
+      timezone: get(kTimezone, ''),
+      autoBackupEnabled: get(kAutoBackupEnabled, true),
+      autoBackupLastAt:
+          rawLast is String ? DateTime.tryParse(rawLast) : null,
+    );
+  }
+
+  AppSettings copyWith({
+    bool? onboardingComplete,
+    ThemeMode? themeMode,
+    int? defaultTaxId,
+    bool clearDefaultTaxId = false,
+    int? lowStockThreshold,
+    bool? loyaltyEnabled,
+    double? loyaltyEarnRate,
+    double? loyaltyPointValue,
+    String? printerDeviceAddress,
+    String? printerDeviceName,
+    bool clearPrinterDevice = false,
+    int? printerPaperWidth,
+    String? businessName,
+    String? businessTagline,
+    String? businessPhone,
+    String? businessAddress,
+    String? businessPan,
+    String? currencySymbol,
+    String? currencyCode,
+    String? countryCode,
+    String? timezone,
+    bool? autoBackupEnabled,
+    DateTime? autoBackupLastAt,
+  }) =>
+      AppSettings(
+        onboardingComplete: onboardingComplete ?? this.onboardingComplete,
+        themeMode: themeMode ?? this.themeMode,
+        defaultTaxId:
+            clearDefaultTaxId ? null : (defaultTaxId ?? this.defaultTaxId),
+        lowStockThreshold: lowStockThreshold ?? this.lowStockThreshold,
+        loyaltyEnabled: loyaltyEnabled ?? this.loyaltyEnabled,
+        loyaltyEarnRate: loyaltyEarnRate ?? this.loyaltyEarnRate,
+        loyaltyPointValue: loyaltyPointValue ?? this.loyaltyPointValue,
+        printerDeviceAddress: clearPrinterDevice
+            ? null
+            : (printerDeviceAddress ?? this.printerDeviceAddress),
+        printerDeviceName: clearPrinterDevice
+            ? null
+            : (printerDeviceName ?? this.printerDeviceName),
+        printerPaperWidth: printerPaperWidth ?? this.printerPaperWidth,
+        businessName: businessName ?? this.businessName,
+        businessTagline: businessTagline ?? this.businessTagline,
+        businessPhone: businessPhone ?? this.businessPhone,
+        businessAddress: businessAddress ?? this.businessAddress,
+        businessPan: businessPan ?? this.businessPan,
+        currencySymbol: currencySymbol ?? this.currencySymbol,
+        currencyCode: currencyCode ?? this.currencyCode,
+        countryCode: countryCode ?? this.countryCode,
+        timezone: timezone ?? this.timezone,
+        autoBackupEnabled: autoBackupEnabled ?? this.autoBackupEnabled,
+        autoBackupLastAt: autoBackupLastAt ?? this.autoBackupLastAt,
+      );
+
+  static ThemeMode _themeModeFrom(String raw) => switch (raw) {
+        'dark' => ThemeMode.dark,
+        'light' => ThemeMode.light,
+        _ => ThemeMode.system,
+      };
+
+  static String _themeModeTo(ThemeMode mode) => switch (mode) {
+        ThemeMode.dark => 'dark',
+        ThemeMode.light => 'light',
+        _ => 'system',
+      };
+}
+
+// ── Notifier ─────────────────────────────────────────────────────────────────
+
+/// Single writer for the settings box. State updates synchronously (so the
+/// UI and router react at once); the Hive write is awaited afterwards.
+class SettingsNotifier extends Notifier<AppSettings> {
+  Box<dynamic> get _box => ref.read(settingsBoxProvider);
+
+  @override
+  AppSettings build() => AppSettings.fromBox(_box);
+
+  /// Re-reads the box — call after wiping/replacing it (factory reset).
+  void reload() => state = AppSettings.fromBox(_box);
+
+  Future<void> _write(AppSettings next, Map<String, Object?> puts) async {
+    state = next;
+    for (final e in puts.entries) {
+      if (e.value == null) {
+        await _box.delete(e.key);
+      } else {
+        await _box.put(e.key, e.value);
+      }
+    }
+  }
+
+  // Onboarding / theme
+  Future<void> setOnboardingComplete(bool v) => _write(
+      state.copyWith(onboardingComplete: v), {_kOnboardingComplete: v});
+  Future<void> setThemeMode(ThemeMode mode) => _write(
+      state.copyWith(themeMode: mode),
+      {_kThemeMode: AppSettings._themeModeTo(mode)});
+
+  // Tax / stock
+  Future<void> setDefaultTaxId(int? id) => _write(
+      id == null
+          ? state.copyWith(clearDefaultTaxId: true)
+          : state.copyWith(defaultTaxId: id),
+      {_kDefaultTaxId: id});
+  Future<void> setLowStockThreshold(int v) => _write(
+      state.copyWith(lowStockThreshold: v), {_kLowStockThreshold: v});
+
+  // Loyalty
+  Future<void> setLoyaltyEnabled(bool v) =>
+      _write(state.copyWith(loyaltyEnabled: v), {kLoyaltyEnabled: v});
+  Future<void> setLoyaltyRates(
+          {required double earnRate, required double pointValue}) =>
+      _write(
+        state.copyWith(loyaltyEarnRate: earnRate, loyaltyPointValue: pointValue),
+        {kLoyaltyEarnRate: earnRate, kLoyaltyPointValue: pointValue},
+      );
+
+  // Printer
+  Future<void> setPrinterDevice(
+          {required String address, required String name}) =>
+      _write(
+        state.copyWith(printerDeviceAddress: address, printerDeviceName: name),
+        {kPrinterDeviceAddress: address, kPrinterDeviceName: name},
+      );
+  Future<void> clearPrinterDevice() => _write(
+        state.copyWith(clearPrinterDevice: true),
+        {kPrinterDeviceAddress: null, kPrinterDeviceName: null},
+      );
+  Future<void> setPrinterPaperWidth(int mm) => _write(
+      state.copyWith(printerPaperWidth: mm), {kPrinterPaperWidth: mm.toString()});
+
+  // Store profile
+  Future<void> setStoreProfile({
+    String? name,
+    String? tagline,
+    String? phone,
+    String? address,
+    String? pan,
+  }) =>
+      _write(
+        state.copyWith(
+          businessName: name,
+          businessTagline: tagline,
+          businessPhone: phone,
+          businessAddress: address,
+          businessPan: pan,
+        ),
+        {
+          if (name != null) kBusinessName: name,
+          if (tagline != null) kBusinessTagline: tagline,
+          if (phone != null) kBusinessPhone: phone,
+          if (address != null) kBusinessAddress: address,
+          if (pan != null) kBusinessPan: pan,
+        },
+      );
+  Future<void> setCurrency({required String symbol, required String code}) =>
+      _write(
+        state.copyWith(currencySymbol: symbol, currencyCode: code),
+        {kCurrencySymbol: symbol, kCurrencyCode: code},
+      );
+  Future<void> setLocale({required String countryCode, required String timezone}) =>
+      _write(
+        state.copyWith(countryCode: countryCode, timezone: timezone),
+        {kCountryCode: countryCode, kTimezone: timezone},
+      );
+
+  // Backup
+  Future<void> setAutoBackupEnabled(bool v) =>
+      _write(state.copyWith(autoBackupEnabled: v), {kAutoBackupEnabled: v});
+  Future<void> markAutoBackupRun(DateTime t) => _write(
+      state.copyWith(autoBackupLastAt: t), {kAutoBackupLastAt: t.toIso8601String()});
+}
+
+final settingsProvider =
+    NotifierProvider<SettingsNotifier, AppSettings>(SettingsNotifier.new);
+
+// ── Field selectors (reactive) ───────────────────────────────────────────────
+// Kept as named providers so call sites read naturally and only rebuild when
+// their own field changes.
+
+Provider<T> _field<T>(T Function(AppSettings s) pick) =>
+    Provider<T>((ref) => ref.watch(settingsProvider.select(pick)));
 
 /// True once the first-run setup wizard has been completed.
-final onboardingCompleteProvider = Provider<bool>((ref) {
-  final box = ref.watch(settingsBoxProvider);
-  return box.get(_kOnboardingComplete, defaultValue: false) as bool;
-});
+final onboardingCompleteProvider = _field((s) => s.onboardingComplete);
 
-/// Current ThemeMode. Defaults to system.
-final savedThemeModeProvider = Provider<ThemeMode>((ref) {
-  final box = ref.watch(settingsBoxProvider);
-  final raw = box.get(_kThemeMode, defaultValue: 'system') as String;
-  return switch (raw) {
-    'dark' => ThemeMode.dark,
-    'light' => ThemeMode.light,
-    _ => ThemeMode.system,
-  };
-});
+/// App-wide ThemeMode (persisted).
+final themeModeProvider = _field((s) => s.themeMode);
 
 /// Store-wide default tax rate ID (null = no default set yet).
-final defaultTaxIdProvider = Provider<int?>((ref) {
-  final box = ref.watch(settingsBoxProvider);
-  return box.get(_kDefaultTaxId) as int?;
-});
+final defaultTaxIdProvider = _field((s) => s.defaultTaxId);
 
 /// Low-stock alert threshold (unit count). Default 5.
-final lowStockThresholdProvider = Provider<int>((ref) {
-  final box = ref.watch(settingsBoxProvider);
-  return box.get(_kLowStockThreshold, defaultValue: 5) as int;
-});
+final lowStockThresholdProvider = _field((s) => s.lowStockThreshold);
 
-// ── Write helpers (called from notifiers) ─────────────────────────────────────
+final loyaltyEnabledProvider = _field((s) => s.loyaltyEnabled);
+/// Points earned per 1 currency unit spent.
+final loyaltyEarnRateProvider = _field((s) => s.loyaltyEarnRate);
+/// Currency value of 1 loyalty point.
+final loyaltyPointValueProvider = _field((s) => s.loyaltyPointValue);
 
-Future<void> saveOnboardingComplete(Box<dynamic> box) =>
-    box.put(_kOnboardingComplete, true);
+final businessNameProvider = _field((s) => s.businessName);
+final businessTaglineProvider = _field((s) => s.businessTagline);
+final businessPhoneProvider = _field((s) => s.businessPhone);
+final businessAddressProvider = _field((s) => s.businessAddress);
+final businessPanProvider = _field((s) => s.businessPan);
+/// Currency symbol shown before amounts (e.g. "Rs", "$").
+final currencySymbolProvider = _field((s) => s.currencySymbol);
+final currencyCodeProvider = _field((s) => s.currencyCode);
 
-Future<void> saveThemeMode(Box<dynamic> box, ThemeMode mode) {
-  final raw = switch (mode) {
-    ThemeMode.dark => 'dark',
-    ThemeMode.light => 'light',
-    _ => 'system',
-  };
-  return box.put(_kThemeMode, raw);
-}
-
-Future<void> saveDefaultTaxId(Box<dynamic> box, int taxId) =>
-    box.put(_kDefaultTaxId, taxId);
-
-Future<void> saveLowStockThreshold(Box<dynamic> box, int threshold) =>
-    box.put(_kLowStockThreshold, threshold);
-
-Future<void> saveLoyaltyEnabled(Box<dynamic> box, bool v) => box.put(kLoyaltyEnabled, v);
-Future<void> saveLoyaltyEarnRate(Box<dynamic> box, double v) => box.put(kLoyaltyEarnRate, v);
-Future<void> saveLoyaltyPointValue(Box<dynamic> box, double v) => box.put(kLoyaltyPointValue, v);
-
-// Store profile helpers
-Future<void> saveBusinessName(Box<dynamic> box, String v) => box.put(kBusinessName, v);
-Future<void> saveBusinessTagline(Box<dynamic> box, String v) => box.put(kBusinessTagline, v);
-Future<void> saveBusinessPhone(Box<dynamic> box, String v) => box.put(kBusinessPhone, v);
-Future<void> saveBusinessAddress(Box<dynamic> box, String v) => box.put(kBusinessAddress, v);
-Future<void> saveBusinessPan(Box<dynamic> box, String v) => box.put(kBusinessPan, v);
-Future<void> saveCurrencySymbol(Box<dynamic> box, String v) => box.put(kCurrencySymbol, v);
-Future<void> saveCurrencyCode(Box<dynamic> box, String v) => box.put(kCurrencyCode, v);
-
-// Store profile providers
-final businessNameProvider = Provider<String>((ref) {
-  final box = ref.watch(settingsBoxProvider);
-  return box.get(kBusinessName, defaultValue: '') as String;
-});
-
-final businessTaglineProvider = Provider<String>((ref) {
-  final box = ref.watch(settingsBoxProvider);
-  return box.get(kBusinessTagline, defaultValue: '') as String;
-});
-
-final businessPhoneProvider = Provider<String>((ref) {
-  final box = ref.watch(settingsBoxProvider);
-  return box.get(kBusinessPhone, defaultValue: '') as String;
-});
-
-final businessAddressProvider = Provider<String>((ref) {
-  final box = ref.watch(settingsBoxProvider);
-  return box.get(kBusinessAddress, defaultValue: '') as String;
-});
-
-final businessPanProvider = Provider<String>((ref) {
-  final box = ref.watch(settingsBoxProvider);
-  return box.get(kBusinessPan, defaultValue: '') as String;
-});
-
-final currencyCodeProvider = Provider<String>((ref) {
-  final box = ref.watch(settingsBoxProvider);
-  return box.get(kCurrencyCode, defaultValue: 'NPR') as String;
-});
-
-final loyaltyEnabledProvider = Provider<bool>((ref) {
-  final box = ref.watch(settingsBoxProvider);
-  return box.get(kLoyaltyEnabled, defaultValue: false) as bool;
-});
-
-/// Points earned per 1 currency unit spent. Default: 1 pt per 100 units = 0.01.
-final loyaltyEarnRateProvider = Provider<double>((ref) {
-  final box = ref.watch(settingsBoxProvider);
-  return (box.get(kLoyaltyEarnRate, defaultValue: 1.0) as num).toDouble();
-});
-
-/// Currency value of 1 loyalty point. Default: 1 pt = 1 currency unit.
-final loyaltyPointValueProvider = Provider<double>((ref) {
-  final box = ref.watch(settingsBoxProvider);
-  return (box.get(kLoyaltyPointValue, defaultValue: 1.0) as num).toDouble();
-});
-
-// ── Printer providers + helpers ──────────────────────────────────────────────
+/// Daily local snapshot on launch (kept in the app's documents dir).
+final autoBackupEnabledProvider = _field((s) => s.autoBackupEnabled);
+final autoBackupLastAtProvider = _field((s) => s.autoBackupLastAt);
 
 /// MAC address (BLE) or USB device id of the saved thermal printer, if any.
-final printerDeviceAddressProvider = Provider<String?>((ref) {
-  final box = ref.watch(settingsBoxProvider);
-  return box.get(kPrinterDeviceAddress) as String?;
-});
-
+final printerDeviceAddressProvider = _field((s) => s.printerDeviceAddress);
 /// Human-readable name of the saved thermal printer, if any.
-final printerDeviceNameProvider = Provider<String?>((ref) {
-  final box = ref.watch(settingsBoxProvider);
-  return box.get(kPrinterDeviceName) as String?;
-});
-
-/// Paper width in millimetres. Defaults to 80 (most common countertop roll).
-final printerPaperWidthProvider = Provider<int>((ref) {
-  final box = ref.watch(settingsBoxProvider);
-  final raw = box.get(kPrinterPaperWidth, defaultValue: '80') as String;
-  return int.tryParse(raw) ?? 80;
-});
-
-Future<void> savePrinterDevice(
-  Box<dynamic> box, {
-  required String address,
-  required String name,
-}) async {
-  await box.put(kPrinterDeviceAddress, address);
-  await box.put(kPrinterDeviceName, name);
-}
-
-Future<void> clearPrinterDevice(Box<dynamic> box) async {
-  await box.delete(kPrinterDeviceAddress);
-  await box.delete(kPrinterDeviceName);
-}
-
-Future<void> savePrinterPaperWidth(Box<dynamic> box, int mm) =>
-    box.put(kPrinterPaperWidth, mm.toString());
+final printerDeviceNameProvider = _field((s) => s.printerDeviceName);
+/// Paper width in millimetres. Defaults to 80.
+final printerPaperWidthProvider = _field((s) => s.printerPaperWidth);

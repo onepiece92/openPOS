@@ -35,12 +35,6 @@ final productSalesCountProvider = StreamProvider<Map<int, int>>((ref) {
   return ref.watch(databaseProvider).ordersDao.watchProductSalesCounts();
 });
 
-/// Currency symbol from Hive settings (e.g. "Rs", "$").
-final currencySymbolProvider = Provider<String>((ref) {
-  final box = ref.watch(settingsBoxProvider);
-  return box.get(kCurrencySymbol, defaultValue: 'Rs') as String;
-});
-
 /// Shared [CurrencyFormatter] that reads the active currency symbol from
 /// settings. Use this in UI code instead of inline `toStringAsFixed(2)`
 /// concatenation so the symbol, grouping, and decimal count stay consistent.

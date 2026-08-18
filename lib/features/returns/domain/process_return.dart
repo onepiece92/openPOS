@@ -2,6 +2,7 @@ import 'package:drift/drift.dart' show Value;
 
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/services/audit_service.dart';
+import 'package:pos_app/features/orders/domain/order_number.dart';
 
 /// Atomically commits a refund against a completed order.
 ///
@@ -52,7 +53,7 @@ Future<int> processReturn(
                 productId: comp.componentProductId,
                 delta: addBack,
                 reasonCode: 'return',
-                notes: Value('Refund for Order #$orderId (via ${item.productName})'),
+                notes: Value('Refund for Order ${order.billNo} (via ${item.productName})'),
               ),
             );
           }
@@ -63,7 +64,7 @@ Future<int> processReturn(
               productId: item.productId,
               delta: item.quantity,
               reasonCode: 'return',
-              notes: Value('Refund for Order #$orderId'),
+              notes: Value('Refund for Order ${order.billNo}'),
             ),
           );
         }

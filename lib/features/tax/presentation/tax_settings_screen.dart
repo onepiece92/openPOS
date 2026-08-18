@@ -119,10 +119,8 @@ class TaxSettingsScreen extends ConsumerWidget {
     );
   }
 
-  void _setDefault(WidgetRef ref, int taxId) async {
-    final box = ref.read(settingsBoxProvider);
-    await saveDefaultTaxId(box, taxId);
-  }
+  Future<void> _setDefault(WidgetRef ref, int taxId) =>
+      ref.read(settingsProvider.notifier).setDefaultTaxId(taxId);
 
   void _toggleActive(WidgetRef ref, TaxRate t) async {
     await ref.read(databaseProvider).taxDao.upsertRate(

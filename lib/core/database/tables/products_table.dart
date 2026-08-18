@@ -9,7 +9,16 @@ class Products extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get sku => text().unique()();
   TextColumn get name => text()();
-  RealColumn get price => real()(); // base price in store currency
+  RealColumn get price => real()(); // base selling price in store currency
+  RealColumn get purchasePrice =>
+      real().withDefault(const Constant(0.0))(); // cost price per main unit
+  /// Main unit stock & price are expressed in (e.g. 'pcs', 'kg', 'ltr').
+  TextColumn get unit => text().withDefault(const Constant('pcs'))();
+  /// Optional larger unit (e.g. 'box', 'dozen'). Null = no secondary unit.
+  TextColumn get secondaryUnit => text().nullable()();
+  /// How many main units make up one secondary unit (1 box = N pcs).
+  RealColumn get conversionRate =>
+      real().withDefault(const Constant(1.0))();
   IntColumn get stockQuantity =>
       integer().withDefault(const Constant(0))();
   BoolColumn get isTaxable =>

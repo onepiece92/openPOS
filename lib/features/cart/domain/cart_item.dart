@@ -1,3 +1,5 @@
+import 'package:pos_app/core/utils/money.dart';
+
 class CartItem {
   CartItem({
     required this.productId,
@@ -15,7 +17,7 @@ class CartItem {
   final bool isTaxable;
   final double lineDiscount; // flat amount off the whole line
 
-  double get lineSubtotal => (unitPrice * quantity) - lineDiscount;
+  double get lineSubtotal => roundMoney((unitPrice * quantity) - lineDiscount);
 
   CartItem copyWith({int? quantity, double? lineDiscount}) => CartItem(
         productId: productId,
