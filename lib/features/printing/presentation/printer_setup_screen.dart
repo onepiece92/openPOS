@@ -2,12 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_thermal_printer/flutter_thermal_printer.dart';
-import 'package:flutter_thermal_printer/utils/printer.dart';
-
 import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/core/utils/async_feedback.dart';
-import 'package:pos_app/features/printing/domain/print_receipt.dart';
+import 'package:pos_app/features/printing/domain/receipt_printer.dart';
 import 'package:pos_app/features/printing/domain/render_receipt.dart';
 
 class PrinterSetupScreen extends ConsumerStatefulWidget {
@@ -18,16 +15,16 @@ class PrinterSetupScreen extends ConsumerStatefulWidget {
 }
 
 class _PrinterSetupScreenState extends ConsumerState<PrinterSetupScreen> {
-  final _ftp = FlutterThermalPrinter.instance;
-  StreamSubscription<List<Printer>>? _devicesSub;
-  List<Printer> _devices = [];
+  ReceiptPrinter get _printer => ref.read(receiptPrinterProvider);
+  StreamSubscription<List<DiscoveredPrinter>>? _devicesSub;
+  List<DiscoveredPrinter> _devices = [];
   bool _scanning = false;
   bool _testing = false;
 
   @override
   void initState() {
     super.initState();
-    _devicesSub = _ftp.devicesStream.listen((list) {
+    _devicesSub = _printer.devices.listen((list) {
       if (mounted) setState(() => _devices = list);
     });
   }
@@ -35,7 +32,7 @@ class _PrinterSetupScreenState extends ConsumerState<PrinterSetupScreen> {
   @override
   void dispose() {
     _devicesSub?.cancel();
-    _ftp.stopScan();
+    _printer.stopScan();
     super.dispose();
   }
 
@@ -45,7 +42,7 @@ class _PrinterSetupScreenState extends ConsumerState<PrinterSetupScreen> {
       _devices = [];
     });
     try {
-      await _ftp.getPrinters(connectionTypes: const [ConnectionType.BLE]);
+      await _printer.startScan();
     } catch (_) {
       // Surface a snackbar but keep the page usable.
       if (mounted) {
@@ -57,25 +54,18 @@ class _PrinterSetupScreenState extends ConsumerState<PrinterSetupScreen> {
   }
 
   Future<void> _stopScan() async {
-    await _ftp.stopScan();
+    await _printer.stopScan();
     if (mounted) setState(() => _scanning = false);
   }
 
-  Future<void> _selectDevice(Printer device) async {
-    final address = device.address;
-    final name = device.name ?? 'Unknown';
-    if (address == null || address.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Device has no address')),
-      );
-      return;
-    }
+  Future<void> _selectDevice(DiscoveredPrinter device) async {
     await ref
         .read(settingsProvider.notifier)
-        .setPrinterDevice(address: address, name: name);
+        .setPrinterDevice(address: device.address, name: device.name);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Saved "$name" as the active printer')),
+        SnackBar(
+            content: Text('Saved "${device.name}" as the active printer')),
       );
     }
   }
@@ -98,7 +88,7 @@ class _PrinterSetupScreenState extends ConsumerState<PrinterSetupScreen> {
           storeName: storeName,
           paperMm: paper,
         );
-        await printBytesToBleAddress(
+        await _printer.printBytes(
           address: address,
           name: name,
           bytes: bytes,
@@ -251,13 +241,13 @@ class _PrinterSetupScreenState extends ConsumerState<PrinterSetupScreen> {
                       final isActive = d.address == savedAddr;
                       return ListTile(
                         leading: Icon(
-                          d.connectionType == ConnectionType.BLE
+                          d.transport == PrinterTransport.ble
                               ? Icons.bluetooth_rounded
                               : Icons.usb_rounded,
                           color: isActive ? cs.primary : cs.onSurfaceVariant,
                         ),
-                        title: Text(d.name ?? 'Unknown'),
-                        subtitle: Text(d.address ?? ''),
+                        title: Text(d.name),
+                        subtitle: Text(d.address),
                         trailing: isActive
                             ? Icon(Icons.check_circle_rounded,
                                 color: cs.primary)

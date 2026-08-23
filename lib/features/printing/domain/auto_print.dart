@@ -2,7 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
-import 'package:pos_app/features/printing/domain/print_receipt.dart';
+import 'package:pos_app/features/printing/domain/receipt_printer.dart';
 import 'package:pos_app/features/printing/domain/render_receipt.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
 import 'package:pos_app/features/receipts/presentation/receipt_body.dart';
@@ -13,45 +13,59 @@ import 'package:pos_app/features/receipts/presentation/receipt_body.dart';
 ///
 /// Returns `null` if no printer is paired — that is not an error, the user
 /// may genuinely be running paperless.
-Future<String?> autoPrintOrder(WidgetRef ref, int orderId) async {
-  final address = ref.read(printerDeviceAddressProvider);
-  final name = ref.read(printerDeviceNameProvider);
-  if (address == null || name == null) return null;
+Future<String?> autoPrintOrder(WidgetRef ref, int orderId) =>
+    ref.read(autoPrintServiceProvider).printOrder(orderId);
 
-  try {
-    final db = ref.read(databaseProvider);
-    final paper = ref.read(printerPaperWidthProvider);
-    final fmt = ref.read(currencyFormatterProvider);
+final autoPrintServiceProvider =
+    Provider<AutoPrintService>((ref) => AutoPrintService(ref));
 
-    final order = await db.ordersDao.getById(orderId);
-    if (order == null) return 'Order not found for printing';
-    final items = await db.ordersDao.getItems(orderId);
-    final taxes = await db.ordersDao.getTaxBreakdown(orderId);
-    final businessName = ref.read(settingsProvider).businessNameOrDefault;
-    final customer = order.customerId == null
-        ? null
-        : await db.customersDao.getById(order.customerId!);
-    final table = order.tableId == null
-        ? null
-        : await db.tablesDao.getById(order.tableId!);
+/// Loads an order + everything the receipt shows, renders ESC/POS bytes and
+/// hands them to the [ReceiptPrinter] port. Kept off the widget layer so it
+/// can be exercised in plain provider-container tests with a fake printer.
+class AutoPrintService {
+  AutoPrintService(this._ref);
+  final Ref _ref;
 
-    final data = ReceiptBodyData(
-      order: order,
-      items: items,
-      taxes: taxes,
-      businessName: businessName,
-      customer: customer,
-      table: table,
-    );
+  Future<String?> printOrder(int orderId) async {
+    final address = _ref.read(printerDeviceAddressProvider);
+    final name = _ref.read(printerDeviceNameProvider);
+    if (address == null || name == null) return null;
 
-    final bytes = await renderReceiptBytes(data, fmt, paper);
-    await printBytesToBleAddress(
-      address: address,
-      name: name,
-      bytes: bytes,
-    );
-    return null;
-  } catch (e) {
-    return 'Printer: $e';
+    try {
+      final db = _ref.read(databaseProvider);
+      final paper = _ref.read(printerPaperWidthProvider);
+      final fmt = _ref.read(currencyFormatterProvider);
+
+      final order = await db.ordersDao.getById(orderId);
+      if (order == null) return 'Order not found for printing';
+      final items = await db.ordersDao.getItems(orderId);
+      final taxes = await db.ordersDao.getTaxBreakdown(orderId);
+      final businessName = _ref.read(settingsProvider).businessNameOrDefault;
+      final customer = order.customerId == null
+          ? null
+          : await db.customersDao.getById(order.customerId!);
+      final table = order.tableId == null
+          ? null
+          : await db.tablesDao.getById(order.tableId!);
+
+      final data = ReceiptBodyData(
+        order: order,
+        items: items,
+        taxes: taxes,
+        businessName: businessName,
+        customer: customer,
+        table: table,
+      );
+
+      final bytes = await renderReceiptBytes(data, fmt, paper);
+      await _ref.read(receiptPrinterProvider).printBytes(
+            address: address,
+            name: name,
+            bytes: bytes,
+          );
+      return null;
+    } catch (e) {
+      return 'Printer: $e';
+    }
   }
 }
