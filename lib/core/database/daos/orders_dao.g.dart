@@ -10,7 +10,6 @@ mixin _$OrdersDaoMixin on DatabaseAccessor<AppDatabase> {
   $TaxRatesTable get taxRates => attachedDatabase.taxRates;
   $CategoriesTable get categories => attachedDatabase.categories;
   $ProductsTable get products => attachedDatabase.products;
-  $ProductVariantsTable get productVariants => attachedDatabase.productVariants;
   $OrderItemsTable get orderItems => attachedDatabase.orderItems;
   $OrderTaxesTable get orderTaxes => attachedDatabase.orderTaxes;
   $ReturnsTable get returns => attachedDatabase.returns;

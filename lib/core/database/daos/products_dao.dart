@@ -3,15 +3,13 @@ import 'package:drift/drift.dart';
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/database/tables/categories_table.dart';
 import 'package:pos_app/core/database/tables/product_components_table.dart';
-import 'package:pos_app/core/database/tables/product_modifiers_table.dart';
 import 'package:pos_app/core/database/tables/product_taxes_table.dart';
-import 'package:pos_app/core/database/tables/product_variants_table.dart';
 import 'package:pos_app/core/database/tables/products_table.dart';
 
 part 'products_dao.g.dart';
 
 @DriftAccessor(
-  tables: [Products, ProductComponents, ProductVariants, ProductModifiers, ProductTaxes, Categories],
+  tables: [Products, ProductComponents, ProductTaxes, Categories],
 )
 class ProductsDao extends DatabaseAccessor<AppDatabase>
     with _$ProductsDaoMixin {
@@ -42,30 +40,12 @@ class ProductsDao extends DatabaseAccessor<AppDatabase>
   Future<Product?> getById(int id) =>
       (select(products)..where((p) => p.id.equals(id))).getSingleOrNull();
 
-  Future<List<ProductVariant>> getVariants(int productId) =>
-      (select(productVariants)
-            ..where((v) => v.productId.equals(productId)))
-          .get();
-
-  Future<List<ProductModifier>> getModifiers(int productId) =>
-      (select(productModifiers)
-            ..where((m) => m.productId.equals(productId)))
-          .get();
-
-  // ── Write ──────────────────────────────────────────────────────────────
-
   Future<int> upsert(ProductsCompanion entry) =>
       into(products).insertOnConflictUpdate(entry);
 
   /// Targeted update for edit mode — only touches columns present in [companion].
   Future<void> updateProduct(int id, ProductsCompanion companion) =>
       (update(products)..where((p) => p.id.equals(id))).write(companion);
-
-  Future<int> upsertVariant(ProductVariantsCompanion entry) =>
-      into(productVariants).insertOnConflictUpdate(entry);
-
-  Future<int> upsertModifier(ProductModifiersCompanion entry) =>
-      into(productModifiers).insertOnConflictUpdate(entry);
 
   /// Soft-delete: sets is_active = false. Hard deletes break order history.
   Future<void> softDelete(int id) async {

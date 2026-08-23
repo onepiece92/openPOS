@@ -21,9 +21,7 @@ import 'package:pos_app/core/database/tables/order_tax_override_table.dart';
 import 'package:pos_app/core/database/tables/order_taxes_table.dart';
 import 'package:pos_app/core/database/tables/orders_table.dart';
 import 'package:pos_app/core/database/tables/product_components_table.dart';
-import 'package:pos_app/core/database/tables/product_modifiers_table.dart';
 import 'package:pos_app/core/database/tables/product_taxes_table.dart';
-import 'package:pos_app/core/database/tables/product_variants_table.dart';
 import 'package:pos_app/core/database/tables/products_table.dart';
 import 'package:pos_app/core/database/tables/returns_table.dart';
 import 'package:pos_app/core/database/tables/stock_adjustments_table.dart';
@@ -44,8 +42,6 @@ part 'app_database.g.dart';
     Categories,
     Products,
     ProductComponents,
-    ProductVariants,
-    ProductModifiers,
     ProductTaxes,
     // Customers
     Customers,
@@ -81,7 +77,7 @@ class AppDatabase extends _$AppDatabase {
       : super(executor ?? _openConnection());
 
   /// Bump together with a new `onUpgrade` step below.
-  static const int currentSchemaVersion = 11;
+  static const int currentSchemaVersion = 12;
 
   @override
   int get schemaVersion => currentSchemaVersion;
@@ -152,6 +148,16 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(orders, orders.printCount);
             await customStatement('DROP INDEX IF EXISTS idx_orders_invoice_no');
             await m.createIndex(idxOrdersInvoiceNo);
+          }
+          if (from < 12) {
+            // Variants/modifiers never reached the sale flow (no UI, no
+            // writes) — drop them and the always-NULL order_items.variant_id.
+            // alterTable recreates order_items from the current definition,
+            // copying the surviving columns.
+            // ignore: experimental_member_use
+            await m.alterTable(TableMigration(orderItems));
+            await customStatement('DROP TABLE IF EXISTS product_variants');
+            await customStatement('DROP TABLE IF EXISTS product_modifiers');
           }
         },
         beforeOpen: (details) async {

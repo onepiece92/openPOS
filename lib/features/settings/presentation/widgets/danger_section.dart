@@ -74,8 +74,6 @@ class DangerSection extends ConsumerWidget {
         await db.delete(db.orders).go();
         await db.delete(db.expenses).go();
         await db.delete(db.productTaxes).go();
-        await db.delete(db.productModifiers).go();
-        await db.delete(db.productVariants).go();
         await db.delete(db.productComponents).go();
         await db.delete(db.products).go();
         await db.delete(db.customers).go();

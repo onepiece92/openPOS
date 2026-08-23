@@ -20,7 +20,7 @@ void main() {
 
   setUpAll(() => verifier = SchemaVerifier(GeneratedHelper()));
 
-  const shipped = [4, 6, 7, 8, 9, 10];
+  const shipped = [4, 6, 7, 8, 9, 10, 11];
 
   for (final from in shipped) {
     test('upgrade v$from → v${AppDatabase.currentSchemaVersion} yields the expected schema',
@@ -41,6 +41,31 @@ void main() {
     await db.validateDatabaseSchema(
       options: const ValidationOptions(validateDropped: true),
     );
+  });
+
+  test('order_items survive the v12 variant_id column drop', () async {
+    final schema = await verifier.schemaAt(11);
+    schema.rawDatabase.execute(
+      "INSERT INTO products (sku, name, price) VALUES ('X', 'X', 5)",
+    );
+    schema.rawDatabase.execute(
+      "INSERT INTO orders (subtotal, total, payment_method) VALUES (5, 5, 'cash')",
+    );
+    // A v11-era line item with variant_id still present (and NULL, as always).
+    schema.rawDatabase.execute(
+      'INSERT INTO order_items (order_id, product_id, variant_id, product_name, unit_price, quantity, line_total) '
+      "VALUES (1, 1, NULL, 'Espresso', 5, 2, 10)",
+    );
+
+    final db = AppDatabase(schema.newConnection());
+    addTearDown(db.close);
+    await verifier.migrateAndValidate(db, AppDatabase.currentSchemaVersion);
+
+    final items = await db.ordersDao.getItems(1);
+    expect(items, hasLength(1));
+    expect(items.single.productName, 'Espresso');
+    expect(items.single.quantity, 2);
+    expect(items.single.lineTotal, 10);
   });
 
   test('data survives v8 → current (invoice numbers back-filled)', () async {

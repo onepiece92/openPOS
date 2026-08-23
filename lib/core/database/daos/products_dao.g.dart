@@ -9,8 +9,5 @@ mixin _$ProductsDaoMixin on DatabaseAccessor<AppDatabase> {
   $ProductsTable get products => attachedDatabase.products;
   $ProductComponentsTable get productComponents =>
       attachedDatabase.productComponents;
-  $ProductVariantsTable get productVariants => attachedDatabase.productVariants;
-  $ProductModifiersTable get productModifiers =>
-      attachedDatabase.productModifiers;
   $ProductTaxesTable get productTaxes => attachedDatabase.productTaxes;
 }

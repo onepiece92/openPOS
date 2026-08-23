@@ -1,7 +1,6 @@
 import 'package:drift/drift.dart';
 
 import 'package:pos_app/core/database/tables/orders_table.dart';
-import 'package:pos_app/core/database/tables/product_variants_table.dart';
 import 'package:pos_app/core/database/tables/products_table.dart';
 
 /// Line items within an order.
@@ -11,8 +10,6 @@ class OrderItems extends Table {
   IntColumn get id => integer().autoIncrement()();
   IntColumn get orderId => integer().references(Orders, #id)();
   IntColumn get productId => integer().references(Products, #id)();
-  IntColumn get variantId =>
-      integer().nullable().references(ProductVariants, #id)();
   TextColumn get productName => text()(); // snapshot
   RealColumn get unitPrice => real()(); // snapshot
   IntColumn get quantity => integer()();
