@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/theme/app_theme.dart';
+import 'package:pos_app/core/utils/money.dart';
 import 'package:pos_app/shared/widgets/app_sheet.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
 
@@ -101,13 +102,11 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
             p.purchasePrice > 0 ? p.purchasePrice.toStringAsFixed(2) : '';
         _unitCtrl.text = p.unit;
         _secondaryUnitCtrl.text = p.secondaryUnit ?? '';
-        _conversionCtrl.text = p.secondaryUnit == null
-            ? ''
-            : _fmtRate(p.conversionRate);
+        _conversionCtrl.text =
+            p.secondaryUnit == null ? '' : _fmtRate(p.conversionRate);
         // Show empty when 0 (= unlimited); show actual value when > 0
         _trackStock = p.stockQuantity > 0;
-        _stockCtrl.text =
-            p.stockQuantity > 0 ? p.stockQuantity.toString() : '';
+        _stockCtrl.text = p.stockQuantity > 0 ? p.stockQuantity.toString() : '';
         _categoryId = p.categoryId;
         _isTaxable = p.isTaxable;
         _isComposite = p.isComposite;
@@ -148,10 +147,12 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
       final sku = _skuCtrl.text.trim().isEmpty
           ? const Uuid().v4().substring(0, 8).toUpperCase()
           : _skuCtrl.text.trim();
-      final stockQty =
-          (_isComposite || !_trackStock) ? 0 : (int.tryParse(_stockCtrl.text) ?? 0);
+      final stockQty = (_isComposite || !_trackStock)
+          ? 0
+          : (int.tryParse(_stockCtrl.text) ?? 0);
       final purchasePrice = double.tryParse(_purchasePriceCtrl.text) ?? 0.0;
-      final unit = _unitCtrl.text.trim().isEmpty ? 'pcs' : _unitCtrl.text.trim();
+      final unit =
+          _unitCtrl.text.trim().isEmpty ? 'pcs' : _unitCtrl.text.trim();
       final secondaryUnit = _secondaryUnitCtrl.text.trim();
       final hasSecondary = secondaryUnit.isNotEmpty;
       final conversionRate =
@@ -254,18 +255,24 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
       ),
     );
     if (confirm == true && mounted) {
-      await ref.read(databaseProvider).productsDao.softDelete(widget.productId!);
+      await ref
+          .read(databaseProvider)
+          .productsDao
+          .softDelete(widget.productId!);
       if (mounted) context.pop();
     }
   }
 
   Future<void> _pickComponent() async {
-    final allProducts = await ref.read(databaseProvider).productsDao.watchAll().first;
+    final allProducts =
+        await ref.read(databaseProvider).productsDao.watchAll().first;
     // Exclude composites and already-added products (and self)
-    final eligible = allProducts.where((p) =>
-        !p.isComposite &&
-        p.id != widget.productId &&
-        !_components.any((c) => c.product.id == p.id)).toList();
+    final eligible = allProducts
+        .where((p) =>
+            !p.isComposite &&
+            p.id != widget.productId &&
+            !_components.any((c) => c.product.id == p.id))
+        .toList();
 
     if (!mounted) return;
     final picked = await showAppSheet<Product>(
@@ -394,8 +401,8 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                   children: [
                     TextFormField(
                       controller: _priceCtrl,
-                      keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
                       inputFormatters: [
                         FilteringTextInputFormatter.allow(
                             RegExp(r'^\d*\.?\d{0,2}')),
@@ -405,19 +412,15 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                         prefixIcon: Icon(Icons.sell_outlined),
                         border: OutlineInputBorder(),
                       ),
-                      validator: (v) {
-                        if (v == null || v.isEmpty) return 'Price is required';
-                        if (double.tryParse(v) == null) {
-                          return 'Enter a valid price';
-                        }
-                        return null;
-                      },
+                      // Zero is allowed: complimentary/promo items are real.
+                      validator: (v) => validateMoneyAmount(v,
+                          noun: 'Price', allowZero: true),
                     ),
                     const SizedBox(height: 14),
                     TextFormField(
                       controller: _purchasePriceCtrl,
-                      keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
                       inputFormatters: [
                         FilteringTextInputFormatter.allow(
                             RegExp(r'^\d*\.?\d{0,2}')),
@@ -428,13 +431,12 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                         prefixIcon: Icon(Icons.shopping_bag_outlined),
                         border: OutlineInputBorder(),
                       ),
-                      validator: (v) {
-                        if (v == null || v.isEmpty) return null;
-                        if (double.tryParse(v) == null) {
-                          return 'Enter a valid price';
-                        }
-                        return null;
-                      },
+                      validator: (v) => validateMoneyAmount(
+                        v,
+                        noun: 'Purchase price',
+                        isRequired: false,
+                        allowZero: true,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     SwitchListTile(
@@ -498,9 +500,8 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                           child: TextFormField(
                             controller: _conversionCtrl,
                             enabled: _hasSecondaryUnit,
-                            keyboardType:
-                                const TextInputType.numberWithOptions(
-                                    decimal: true),
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true),
                             inputFormatters: [
                               FilteringTextInputFormatter.allow(
                                   RegExp(r'^\d*\.?\d{0,3}')),
@@ -526,8 +527,8 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                       padding: const EdgeInsets.only(left: 4),
                       child: Text(
                         _conversionHint,
-                        style: tt.bodySmall
-                            ?.copyWith(color: cs.onSurfaceVariant),
+                        style:
+                            tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                       ),
                     ),
                   ],
@@ -577,8 +578,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                           labelText:
                               '${_isEdit ? 'Stock quantity' : 'Opening stock'} ($_unitLabel)',
                           hintText: '0',
-                          prefixIcon:
-                              const Icon(Icons.numbers_rounded),
+                          prefixIcon: const Icon(Icons.numbers_rounded),
                           border: const OutlineInputBorder(),
                         ),
                       ),

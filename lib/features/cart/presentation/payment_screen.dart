@@ -13,6 +13,7 @@ import 'package:pos_app/core/theme/app_theme.dart';
 import 'package:pos_app/core/theme/tokens.dart';
 import 'package:pos_app/core/utils/currency_formatter.dart';
 import 'package:pos_app/features/cart/presentation/providers/cart_notifier.dart';
+import 'package:pos_app/features/cart/presentation/providers/held_orders_notifier.dart';
 import 'package:pos_app/features/cart/data/place_order.dart';
 import 'package:pos_app/features/customers/domain/customers_provider.dart';
 import 'package:pos_app/features/printing/domain/auto_print.dart';
@@ -90,6 +91,12 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       return;
     }
 
+    // The cart may have been resumed from a held ticket, which now stays on
+    // disk while it is edited — the sale is what retires it.
+    final heldTicketId = session.heldTicketId;
+    if (heldTicketId != null) {
+      ref.read(heldOrdersProvider.notifier).delete(heldTicketId);
+    }
     ref.read(cartProvider.notifier).clear();
 
     // Fire-and-forget print. Failures surface via snackbar but don't block

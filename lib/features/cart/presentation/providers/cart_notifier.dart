@@ -2,10 +2,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
+import 'package:pos_app/features/cart/data/ticket_sequence.dart';
 import 'package:pos_app/features/cart/domain/cart_calculator.dart';
 import 'package:pos_app/features/cart/domain/cart_item.dart';
 import 'package:pos_app/features/cart/domain/cart_session.dart';
 import 'package:pos_app/features/cart/domain/cart_summary.dart';
+import 'package:pos_app/features/cart/domain/held_order.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
 
 // Domain types moved to features/cart/domain; re-exported so existing
@@ -17,7 +19,11 @@ export 'package:pos_app/features/cart/domain/cart_summary.dart';
 
 class CartSessionNotifier extends Notifier<CartSession> {
   @override
-  CartSession build() => CartSession.fresh();
+  CartSession build() => CartSession.fresh(_nextTicketNumber());
+
+  /// Burns one value off the persisted counter. Numbers only ever climb, so an
+  /// abandoned cart leaves a gap rather than letting a later ticket reuse it.
+  String _nextTicketNumber() => ref.read(ticketSequenceProvider).next();
 
   void setCustomer(int? id) => id == null
       ? state = state.copyWith(clearCustomer: true)
@@ -32,7 +38,20 @@ class CartSessionNotifier extends Notifier<CartSession> {
       state = state.copyWith(taxEnabled: enabled);
   void setLoyaltyPoints(int points) =>
       state = state.copyWith(loyaltyPointsToRedeem: points.clamp(0, 999999));
-  void reset() => state = CartSession.fresh();
+  void reset() => state = CartSession.fresh(_nextTicketNumber());
+
+  /// Rebinds the cart to an existing held ticket, adopting its number and
+  /// metadata so a later save updates that ticket rather than minting a new
+  /// one. No counter value is consumed — the ticket already owns its number.
+  void resumeTicket(HeldOrder ticket) => state = CartSession(
+        ticketNumber: ticket.ticketNumber,
+        openedAt: ticket.createdAt,
+        heldTicketId: ticket.id,
+        customerId: ticket.customerId,
+        tableId: ticket.tableId,
+        orderDiscount: ticket.orderDiscount,
+        orderDiscountIsPercent: ticket.orderDiscountIsPercent,
+      );
 }
 
 final cartSessionProvider =
@@ -128,10 +147,18 @@ class CartNotifier extends Notifier<List<CartItem>> {
     }
   }
 
-  void clear() {
+  /// Empties the line items but leaves the ticket identity alone. Used when
+  /// resuming a held ticket, which rebinds the session itself right after.
+  void clearItems() {
     state = [];
-    ref.read(cartSessionProvider.notifier).reset();
     ref.read(selectedTaxRatesProvider.notifier).reset();
+  }
+
+  /// Ends the ticket entirely: empties the cart and opens a fresh session
+  /// (which takes the next number off the counter).
+  void clear() {
+    clearItems();
+    ref.read(cartSessionProvider.notifier).reset();
   }
 
   int get itemCount => state.fold(0, (sum, i) => sum + i.quantity);

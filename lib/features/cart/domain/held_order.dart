@@ -3,6 +3,7 @@ import 'package:pos_app/features/cart/domain/cart_item.dart';
 class HeldOrder {
   HeldOrder({
     required this.id,
+    required this.ticketNumber,
     required this.label,
     required this.createdAt,
     required this.items,
@@ -15,6 +16,12 @@ class HeldOrder {
   });
 
   final String id;
+
+  /// Stable display number (`#0042`) from the persisted ticket counter. Set
+  /// once when the ticket is first saved and never reassigned, so editing a
+  /// ticket cannot renumber it.
+  final String ticketNumber;
+
   final String label;
   final DateTime createdAt;
   final List<CartItem> items;
@@ -30,6 +37,7 @@ class HeldOrder {
   HeldOrder copyWith({DateTime? archivedAt, bool clearArchived = false}) =>
       HeldOrder(
         id: id,
+        ticketNumber: ticketNumber,
         label: label,
         createdAt: createdAt,
         items: items,
@@ -46,6 +54,7 @@ class HeldOrder {
 
   Map<String, dynamic> toJson() => {
         'id': id,
+        'ticketNumber': ticketNumber,
         'label': label,
         'createdAt': createdAt.toIso8601String(),
         if (customerName != null) 'customerName': customerName,
@@ -68,6 +77,7 @@ class HeldOrder {
 
   factory HeldOrder.fromJson(Map<String, dynamic> json) => HeldOrder(
         id: json['id'] as String,
+        ticketNumber: json['ticketNumber'] as String? ?? _legacyNumber(json),
         label: json['label'] as String,
         createdAt: DateTime.parse(json['createdAt'] as String),
         customerName: json['customerName'] as String?,
@@ -93,4 +103,13 @@ class HeldOrder {
             })
             .toList(),
       );
+}
+
+/// Tickets written before the counter existed carry no `ticketNumber`. Their
+/// id was `DateTime.now().millisecondsSinceEpoch`, which is what the old cart
+/// header derived its number from — so reproduce that rather than showing a
+/// blank, and let the counter's high-water-mark scan pick it up.
+String _legacyNumber(Map<String, dynamic> json) {
+  final id = int.tryParse(json['id'] as String? ?? '') ?? 0;
+  return '#${(id % 10000).toString().padLeft(4, '0')}';
 }

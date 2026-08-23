@@ -30,6 +30,26 @@ import 'package:pos_app/features/settings/presentation/settings_screen.dart';
 import 'package:pos_app/features/settings/presentation/store_profile_edit_screen.dart';
 import 'package:pos_app/features/tax/presentation/tax_settings_screen.dart';
 import 'package:pos_app/features/theme/presentation/theme_preview_screen.dart';
+import 'package:pos_app/shared/widgets/dismiss_keyboard.dart';
+
+/// App-wide scroll behaviour. Dragging any list dismisses the software
+/// keyboard, alongside the tap-to-dismiss in [DismissKeyboardOnTap].
+///
+/// Set once here rather than per scroll view: [ScrollView] falls back to
+/// `ScrollConfiguration.of(context)` whenever its own `keyboardDismissBehavior`
+/// is null, so every list, grid and CustomScrollView in the app inherits this
+/// unless it deliberately opts out.
+class AppScrollBehavior extends MaterialScrollBehavior {
+  const AppScrollBehavior();
+
+  @override
+  ScrollViewKeyboardDismissBehavior getKeyboardDismissBehavior(
+          BuildContext context) =>
+      ScrollViewKeyboardDismissBehavior.onDrag;
+}
+
+/// The single instance handed to [MaterialApp.router].
+const appScrollBehavior = AppScrollBehavior();
 
 CustomTransitionPage<void> _slide(GoRouterState state, Widget child) =>
     CustomTransitionPage<void>(
@@ -59,48 +79,53 @@ class POSApp extends ConsumerWidget {
       themeMode: themeMode,
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
+      scrollBehavior: appScrollBehavior,
       builder: (context, child) {
         final brightness = Theme.of(context).brightness;
-        return Container(
-          decoration: BoxDecoration(
-            gradient: AppTheme.backgroundGradient(brightness),
-          ),
-          child: CallbackShortcuts(
-            bindings: {
-              const SingleActivator(LogicalKeyboardKey.keyS, meta: true): () {
-                final loc =
-                    router.routerDelegate.currentConfiguration.uri.toString();
-                if (loc != '/help/shortcuts') router.push('/help/shortcuts');
+        // Wraps the router's whole subtree, so tap-to-dismiss covers every
+        // screen, bottom sheet and dialog without per-page wiring.
+        return DismissKeyboardOnTap(
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: AppTheme.backgroundGradient(brightness),
+            ),
+            child: CallbackShortcuts(
+              bindings: {
+                const SingleActivator(LogicalKeyboardKey.keyS, meta: true): () {
+                  final loc =
+                      router.routerDelegate.currentConfiguration.uri.toString();
+                  if (loc != '/help/shortcuts') router.push('/help/shortcuts');
+                },
+                const SingleActivator(LogicalKeyboardKey.slash,
+                    meta: true, shift: true): () {
+                  final loc =
+                      router.routerDelegate.currentConfiguration.uri.toString();
+                  if (loc != '/help/shortcuts') router.push('/help/shortcuts');
+                },
+                const SingleActivator(LogicalKeyboardKey.keyH, meta: true):
+                    () => router.go('/pos'),
+                const SingleActivator(LogicalKeyboardKey.keyP, meta: true):
+                    () => router.go('/products'),
+                const SingleActivator(LogicalKeyboardKey.keyO, meta: true):
+                    () => router.go('/orders'),
+                const SingleActivator(LogicalKeyboardKey.keyU, meta: true):
+                    () => router.go('/customers'),
+                const SingleActivator(LogicalKeyboardKey.keyT, meta: true):
+                    () => router.go('/tables'),
+                const SingleActivator(LogicalKeyboardKey.keyE, meta: true):
+                    () => router.go('/expenses'),
+                const SingleActivator(LogicalKeyboardKey.comma, meta: true):
+                    () => router.go('/settings'),
+                const SingleActivator(LogicalKeyboardKey.keyN, meta: true):
+                    () => router.push('/products/add'),
+                const SingleActivator(LogicalKeyboardKey.keyI, meta: true):
+                    () => router.push('/inventory'),
+                const SingleActivator(LogicalKeyboardKey.keyW, meta: true): () {
+                  if (router.canPop()) router.pop();
+                },
               },
-              const SingleActivator(LogicalKeyboardKey.slash,
-                  meta: true, shift: true): () {
-                final loc =
-                    router.routerDelegate.currentConfiguration.uri.toString();
-                if (loc != '/help/shortcuts') router.push('/help/shortcuts');
-              },
-              const SingleActivator(LogicalKeyboardKey.keyH, meta: true): () =>
-                  router.go('/pos'),
-              const SingleActivator(LogicalKeyboardKey.keyP, meta: true): () =>
-                  router.go('/products'),
-              const SingleActivator(LogicalKeyboardKey.keyO, meta: true): () =>
-                  router.go('/orders'),
-              const SingleActivator(LogicalKeyboardKey.keyU, meta: true): () =>
-                  router.go('/customers'),
-              const SingleActivator(LogicalKeyboardKey.keyT, meta: true): () =>
-                  router.go('/tables'),
-              const SingleActivator(LogicalKeyboardKey.keyE, meta: true): () =>
-                  router.go('/expenses'),
-              const SingleActivator(LogicalKeyboardKey.comma, meta: true): () =>
-                  router.go('/settings'),
-              const SingleActivator(LogicalKeyboardKey.keyN, meta: true): () =>
-                  router.push('/products/add'),
-              const SingleActivator(LogicalKeyboardKey.keyI, meta: true): () =>
-                  router.push('/inventory'),
-              const SingleActivator(LogicalKeyboardKey.keyW, meta: true): () {
-                if (router.canPop()) router.pop();
-              },
-            },
-            child: child!,
+              child: child!,
+            ),
           ),
         );
       },

@@ -33,3 +33,44 @@ double roundMoney(double value, [RoundingMode mode = RoundingMode.halfUp]) {
       return nudged.roundToDouble() / 100;
   }
 }
+
+/// The largest amount any money input accepts.
+///
+/// Picked so a value stays far inside the range where a double holds whole
+/// cents exactly (2^53 cents ≈ 9.0e13). Past that, [roundMoney] and every
+/// total derived from it start losing precision silently, so the input is
+/// capped rather than left to store a number the arithmetic can't honour.
+const double kMaxMoneyAmount = 9999999.99;
+
+/// [kMaxMoneyAmount] written for humans, for use in error messages.
+const String kMaxMoneyAmountLabel = '9,999,999.99';
+
+/// Shared validator for money `TextFormField`s — amounts, prices, costs.
+///
+/// The digits-only input formatters on those fields already block a leading
+/// `-`, so the negative branch guards against a value arriving some other way
+/// (paste, autofill, a formatter changing) rather than normal typing.
+///
+/// [noun] leads every message, so pass the field's own name ("Amount",
+/// "Price"). Set [isRequired] false for optional fields and [allowZero] true
+/// where a free item or zero cost is legitimate.
+String? validateMoneyAmount(
+  String? raw, {
+  String noun = 'Amount',
+  bool isRequired = true,
+  bool allowZero = false,
+}) {
+  final text = raw?.trim() ?? '';
+  if (text.isEmpty) return isRequired ? '$noun is required' : null;
+
+  final value = double.tryParse(text);
+  if (value == null || value.isNaN || value.isInfinite) {
+    return 'Enter a valid ${noun.toLowerCase()}';
+  }
+  if (value < 0) return '$noun cannot be negative';
+  if (value == 0 && !allowZero) return '$noun must be greater than zero';
+  if (value > kMaxMoneyAmount) {
+    return '$noun cannot exceed $kMaxMoneyAmountLabel';
+  }
+  return null;
+}

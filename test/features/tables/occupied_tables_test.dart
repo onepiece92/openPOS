@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:pos_app/features/cart/data/ticket_sequence.dart';
 import 'package:pos_app/features/cart/domain/cart_item.dart';
 import 'package:pos_app/features/cart/presentation/providers/cart_notifier.dart';
 import 'package:pos_app/features/cart/domain/held_order.dart';
@@ -13,6 +14,9 @@ ProviderContainer _container({
 }) {
   return ProviderContainer(
     overrides: [
+      // cartSessionProvider draws its ticket number from the persisted
+      // counter; these tests care only about tableId, so keep Hive out of it.
+      ticketSequenceProvider.overrideWithValue(_MemorySequence()),
       activeHeldOrdersProvider.overrideWithValue(heldOrders),
       if (session != null)
         cartSessionProvider.overrideWith(_FixedSessionNotifier.new),
@@ -20,8 +24,18 @@ ProviderContainer _container({
   );
 }
 
+class _MemorySequence implements TicketSequence {
+  int _n = 0;
+  @override
+  String next() => formatTicketNumber(++_n);
+}
+
 class _FixedSessionNotifier extends CartSessionNotifier {
-  // Fall back to fresh() — we override per-test by calling setTable directly.
+  // Bypasses the persisted ticket counter, which would need an open Hive box.
+  // These tests only care about tableId; we set it per-test via setTable.
+  @override
+  CartSession build() =>
+      CartSession(ticketNumber: '#0001', openedAt: DateTime(2026));
 }
 
 void main() {
@@ -35,6 +49,7 @@ void main() {
     final held = [
       HeldOrder(
         id: '1',
+        ticketNumber: '#0001',
         label: 'A',
         createdAt: DateTime(2026),
         items: const <CartItem>[],
@@ -42,12 +57,14 @@ void main() {
       ),
       HeldOrder(
         id: '2',
+        ticketNumber: '#0002',
         label: 'B',
         createdAt: DateTime(2026),
         items: const <CartItem>[],
       ), // no table
       HeldOrder(
         id: '3',
+        ticketNumber: '#0003',
         label: 'C',
         createdAt: DateTime(2026),
         items: const <CartItem>[],
@@ -60,7 +77,7 @@ void main() {
   });
 
   test('includes the active cart session tableId', () {
-    final c = _container(session: CartSession.fresh());
+    final c = _container(session: CartSession.fresh('#0001'));
     c.read(cartSessionProvider.notifier).setTable(42);
     expect(c.read(occupiedTableIdsProvider), {42});
     c.dispose();
@@ -70,13 +87,14 @@ void main() {
     final held = [
       HeldOrder(
         id: '1',
+        ticketNumber: '#0001',
         label: 'A',
         createdAt: DateTime(2026),
         items: const <CartItem>[],
         tableId: 7,
       ),
     ];
-    final c = _container(heldOrders: held, session: CartSession.fresh());
+    final c = _container(heldOrders: held, session: CartSession.fresh('#0001'));
     c.read(cartSessionProvider.notifier).setTable(42);
     expect(c.read(occupiedTableIdsProvider), {7, 42});
     c.dispose();

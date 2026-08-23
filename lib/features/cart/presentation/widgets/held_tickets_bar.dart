@@ -299,9 +299,35 @@ class _HeldTicketsSheetState extends ConsumerState<_HeldTicketsSheet>
                 icon:
                     Icon(Icons.delete_outline_rounded, color: cs.error),
                 tooltip: 'Delete',
-                onPressed: () => ref
-                    .read(heldOrdersProvider.notifier)
-                    .delete(ticket.id),
+                onPressed: () async {
+                  final confirm = await showDialog<bool>(
+                    context: ctx,
+                    builder: (dCtx) => AlertDialog(
+                      title: const Text('Delete this ticket?'),
+                      content: Text(
+                        '${ticket.label} (${ticket.ticketNumber}) will be '
+                        'permanently deleted. This cannot be undone.',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(dCtx, false),
+                          child: const Text('Cancel'),
+                        ),
+                        FilledButton(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: cs.error,
+                            foregroundColor: cs.onError,
+                          ),
+                          onPressed: () => Navigator.pop(dCtx, true),
+                          child: const Text('Delete'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirm == true) {
+                    ref.read(heldOrdersProvider.notifier).delete(ticket.id);
+                  }
+                },
               ),
             ],
           ),
@@ -356,23 +382,18 @@ class _HeldTicketsSheetState extends ConsumerState<_HeldTicketsSheet>
   void _loadTicket(
       NavigatorState nav, GoRouter router, WidgetRef ref, HeldOrder ticket) {
     final notifier = ref.read(cartProvider.notifier);
-    notifier.clear();
+    // clearItems, not clear: clear() would open a fresh session and burn a new
+    // ticket number, which is exactly what resumeTicket is about to undo.
+    notifier.clearItems();
     for (final item in ticket.items) {
       notifier.addItem(item);
     }
+    // The ticket stays on disk while it is being edited — saving rewrites it
+    // in place, so its number, label and position never change.
     final sessionNotifier = ref.read(cartSessionProvider.notifier);
-    if (ticket.customerId != null) {
-      sessionNotifier.setCustomer(ticket.customerId);
-    }
-    if (ticket.tableId != null) {
-      sessionNotifier.setTable(ticket.tableId);
-    }
-    if (ticket.orderDiscount > 0) {
-      sessionNotifier.setOrderDiscount(
-        ticket.orderDiscount,
-        isPercent: ticket.orderDiscountIsPercent,
-      );
-    } else if (ticket.customerId != null) {
+    sessionNotifier.resumeTicket(ticket);
+
+    if (ticket.orderDiscount <= 0 && ticket.customerId != null) {
       final customers =
           ref.read(customersStreamProvider).valueOrNull ?? [];
       try {
@@ -385,7 +406,6 @@ class _HeldTicketsSheetState extends ConsumerState<_HeldTicketsSheet>
         }
       } catch (_) {}
     }
-    ref.read(heldOrdersProvider.notifier).delete(ticket.id);
     nav.pop(); // close the sheet
     router.push('/cart'); // open cart detail
   }

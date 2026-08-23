@@ -17,6 +17,7 @@ import 'package:pos_app/core/theme/app_theme.dart';
 import 'package:pos_app/core/theme/tokens.dart';
 import 'package:pos_app/core/utils/async_feedback.dart';
 import 'package:pos_app/core/utils/currency_formatter.dart';
+import 'package:pos_app/core/utils/money.dart';
 import 'package:pos_app/shared/widgets/app_empty_state.dart';
 import 'package:pos_app/shared/widgets/app_sheet.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
@@ -87,8 +88,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
                         .where((e) => e.categoryId == _selectedCategoryId)
                         .toList();
 
-                final total =
-                    filtered.fold(0.0, (sum, e) => sum + e.amount);
+                final total = filtered.fold(0.0, (sum, e) => sum + e.amount);
 
                 if (all.isEmpty) {
                   return AppEmptyState(
@@ -132,8 +132,7 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
                   ],
                 );
               },
-              loading: () =>
-                  const Center(child: CircularProgressIndicator()),
+              loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(child: Text('Error: $e')),
             ),
           ),
@@ -221,9 +220,7 @@ class _Chip extends StatelessWidget {
         onSelected: (_) => onTap(),
         showCheckmark: false,
         selectedColor: color?.withValues(alpha: 0.2),
-        side: selected && color != null
-            ? BorderSide(color: color!)
-            : null,
+        side: selected && color != null ? BorderSide(color: color!) : null,
       ),
     );
   }
@@ -287,8 +284,7 @@ class _ExpenseTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
-    final dateLabel =
-        DateFormat('d MMM y').format(expense.date.toLocal());
+    final dateLabel = DateFormat('d MMM y').format(expense.date.toLocal());
     final catColor = _parseColor(category?.color) ?? cs.primary;
     final hasReceipt = expense.receiptImagePath != null &&
         File(expense.receiptImagePath!).existsSync();
@@ -307,7 +303,8 @@ class _ExpenseTile extends StatelessWidget {
         children: [
           Expanded(
             child: Text(
-              [dateLabel, if (expense.notes != null) expense.notes!].join(' · '),
+              [dateLabel, if (expense.notes != null) expense.notes!]
+                  .join(' · '),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(color: cs.onSurfaceVariant),
@@ -354,8 +351,8 @@ class _ExpenseForm extends ConsumerStatefulWidget {
 
 class _ExpenseFormState extends ConsumerState<_ExpenseForm> {
   final _formKey = GlobalKey<FormState>();
-  late final _amountCtrl =
-      TextEditingController(text: widget.expense?.amount.toStringAsFixed(2) ?? '');
+  late final _amountCtrl = TextEditingController(
+      text: widget.expense?.amount.toStringAsFixed(2) ?? '');
   late final _notesCtrl =
       TextEditingController(text: widget.expense?.notes ?? '');
   late DateTime _date;
@@ -538,7 +535,8 @@ class _ExpenseFormState extends ConsumerState<_ExpenseForm> {
       amount: Value(double.parse(_amountCtrl.text)),
       date: Value(_date),
       categoryId: Value(_categoryId!),
-      notes: Value(_notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim()),
+      notes:
+          Value(_notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim()),
       receiptImagePath: Value(_imagePath),
     );
 
@@ -566,7 +564,8 @@ class _ExpenseFormState extends ConsumerState<_ExpenseForm> {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Delete expense?'),
-        content: const Text('This will permanently remove this expense record.'),
+        content:
+            const Text('This will permanently remove this expense record.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -645,11 +644,7 @@ class _ExpenseFormState extends ConsumerState<_ExpenseForm> {
                   prefixIcon: Icon(Icons.attach_money_rounded),
                   border: OutlineInputBorder(),
                 ),
-                validator: (v) {
-                  if (v == null || v.isEmpty) return 'Amount is required';
-                  if (double.tryParse(v) == null) return 'Enter a valid amount';
-                  return null;
-                },
+                validator: (v) => validateMoneyAmount(v, noun: 'Amount'),
               ),
               const SizedBox(height: 14),
 
@@ -783,4 +778,3 @@ class _ExpenseFormState extends ConsumerState<_ExpenseForm> {
     );
   }
 }
-
