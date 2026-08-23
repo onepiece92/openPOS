@@ -136,6 +136,27 @@ void main() {
     expect(bytesContain(job.bytes, 'Walk-in'), isTrue);
   });
 
+  test('first print is the original; reprint is marked COPY and counted',
+      () async {
+    final c = makeContainer();
+    addTearDown(c.dispose);
+    await c
+        .read(settingsProvider.notifier)
+        .setPrinterDevice(address: 'AA:BB', name: 'Rongta');
+    final orderId = await seedOrder();
+    final svc = c.read(autoPrintServiceProvider);
+
+    expect(await svc.printOrder(orderId), isNull);
+    expect(bytesContain(printer.printed[0].bytes, 'COPY OF ORIGINAL'), isFalse,
+        reason: 'first print is the original');
+
+    expect(await svc.printOrder(orderId), isNull);
+    expect(bytesContain(printer.printed[1].bytes, 'COPY OF ORIGINAL'), isTrue,
+        reason: 'every print after the first is a marked copy');
+
+    expect((await db.ordersDao.getById(orderId))!.printCount, 2);
+  });
+
   test('transport failure surfaces as a short error string', () async {
     final c = makeContainer();
     addTearDown(c.dispose);

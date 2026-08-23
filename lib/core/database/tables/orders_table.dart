@@ -10,10 +10,18 @@ import 'package:pos_app/core/database/tables/tables_table.dart';
 ///
 /// invoice_no is a gap-free sequence assigned when a sale is placed; voided
 /// and refunded orders keep theirs (they are cancelled, not erased).
-@TableIndex(name: 'idx_orders_invoice_no', columns: {#invoiceNo}, unique: true)
+/// invoice_prefix scopes the sequence (e.g. fiscal year '2082/83') — setting
+/// a new prefix restarts numbering at 1 without disturbing old bills.
+/// print_count tracks physical receipt prints; reprints are marked COPY.
+@TableIndex(
+    name: 'idx_orders_invoice_no',
+    columns: {#invoicePrefix, #invoiceNo},
+    unique: true)
 class Orders extends Table {
   IntColumn get id => integer().autoIncrement()();
   IntColumn get invoiceNo => integer().nullable()();
+  TextColumn get invoicePrefix =>
+      text().withDefault(const Constant(''))();
   TextColumn get status =>
       text().withDefault(const Constant('completed'))();
   RealColumn get subtotal => real()();
@@ -41,6 +49,8 @@ class Orders extends Table {
   RealColumn get loyaltyDiscount =>
       real().withDefault(const Constant(0.0))();
   IntColumn get pointsEarned =>
+      integer().withDefault(const Constant(0))();
+  IntColumn get printCount =>
       integer().withDefault(const Constant(0))();
   TextColumn get notes => text().nullable()();
   DateTimeColumn get createdAt =>

@@ -20,7 +20,7 @@ void main() {
 
   setUpAll(() => verifier = SchemaVerifier(GeneratedHelper()));
 
-  const shipped = [4, 6, 7, 8, 9];
+  const shipped = [4, 6, 7, 8, 9, 10];
 
   for (final from in shipped) {
     test('upgrade v$from → v${AppDatabase.currentSchemaVersion} yields the expected schema',

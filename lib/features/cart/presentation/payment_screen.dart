@@ -80,6 +80,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         session: session,
         paymentMethod: _paymentMethod,
         tenderedAmount: _tendered,
+        invoicePrefix: ref.read(invoicePrefixProvider),
       );
     } catch (e) {
       if (mounted) setState(() => _placing = false);

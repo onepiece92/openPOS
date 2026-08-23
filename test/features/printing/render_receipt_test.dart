@@ -13,6 +13,8 @@ ReceiptBodyData _sampleData() {
     taxTotal: 13.0,
     discountTotal: 0.0,
     discountIsPercent: false,
+    invoicePrefix: '',
+    printCount: 0,
     total: 113.0,
     paymentMethod: 'cash',
     tenderedAmount: 120.0,

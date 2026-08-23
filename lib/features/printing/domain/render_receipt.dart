@@ -10,11 +10,15 @@ import 'package:pos_app/features/orders/domain/order_number.dart';
 /// Caller is responsible for transport (BT/USB/network).
 ///
 /// `paperMm` must be 58 or 80. Other values fall back to 80mm.
+///
+/// [isCopy] prints a "COPY OF ORIGINAL" banner under the header — set for
+/// every reprint so the first bill stays the only original.
 Future<List<int>> renderReceiptBytes(
   ReceiptBodyData data,
   CurrencyFormatter fmt,
-  int paperMm,
-) async {
+  int paperMm, {
+  bool isCopy = false,
+}) async {
   final size = paperMm == 58 ? PaperSize.mm58 : PaperSize.mm80;
   final profile = await CapabilityProfile.load();
   final g = Generator(size, profile);
@@ -33,6 +37,14 @@ Future<List<int>> renderReceiptBytes(
     ),
   ));
   bytes.addAll(g.hr());
+
+  if (isCopy) {
+    bytes.addAll(g.text(
+      '*** COPY OF ORIGINAL ***',
+      styles: const PosStyles(align: PosAlign.center, bold: true),
+    ));
+    bytes.addAll(g.hr());
+  }
 
   // ── Customer + Bill no. ────────────────────────────────────────────────
   final customerName = data.customer?.name ?? 'Walk-in';

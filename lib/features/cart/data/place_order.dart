@@ -19,13 +19,16 @@ Future<int> placeOrder(
   required CartSession session,
   required String paymentMethod,
   required double tenderedAmount,
+  String invoicePrefix = '',
 }) {
   return db.transaction(() async {
     // Gap-free: computed inside the transaction, never reused (voids keep it).
-    final invoiceNo = await db.ordersDao.nextInvoiceNo();
+    final invoiceNo =
+        await db.ordersDao.nextInvoiceNo(prefix: invoicePrefix);
     final id = await db.ordersDao.insertOrder(
       OrdersCompanion.insert(
         invoiceNo: Value(invoiceNo),
+        invoicePrefix: Value(invoicePrefix),
         subtotal: summary.subtotal,
         taxTotal: Value(summary.taxAmount),
         discountTotal: Value(summary.orderDiscount),

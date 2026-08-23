@@ -81,7 +81,7 @@ class AppDatabase extends _$AppDatabase {
       : super(executor ?? _openConnection());
 
   /// Bump together with a new `onUpgrade` step below.
-  static const int currentSchemaVersion = 10;
+  static const int currentSchemaVersion = 11;
 
   @override
   int get schemaVersion => currentSchemaVersion;
@@ -139,8 +139,19 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(orders, orders.invoiceNo);
             await m.addColumn(orders, orders.discountValue);
             await m.addColumn(orders, orders.discountIsPercent);
-            await m.createIndex(idxOrdersInvoiceNo);
+            await customStatement(
+              'CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_invoice_no ON orders (invoice_no)',
+            );
             await backfillInvoiceNumbers();
+          }
+          if (from < 11) {
+            // Fiscal-year invoice prefix + physical print counter. The
+            // invoice_no unique index becomes composite so each prefix owns
+            // its own gap-free sequence.
+            await m.addColumn(orders, orders.invoicePrefix);
+            await m.addColumn(orders, orders.printCount);
+            await customStatement('DROP INDEX IF EXISTS idx_orders_invoice_no');
+            await m.createIndex(idxOrdersInvoiceNo);
           }
         },
         beforeOpen: (details) async {

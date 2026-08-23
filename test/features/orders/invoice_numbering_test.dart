@@ -27,7 +27,8 @@ void main() {
         ProductsCompanion.insert(sku: 'P', name: 'P', price: 5, stockQuantity: const Value(100)),
       );
 
-  Future<int> sell(int productId, {double discount = 0, bool percent = false}) =>
+  Future<int> sell(int productId,
+          {double discount = 0, bool percent = false, String prefix = ''}) =>
       placeOrder(
         db,
         audit,
@@ -52,7 +53,45 @@ void main() {
         ),
         paymentMethod: 'cash',
         tenderedAmount: 5,
+        invoicePrefix: prefix,
       );
+
+  test('each prefix owns an independent gap-free sequence', () async {
+    final p = await seedProduct();
+    final a = await sell(p); // '' prefix → #1
+    final b = await sell(p, prefix: '2082/83'); // → 2082/83-1
+    final c = await sell(p, prefix: '2082/83'); // → 2082/83-2
+    final d = await sell(p); // '' again → #2
+
+    Future<Order> get(int id) async => (await db.ordersDao.getById(id))!;
+    expect((await get(a)).billNo, '#1');
+    expect((await get(b)).billNo, '2082/83-1');
+    expect((await get(c)).billNo, '2082/83-2');
+    expect((await get(d)).billNo, '#2');
+
+    // A fresh prefix restarts at 1 without disturbing the others.
+    final e = await sell(p, prefix: '2083/84');
+    expect((await get(e)).billNo, '2083/84-1');
+    expect(await db.ordersDao.nextInvoiceNo(prefix: '2082/83'), 3);
+    expect(await db.ordersDao.nextInvoiceNo(), 3);
+  });
+
+  test('the same number may exist under different prefixes, not within one',
+      () async {
+    final p = await seedProduct();
+    await sell(p); // '' #1
+    await sell(p, prefix: 'FY'); // FY-1 — same number, different prefix: fine
+    expect(
+      () => db.ordersDao.insertOrder(OrdersCompanion.insert(
+        invoiceNo: const Value(1),
+        invoicePrefix: const Value('FY'),
+        subtotal: 1,
+        total: 1,
+        paymentMethod: 'cash',
+      )),
+      throwsA(anything),
+    );
+  });
 
   test('placeOrder assigns 1, 2, 3 … and stores the discount as entered',
       () async {

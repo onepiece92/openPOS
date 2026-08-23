@@ -57,7 +57,15 @@ class AutoPrintService {
         table: table,
       );
 
-      final bytes = await renderReceiptBytes(data, fmt, paper);
+      // Count first: anything after the original is a marked copy, and a
+      // print that fails half-way was still an issue attempt.
+      final printsBefore = await db.ordersDao.incrementPrintCount(orderId);
+      final bytes = await renderReceiptBytes(
+        data,
+        fmt,
+        paper,
+        isCopy: printsBefore > 0,
+      );
       await _ref.read(receiptPrinterProvider).printBytes(
             address: address,
             name: name,

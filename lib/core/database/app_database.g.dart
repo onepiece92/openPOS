@@ -4333,6 +4333,14 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
   late final GeneratedColumn<int> invoiceNo = GeneratedColumn<int>(
       'invoice_no', aliasedName, true,
       type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _invoicePrefixMeta =
+      const VerificationMeta('invoicePrefix');
+  @override
+  late final GeneratedColumn<String> invoicePrefix = GeneratedColumn<String>(
+      'invoice_prefix', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(''));
   static const VerificationMeta _statusMeta = const VerificationMeta('status');
   @override
   late final GeneratedColumn<String> status = GeneratedColumn<String>(
@@ -4443,6 +4451,14 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
       type: DriftSqlType.int,
       requiredDuringInsert: false,
       defaultValue: const Constant(0));
+  static const VerificationMeta _printCountMeta =
+      const VerificationMeta('printCount');
+  @override
+  late final GeneratedColumn<int> printCount = GeneratedColumn<int>(
+      'print_count', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0));
   static const VerificationMeta _notesMeta = const VerificationMeta('notes');
   @override
   late final GeneratedColumn<String> notes = GeneratedColumn<String>(
@@ -4468,6 +4484,7 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
   List<GeneratedColumn> get $columns => [
         id,
         invoiceNo,
+        invoicePrefix,
         status,
         subtotal,
         taxTotal,
@@ -4483,6 +4500,7 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
         pointsRedeemed,
         loyaltyDiscount,
         pointsEarned,
+        printCount,
         notes,
         createdAt,
         updatedAt
@@ -4503,6 +4521,12 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
     if (data.containsKey('invoice_no')) {
       context.handle(_invoiceNoMeta,
           invoiceNo.isAcceptableOrUnknown(data['invoice_no']!, _invoiceNoMeta));
+    }
+    if (data.containsKey('invoice_prefix')) {
+      context.handle(
+          _invoicePrefixMeta,
+          invoicePrefix.isAcceptableOrUnknown(
+              data['invoice_prefix']!, _invoicePrefixMeta));
     }
     if (data.containsKey('status')) {
       context.handle(_statusMeta,
@@ -4590,6 +4614,12 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
           pointsEarned.isAcceptableOrUnknown(
               data['points_earned']!, _pointsEarnedMeta));
     }
+    if (data.containsKey('print_count')) {
+      context.handle(
+          _printCountMeta,
+          printCount.isAcceptableOrUnknown(
+              data['print_count']!, _printCountMeta));
+    }
     if (data.containsKey('notes')) {
       context.handle(
           _notesMeta, notes.isAcceptableOrUnknown(data['notes']!, _notesMeta));
@@ -4615,6 +4645,8 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
           .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
       invoiceNo: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}invoice_no']),
+      invoicePrefix: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}invoice_prefix'])!,
       status: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}status'])!,
       subtotal: attachedDatabase.typeMapping
@@ -4645,6 +4677,8 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
           DriftSqlType.double, data['${effectivePrefix}loyalty_discount'])!,
       pointsEarned: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}points_earned'])!,
+      printCount: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}print_count'])!,
       notes: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}notes']),
       createdAt: attachedDatabase.typeMapping
@@ -4663,6 +4697,7 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
 class Order extends DataClass implements Insertable<Order> {
   final int id;
   final int? invoiceNo;
+  final String invoicePrefix;
   final String status;
   final double subtotal;
   final double taxTotal;
@@ -4681,12 +4716,14 @@ class Order extends DataClass implements Insertable<Order> {
   final int pointsRedeemed;
   final double loyaltyDiscount;
   final int pointsEarned;
+  final int printCount;
   final String? notes;
   final DateTime createdAt;
   final DateTime updatedAt;
   const Order(
       {required this.id,
       this.invoiceNo,
+      required this.invoicePrefix,
       required this.status,
       required this.subtotal,
       required this.taxTotal,
@@ -4702,6 +4739,7 @@ class Order extends DataClass implements Insertable<Order> {
       required this.pointsRedeemed,
       required this.loyaltyDiscount,
       required this.pointsEarned,
+      required this.printCount,
       this.notes,
       required this.createdAt,
       required this.updatedAt});
@@ -4712,6 +4750,7 @@ class Order extends DataClass implements Insertable<Order> {
     if (!nullToAbsent || invoiceNo != null) {
       map['invoice_no'] = Variable<int>(invoiceNo);
     }
+    map['invoice_prefix'] = Variable<String>(invoicePrefix);
     map['status'] = Variable<String>(status);
     map['subtotal'] = Variable<double>(subtotal);
     map['tax_total'] = Variable<double>(taxTotal);
@@ -4737,6 +4776,7 @@ class Order extends DataClass implements Insertable<Order> {
     map['points_redeemed'] = Variable<int>(pointsRedeemed);
     map['loyalty_discount'] = Variable<double>(loyaltyDiscount);
     map['points_earned'] = Variable<int>(pointsEarned);
+    map['print_count'] = Variable<int>(printCount);
     if (!nullToAbsent || notes != null) {
       map['notes'] = Variable<String>(notes);
     }
@@ -4751,6 +4791,7 @@ class Order extends DataClass implements Insertable<Order> {
       invoiceNo: invoiceNo == null && nullToAbsent
           ? const Value.absent()
           : Value(invoiceNo),
+      invoicePrefix: Value(invoicePrefix),
       status: Value(status),
       subtotal: Value(subtotal),
       taxTotal: Value(taxTotal),
@@ -4776,6 +4817,7 @@ class Order extends DataClass implements Insertable<Order> {
       pointsRedeemed: Value(pointsRedeemed),
       loyaltyDiscount: Value(loyaltyDiscount),
       pointsEarned: Value(pointsEarned),
+      printCount: Value(printCount),
       notes:
           notes == null && nullToAbsent ? const Value.absent() : Value(notes),
       createdAt: Value(createdAt),
@@ -4789,6 +4831,7 @@ class Order extends DataClass implements Insertable<Order> {
     return Order(
       id: serializer.fromJson<int>(json['id']),
       invoiceNo: serializer.fromJson<int?>(json['invoiceNo']),
+      invoicePrefix: serializer.fromJson<String>(json['invoicePrefix']),
       status: serializer.fromJson<String>(json['status']),
       subtotal: serializer.fromJson<double>(json['subtotal']),
       taxTotal: serializer.fromJson<double>(json['taxTotal']),
@@ -4804,6 +4847,7 @@ class Order extends DataClass implements Insertable<Order> {
       pointsRedeemed: serializer.fromJson<int>(json['pointsRedeemed']),
       loyaltyDiscount: serializer.fromJson<double>(json['loyaltyDiscount']),
       pointsEarned: serializer.fromJson<int>(json['pointsEarned']),
+      printCount: serializer.fromJson<int>(json['printCount']),
       notes: serializer.fromJson<String?>(json['notes']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
@@ -4815,6 +4859,7 @@ class Order extends DataClass implements Insertable<Order> {
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
       'invoiceNo': serializer.toJson<int?>(invoiceNo),
+      'invoicePrefix': serializer.toJson<String>(invoicePrefix),
       'status': serializer.toJson<String>(status),
       'subtotal': serializer.toJson<double>(subtotal),
       'taxTotal': serializer.toJson<double>(taxTotal),
@@ -4830,6 +4875,7 @@ class Order extends DataClass implements Insertable<Order> {
       'pointsRedeemed': serializer.toJson<int>(pointsRedeemed),
       'loyaltyDiscount': serializer.toJson<double>(loyaltyDiscount),
       'pointsEarned': serializer.toJson<int>(pointsEarned),
+      'printCount': serializer.toJson<int>(printCount),
       'notes': serializer.toJson<String?>(notes),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
@@ -4839,6 +4885,7 @@ class Order extends DataClass implements Insertable<Order> {
   Order copyWith(
           {int? id,
           Value<int?> invoiceNo = const Value.absent(),
+          String? invoicePrefix,
           String? status,
           double? subtotal,
           double? taxTotal,
@@ -4854,12 +4901,14 @@ class Order extends DataClass implements Insertable<Order> {
           int? pointsRedeemed,
           double? loyaltyDiscount,
           int? pointsEarned,
+          int? printCount,
           Value<String?> notes = const Value.absent(),
           DateTime? createdAt,
           DateTime? updatedAt}) =>
       Order(
         id: id ?? this.id,
         invoiceNo: invoiceNo.present ? invoiceNo.value : this.invoiceNo,
+        invoicePrefix: invoicePrefix ?? this.invoicePrefix,
         status: status ?? this.status,
         subtotal: subtotal ?? this.subtotal,
         taxTotal: taxTotal ?? this.taxTotal,
@@ -4878,6 +4927,7 @@ class Order extends DataClass implements Insertable<Order> {
         pointsRedeemed: pointsRedeemed ?? this.pointsRedeemed,
         loyaltyDiscount: loyaltyDiscount ?? this.loyaltyDiscount,
         pointsEarned: pointsEarned ?? this.pointsEarned,
+        printCount: printCount ?? this.printCount,
         notes: notes.present ? notes.value : this.notes,
         createdAt: createdAt ?? this.createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
@@ -4886,6 +4936,9 @@ class Order extends DataClass implements Insertable<Order> {
     return Order(
       id: data.id.present ? data.id.value : this.id,
       invoiceNo: data.invoiceNo.present ? data.invoiceNo.value : this.invoiceNo,
+      invoicePrefix: data.invoicePrefix.present
+          ? data.invoicePrefix.value
+          : this.invoicePrefix,
       status: data.status.present ? data.status.value : this.status,
       subtotal: data.subtotal.present ? data.subtotal.value : this.subtotal,
       taxTotal: data.taxTotal.present ? data.taxTotal.value : this.taxTotal,
@@ -4920,6 +4973,8 @@ class Order extends DataClass implements Insertable<Order> {
       pointsEarned: data.pointsEarned.present
           ? data.pointsEarned.value
           : this.pointsEarned,
+      printCount:
+          data.printCount.present ? data.printCount.value : this.printCount,
       notes: data.notes.present ? data.notes.value : this.notes,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
@@ -4931,6 +4986,7 @@ class Order extends DataClass implements Insertable<Order> {
     return (StringBuffer('Order(')
           ..write('id: $id, ')
           ..write('invoiceNo: $invoiceNo, ')
+          ..write('invoicePrefix: $invoicePrefix, ')
           ..write('status: $status, ')
           ..write('subtotal: $subtotal, ')
           ..write('taxTotal: $taxTotal, ')
@@ -4946,6 +5002,7 @@ class Order extends DataClass implements Insertable<Order> {
           ..write('pointsRedeemed: $pointsRedeemed, ')
           ..write('loyaltyDiscount: $loyaltyDiscount, ')
           ..write('pointsEarned: $pointsEarned, ')
+          ..write('printCount: $printCount, ')
           ..write('notes: $notes, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
@@ -4954,33 +5011,37 @@ class Order extends DataClass implements Insertable<Order> {
   }
 
   @override
-  int get hashCode => Object.hash(
-      id,
-      invoiceNo,
-      status,
-      subtotal,
-      taxTotal,
-      discountTotal,
-      discountValue,
-      discountIsPercent,
-      total,
-      paymentMethod,
-      tenderedAmount,
-      changeAmount,
-      customerId,
-      tableId,
-      pointsRedeemed,
-      loyaltyDiscount,
-      pointsEarned,
-      notes,
-      createdAt,
-      updatedAt);
+  int get hashCode => Object.hashAll([
+        id,
+        invoiceNo,
+        invoicePrefix,
+        status,
+        subtotal,
+        taxTotal,
+        discountTotal,
+        discountValue,
+        discountIsPercent,
+        total,
+        paymentMethod,
+        tenderedAmount,
+        changeAmount,
+        customerId,
+        tableId,
+        pointsRedeemed,
+        loyaltyDiscount,
+        pointsEarned,
+        printCount,
+        notes,
+        createdAt,
+        updatedAt
+      ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is Order &&
           other.id == this.id &&
           other.invoiceNo == this.invoiceNo &&
+          other.invoicePrefix == this.invoicePrefix &&
           other.status == this.status &&
           other.subtotal == this.subtotal &&
           other.taxTotal == this.taxTotal &&
@@ -4996,6 +5057,7 @@ class Order extends DataClass implements Insertable<Order> {
           other.pointsRedeemed == this.pointsRedeemed &&
           other.loyaltyDiscount == this.loyaltyDiscount &&
           other.pointsEarned == this.pointsEarned &&
+          other.printCount == this.printCount &&
           other.notes == this.notes &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
@@ -5004,6 +5066,7 @@ class Order extends DataClass implements Insertable<Order> {
 class OrdersCompanion extends UpdateCompanion<Order> {
   final Value<int> id;
   final Value<int?> invoiceNo;
+  final Value<String> invoicePrefix;
   final Value<String> status;
   final Value<double> subtotal;
   final Value<double> taxTotal;
@@ -5019,12 +5082,14 @@ class OrdersCompanion extends UpdateCompanion<Order> {
   final Value<int> pointsRedeemed;
   final Value<double> loyaltyDiscount;
   final Value<int> pointsEarned;
+  final Value<int> printCount;
   final Value<String?> notes;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   const OrdersCompanion({
     this.id = const Value.absent(),
     this.invoiceNo = const Value.absent(),
+    this.invoicePrefix = const Value.absent(),
     this.status = const Value.absent(),
     this.subtotal = const Value.absent(),
     this.taxTotal = const Value.absent(),
@@ -5040,6 +5105,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     this.pointsRedeemed = const Value.absent(),
     this.loyaltyDiscount = const Value.absent(),
     this.pointsEarned = const Value.absent(),
+    this.printCount = const Value.absent(),
     this.notes = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -5047,6 +5113,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
   OrdersCompanion.insert({
     this.id = const Value.absent(),
     this.invoiceNo = const Value.absent(),
+    this.invoicePrefix = const Value.absent(),
     this.status = const Value.absent(),
     required double subtotal,
     this.taxTotal = const Value.absent(),
@@ -5062,6 +5129,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     this.pointsRedeemed = const Value.absent(),
     this.loyaltyDiscount = const Value.absent(),
     this.pointsEarned = const Value.absent(),
+    this.printCount = const Value.absent(),
     this.notes = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -5071,6 +5139,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
   static Insertable<Order> custom({
     Expression<int>? id,
     Expression<int>? invoiceNo,
+    Expression<String>? invoicePrefix,
     Expression<String>? status,
     Expression<double>? subtotal,
     Expression<double>? taxTotal,
@@ -5086,6 +5155,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     Expression<int>? pointsRedeemed,
     Expression<double>? loyaltyDiscount,
     Expression<int>? pointsEarned,
+    Expression<int>? printCount,
     Expression<String>? notes,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
@@ -5093,6 +5163,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (invoiceNo != null) 'invoice_no': invoiceNo,
+      if (invoicePrefix != null) 'invoice_prefix': invoicePrefix,
       if (status != null) 'status': status,
       if (subtotal != null) 'subtotal': subtotal,
       if (taxTotal != null) 'tax_total': taxTotal,
@@ -5108,6 +5179,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
       if (pointsRedeemed != null) 'points_redeemed': pointsRedeemed,
       if (loyaltyDiscount != null) 'loyalty_discount': loyaltyDiscount,
       if (pointsEarned != null) 'points_earned': pointsEarned,
+      if (printCount != null) 'print_count': printCount,
       if (notes != null) 'notes': notes,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -5117,6 +5189,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
   OrdersCompanion copyWith(
       {Value<int>? id,
       Value<int?>? invoiceNo,
+      Value<String>? invoicePrefix,
       Value<String>? status,
       Value<double>? subtotal,
       Value<double>? taxTotal,
@@ -5132,12 +5205,14 @@ class OrdersCompanion extends UpdateCompanion<Order> {
       Value<int>? pointsRedeemed,
       Value<double>? loyaltyDiscount,
       Value<int>? pointsEarned,
+      Value<int>? printCount,
       Value<String?>? notes,
       Value<DateTime>? createdAt,
       Value<DateTime>? updatedAt}) {
     return OrdersCompanion(
       id: id ?? this.id,
       invoiceNo: invoiceNo ?? this.invoiceNo,
+      invoicePrefix: invoicePrefix ?? this.invoicePrefix,
       status: status ?? this.status,
       subtotal: subtotal ?? this.subtotal,
       taxTotal: taxTotal ?? this.taxTotal,
@@ -5153,6 +5228,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
       pointsRedeemed: pointsRedeemed ?? this.pointsRedeemed,
       loyaltyDiscount: loyaltyDiscount ?? this.loyaltyDiscount,
       pointsEarned: pointsEarned ?? this.pointsEarned,
+      printCount: printCount ?? this.printCount,
       notes: notes ?? this.notes,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -5167,6 +5243,9 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     }
     if (invoiceNo.present) {
       map['invoice_no'] = Variable<int>(invoiceNo.value);
+    }
+    if (invoicePrefix.present) {
+      map['invoice_prefix'] = Variable<String>(invoicePrefix.value);
     }
     if (status.present) {
       map['status'] = Variable<String>(status.value);
@@ -5213,6 +5292,9 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     if (pointsEarned.present) {
       map['points_earned'] = Variable<int>(pointsEarned.value);
     }
+    if (printCount.present) {
+      map['print_count'] = Variable<int>(printCount.value);
+    }
     if (notes.present) {
       map['notes'] = Variable<String>(notes.value);
     }
@@ -5230,6 +5312,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     return (StringBuffer('OrdersCompanion(')
           ..write('id: $id, ')
           ..write('invoiceNo: $invoiceNo, ')
+          ..write('invoicePrefix: $invoicePrefix, ')
           ..write('status: $status, ')
           ..write('subtotal: $subtotal, ')
           ..write('taxTotal: $taxTotal, ')
@@ -5245,6 +5328,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
           ..write('pointsRedeemed: $pointsRedeemed, ')
           ..write('loyaltyDiscount: $loyaltyDiscount, ')
           ..write('pointsEarned: $pointsEarned, ')
+          ..write('printCount: $printCount, ')
           ..write('notes: $notes, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
@@ -8458,7 +8542,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $StockAdjustmentsTable(this);
   late final $AuditLogTable auditLog = $AuditLogTable(this);
   late final Index idxOrdersInvoiceNo = Index('idx_orders_invoice_no',
-      'CREATE UNIQUE INDEX idx_orders_invoice_no ON orders (invoice_no)');
+      'CREATE UNIQUE INDEX idx_orders_invoice_no ON orders (invoice_prefix, invoice_no)');
   late final ProductsDao productsDao = ProductsDao(this as AppDatabase);
   late final OrdersDao ordersDao = OrdersDao(this as AppDatabase);
   late final CustomersDao customersDao = CustomersDao(this as AppDatabase);
@@ -12880,6 +12964,7 @@ typedef $$TablesTableProcessedTableManager = ProcessedTableManager<
 typedef $$OrdersTableCreateCompanionBuilder = OrdersCompanion Function({
   Value<int> id,
   Value<int?> invoiceNo,
+  Value<String> invoicePrefix,
   Value<String> status,
   required double subtotal,
   Value<double> taxTotal,
@@ -12895,6 +12980,7 @@ typedef $$OrdersTableCreateCompanionBuilder = OrdersCompanion Function({
   Value<int> pointsRedeemed,
   Value<double> loyaltyDiscount,
   Value<int> pointsEarned,
+  Value<int> printCount,
   Value<String?> notes,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
@@ -12902,6 +12988,7 @@ typedef $$OrdersTableCreateCompanionBuilder = OrdersCompanion Function({
 typedef $$OrdersTableUpdateCompanionBuilder = OrdersCompanion Function({
   Value<int> id,
   Value<int?> invoiceNo,
+  Value<String> invoicePrefix,
   Value<String> status,
   Value<double> subtotal,
   Value<double> taxTotal,
@@ -12917,6 +13004,7 @@ typedef $$OrdersTableUpdateCompanionBuilder = OrdersCompanion Function({
   Value<int> pointsRedeemed,
   Value<double> loyaltyDiscount,
   Value<int> pointsEarned,
+  Value<int> printCount,
   Value<String?> notes,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
@@ -13029,6 +13117,9 @@ class $$OrdersTableFilterComposer
   ColumnFilters<int> get invoiceNo => $composableBuilder(
       column: $table.invoiceNo, builder: (column) => ColumnFilters(column));
 
+  ColumnFilters<String> get invoicePrefix => $composableBuilder(
+      column: $table.invoicePrefix, builder: (column) => ColumnFilters(column));
+
   ColumnFilters<String> get status => $composableBuilder(
       column: $table.status, builder: (column) => ColumnFilters(column));
 
@@ -13071,6 +13162,9 @@ class $$OrdersTableFilterComposer
 
   ColumnFilters<int> get pointsEarned => $composableBuilder(
       column: $table.pointsEarned, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get printCount => $composableBuilder(
+      column: $table.printCount, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get notes => $composableBuilder(
       column: $table.notes, builder: (column) => ColumnFilters(column));
@@ -13221,6 +13315,10 @@ class $$OrdersTableOrderingComposer
   ColumnOrderings<int> get invoiceNo => $composableBuilder(
       column: $table.invoiceNo, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get invoicePrefix => $composableBuilder(
+      column: $table.invoicePrefix,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<String> get status => $composableBuilder(
       column: $table.status, builder: (column) => ColumnOrderings(column));
 
@@ -13268,6 +13366,9 @@ class $$OrdersTableOrderingComposer
   ColumnOrderings<int> get pointsEarned => $composableBuilder(
       column: $table.pointsEarned,
       builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get printCount => $composableBuilder(
+      column: $table.printCount, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<String> get notes => $composableBuilder(
       column: $table.notes, builder: (column) => ColumnOrderings(column));
@@ -13334,6 +13435,9 @@ class $$OrdersTableAnnotationComposer
   GeneratedColumn<int> get invoiceNo =>
       $composableBuilder(column: $table.invoiceNo, builder: (column) => column);
 
+  GeneratedColumn<String> get invoicePrefix => $composableBuilder(
+      column: $table.invoicePrefix, builder: (column) => column);
+
   GeneratedColumn<String> get status =>
       $composableBuilder(column: $table.status, builder: (column) => column);
 
@@ -13372,6 +13476,9 @@ class $$OrdersTableAnnotationComposer
 
   GeneratedColumn<int> get pointsEarned => $composableBuilder(
       column: $table.pointsEarned, builder: (column) => column);
+
+  GeneratedColumn<int> get printCount => $composableBuilder(
+      column: $table.printCount, builder: (column) => column);
 
   GeneratedColumn<String> get notes =>
       $composableBuilder(column: $table.notes, builder: (column) => column);
@@ -13539,6 +13646,7 @@ class $$OrdersTableTableManager extends RootTableManager<
           updateCompanionCallback: ({
             Value<int> id = const Value.absent(),
             Value<int?> invoiceNo = const Value.absent(),
+            Value<String> invoicePrefix = const Value.absent(),
             Value<String> status = const Value.absent(),
             Value<double> subtotal = const Value.absent(),
             Value<double> taxTotal = const Value.absent(),
@@ -13554,6 +13662,7 @@ class $$OrdersTableTableManager extends RootTableManager<
             Value<int> pointsRedeemed = const Value.absent(),
             Value<double> loyaltyDiscount = const Value.absent(),
             Value<int> pointsEarned = const Value.absent(),
+            Value<int> printCount = const Value.absent(),
             Value<String?> notes = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<DateTime> updatedAt = const Value.absent(),
@@ -13561,6 +13670,7 @@ class $$OrdersTableTableManager extends RootTableManager<
               OrdersCompanion(
             id: id,
             invoiceNo: invoiceNo,
+            invoicePrefix: invoicePrefix,
             status: status,
             subtotal: subtotal,
             taxTotal: taxTotal,
@@ -13576,6 +13686,7 @@ class $$OrdersTableTableManager extends RootTableManager<
             pointsRedeemed: pointsRedeemed,
             loyaltyDiscount: loyaltyDiscount,
             pointsEarned: pointsEarned,
+            printCount: printCount,
             notes: notes,
             createdAt: createdAt,
             updatedAt: updatedAt,
@@ -13583,6 +13694,7 @@ class $$OrdersTableTableManager extends RootTableManager<
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
             Value<int?> invoiceNo = const Value.absent(),
+            Value<String> invoicePrefix = const Value.absent(),
             Value<String> status = const Value.absent(),
             required double subtotal,
             Value<double> taxTotal = const Value.absent(),
@@ -13598,6 +13710,7 @@ class $$OrdersTableTableManager extends RootTableManager<
             Value<int> pointsRedeemed = const Value.absent(),
             Value<double> loyaltyDiscount = const Value.absent(),
             Value<int> pointsEarned = const Value.absent(),
+            Value<int> printCount = const Value.absent(),
             Value<String?> notes = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<DateTime> updatedAt = const Value.absent(),
@@ -13605,6 +13718,7 @@ class $$OrdersTableTableManager extends RootTableManager<
               OrdersCompanion.insert(
             id: id,
             invoiceNo: invoiceNo,
+            invoicePrefix: invoicePrefix,
             status: status,
             subtotal: subtotal,
             taxTotal: taxTotal,
@@ -13620,6 +13734,7 @@ class $$OrdersTableTableManager extends RootTableManager<
             pointsRedeemed: pointsRedeemed,
             loyaltyDiscount: loyaltyDiscount,
             pointsEarned: pointsEarned,
+            printCount: printCount,
             notes: notes,
             createdAt: createdAt,
             updatedAt: updatedAt,

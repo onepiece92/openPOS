@@ -59,8 +59,8 @@ void main() {
     expect(p.conversionRate, 1);
   });
 
-  test('schema is at v10 and products table exposes the new columns', () {
-    expect(db.schemaVersion, 10);
+  test('schema is current and products table exposes the unit columns', () {
+    expect(db.schemaVersion, AppDatabase.currentSchemaVersion);
     final cols = db.products.$columns.map((c) => c.name).toSet();
     expect(cols, containsAll(['purchase_price', 'unit', 'secondary_unit', 'conversion_rate']));
     // Keep the import used so this test stays a compile-time guard on the table class.

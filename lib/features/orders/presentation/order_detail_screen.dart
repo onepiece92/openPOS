@@ -15,6 +15,7 @@ import 'package:pos_app/features/receipts/presentation/receipt_pdf_service.dart'
 import 'package:pos_app/features/returns/domain/process_return.dart';
 import 'package:pos_app/features/returns/domain/void_order.dart' as void_svc;
 import 'package:pos_app/features/orders/domain/order_number.dart';
+import 'package:pos_app/features/printing/domain/auto_print.dart';
 
 // ─── Data bundle ──────────────────────────────────────────────────────────────
 
@@ -79,6 +80,17 @@ class OrderDetailScreen extends ConsumerWidget {
               switch (v) {
                 case 'pdf':
                   await downloadReceiptPdf(context, data.receipt, fmt);
+                case 'print':
+                  final err = await ref
+                      .read(autoPrintServiceProvider)
+                      .printOrder(orderId);
+                  if (err != null && context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(err)),
+                    );
+                  } else {
+                    ref.invalidate(_orderDetailProvider(orderId));
+                  }
               }
             },
             itemBuilder: (_) => const [
@@ -95,14 +107,6 @@ class OrderDetailScreen extends ConsumerWidget {
                 child: ListTile(
                   leading: Icon(Icons.print_outlined),
                   title: Text('Print'),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-              PopupMenuItem(
-                value: 'share',
-                child: ListTile(
-                  leading: Icon(Icons.share_outlined),
-                  title: Text('Share'),
                   contentPadding: EdgeInsets.zero,
                 ),
               ),

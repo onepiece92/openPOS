@@ -67,14 +67,27 @@ class OrdersDao extends DatabaseAccessor<AppDatabase> with _$OrdersDaoMixin {
   Future<int> insertReturn(ReturnsCompanion entry) =>
       into(returns).insert(entry);
 
-  /// Next gap-free invoice number. Call inside the placing transaction.
-  Future<int> nextInvoiceNo() async {
+  /// Next gap-free invoice number within [prefix] (e.g. fiscal year
+  /// '2082/83'; '' = no prefix). Call inside the placing transaction.
+  Future<int> nextInvoiceNo({String prefix = ''}) async {
     final row = await customSelect(
-      'SELECT COALESCE(MAX(invoice_no), 0) + 1 AS n FROM orders',
+      'SELECT COALESCE(MAX(invoice_no), 0) + 1 AS n FROM orders '
+      'WHERE invoice_prefix = ?',
+      variables: [Variable(prefix)],
       readsFrom: {orders},
     ).getSingle();
     return row.read<int>('n');
   }
+
+  /// Records one physical receipt print. Returns the count *before* this
+  /// print — 0 means the copy just produced was the original.
+  Future<int> incrementPrintCount(int id) => transaction(() async {
+        final row = await getById(id);
+        final before = row?.printCount ?? 0;
+        await (update(orders)..where((o) => o.id.equals(id)))
+            .write(OrdersCompanion(printCount: Value(before + 1)));
+        return before;
+      });
 
   // ── Aggregates (for reports) ───────────────────────────────────────────
 

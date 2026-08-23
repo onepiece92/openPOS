@@ -37,6 +37,7 @@ const kBusinessPan = 'business_pan';
 const kCurrencySymbol = 'currency_symbol';
 const kCurrencyCode = 'currency_code';
 const kCountryCode = 'country_code';
+const kInvoicePrefix = 'invoice_prefix';
 const kTimezone = 'timezone';
 
 // ── Raw box provider ─────────────────────────────────────────────────────────
@@ -70,6 +71,7 @@ class AppSettings {
     this.currencySymbol = 'Rs',
     this.currencyCode = 'NPR',
     this.countryCode = '',
+    this.invoicePrefix = '',
     this.timezone = '',
     this.autoBackupEnabled = true,
     this.autoBackupLastAt,
@@ -93,6 +95,10 @@ class AppSettings {
   final String currencySymbol;
   final String currencyCode;
   final String countryCode;
+
+  /// Scopes invoice numbering (e.g. fiscal year '2082/83'). Changing it
+  /// restarts the bill sequence at 1; old bills keep their numbers.
+  final String invoicePrefix;
   final String timezone;
   final bool autoBackupEnabled;
   final DateTime? autoBackupLastAt;
@@ -139,6 +145,7 @@ class AppSettings {
       currencySymbol: get(kCurrencySymbol, 'Rs'),
       currencyCode: get(kCurrencyCode, 'NPR'),
       countryCode: get(kCountryCode, ''),
+      invoicePrefix: get(kInvoicePrefix, ''),
       timezone: get(kTimezone, ''),
       autoBackupEnabled: get(kAutoBackupEnabled, true),
       autoBackupLastAt:
@@ -167,6 +174,7 @@ class AppSettings {
     String? currencySymbol,
     String? currencyCode,
     String? countryCode,
+    String? invoicePrefix,
     String? timezone,
     bool? autoBackupEnabled,
     DateTime? autoBackupLastAt,
@@ -195,6 +203,7 @@ class AppSettings {
         currencySymbol: currencySymbol ?? this.currencySymbol,
         currencyCode: currencyCode ?? this.currencyCode,
         countryCode: countryCode ?? this.countryCode,
+        invoicePrefix: invoicePrefix ?? this.invoicePrefix,
         timezone: timezone ?? this.timezone,
         autoBackupEnabled: autoBackupEnabled ?? this.autoBackupEnabled,
         autoBackupLastAt: autoBackupLastAt ?? this.autoBackupLastAt,
@@ -306,6 +315,8 @@ class SettingsNotifier extends Notifier<AppSettings> {
         state.copyWith(currencySymbol: symbol, currencyCode: code),
         {kCurrencySymbol: symbol, kCurrencyCode: code},
       );
+  Future<void> setInvoicePrefix(String v) =>
+      _write(state.copyWith(invoicePrefix: v.trim()), {kInvoicePrefix: v.trim()});
   Future<void> setLocale({required String countryCode, required String timezone}) =>
       _write(
         state.copyWith(countryCode: countryCode, timezone: timezone),
@@ -355,6 +366,8 @@ final businessPanProvider = _field((s) => s.businessPan);
 /// Currency symbol shown before amounts (e.g. "Rs", "$").
 final currencySymbolProvider = _field((s) => s.currencySymbol);
 final currencyCodeProvider = _field((s) => s.currencyCode);
+/// Fiscal-year invoice prefix ('' = plain numbering).
+final invoicePrefixProvider = _field((s) => s.invoicePrefix);
 
 /// Daily local snapshot on launch (kept in the app's documents dir).
 final autoBackupEnabledProvider = _field((s) => s.autoBackupEnabled);
