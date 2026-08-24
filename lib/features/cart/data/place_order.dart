@@ -60,9 +60,15 @@ Future<int> placeOrder(
         OrderItemsCompanion.insert(
           orderId: id,
           productId: item.productId,
-          productName: item.name,
+          // Suffix the sold unit so receipts and history read naturally
+          // ("Eggs (dozen)"); the raw label/conversion are snapshot too.
+          productName: item.isSecondaryUnit
+              ? '${item.name} (${item.unitLabel})'
+              : item.name,
           unitPrice: item.unitPrice,
           quantity: item.quantity,
+          unitLabel: Value(item.unitLabel),
+          unitsPerQty: Value(item.unitsPerQty),
           discount: Value(item.lineDiscount),
           lineTotal: item.lineSubtotal,
         ),
@@ -85,10 +91,13 @@ Future<int> placeOrder(
 
     for (final item in cart) {
       final product = await db.productsDao.getById(item.productId);
+      // Stock is tracked in main units — a secondary-unit line deducts
+      // quantity × conversion (e.g. 2 dozen → 24 pcs).
+      final mainUnits = item.mainUnitQty;
       if (product != null && product.isComposite) {
         final components = await db.productsDao.getComponents(item.productId);
         for (final comp in components) {
-          final deduct = comp.quantity * item.quantity;
+          final deduct = comp.quantity * mainUnits;
           await db.productsDao.deductStock(comp.componentProductId, deduct);
           await db.inventoryDao.logAdjustment(
             StockAdjustmentsCompanion.insert(
@@ -100,11 +109,11 @@ Future<int> placeOrder(
           );
         }
       } else {
-        await db.productsDao.deductStock(item.productId, item.quantity);
+        await db.productsDao.deductStock(item.productId, mainUnits);
         await db.inventoryDao.logAdjustment(
           StockAdjustmentsCompanion.insert(
             productId: item.productId,
-            delta: -item.quantity,
+            delta: -mainUnits,
             reasonCode: 'sale',
             notes: Value('Order #$invoiceNo'),
           ),

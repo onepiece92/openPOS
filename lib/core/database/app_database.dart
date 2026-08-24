@@ -77,7 +77,7 @@ class AppDatabase extends _$AppDatabase {
       : super(executor ?? _openConnection());
 
   /// Bump together with a new `onUpgrade` step below.
-  static const int currentSchemaVersion = 12;
+  static const int currentSchemaVersion = 13;
 
   @override
   int get schemaVersion => currentSchemaVersion;
@@ -152,12 +152,22 @@ class AppDatabase extends _$AppDatabase {
           if (from < 12) {
             // Variants/modifiers never reached the sale flow (no UI, no
             // writes) — drop them and the always-NULL order_items.variant_id.
-            // alterTable recreates order_items from the current definition,
-            // copying the surviving columns.
+            // alterTable recreates order_items from the *current* definition,
+            // which already includes the v13 unit columns — the transformer
+            // fills them since the old table has nothing to copy from.
             // ignore: experimental_member_use
-            await m.alterTable(TableMigration(orderItems));
+            await m.alterTable(TableMigration(orderItems, columnTransformer: {
+              orderItems.unitLabel: const Constant(''),
+              orderItems.unitsPerQty: const Constant(1.0),
+            }));
             await customStatement('DROP TABLE IF EXISTS product_variants');
             await customStatement('DROP TABLE IF EXISTS product_modifiers');
+          } else if (from < 13) {
+            // Secondary-unit selling: snapshot which unit a line was sold in
+            // and its main-unit conversion. Only databases already at v12
+            // need this — older ones got the columns in the recreate above.
+            await m.addColumn(orderItems, orderItems.unitLabel);
+            await m.addColumn(orderItems, orderItems.unitsPerQty);
           }
         },
         beforeOpen: (details) async {

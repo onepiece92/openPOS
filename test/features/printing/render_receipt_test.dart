@@ -34,6 +34,8 @@ ReceiptBodyData _sampleData() {
     productName: 'Coffee',
     unitPrice: 50.0,
     quantity: 2,
+    unitLabel: '',
+    unitsPerQty: 1.0,
     discount: 0.0,
     taxAmount: 13.0,
     lineTotal: 100.0,

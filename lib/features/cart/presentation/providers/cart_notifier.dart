@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
+import 'package:pos_app/core/utils/money.dart';
 import 'package:pos_app/features/cart/data/ticket_sequence.dart';
 import 'package:pos_app/features/cart/domain/cart_calculator.dart';
 import 'package:pos_app/features/cart/domain/cart_item.dart';
@@ -88,55 +89,65 @@ class CartNotifier extends Notifier<List<CartItem>> {
   @override
   List<CartItem> build() => [];
 
-  void addProduct(Product p) {
-    final existing = state.indexWhere((i) => i.productId == p.id);
-    if (existing >= 0) {
-      final updated = [...state];
-      updated[existing] =
-          updated[existing].copyWith(quantity: updated[existing].quantity + 1);
-      state = updated;
-    } else {
-      state = [
-        ...state,
-        CartItem(
-          productId: p.id,
-          name: p.name,
-          unitPrice: p.price,
-          quantity: 1,
-          isTaxable: p.isTaxable,
-        ),
-      ];
-    }
+  /// Adds one main-unit of [p] (merging into the main-unit line if present).
+  void addProduct(Product p) => addItem(CartItem(
+        productId: p.id,
+        name: p.name,
+        unitPrice: p.price,
+        quantity: 1,
+        isTaxable: p.isTaxable,
+      ));
+
+  /// Adds one *secondary* unit of [p] (e.g. one dozen) as its own line.
+  /// Price is the main-unit price × conversion, rounded to money.
+  void addProductInSecondaryUnit(Product p) {
+    final label = p.secondaryUnit;
+    if (label == null || label.isEmpty) return;
+    addItem(CartItem(
+      productId: p.id,
+      name: p.name,
+      unitPrice: roundMoney(p.price * p.conversionRate),
+      quantity: 1,
+      isTaxable: p.isTaxable,
+      unitLabel: label,
+      unitsPerQty: p.conversionRate,
+    ));
   }
 
-  void setQuantity(int productId, int qty) {
+  void setQuantity(int productId, int qty, {String unitLabel = ''}) {
     if (qty <= 0) {
-      remove(productId);
+      remove(productId, unitLabel: unitLabel);
       return;
     }
     state = [
       for (final item in state)
-        if (item.productId == productId) item.copyWith(quantity: qty) else item,
+        if (item.sameLine(productId, unitLabel))
+          item.copyWith(quantity: qty)
+        else
+          item,
     ];
   }
 
-  void remove(int productId) {
-    state = state.where((i) => i.productId != productId).toList();
+  void remove(int productId, {String unitLabel = ''}) {
+    state =
+        state.where((i) => !i.sameLine(productId, unitLabel)).toList();
   }
 
-  void setDiscount(int productId, double discount) {
+  void setDiscount(int productId, double discount, {String unitLabel = ''}) {
     state = [
       for (final item in state)
-        if (item.productId == productId)
+        if (item.sameLine(productId, unitLabel))
           item.copyWith(lineDiscount: discount.clamp(0, item.lineSubtotal))
         else
           item,
     ];
   }
 
-  /// Adds a [CartItem] directly — used when resuming a held order.
+  /// Adds a [CartItem], merging into the matching (product, unit) line —
+  /// also used when resuming a held order.
   void addItem(CartItem item) {
-    final existing = state.indexWhere((i) => i.productId == item.productId);
+    final existing =
+        state.indexWhere((i) => i.sameLine(item.productId, item.unitLabel));
     if (existing >= 0) {
       final updated = [...state];
       updated[existing] = updated[existing]

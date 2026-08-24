@@ -196,7 +196,8 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
             child: productsAsync.when(
               data: (all) {
                 final catMap = <int?, String>{
-                  for (final c in categoriesAsync.valueOrNull ?? [])
+                  for (final c
+                      in categoriesAsync.valueOrNull ?? const <Category>[])
                     c.id: c.name
                 };
                 final filtered = _applyFilter(all, f);

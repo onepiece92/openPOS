@@ -71,6 +71,8 @@ class HeldOrder {
                   'quantity': i.quantity,
                   'isTaxable': i.isTaxable,
                   'lineDiscount': i.lineDiscount,
+                  if (i.unitLabel.isNotEmpty) 'unitLabel': i.unitLabel,
+                  if (i.unitsPerQty != 1.0) 'unitsPerQty': i.unitsPerQty,
                 })
             .toList(),
       };
@@ -99,6 +101,8 @@ class HeldOrder {
                 quantity: m['quantity'] as int,
                 isTaxable: m['isTaxable'] as bool,
                 lineDiscount: (m['lineDiscount'] as num?)?.toDouble() ?? 0.0,
+                unitLabel: m['unitLabel'] as String? ?? '',
+                unitsPerQty: (m['unitsPerQty'] as num?)?.toDouble() ?? 1.0,
               );
             })
             .toList(),

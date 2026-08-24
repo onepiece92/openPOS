@@ -4700,6 +4700,22 @@ class $OrderItemsTable extends OrderItems
   late final GeneratedColumn<int> quantity = GeneratedColumn<int>(
       'quantity', aliasedName, false,
       type: DriftSqlType.int, requiredDuringInsert: true);
+  static const VerificationMeta _unitLabelMeta =
+      const VerificationMeta('unitLabel');
+  @override
+  late final GeneratedColumn<String> unitLabel = GeneratedColumn<String>(
+      'unit_label', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(''));
+  static const VerificationMeta _unitsPerQtyMeta =
+      const VerificationMeta('unitsPerQty');
+  @override
+  late final GeneratedColumn<double> unitsPerQty = GeneratedColumn<double>(
+      'units_per_qty', aliasedName, false,
+      type: DriftSqlType.double,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(1.0));
   static const VerificationMeta _discountMeta =
       const VerificationMeta('discount');
   @override
@@ -4730,6 +4746,8 @@ class $OrderItemsTable extends OrderItems
         productName,
         unitPrice,
         quantity,
+        unitLabel,
+        unitsPerQty,
         discount,
         taxAmount,
         lineTotal
@@ -4779,6 +4797,16 @@ class $OrderItemsTable extends OrderItems
     } else if (isInserting) {
       context.missing(_quantityMeta);
     }
+    if (data.containsKey('unit_label')) {
+      context.handle(_unitLabelMeta,
+          unitLabel.isAcceptableOrUnknown(data['unit_label']!, _unitLabelMeta));
+    }
+    if (data.containsKey('units_per_qty')) {
+      context.handle(
+          _unitsPerQtyMeta,
+          unitsPerQty.isAcceptableOrUnknown(
+              data['units_per_qty']!, _unitsPerQtyMeta));
+    }
     if (data.containsKey('discount')) {
       context.handle(_discountMeta,
           discount.isAcceptableOrUnknown(data['discount']!, _discountMeta));
@@ -4814,6 +4842,10 @@ class $OrderItemsTable extends OrderItems
           .read(DriftSqlType.double, data['${effectivePrefix}unit_price'])!,
       quantity: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}quantity'])!,
+      unitLabel: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}unit_label'])!,
+      unitsPerQty: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}units_per_qty'])!,
       discount: attachedDatabase.typeMapping
           .read(DriftSqlType.double, data['${effectivePrefix}discount'])!,
       taxAmount: attachedDatabase.typeMapping
@@ -4836,6 +4868,12 @@ class OrderItem extends DataClass implements Insertable<OrderItem> {
   final String productName;
   final double unitPrice;
   final int quantity;
+
+  /// '' = main unit; else the secondary unit sold (e.g. 'dozen'). Snapshot.
+  final String unitLabel;
+
+  /// Main units per quantity step at sale time (1.0 for the main unit).
+  final double unitsPerQty;
   final double discount;
   final double taxAmount;
   final double lineTotal;
@@ -4846,6 +4884,8 @@ class OrderItem extends DataClass implements Insertable<OrderItem> {
       required this.productName,
       required this.unitPrice,
       required this.quantity,
+      required this.unitLabel,
+      required this.unitsPerQty,
       required this.discount,
       required this.taxAmount,
       required this.lineTotal});
@@ -4858,6 +4898,8 @@ class OrderItem extends DataClass implements Insertable<OrderItem> {
     map['product_name'] = Variable<String>(productName);
     map['unit_price'] = Variable<double>(unitPrice);
     map['quantity'] = Variable<int>(quantity);
+    map['unit_label'] = Variable<String>(unitLabel);
+    map['units_per_qty'] = Variable<double>(unitsPerQty);
     map['discount'] = Variable<double>(discount);
     map['tax_amount'] = Variable<double>(taxAmount);
     map['line_total'] = Variable<double>(lineTotal);
@@ -4872,6 +4914,8 @@ class OrderItem extends DataClass implements Insertable<OrderItem> {
       productName: Value(productName),
       unitPrice: Value(unitPrice),
       quantity: Value(quantity),
+      unitLabel: Value(unitLabel),
+      unitsPerQty: Value(unitsPerQty),
       discount: Value(discount),
       taxAmount: Value(taxAmount),
       lineTotal: Value(lineTotal),
@@ -4888,6 +4932,8 @@ class OrderItem extends DataClass implements Insertable<OrderItem> {
       productName: serializer.fromJson<String>(json['productName']),
       unitPrice: serializer.fromJson<double>(json['unitPrice']),
       quantity: serializer.fromJson<int>(json['quantity']),
+      unitLabel: serializer.fromJson<String>(json['unitLabel']),
+      unitsPerQty: serializer.fromJson<double>(json['unitsPerQty']),
       discount: serializer.fromJson<double>(json['discount']),
       taxAmount: serializer.fromJson<double>(json['taxAmount']),
       lineTotal: serializer.fromJson<double>(json['lineTotal']),
@@ -4903,6 +4949,8 @@ class OrderItem extends DataClass implements Insertable<OrderItem> {
       'productName': serializer.toJson<String>(productName),
       'unitPrice': serializer.toJson<double>(unitPrice),
       'quantity': serializer.toJson<int>(quantity),
+      'unitLabel': serializer.toJson<String>(unitLabel),
+      'unitsPerQty': serializer.toJson<double>(unitsPerQty),
       'discount': serializer.toJson<double>(discount),
       'taxAmount': serializer.toJson<double>(taxAmount),
       'lineTotal': serializer.toJson<double>(lineTotal),
@@ -4916,6 +4964,8 @@ class OrderItem extends DataClass implements Insertable<OrderItem> {
           String? productName,
           double? unitPrice,
           int? quantity,
+          String? unitLabel,
+          double? unitsPerQty,
           double? discount,
           double? taxAmount,
           double? lineTotal}) =>
@@ -4926,6 +4976,8 @@ class OrderItem extends DataClass implements Insertable<OrderItem> {
         productName: productName ?? this.productName,
         unitPrice: unitPrice ?? this.unitPrice,
         quantity: quantity ?? this.quantity,
+        unitLabel: unitLabel ?? this.unitLabel,
+        unitsPerQty: unitsPerQty ?? this.unitsPerQty,
         discount: discount ?? this.discount,
         taxAmount: taxAmount ?? this.taxAmount,
         lineTotal: lineTotal ?? this.lineTotal,
@@ -4939,6 +4991,9 @@ class OrderItem extends DataClass implements Insertable<OrderItem> {
           data.productName.present ? data.productName.value : this.productName,
       unitPrice: data.unitPrice.present ? data.unitPrice.value : this.unitPrice,
       quantity: data.quantity.present ? data.quantity.value : this.quantity,
+      unitLabel: data.unitLabel.present ? data.unitLabel.value : this.unitLabel,
+      unitsPerQty:
+          data.unitsPerQty.present ? data.unitsPerQty.value : this.unitsPerQty,
       discount: data.discount.present ? data.discount.value : this.discount,
       taxAmount: data.taxAmount.present ? data.taxAmount.value : this.taxAmount,
       lineTotal: data.lineTotal.present ? data.lineTotal.value : this.lineTotal,
@@ -4954,6 +5009,8 @@ class OrderItem extends DataClass implements Insertable<OrderItem> {
           ..write('productName: $productName, ')
           ..write('unitPrice: $unitPrice, ')
           ..write('quantity: $quantity, ')
+          ..write('unitLabel: $unitLabel, ')
+          ..write('unitsPerQty: $unitsPerQty, ')
           ..write('discount: $discount, ')
           ..write('taxAmount: $taxAmount, ')
           ..write('lineTotal: $lineTotal')
@@ -4962,8 +5019,18 @@ class OrderItem extends DataClass implements Insertable<OrderItem> {
   }
 
   @override
-  int get hashCode => Object.hash(id, orderId, productId, productName,
-      unitPrice, quantity, discount, taxAmount, lineTotal);
+  int get hashCode => Object.hash(
+      id,
+      orderId,
+      productId,
+      productName,
+      unitPrice,
+      quantity,
+      unitLabel,
+      unitsPerQty,
+      discount,
+      taxAmount,
+      lineTotal);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -4974,6 +5041,8 @@ class OrderItem extends DataClass implements Insertable<OrderItem> {
           other.productName == this.productName &&
           other.unitPrice == this.unitPrice &&
           other.quantity == this.quantity &&
+          other.unitLabel == this.unitLabel &&
+          other.unitsPerQty == this.unitsPerQty &&
           other.discount == this.discount &&
           other.taxAmount == this.taxAmount &&
           other.lineTotal == this.lineTotal);
@@ -4986,6 +5055,8 @@ class OrderItemsCompanion extends UpdateCompanion<OrderItem> {
   final Value<String> productName;
   final Value<double> unitPrice;
   final Value<int> quantity;
+  final Value<String> unitLabel;
+  final Value<double> unitsPerQty;
   final Value<double> discount;
   final Value<double> taxAmount;
   final Value<double> lineTotal;
@@ -4996,6 +5067,8 @@ class OrderItemsCompanion extends UpdateCompanion<OrderItem> {
     this.productName = const Value.absent(),
     this.unitPrice = const Value.absent(),
     this.quantity = const Value.absent(),
+    this.unitLabel = const Value.absent(),
+    this.unitsPerQty = const Value.absent(),
     this.discount = const Value.absent(),
     this.taxAmount = const Value.absent(),
     this.lineTotal = const Value.absent(),
@@ -5007,6 +5080,8 @@ class OrderItemsCompanion extends UpdateCompanion<OrderItem> {
     required String productName,
     required double unitPrice,
     required int quantity,
+    this.unitLabel = const Value.absent(),
+    this.unitsPerQty = const Value.absent(),
     this.discount = const Value.absent(),
     this.taxAmount = const Value.absent(),
     required double lineTotal,
@@ -5023,6 +5098,8 @@ class OrderItemsCompanion extends UpdateCompanion<OrderItem> {
     Expression<String>? productName,
     Expression<double>? unitPrice,
     Expression<int>? quantity,
+    Expression<String>? unitLabel,
+    Expression<double>? unitsPerQty,
     Expression<double>? discount,
     Expression<double>? taxAmount,
     Expression<double>? lineTotal,
@@ -5034,6 +5111,8 @@ class OrderItemsCompanion extends UpdateCompanion<OrderItem> {
       if (productName != null) 'product_name': productName,
       if (unitPrice != null) 'unit_price': unitPrice,
       if (quantity != null) 'quantity': quantity,
+      if (unitLabel != null) 'unit_label': unitLabel,
+      if (unitsPerQty != null) 'units_per_qty': unitsPerQty,
       if (discount != null) 'discount': discount,
       if (taxAmount != null) 'tax_amount': taxAmount,
       if (lineTotal != null) 'line_total': lineTotal,
@@ -5047,6 +5126,8 @@ class OrderItemsCompanion extends UpdateCompanion<OrderItem> {
       Value<String>? productName,
       Value<double>? unitPrice,
       Value<int>? quantity,
+      Value<String>? unitLabel,
+      Value<double>? unitsPerQty,
       Value<double>? discount,
       Value<double>? taxAmount,
       Value<double>? lineTotal}) {
@@ -5057,6 +5138,8 @@ class OrderItemsCompanion extends UpdateCompanion<OrderItem> {
       productName: productName ?? this.productName,
       unitPrice: unitPrice ?? this.unitPrice,
       quantity: quantity ?? this.quantity,
+      unitLabel: unitLabel ?? this.unitLabel,
+      unitsPerQty: unitsPerQty ?? this.unitsPerQty,
       discount: discount ?? this.discount,
       taxAmount: taxAmount ?? this.taxAmount,
       lineTotal: lineTotal ?? this.lineTotal,
@@ -5084,6 +5167,12 @@ class OrderItemsCompanion extends UpdateCompanion<OrderItem> {
     if (quantity.present) {
       map['quantity'] = Variable<int>(quantity.value);
     }
+    if (unitLabel.present) {
+      map['unit_label'] = Variable<String>(unitLabel.value);
+    }
+    if (unitsPerQty.present) {
+      map['units_per_qty'] = Variable<double>(unitsPerQty.value);
+    }
     if (discount.present) {
       map['discount'] = Variable<double>(discount.value);
     }
@@ -5105,6 +5194,8 @@ class OrderItemsCompanion extends UpdateCompanion<OrderItem> {
           ..write('productName: $productName, ')
           ..write('unitPrice: $unitPrice, ')
           ..write('quantity: $quantity, ')
+          ..write('unitLabel: $unitLabel, ')
+          ..write('unitsPerQty: $unitsPerQty, ')
           ..write('discount: $discount, ')
           ..write('taxAmount: $taxAmount, ')
           ..write('lineTotal: $lineTotal')
@@ -12342,6 +12433,8 @@ typedef $$OrderItemsTableCreateCompanionBuilder = OrderItemsCompanion Function({
   required String productName,
   required double unitPrice,
   required int quantity,
+  Value<String> unitLabel,
+  Value<double> unitsPerQty,
   Value<double> discount,
   Value<double> taxAmount,
   required double lineTotal,
@@ -12353,6 +12446,8 @@ typedef $$OrderItemsTableUpdateCompanionBuilder = OrderItemsCompanion Function({
   Value<String> productName,
   Value<double> unitPrice,
   Value<int> quantity,
+  Value<String> unitLabel,
+  Value<double> unitsPerQty,
   Value<double> discount,
   Value<double> taxAmount,
   Value<double> lineTotal,
@@ -12412,6 +12507,12 @@ class $$OrderItemsTableFilterComposer
 
   ColumnFilters<int> get quantity => $composableBuilder(
       column: $table.quantity, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get unitLabel => $composableBuilder(
+      column: $table.unitLabel, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get unitsPerQty => $composableBuilder(
+      column: $table.unitsPerQty, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<double> get discount => $composableBuilder(
       column: $table.discount, builder: (column) => ColumnFilters(column));
@@ -12484,6 +12585,12 @@ class $$OrderItemsTableOrderingComposer
   ColumnOrderings<int> get quantity => $composableBuilder(
       column: $table.quantity, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get unitLabel => $composableBuilder(
+      column: $table.unitLabel, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get unitsPerQty => $composableBuilder(
+      column: $table.unitsPerQty, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<double> get discount => $composableBuilder(
       column: $table.discount, builder: (column) => ColumnOrderings(column));
 
@@ -12554,6 +12661,12 @@ class $$OrderItemsTableAnnotationComposer
 
   GeneratedColumn<int> get quantity =>
       $composableBuilder(column: $table.quantity, builder: (column) => column);
+
+  GeneratedColumn<String> get unitLabel =>
+      $composableBuilder(column: $table.unitLabel, builder: (column) => column);
+
+  GeneratedColumn<double> get unitsPerQty => $composableBuilder(
+      column: $table.unitsPerQty, builder: (column) => column);
 
   GeneratedColumn<double> get discount =>
       $composableBuilder(column: $table.discount, builder: (column) => column);
@@ -12634,6 +12747,8 @@ class $$OrderItemsTableTableManager extends RootTableManager<
             Value<String> productName = const Value.absent(),
             Value<double> unitPrice = const Value.absent(),
             Value<int> quantity = const Value.absent(),
+            Value<String> unitLabel = const Value.absent(),
+            Value<double> unitsPerQty = const Value.absent(),
             Value<double> discount = const Value.absent(),
             Value<double> taxAmount = const Value.absent(),
             Value<double> lineTotal = const Value.absent(),
@@ -12645,6 +12760,8 @@ class $$OrderItemsTableTableManager extends RootTableManager<
             productName: productName,
             unitPrice: unitPrice,
             quantity: quantity,
+            unitLabel: unitLabel,
+            unitsPerQty: unitsPerQty,
             discount: discount,
             taxAmount: taxAmount,
             lineTotal: lineTotal,
@@ -12656,6 +12773,8 @@ class $$OrderItemsTableTableManager extends RootTableManager<
             required String productName,
             required double unitPrice,
             required int quantity,
+            Value<String> unitLabel = const Value.absent(),
+            Value<double> unitsPerQty = const Value.absent(),
             Value<double> discount = const Value.absent(),
             Value<double> taxAmount = const Value.absent(),
             required double lineTotal,
@@ -12667,6 +12786,8 @@ class $$OrderItemsTableTableManager extends RootTableManager<
             productName: productName,
             unitPrice: unitPrice,
             quantity: quantity,
+            unitLabel: unitLabel,
+            unitsPerQty: unitsPerQty,
             discount: discount,
             taxAmount: taxAmount,
             lineTotal: lineTotal,

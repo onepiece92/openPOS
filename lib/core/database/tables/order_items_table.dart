@@ -11,8 +11,13 @@ class OrderItems extends Table {
   IntColumn get orderId => integer().references(Orders, #id)();
   IntColumn get productId => integer().references(Products, #id)();
   TextColumn get productName => text()(); // snapshot
-  RealColumn get unitPrice => real()(); // snapshot
+  RealColumn get unitPrice => real()(); // snapshot, per unit_label unit
   IntColumn get quantity => integer()();
+  /// '' = main unit; else the secondary unit sold (e.g. 'dozen'). Snapshot.
+  TextColumn get unitLabel => text().withDefault(const Constant(''))();
+  /// Main units per quantity step at sale time (1.0 for the main unit).
+  RealColumn get unitsPerQty =>
+      real().withDefault(const Constant(1.0))();
   RealColumn get discount =>
       real().withDefault(const Constant(0.0))(); // flat amount off line
   RealColumn get taxAmount =>

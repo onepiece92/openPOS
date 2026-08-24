@@ -72,7 +72,7 @@ class CategoriesScreen extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(14),
                   child: child,
                 ),
-                onReorder: (oldIndex, newIndex) =>
+                onReorderItem: (oldIndex, newIndex) =>
                     _reorder(ref, cats, oldIndex, newIndex),
                 itemBuilder: (_, i) => _CategoryCard(
                   key: ValueKey(cats[i].id),
@@ -102,7 +102,7 @@ class CategoriesScreen extends ConsumerWidget {
     int oldIndex,
     int newIndex,
   ) async {
-    if (newIndex > oldIndex) newIndex--;
+    // onReorderItem already accounts for the removed item's slot.
     final db = ref.read(databaseProvider);
     final reordered = [...cats];
     final moved = reordered.removeAt(oldIndex);

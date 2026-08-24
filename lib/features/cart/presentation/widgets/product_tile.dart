@@ -10,6 +10,7 @@ class PosProductTile extends StatelessWidget {
     required this.fmt,
     required this.qtyInCart,
     required this.onTap,
+    this.onLongPress,
     required this.onIncrement,
     required this.onDecrement,
     required this.isFavorite,
@@ -20,6 +21,7 @@ class PosProductTile extends StatelessWidget {
   final CurrencyFormatter fmt;
   final int qtyInCart;
   final VoidCallback onTap;       // add to cart (not in cart)
+  final VoidCallback? onLongPress; // unit picker (products with a 2nd unit)
   final VoidCallback onIncrement; // qty++
   final VoidCallback onDecrement; // qty-- / remove
   final bool isFavorite;
@@ -43,6 +45,7 @@ class PosProductTile extends StatelessWidget {
       // the "Only N in stock" snackbar. The greyed `+` button is the
       // visual cap indicator.
       onTap: outOfStock ? null : (inCart ? onIncrement : onTap),
+      onLongPress: outOfStock ? null : onLongPress,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeOut,

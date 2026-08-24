@@ -6,7 +6,9 @@ import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/services/demo_data_service.dart';
 import 'package:pos_app/core/utils/currency_formatter.dart';
 import 'package:pos_app/features/cart/domain/cart_item.dart';
+import 'package:pos_app/shared/widgets/app_sheet.dart';
 import 'package:pos_app/features/cart/presentation/providers/cart_notifier.dart';
+import 'package:pos_app/features/cart/presentation/widgets/unit_picker_sheet.dart';
 import 'package:pos_app/features/cart/domain/pos_filter_provider.dart';
 import 'package:pos_app/features/cart/presentation/widgets/grid_product_tile.dart';
 import 'package:pos_app/features/cart/presentation/widgets/checkout_bar.dart';
@@ -102,9 +104,10 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     // Cap cart qty at stock for tracked products.
     // Unlimited (qty=0) and flagged out-of-stock are untouched here —
     // out-of-stock tiles are already blocked upstream.
-    bool allowQty(Product p, int desiredQty) {
+    // desiredMainUnits counts every line of the product (pcs + boxes).
+    bool allowQty(Product p, int desiredMainUnits) {
       if (p.stockQuantity <= 0) return true;
-      if (desiredQty <= p.stockQuantity) return true;
+      if (desiredMainUnits <= p.stockQuantity) return true;
       ScaffoldMessenger.of(context)
         ..clearSnackBars()
         ..showSnackBar(SnackBar(
@@ -357,19 +360,50 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                       );
                     }
                     final productsById = {for (final p in all) p.id: p};
+                    // Tile steppers drive the main-unit line only…
                     final cartMap = {
-                      for (final i in cart) i.productId: i.quantity,
+                      for (final i in cart)
+                        if (!i.isSecondaryUnit) i.productId: i.quantity,
                     };
+                    // …while the stock cap counts every line in main units.
+                    final committed = <int, int>{};
+                    for (final i in cart) {
+                      committed[i.productId] =
+                          (committed[i.productId] ?? 0) + i.mainUnitQty;
+                    }
                     void tryAdd(Product p) {
-                      final current = cartMap[p.id] ?? 0;
+                      final current = committed[p.id] ?? 0;
                       if (!allowQty(p, current + 1)) return;
                       ref.read(cartProvider.notifier).addProduct(p);
                     }
 
                     void trySetQty(int id, int qty) {
                       final p = productsById[id];
-                      if (p != null && qty > 0 && !allowQty(p, qty)) return;
+                      if (p != null && qty > 0) {
+                        final otherLines =
+                            (committed[id] ?? 0) - (cartMap[id] ?? 0);
+                        if (!allowQty(p, otherLines + qty)) return;
+                      }
                       ref.read(cartProvider.notifier).setQuantity(id, qty);
+                    }
+
+                    Future<void> pickUnit(Product p) async {
+                      final unit = await showAppSheet<String>(
+                        context: context,
+                        builder: (_) =>
+                            UnitPickerSheet(product: p, fmt: fmt),
+                      );
+                      if (unit == null) return;
+                      if (unit.isEmpty) {
+                        tryAdd(p);
+                        return;
+                      }
+                      final current = committed[p.id] ?? 0;
+                      final add = p.conversionRate.round();
+                      if (!allowQty(p, current + add)) return;
+                      ref
+                          .read(cartProvider.notifier)
+                          .addProductInSecondaryUnit(p);
                     }
 
                     if (filter.isGrid) {
@@ -380,6 +414,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                         favorites: favorites,
                         onToggleFavorite: favoritesN.toggle,
                         onTap: tryAdd,
+                        onPickUnit: pickUnit,
                         onSetQuantity: trySetQty,
                       );
                     }
@@ -390,6 +425,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                       favorites: favorites,
                       onToggleFavorite: favoritesN.toggle,
                       onTap: tryAdd,
+                      onPickUnit: pickUnit,
                       onSetQuantity: trySetQty,
                     );
                   },
@@ -564,6 +600,7 @@ class _PosProductGrid extends StatelessWidget {
     required this.cart,
     required this.fmt,
     required this.onTap,
+    required this.onPickUnit,
     required this.onSetQuantity,
     required this.favorites,
     required this.onToggleFavorite,
@@ -572,13 +609,17 @@ class _PosProductGrid extends StatelessWidget {
   final List<CartItem> cart;
   final CurrencyFormatter fmt;
   final ValueChanged<Product> onTap;
+  final ValueChanged<Product> onPickUnit;
   final void Function(int productId, int qty) onSetQuantity;
   final Set<int> favorites;
   final ValueChanged<int> onToggleFavorite;
 
   @override
   Widget build(BuildContext context) {
-    final cartMap = {for (final i in cart) i.productId: i.quantity};
+    final cartMap = {
+      for (final i in cart)
+        if (!i.isSecondaryUnit) i.productId: i.quantity,
+    };
     return GridView.builder(
       padding: const EdgeInsets.fromLTRB(10, 6, 10, 10),
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
@@ -598,6 +639,8 @@ class _PosProductGrid extends StatelessWidget {
           isFavorite: favorites.contains(p.id),
           onToggleFavorite: () => onToggleFavorite(p.id),
           onTap: () => onTap(p),
+          onLongPress:
+              p.secondaryUnit == null ? null : () => onPickUnit(p),
           onIncrement: () => onSetQuantity(p.id, qty + 1),
           onDecrement: () => onSetQuantity(p.id, qty - 1),
         );
@@ -614,6 +657,7 @@ class _PosProductList extends StatelessWidget {
     required this.cart,
     required this.fmt,
     required this.onTap,
+    required this.onPickUnit,
     required this.onSetQuantity,
     required this.favorites,
     required this.onToggleFavorite,
@@ -622,6 +666,7 @@ class _PosProductList extends StatelessWidget {
   final List<CartItem> cart;
   final CurrencyFormatter fmt;
   final ValueChanged<Product> onTap;
+  final ValueChanged<Product> onPickUnit;
   final void Function(int productId, int qty) onSetQuantity;
   final Set<int> favorites;
   final ValueChanged<int> onToggleFavorite;
@@ -629,7 +674,10 @@ class _PosProductList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final cartMap = {for (final i in cart) i.productId: i.quantity};
+    final cartMap = {
+      for (final i in cart)
+        if (!i.isSecondaryUnit) i.productId: i.quantity,
+    };
     return ListView.separated(
       padding: const EdgeInsets.only(top: 4, bottom: 8),
       itemCount: products.length,
@@ -656,6 +704,8 @@ class _PosProductList extends StatelessWidget {
           isFavorite: favorites.contains(p.id),
           onToggleFavorite: () => onToggleFavorite(p.id),
           onTap: () => onTap(p),
+          onLongPress:
+              p.secondaryUnit == null ? null : () => onPickUnit(p),
           onIncrement: () => onSetQuantity(p.id, qty + 1),
           onDecrement: () => onSetQuantity(p.id, qty - 1),
         );

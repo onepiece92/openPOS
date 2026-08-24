@@ -25,14 +25,19 @@ class CartLineItem extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(item.name,
+                Text(
+                    item.isSecondaryUnit
+                        ? '${item.name} (${item.unitLabel})'
+                        : item.name,
                     style: tt.bodyMedium
                         ?.copyWith(fontWeight: FontWeight.w500),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis),
                 const SizedBox(height: 2),
                 Text(
-                  '${fmt.formatPlain(item.unitPrice)} each',
+                  item.isSecondaryUnit
+                      ? '${fmt.formatPlain(item.unitPrice)} per ${item.unitLabel}'
+                      : '${fmt.formatPlain(item.unitPrice)} each',
                   style: tt.labelSmall
                       ?.copyWith(color: cs.onSurfaceVariant),
                 ),
@@ -46,7 +51,8 @@ class CartLineItem extends ConsumerWidget {
               _QtyButton(
                 icon: Icons.remove_rounded,
                 onPressed: () => notifier.setQuantity(
-                    item.productId, item.quantity - 1),
+                    item.productId, item.quantity - 1,
+                    unitLabel: item.unitLabel),
               ),
               SizedBox(
                 width: 36,
@@ -60,7 +66,8 @@ class CartLineItem extends ConsumerWidget {
               _QtyButton(
                 icon: Icons.add_rounded,
                 onPressed: () => notifier.setQuantity(
-                    item.productId, item.quantity + 1),
+                    item.productId, item.quantity + 1,
+                    unitLabel: item.unitLabel),
               ),
             ],
           ),
@@ -78,7 +85,8 @@ class CartLineItem extends ConsumerWidget {
           // Delete
           IconButton(
             icon: Icon(Icons.delete_outline_rounded, color: cs.error),
-            onPressed: () => notifier.remove(item.productId),
+            onPressed: () =>
+                notifier.remove(item.productId, unitLabel: item.unitLabel),
             iconSize: 20,
             padding: const EdgeInsets.only(left: 4),
             constraints: const BoxConstraints(minWidth: 32, minHeight: 32),

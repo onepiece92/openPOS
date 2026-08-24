@@ -64,6 +64,12 @@ Future<pw.Document> buildReceiptPdf(
           ),
           pw.SizedBox(height: 10),
           divider(),
+          if (order.printCount > 0) ...[
+            pw.Center(
+              child: pw.Text('*** COPY OF ORIGINAL ***', style: boldStyle),
+            ),
+            divider(),
+          ],
 
           // ── Customer + bill number ──────────────────────────────────────
           pw.Row(
