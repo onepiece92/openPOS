@@ -294,10 +294,10 @@
     "semantic_hash": "a7877ba22a91831a16e01846cd75088e"
   },
   "lib/core/providers/hive_provider.dart": {
-    "mtime": 1789887721.1469462,
-    "seen": 1789888586.907927,
-    "ast_hash": "7b69d420b97df8fc227c9270e0a25447",
-    "semantic_hash": ""
+    "mtime": 1787480587.9195583,
+    "seen": 1787549093.4268029,
+    "ast_hash": "e521ae5115b9a73404307e528f4073f1",
+    "semantic_hash": "e521ae5115b9a73404307e528f4073f1"
   },
   "lib/core/providers/audit_service_provider.dart": {
     "mtime": 1772879448.5285254,
@@ -462,16 +462,16 @@
     "semantic_hash": "7c60ba9c120e5fb8f114097564b5d9f5"
   },
   "lib/features/printing/domain/auto_print.dart": {
-    "mtime": 1789887888.1115036,
-    "seen": 1789888586.907974,
-    "ast_hash": "0878816dc3155efd00ec1a4aef815a65",
-    "semantic_hash": ""
+    "mtime": 1787480626.8157783,
+    "seen": 1787549093.4268448,
+    "ast_hash": "7c7c32ca5cccbce40894b626e043167d",
+    "semantic_hash": "7c7c32ca5cccbce40894b626e043167d"
   },
   "lib/features/printing/presentation/printer_setup_screen.dart": {
-    "mtime": 1789887925.4674237,
-    "seen": 1789888586.9079769,
-    "ast_hash": "04f15fa198ab2fea27c8031df5c185d1",
-    "semantic_hash": ""
+    "mtime": 1787476755.8941455,
+    "seen": 1787549093.426847,
+    "ast_hash": "3c3bc545bdb6e280e6b194986492ecc6",
+    "semantic_hash": "3c3bc545bdb6e280e6b194986492ecc6"
   },
   "lib/features/tax/presentation/tax_settings_screen.dart": {
     "mtime": 1787044651.7012978,
@@ -876,10 +876,10 @@
     "semantic_hash": "a62323b757ea49684e822ad07d5adca4"
   },
   "test/core/providers/settings_notifier_test.dart": {
-    "mtime": 1789888011.9371033,
-    "seen": 1789888586.908028,
-    "ast_hash": "63a948d3f28d60a4252974cdedbfcd04",
-    "semantic_hash": ""
+    "mtime": 1787044219.8356333,
+    "seen": 1787549093.4268742,
+    "ast_hash": "54a52e78e81deaea8602c23f11baf844",
+    "semantic_hash": "54a52e78e81deaea8602c23f11baf844"
   },
   "lib/features/cart/data/ticket_sequence.dart": {
     "mtime": 1787044764.3385198,
@@ -1080,22 +1080,22 @@
     "semantic_hash": "51ab4e48d44838768d9db98552a660cd"
   },
   "lib/features/printing/data/thermal_plugin_printer.dart": {
-    "mtime": 1789887873.0607774,
-    "seen": 1789888586.907973,
-    "ast_hash": "61189adff323cff9dc03e5db7e64fc7e",
-    "semantic_hash": ""
+    "mtime": 1787476732.418292,
+    "seen": 1787549093.4268448,
+    "ast_hash": "701add5070b5f5979f62af911f26308b",
+    "semantic_hash": "701add5070b5f5979f62af911f26308b"
   },
   "lib/features/printing/domain/receipt_printer.dart": {
-    "mtime": 1789888011.9376304,
-    "seen": 1789888586.907975,
-    "ast_hash": "4cfde995258d7bae1f4378eda5974592",
-    "semantic_hash": ""
+    "mtime": 1787476732.415328,
+    "seen": 1787549093.426846,
+    "ast_hash": "960a0fda5452fdf4c901f3a9f549a549",
+    "semantic_hash": "960a0fda5452fdf4c901f3a9f549a549"
   },
   "test/features/printing/auto_print_test.dart": {
-    "mtime": 1789887988.2108293,
-    "seen": 1789888586.908042,
-    "ast_hash": "bac5ddd27c3f5187b59b976ea0d02d74",
-    "semantic_hash": ""
+    "mtime": 1787480672.984325,
+    "seen": 1787549093.4268851,
+    "ast_hash": "99dc3d565c424e3c04be87d4582df4d6",
+    "semantic_hash": "99dc3d565c424e3c04be87d4582df4d6"
   },
   "lib/features/customers/presentation/widgets/customer_card.dart": {
     "mtime": 1787479733.7209203,
@@ -1264,29 +1264,5 @@
     "seen": 1787549093.4268842,
     "ast_hash": "a0c067daa18f757df1e2f3366bf25069",
     "semantic_hash": "a0c067daa18f757df1e2f3366bf25069"
-  },
-  "lib/features/printing/data/star_printer.dart": {
-    "mtime": 1789888011.9373503,
-    "seen": 1789888586.907972,
-    "ast_hash": "bbcf8913ab3202db6d0c9598ef491d89",
-    "semantic_hash": ""
-  },
-  "lib/features/printing/domain/receipt_roll_pdf.dart": {
-    "mtime": 1789887821.6776729,
-    "seen": 1789888586.907975,
-    "ast_hash": "0d0e2c65adf34bd14fe87dba3a7f5d95",
-    "semantic_hash": ""
-  },
-  "lib/features/printing/domain/render_receipt_image.dart": {
-    "mtime": 1789887837.292116,
-    "seen": 1789888586.9079769,
-    "ast_hash": "3d6ddab056a161a1fd67401e3362ed81",
-    "semantic_hash": ""
-  },
-  "test/features/printing/receipt_roll_pdf_test.dart": {
-    "mtime": 1789888079.419703,
-    "seen": 1789888586.908043,
-    "ast_hash": "fcf80ddebf784cfe3f6ac7c971c80e0e",
-    "semantic_hash": ""
   }
 }
