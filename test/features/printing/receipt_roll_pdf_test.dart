@@ -72,9 +72,9 @@ ReceiptBodyData _sampleData({int items = 1}) {
 Future<List<PdfPageFormat>> _pageFormats(
   ReceiptBodyData data,
   CurrencyFormatter fmt,
-  int paperMm,
+  int widthDots,
 ) async {
-  final doc = await buildReceiptRollPdf(data, fmt, paperMm);
+  final doc = await buildReceiptRollPdf(data, fmt, widthDots: widthDots);
   await doc.save();
   return doc.document.pdfPageList.pages.map((p) => p.pageFormat).toList();
 }
@@ -85,7 +85,7 @@ void main() {
 
   test('80mm roll is one page exactly as wide as the printable area',
       () async {
-    final formats = await _pageFormats(_sampleData(), fmt, 80);
+    final formats = await _pageFormats(_sampleData(), fmt, 576);
 
     expect(formats, hasLength(1), reason: 'a receipt is one continuous roll');
     expect(formats.single.width, closeTo(72 * PdfPageFormat.mm, 0.01));
@@ -94,34 +94,38 @@ void main() {
         reason: 'infinite height must resolve to the content height');
   });
 
-  test('58mm roll is narrower', () async {
-    final wide = await _pageFormats(_sampleData(), fmt, 80);
-    final narrow = await _pageFormats(_sampleData(), fmt, 58);
+  test('a Star 58mm roll is narrower than an 80mm one', () async {
+    final wide = await _pageFormats(_sampleData(), fmt, 576);
+    final narrow = await _pageFormats(_sampleData(), fmt, 406);
 
-    expect(narrow.single.width, closeTo(50.8 * PdfPageFormat.mm, 0.01));
+    expect(narrow.single.width, closeTo(50.75 * PdfPageFormat.mm, 0.1));
     expect(narrow.single.width, lessThan(wide.single.width));
   });
 
-  test('unknown paper width falls back to 80mm', () async {
-    final fallback = await _pageFormats(_sampleData(), fmt, 999);
-    final standard = await _pageFormats(_sampleData(), fmt, 80);
+  test('ESC/POS 58mm is narrower again — 384 dots, not Star\'s 406', () async {
+    final star = await _pageFormats(_sampleData(), fmt, 406);
+    final escPos = await _pageFormats(_sampleData(), fmt, 384);
 
-    expect(fallback.single.width, standard.single.width);
+    expect(escPos.single.width, closeTo(48 * PdfPageFormat.mm, 0.1));
+    expect(escPos.single.width, lessThan(star.single.width),
+        reason: 'feeding a Star-width page to an ESC/POS printer would '
+            'overflow the head');
   });
 
   test('the roll grows with the bill instead of paginating', () async {
-    final short = await _pageFormats(_sampleData(items: 1), fmt, 80);
-    final long = await _pageFormats(_sampleData(items: 30), fmt, 80);
+    final short = await _pageFormats(_sampleData(items: 1), fmt, 576);
+    final long = await _pageFormats(_sampleData(items: 30), fmt, 576);
 
     expect(long, hasLength(1));
     expect(long.single.height, greaterThan(short.single.height));
   });
 
   test('a copy prints taller than the original (COPY banner)', () async {
-    final original = await buildReceiptRollPdf(_sampleData(), fmt, 80);
+    final original =
+        await buildReceiptRollPdf(_sampleData(), fmt, widthDots: 576);
     await original.save();
-    final copy =
-        await buildReceiptRollPdf(_sampleData(), fmt, 80, isCopy: true);
+    final copy = await buildReceiptRollPdf(_sampleData(), fmt,
+        widthDots: 576, isCopy: true);
     await copy.save();
 
     expect(
@@ -132,7 +136,8 @@ void main() {
   });
 
   test('test page renders on the same roll geometry', () async {
-    final doc = await buildTestPageRollPdf(storeName: 'Test Cafe', paperMm: 80);
+    final doc = await buildTestPageRollPdf(
+        storeName: 'Test Cafe', paperMm: 80, widthDots: 576);
     final bytes = await doc.save();
 
     expect(bytes, isNotEmpty);
@@ -140,10 +145,15 @@ void main() {
         closeTo(72 * PdfPageFormat.mm, 0.01));
   });
 
-  test('print width in dots matches the head at 203 dpi', () {
-    // 72mm x 8 dots/mm, 50.8mm x 8 dots/mm.
-    expect(rollPrintWidthDots(80), 576);
-    expect(rollPrintWidthDots(58), 406);
-    expect(rollPrintWidthDots(999), 576, reason: 'falls back to 80mm');
+  test('each driver asks for its own printable width', () {
+    // Star: 72mm and 50.8mm of head, at 8 dots/mm.
+    expect(starPrintWidthDots(80), 576);
+    expect(starPrintWidthDots(58), 406);
+    expect(starPrintWidthDots(999), 576, reason: 'falls back to 80mm');
+
+    // Generic ESC/POS printers are built to 576/384.
+    expect(escPosPrintWidthDots(80), 576);
+    expect(escPosPrintWidthDots(58), 384);
+    expect(escPosPrintWidthDots(999), 576, reason: 'falls back to 80mm');
   });
 }

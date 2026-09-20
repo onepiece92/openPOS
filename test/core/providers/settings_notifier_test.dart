@@ -108,6 +108,34 @@ void main() {
     expect(s.timezone, 'America/New_York');
     expect(s.autoBackupEnabled, isFalse);
     expect(s.autoBackupLastAt, DateTime(2026, 8, 18, 9));
+    expect(s.printerDriver, 'star',
+        reason: 'the driver that found the printer must survive a restart, '
+            'or a Star printer gets sent ESC/POS text it cannot read');
+  });
+
+  test('pairing a printer records the driver alongside the device', () async {
+    final c = makeContainer();
+    addTearDown(c.dispose);
+    final n = c.read(settingsProvider.notifier);
+
+    await n.setPrinterDevice(
+        address: '00:11:62:00:00:00', name: 'TSP100III', driver: 'star');
+    expect(c.read(printerDriverProvider), 'star');
+    expect(box.get(kPrinterDriver), 'star');
+
+    // Re-pairing a generic printer must not leave the Star driver behind.
+    await n.setPrinterDevice(
+        address: 'AA:BB', name: 'Rongta', driver: 'escpos');
+    expect(c.read(printerDriverProvider), 'escpos');
+  });
+
+  test('a device saved before drivers existed reads back as escpos', () async {
+    await box.put(kPrinterDeviceAddress, 'AA:BB');
+    await box.put(kPrinterDeviceName, 'Rongta');
+
+    final c = makeContainer();
+    addTearDown(c.dispose);
+    expect(c.read(printerDriverProvider), 'escpos');
   });
 
   test('clearing values deletes the keys', () async {

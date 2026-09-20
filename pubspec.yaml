@@ -29,6 +29,7 @@ dependencies:
 
   # ── Printing (ESC/POS) ────────────────────────────────────────────────
   esc_pos_utils_plus: ^2.0.4
+  image: ^4.3.0 # rasterises rendered receipts for ESC/POS printers
   flutter_thermal_printer: ^0.0.9
   pdf: ^3.11.1
   printing: ^5.13.2

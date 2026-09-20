@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart'
     show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter/services.dart';
 
+import 'package:pos_app/features/printing/domain/printer_errors.dart';
 import 'package:pos_app/features/printing/domain/receipt_printer.dart';
 import 'package:pos_app/features/printing/domain/render_receipt_image.dart';
 
@@ -14,7 +15,7 @@ import 'package:pos_app/features/printing/domain/render_receipt_image.dart';
 /// so the receipt is rasterised here and printed as an image. That is also
 /// why this driver renders instead of taking ESC/POS bytes.
 ///
-/// Android only — the bridge exists there because that is where the POS runs.
+/// Implemented on Android and iOS; both talk to the same channel.
 class StarBluetoothPrinter implements ReceiptPrinter {
   static const _methods = MethodChannel('pos_app/star_printer');
   static const _discovery = EventChannel('pos_app/star_printer/devices');
@@ -37,7 +38,7 @@ class StarBluetoothPrinter implements ReceiptPrinter {
 
   @override
   Future<void> startScan() async {
-    _requireAndroid();
+    _requireSupportedPlatform();
     _found.clear();
     _devices.add(const []);
     _events ??= _discovery.receiveBroadcastStream().listen(
@@ -60,17 +61,17 @@ class StarBluetoothPrinter implements ReceiptPrinter {
 
   @override
   Future<void> stopScan() async {
-    if (!_isAndroid) return;
+    if (!_isSupported) return;
     await _methods.invokeMethod<void>('stopDiscovery');
   }
 
   @override
   Future<void> printReceipt(PrinterTarget target, ReceiptPrintJob job) async {
-    _requireAndroid();
+    _requireSupportedPlatform();
     final images = await renderReceiptImages(
       job.data,
       job.fmt,
-      job.paperMm,
+      widthDots: starPrintWidthDots(job.paperMm),
       isCopy: job.isCopy,
     );
     await _printImages(target, images, job.paperMm);
@@ -82,9 +83,12 @@ class StarBluetoothPrinter implements ReceiptPrinter {
     required String storeName,
     required int paperMm,
   }) async {
-    _requireAndroid();
-    final images =
-        await renderTestPageImages(storeName: storeName, paperMm: paperMm);
+    _requireSupportedPlatform();
+    final images = await renderTestPageImages(
+      storeName: storeName,
+      paperMm: paperMm,
+      widthDots: starPrintWidthDots(paperMm),
+    );
     await _printImages(target, images, paperMm);
   }
 
@@ -97,20 +101,21 @@ class StarBluetoothPrinter implements ReceiptPrinter {
       await _methods.invokeMethod<void>('printImages', {
         'address': target.address,
         'images': images,
-        'width': rollPrintWidthDots(paperMm),
+        'width': starPrintWidthDots(paperMm),
       });
     } on PlatformException catch (e) {
-      throw StateError(
-          'Star printer "${target.name}": ${e.message ?? e.code}');
+      throw StateError(friendlyPrinterError(e, printerName: target.name));
     }
   }
 
-  bool get _isAndroid =>
-      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+  bool get _isSupported =>
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS);
 
-  void _requireAndroid() {
-    if (!_isAndroid) {
-      throw StateError('Star printers are supported on Android only');
+  void _requireSupportedPlatform() {
+    if (!_isSupported) {
+      throw StateError('Star printers are supported on Android and iOS only');
     }
   }
 }

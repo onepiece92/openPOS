@@ -30,19 +30,18 @@
 	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>UISupportedExternalAccessoryProtocols</key>
+	<array>
+		<!-- Star MFi printers (TSP100III over Bluetooth). Without this the
+		     External Accessory framework reports no printers at all. -->
+		<string>jp.star-m.starpro</string>
+	</array>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>This app uses Bluetooth to connect to thermal receipt printers.</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
 	<string>This app uses Bluetooth to connect to thermal receipt printers.</string>
-	<key>NSBonjourServices</key>
-	<array>
-		<string>_ipp._tcp</string>
-		<string>_printer._tcp</string>
-	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>This app uses the camera to scan barcodes and take product photos.</string>
-	<key>NSLocalNetworkUsageDescription</key>
-	<string>This app uses the local network to discover and connect to network printers.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>This app accesses the photo library to select product images.</string>
 	<key>UIApplicationSceneManifest</key>

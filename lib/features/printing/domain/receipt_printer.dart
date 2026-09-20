@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/core/utils/currency_formatter.dart';
+import 'package:pos_app/features/printing/data/spp_printer.dart';
 import 'package:pos_app/features/printing/data/star_printer.dart';
 import 'package:pos_app/features/printing/data/thermal_plugin_printer.dart';
 import 'package:pos_app/features/receipts/presentation/receipt_body.dart';
@@ -15,8 +16,12 @@ enum PrinterTransport { ble, bluetoothClassic, usb, network }
 /// while a Star TSP100III is graphics-only and wants a rendered image. The
 /// driver that discovered a device is saved alongside it in settings.
 enum PrinterDriver {
-  /// Generic Bluetooth thermal printers, via `flutter_thermal_printer`.
+  /// Bluetooth Low Energy ESC/POS printers, via `flutter_thermal_printer`.
   escPos('escpos'),
+
+  /// Classic-Bluetooth (SPP) ESC/POS printers — the cheap, common kind.
+  /// Android only; iOS forbids classic Bluetooth to non-MFi devices.
+  spp('spp'),
 
   /// Star TSP100III over classic Bluetooth, via Star's StarXpand SDK.
   star('star');
@@ -37,6 +42,7 @@ class DiscoveredPrinter {
     required this.name,
     required this.transport,
     required this.driver,
+    this.likelyPrinter = false,
   });
 
   /// BLE MAC / USB id / Star device identifier — persisted in settings.
@@ -44,6 +50,11 @@ class DiscoveredPrinter {
   final String name;
   final PrinterTransport transport;
   final PrinterDriver driver;
+
+  /// The device advertises itself as a printer. Paired classic-Bluetooth
+  /// lists are full of phones and headsets, so this sorts the real
+  /// candidates to the top.
+  final bool likelyPrinter;
 }
 
 /// Where to print: the saved device's address plus its display name.
@@ -102,9 +113,16 @@ abstract interface class ReceiptPrinter {
   });
 }
 
-/// Generic Bluetooth ESC/POS driver.
+/// Bluetooth Low Energy ESC/POS driver.
 final escPosPrinterProvider =
     Provider<ReceiptPrinter>((ref) => ThermalPluginPrinter());
+
+/// Classic-Bluetooth (SPP) ESC/POS driver.
+final sppPrinterProvider = Provider<ReceiptPrinter>((ref) {
+  final printer = SppPrinter();
+  ref.onDispose(printer.dispose);
+  return printer;
+});
 
 /// Star TSP100III driver (classic Bluetooth, graphics-only).
 final starPrinterProvider = Provider<ReceiptPrinter>((ref) {
@@ -119,6 +137,7 @@ final printerForDriverProvider =
     Provider.family<ReceiptPrinter, PrinterDriver>((ref, driver) =>
         switch (driver) {
           PrinterDriver.escPos => ref.watch(escPosPrinterProvider),
+          PrinterDriver.spp => ref.watch(sppPrinterProvider),
           PrinterDriver.star => ref.watch(starPrinterProvider),
         });
 

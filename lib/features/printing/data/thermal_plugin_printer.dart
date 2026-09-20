@@ -1,11 +1,19 @@
+import 'dart:typed_data';
+
 import 'package:flutter_thermal_printer/flutter_thermal_printer.dart';
 import 'package:flutter_thermal_printer/utils/printer.dart';
 
+import 'package:pos_app/features/printing/domain/escpos_raster.dart';
+import 'package:pos_app/features/printing/domain/printer_errors.dart';
 import 'package:pos_app/features/printing/domain/receipt_printer.dart';
-import 'package:pos_app/features/printing/domain/render_receipt.dart';
+import 'package:pos_app/features/printing/domain/render_receipt_image.dart';
 
-/// [ReceiptPrinter] backed by the `flutter_thermal_printer` plugin (BLE),
-/// speaking ESC/POS. The only file in the app that imports the plugin.
+/// [ReceiptPrinter] for Bluetooth Low Energy ESC/POS printers, backed by the
+/// `flutter_thermal_printer` plugin. The only file in the app that imports
+/// that plugin.
+///
+/// Receipts go out as raster images rather than ESC/POS text so that any
+/// script prints correctly and the output matches every other driver.
 class ThermalPluginPrinter implements ReceiptPrinter {
   final _ftp = FlutterThermalPrinter.instance;
 
@@ -33,13 +41,13 @@ class ThermalPluginPrinter implements ReceiptPrinter {
 
   @override
   Future<void> printReceipt(PrinterTarget target, ReceiptPrintJob job) async {
-    final bytes = await renderReceiptBytes(
+    final pages = await renderReceiptImages(
       job.data,
       job.fmt,
-      job.paperMm,
+      widthDots: escPosPrintWidthDots(job.paperMm),
       isCopy: job.isCopy,
     );
-    await _printBytes(target, bytes);
+    await _printPages(target, pages, job.paperMm);
   }
 
   @override
@@ -48,23 +56,39 @@ class ThermalPluginPrinter implements ReceiptPrinter {
     required String storeName,
     required int paperMm,
   }) async {
-    final bytes =
-        await renderTestPageBytes(storeName: storeName, paperMm: paperMm);
-    await _printBytes(target, bytes);
+    final pages = await renderTestPageImages(
+      storeName: storeName,
+      paperMm: paperMm,
+      widthDots: escPosPrintWidthDots(paperMm),
+    );
+    await _printPages(target, pages, paperMm);
   }
 
-  /// Sends raw ESC/POS [bytes]. Throws on connect/transmit failure.
-  Future<void> _printBytes(PrinterTarget target, List<int> bytes) async {
+  Future<void> _printPages(
+    PrinterTarget target,
+    List<Uint8List> pages,
+    int paperMm,
+  ) async {
+    final bytes = await escPosRasterBytes(pages, paperMm);
     final device = Printer(
       address: target.address,
       name: target.name,
       connectionType: ConnectionType.BLE,
     );
-    final connected = await _ftp.connect(device);
-    if (!connected) {
-      throw StateError(
-          'Failed to connect to printer "${target.name}" (${target.address})');
+    final bool connected;
+    try {
+      connected = await _ftp.connect(device);
+    } catch (e) {
+      throw StateError(friendlyPrinterError(e, printerName: target.name));
     }
-    await _ftp.printData(device, bytes, longData: true);
+    if (!connected) {
+      throw StateError('${target.name}: could not connect — check it is '
+          'switched on and in range');
+    }
+    try {
+      await _ftp.printData(device, bytes, longData: true);
+    } catch (e) {
+      throw StateError(friendlyPrinterError(e, printerName: target.name));
+    }
   }
 }

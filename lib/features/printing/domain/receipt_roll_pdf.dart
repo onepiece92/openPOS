@@ -15,15 +15,17 @@ import 'package:pos_app/features/receipts/presentation/receipt_body.dart';
 /// area and as tall as the content — `double.infinity` height makes the pdf
 /// package size the page to what was drawn.
 ///
-/// [paperMm] must be 58 or 80; anything else falls back to 80mm.
+/// [widthDots] is the printable width of the head. It differs per driver —
+/// Star prints 406 dots on a 58mm roll where generic ESC/POS prints 384 —
+/// so the caller decides and the page is built to match exactly.
 Future<pw.Document> buildReceiptRollPdf(
   ReceiptBodyData data,
-  CurrencyFormatter fmt,
-  int paperMm, {
+  CurrencyFormatter fmt, {
+  required int widthDots,
   bool isCopy = false,
 }) async {
-  final width = rollPrintWidthMm(paperMm) * PdfPageFormat.mm;
-  final narrow = paperMm == 58;
+  final width = rollWidthMm(widthDots) * PdfPageFormat.mm;
+  final narrow = widthDots < 500;
 
   final font = pw.Font.ttf(
       await rootBundle.load('assets/fonts/JetBrainsMono-Regular.ttf'));
@@ -184,9 +186,10 @@ Future<pw.Document> buildReceiptRollPdf(
 Future<pw.Document> buildTestPageRollPdf({
   required String storeName,
   required int paperMm,
+  required int widthDots,
 }) async {
-  final width = rollPrintWidthMm(paperMm) * PdfPageFormat.mm;
-  final base = paperMm == 58 ? 7.0 : 8.0;
+  final width = rollWidthMm(widthDots) * PdfPageFormat.mm;
+  final base = widthDots < 500 ? 7.0 : 8.0;
 
   final font = pw.Font.ttf(
       await rootBundle.load('assets/fonts/JetBrainsMono-Regular.ttf'));
@@ -228,9 +231,8 @@ Future<pw.Document> buildTestPageRollPdf({
   return doc;
 }
 
-/// Printable width of the roll in millimetres — the paper is wider than what
-/// the head can actually print (TSP100III: 72mm of 80mm, 50.8mm of 58mm).
-double rollPrintWidthMm(int paperMm) => paperMm == 58 ? 50.8 : 72.0;
+/// Dots to millimetres at the 203 dpi (8 dots/mm) every receipt head uses.
+double rollWidthMm(int widthDots) => widthDots / 8;
 
 String _titleCase(String s) =>
     s.isEmpty ? s : '${s[0].toUpperCase()}${s.substring(1)}';

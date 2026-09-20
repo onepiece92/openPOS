@@ -19,7 +19,9 @@ class _PrinterSetupScreenState extends ConsumerState<PrinterSetupScreen> {
   late PrinterDriver _driver =
       PrinterDriver.fromKey(ref.read(printerDriverProvider));
 
-  ReceiptPrinter get _printer => ref.read(printerForDriverProvider(_driver));
+  /// Held directly rather than read through `ref` on demand: [dispose] has
+  /// to stop the scan, and `ref` is already unusable by then.
+  late ReceiptPrinter _printer = ref.read(printerForDriverProvider(_driver));
   StreamSubscription<List<DiscoveredPrinter>>? _devicesSub;
   List<DiscoveredPrinter> _devices = [];
   bool _scanning = false;
@@ -34,7 +36,9 @@ class _PrinterSetupScreenState extends ConsumerState<PrinterSetupScreen> {
   @override
   void dispose() {
     _devicesSub?.cancel();
-    _printer.stopScan();
+    // Fire-and-forget: the widget is going away either way, and a failure
+    // here must not take the frame down with it.
+    unawaited(_printer.stopScan().catchError((_) {}));
     super.dispose();
   }
 
@@ -50,6 +54,7 @@ class _PrinterSetupScreenState extends ConsumerState<PrinterSetupScreen> {
     await _stopScan();
     setState(() {
       _driver = driver;
+      _printer = ref.read(printerForDriverProvider(driver));
       _devices = [];
     });
     _listenForDevices();
@@ -217,17 +222,20 @@ class _PrinterSetupScreenState extends ConsumerState<PrinterSetupScreen> {
                   Text('Printer Type', style: tt.titleMedium),
                   const SizedBox(height: 4),
                   Text(
-                    'Star prints receipts as images — the TSP100III cannot be '
-                    'sent text. Pair the printer in Android Bluetooth settings '
-                    'first, then scan here.',
+                    _driverHelp(_driver),
                     style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                   ),
                   const SizedBox(height: 12),
                   SegmentedButton<PrinterDriver>(
+                    showSelectedIcon: false,
                     segments: const [
                       ButtonSegment(
                         value: PrinterDriver.escPos,
-                        label: Text('ESC/POS'),
+                        label: Text('Bluetooth LE'),
+                      ),
+                      ButtonSegment(
+                        value: PrinterDriver.spp,
+                        label: Text('Classic'),
                       ),
                       ButtonSegment(
                         value: PrinterDriver.star,
@@ -282,9 +290,11 @@ class _PrinterSetupScreenState extends ConsumerState<PrinterSetupScreen> {
                     children: [
                       Expanded(
                         child: Text(
-                          _driver == PrinterDriver.star
-                              ? 'Paired Star Printers'
-                              : 'Nearby Bluetooth Printers',
+                          switch (_driver) {
+                            PrinterDriver.escPos => 'Nearby Bluetooth Printers',
+                            PrinterDriver.spp => 'Paired Printers',
+                            PrinterDriver.star => 'Paired Star Printers',
+                          },
                           style: tt.titleMedium,
                         ),
                       ),
@@ -298,7 +308,9 @@ class _PrinterSetupScreenState extends ConsumerState<PrinterSetupScreen> {
                         FilledButton.icon(
                           onPressed: _startScan,
                           icon: const Icon(Icons.bluetooth_searching_rounded),
-                          label: const Text('Scan'),
+                          label: Text(_driver == PrinterDriver.spp
+                              ? 'List'
+                              : 'Scan'),
                         ),
                     ],
                   ),
@@ -309,7 +321,10 @@ class _PrinterSetupScreenState extends ConsumerState<PrinterSetupScreen> {
                       child: Text(
                         _scanning
                             ? 'Scanning for printers…'
-                            : 'Tap Scan to find a printer.',
+                            : _driver == PrinterDriver.spp
+                                ? 'Tap List to show printers paired in Android '
+                                    'Bluetooth settings.'
+                                : 'Tap Scan to find a printer.',
                         style:
                             tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
                       ),
@@ -345,7 +360,21 @@ class _PrinterSetupScreenState extends ConsumerState<PrinterSetupScreen> {
   }
 
   String _driverLabel(PrinterDriver driver) => switch (driver) {
-        PrinterDriver.escPos => 'ESC/POS',
+        PrinterDriver.escPos => 'Bluetooth LE',
+        PrinterDriver.spp => 'Bluetooth Classic',
         PrinterDriver.star => 'Star',
+      };
+
+  String _driverHelp(PrinterDriver driver) => switch (driver) {
+        PrinterDriver.escPos =>
+          'Most newer ESC/POS printers. Switch the printer on and scan — no '
+              'pairing needed.',
+        PrinterDriver.spp =>
+          'Older and cheaper ESC/POS printers. Pair the printer in Android '
+              'Bluetooth settings first, then list it here. Not available on '
+              'iPhone or iPad, which only allow certified accessories.',
+        PrinterDriver.star =>
+          'Star TSP100III and friends. Pair in Bluetooth settings first. '
+              'These print receipts as images — they cannot be sent text.',
       };
 }
