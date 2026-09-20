@@ -81,7 +81,8 @@ void main() {
     await n.setDefaultTaxId(7);
     await n.setLoyaltyEnabled(true);
     await n.setLoyaltyRates(earnRate: 0.02, pointValue: 0.5);
-    await n.setPrinterDevice(address: 'AA:BB', name: 'Rongta');
+    await n.setPrinterDevice(
+        address: 'AA:BB', name: 'Rongta', driver: 'star');
     await n.setPrinterPaperWidth(58);
     await n.setCurrency(symbol: '\$', code: 'USD');
     await n.setLocale(countryCode: 'US', timezone: 'America/New_York');
@@ -114,7 +115,7 @@ void main() {
     addTearDown(c.dispose);
     final n = c.read(settingsProvider.notifier);
     await n.setDefaultTaxId(3);
-    await n.setPrinterDevice(address: 'X', name: 'Y');
+    await n.setPrinterDevice(address: 'X', name: 'Y', driver: 'escpos');
 
     await n.setDefaultTaxId(null);
     await n.clearPrinterDevice();

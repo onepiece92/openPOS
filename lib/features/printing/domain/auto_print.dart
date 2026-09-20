@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/features/printing/domain/receipt_printer.dart';
-import 'package:pos_app/features/printing/domain/render_receipt.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
 import 'package:pos_app/features/receipts/presentation/receipt_body.dart';
 
@@ -19,9 +18,11 @@ Future<String?> autoPrintOrder(WidgetRef ref, int orderId) =>
 final autoPrintServiceProvider =
     Provider<AutoPrintService>((ref) => AutoPrintService(ref));
 
-/// Loads an order + everything the receipt shows, renders ESC/POS bytes and
-/// hands them to the [ReceiptPrinter] port. Kept off the widget layer so it
-/// can be exercised in plain provider-container tests with a fake printer.
+/// Loads an order + everything the receipt shows and hands it to the
+/// [ReceiptPrinter] port, which renders it the way its own printer wants it
+/// (ESC/POS text, or an image for graphics-only Star hardware). Kept off the
+/// widget layer so it can be exercised in plain provider-container tests
+/// with a fake printer.
 class AutoPrintService {
   AutoPrintService(this._ref);
   final Ref _ref;
@@ -60,16 +61,14 @@ class AutoPrintService {
       // Count first: anything after the original is a marked copy, and a
       // print that fails half-way was still an issue attempt.
       final printsBefore = await db.ordersDao.incrementPrintCount(orderId);
-      final bytes = await renderReceiptBytes(
-        data,
-        fmt,
-        paper,
-        isCopy: printsBefore > 0,
-      );
-      await _ref.read(receiptPrinterProvider).printBytes(
-            address: address,
-            name: name,
-            bytes: bytes,
+      await _ref.read(receiptPrinterProvider).printReceipt(
+            PrinterTarget(address: address, name: name),
+            ReceiptPrintJob(
+              data: data,
+              fmt: fmt,
+              paperMm: paper,
+              isCopy: printsBefore > 0,
+            ),
           );
       return null;
     } catch (e) {

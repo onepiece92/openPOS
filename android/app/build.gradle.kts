@@ -31,7 +31,9 @@ android {
 
     defaultConfig {
         applicationId = "com.brandbuilder.openpos"
-        minSdk = flutter.minSdkVersion
+        // 26, not flutter.minSdkVersion (24): Star's StarXpand SDK requires
+        // Android 8.0+.
+        minSdk = 26
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -67,6 +69,11 @@ android {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+
+    // Star TSP100III support (StarPrinterChannel.kt). Bluetooth only — the
+    // SDK also speaks LAN, which this app deliberately never uses.
+    implementation("com.starmicronics:stario10:1.9.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 }
 
 flutter {

@@ -9,14 +9,17 @@ import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/features/printing/domain/auto_print.dart';
+import 'package:pos_app/features/orders/domain/order_number.dart';
 import 'package:pos_app/features/printing/domain/receipt_printer.dart';
 
 import '../../_support/test_db.dart';
 
 /// End-to-end auto-print against a fake [ReceiptPrinter]: load order →
-/// render ESC/POS → hand bytes to the port. No plugin, no Bluetooth.
+/// assemble the job → hand it to the port. No plugin, no Bluetooth. What
+/// each driver makes of the job (ESC/POS bytes, or an image for Star) is
+/// covered by the render tests.
 class FakeReceiptPrinter implements ReceiptPrinter {
-  final printed = <({String address, String name, List<int> bytes})>[];
+  final printed = <({PrinterTarget target, ReceiptPrintJob job})>[];
   Object? failWith;
 
   @override
@@ -27,18 +30,23 @@ class FakeReceiptPrinter implements ReceiptPrinter {
   Future<void> stopScan() async {}
 
   @override
-  Future<void> printBytes({
-    required String address,
-    required String name,
-    required List<int> bytes,
+  Future<void> printReceipt(PrinterTarget target, ReceiptPrintJob job) async {
+    if (failWith != null) throw failWith!;
+    printed.add((target: target, job: job));
+  }
+
+  @override
+  Future<void> printTestPage(
+    PrinterTarget target, {
+    required String storeName,
+    required int paperMm,
   }) async {
     if (failWith != null) throw failWith!;
-    printed.add((address: address, name: name, bytes: bytes));
   }
 }
 
 void main() {
-  // renderReceiptBytes loads the ESC/POS capability profile via rootBundle.
+  // Settings/Hive and the currency formatter need the binding.
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late Directory tmp;
@@ -89,22 +97,6 @@ void main() {
     return id;
   }
 
-  /// ESC/POS output embeds text as raw bytes — ASCII substrings are findable.
-  bool bytesContain(List<int> bytes, String text) {
-    final needle = text.codeUnits;
-    for (var i = 0; i + needle.length <= bytes.length; i++) {
-      var match = true;
-      for (var j = 0; j < needle.length; j++) {
-        if (bytes[i + j] != needle[j]) {
-          match = false;
-          break;
-        }
-      }
-      if (match) return true;
-    }
-    return false;
-  }
-
   test('no paired printer → success no-op, nothing printed', () async {
     final c = makeContainer();
     addTearDown(c.dispose);
@@ -120,20 +112,21 @@ void main() {
     await c.read(settingsProvider.notifier).setStoreProfile(name: 'Test Shop');
     await c
         .read(settingsProvider.notifier)
-        .setPrinterDevice(address: 'AA:BB', name: 'Rongta');
+        .setPrinterDevice(address: 'AA:BB', name: 'Rongta', driver: 'escpos');
 
     final err =
         await c.read(autoPrintServiceProvider).printOrder(await seedOrder());
 
     expect(err, isNull);
     expect(printer.printed, hasLength(1));
-    final job = printer.printed.single;
-    expect(job.address, 'AA:BB');
-    expect(bytesContain(job.bytes, 'Test Shop'), isTrue);
-    expect(bytesContain(job.bytes, 'Bill #7'), isTrue,
+    final sent = printer.printed.single;
+    expect(sent.target.address, 'AA:BB');
+    expect(sent.job.data.businessName, 'Test Shop');
+    expect(sent.job.data.order.billNo, '#7',
         reason: 'receipt must show the invoice number, not the row id');
-    expect(bytesContain(job.bytes, 'Espresso'), isTrue);
-    expect(bytesContain(job.bytes, 'Walk-in'), isTrue);
+    expect(sent.job.data.items.single.productName, 'Espresso');
+    expect(sent.job.data.customer, isNull, reason: 'walk-in sale');
+    expect(sent.job.paperMm, 80);
   });
 
   test('first print is the original; reprint is marked COPY and counted',
@@ -142,16 +135,16 @@ void main() {
     addTearDown(c.dispose);
     await c
         .read(settingsProvider.notifier)
-        .setPrinterDevice(address: 'AA:BB', name: 'Rongta');
+        .setPrinterDevice(address: 'AA:BB', name: 'Rongta', driver: 'escpos');
     final orderId = await seedOrder();
     final svc = c.read(autoPrintServiceProvider);
 
     expect(await svc.printOrder(orderId), isNull);
-    expect(bytesContain(printer.printed[0].bytes, 'COPY OF ORIGINAL'), isFalse,
+    expect(printer.printed[0].job.isCopy, isFalse,
         reason: 'first print is the original');
 
     expect(await svc.printOrder(orderId), isNull);
-    expect(bytesContain(printer.printed[1].bytes, 'COPY OF ORIGINAL'), isTrue,
+    expect(printer.printed[1].job.isCopy, isTrue,
         reason: 'every print after the first is a marked copy');
 
     expect((await db.ordersDao.getById(orderId))!.printCount, 2);
@@ -162,7 +155,7 @@ void main() {
     addTearDown(c.dispose);
     await c
         .read(settingsProvider.notifier)
-        .setPrinterDevice(address: 'AA:BB', name: 'Rongta');
+        .setPrinterDevice(address: 'AA:BB', name: 'Rongta', driver: 'escpos');
     printer.failWith = StateError('connect timeout');
 
     final err =
@@ -176,7 +169,7 @@ void main() {
     addTearDown(c.dispose);
     await c
         .read(settingsProvider.notifier)
-        .setPrinterDevice(address: 'AA:BB', name: 'Rongta');
+        .setPrinterDevice(address: 'AA:BB', name: 'Rongta', driver: 'escpos');
     final err = await c.read(autoPrintServiceProvider).printOrder(999);
     expect(err, 'Order not found for printing');
     expect(printer.printed, isEmpty);

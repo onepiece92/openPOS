@@ -23,6 +23,7 @@ const kLoyaltyPointValue = 'loyalty_point_value'; // currency value of 1 pt
 const kPrinterDeviceAddress = 'printer_device_address';
 const kPrinterDeviceName = 'printer_device_name';
 const kPrinterPaperWidth = 'printer_paper_width'; // '58' | '80'
+const kPrinterDriver = 'printer_driver'; // 'escpos' | 'star'
 
 // Backup keys
 const kAutoBackupEnabled = 'auto_backup_enabled';
@@ -63,6 +64,7 @@ class AppSettings {
     this.printerDeviceAddress,
     this.printerDeviceName,
     this.printerPaperWidth = 80,
+    this.printerDriver = 'escpos',
     this.businessName = '',
     this.businessTagline = '',
     this.businessPhone = '',
@@ -87,6 +89,10 @@ class AppSettings {
   final String? printerDeviceAddress; // BLE MAC or USB id
   final String? printerDeviceName;
   final int printerPaperWidth; // mm
+
+  /// Which driver owns the saved printer: 'escpos' (generic Bluetooth
+  /// thermal) or 'star' (Star TSP100III over classic Bluetooth).
+  final String printerDriver;
   final String businessName;
   final String businessTagline;
   final String businessPhone;
@@ -137,6 +143,7 @@ class AppSettings {
       printerDeviceAddress: box.get(kPrinterDeviceAddress) as String?,
       printerDeviceName: box.get(kPrinterDeviceName) as String?,
       printerPaperWidth: width,
+      printerDriver: get(kPrinterDriver, 'escpos'),
       businessName: get(kBusinessName, ''),
       businessTagline: get(kBusinessTagline, ''),
       businessPhone: get(kBusinessPhone, ''),
@@ -166,6 +173,7 @@ class AppSettings {
     String? printerDeviceName,
     bool clearPrinterDevice = false,
     int? printerPaperWidth,
+    String? printerDriver,
     String? businessName,
     String? businessTagline,
     String? businessPhone,
@@ -195,6 +203,7 @@ class AppSettings {
             ? null
             : (printerDeviceName ?? this.printerDeviceName),
         printerPaperWidth: printerPaperWidth ?? this.printerPaperWidth,
+        printerDriver: printerDriver ?? this.printerDriver,
         businessName: businessName ?? this.businessName,
         businessTagline: businessTagline ?? this.businessTagline,
         businessPhone: businessPhone ?? this.businessPhone,
@@ -273,11 +282,25 @@ class SettingsNotifier extends Notifier<AppSettings> {
       );
 
   // Printer
-  Future<void> setPrinterDevice(
-          {required String address, required String name}) =>
+  /// [driver] identifies the transport that found this device ('escpos' or
+  /// 'star') — it is saved with the device so printing uses the same driver
+  /// that discovered it.
+  Future<void> setPrinterDevice({
+    required String address,
+    required String name,
+    required String driver,
+  }) =>
       _write(
-        state.copyWith(printerDeviceAddress: address, printerDeviceName: name),
-        {kPrinterDeviceAddress: address, kPrinterDeviceName: name},
+        state.copyWith(
+          printerDeviceAddress: address,
+          printerDeviceName: name,
+          printerDriver: driver,
+        ),
+        {
+          kPrinterDeviceAddress: address,
+          kPrinterDeviceName: name,
+          kPrinterDriver: driver,
+        },
       );
   Future<void> clearPrinterDevice() => _write(
         state.copyWith(clearPrinterDevice: true),
@@ -379,3 +402,6 @@ final printerDeviceAddressProvider = _field((s) => s.printerDeviceAddress);
 final printerDeviceNameProvider = _field((s) => s.printerDeviceName);
 /// Paper width in millimetres. Defaults to 80.
 final printerPaperWidthProvider = _field((s) => s.printerPaperWidth);
+
+/// Driver key of the saved printer: 'escpos' or 'star'.
+final printerDriverProvider = _field((s) => s.printerDriver);

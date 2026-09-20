@@ -2,10 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/core/utils/async_feedback.dart';
 import 'package:pos_app/features/printing/domain/receipt_printer.dart';
-import 'package:pos_app/features/printing/domain/render_receipt.dart';
 
 class PrinterSetupScreen extends ConsumerStatefulWidget {
   const PrinterSetupScreen({super.key});
@@ -15,7 +15,11 @@ class PrinterSetupScreen extends ConsumerStatefulWidget {
 }
 
 class _PrinterSetupScreenState extends ConsumerState<PrinterSetupScreen> {
-  ReceiptPrinter get _printer => ref.read(receiptPrinterProvider);
+  /// Driver used for scanning. Starts on whatever the saved printer uses.
+  late PrinterDriver _driver =
+      PrinterDriver.fromKey(ref.read(printerDriverProvider));
+
+  ReceiptPrinter get _printer => ref.read(printerForDriverProvider(_driver));
   StreamSubscription<List<DiscoveredPrinter>>? _devicesSub;
   List<DiscoveredPrinter> _devices = [];
   bool _scanning = false;
@@ -24,9 +28,7 @@ class _PrinterSetupScreenState extends ConsumerState<PrinterSetupScreen> {
   @override
   void initState() {
     super.initState();
-    _devicesSub = _printer.devices.listen((list) {
-      if (mounted) setState(() => _devices = list);
-    });
+    _listenForDevices();
   }
 
   @override
@@ -36,18 +38,53 @@ class _PrinterSetupScreenState extends ConsumerState<PrinterSetupScreen> {
     super.dispose();
   }
 
+  void _listenForDevices() {
+    _devicesSub?.cancel();
+    _devicesSub = _printer.devices.listen((list) {
+      if (mounted) setState(() => _devices = list);
+    });
+  }
+
+  Future<void> _switchDriver(PrinterDriver driver) async {
+    if (driver == _driver) return;
+    await _stopScan();
+    setState(() {
+      _driver = driver;
+      _devices = [];
+    });
+    _listenForDevices();
+  }
+
+  /// Android 12+ gates Bluetooth scanning and connecting behind runtime
+  /// permissions; without them the scan silently finds nothing.
+  Future<bool> _ensureBluetoothPermission() async {
+    final statuses = await [
+      Permission.bluetoothScan,
+      Permission.bluetoothConnect,
+    ].request();
+    return statuses.values.every((s) => s.isGranted || s.isLimited);
+  }
+
   Future<void> _startScan() async {
+    if (!await _ensureBluetoothPermission()) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Bluetooth permission is required')),
+        );
+      }
+      return;
+    }
     setState(() {
       _scanning = true;
       _devices = [];
     });
     try {
       await _printer.startScan();
-    } catch (_) {
-      // Surface a snackbar but keep the page usable.
+    } catch (e) {
       if (mounted) {
+        setState(() => _scanning = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to start Bluetooth scan')),
+          SnackBar(content: Text('Failed to start Bluetooth scan: $e')),
         );
       }
     }
@@ -59,13 +96,14 @@ class _PrinterSetupScreenState extends ConsumerState<PrinterSetupScreen> {
   }
 
   Future<void> _selectDevice(DiscoveredPrinter device) async {
-    await ref
-        .read(settingsProvider.notifier)
-        .setPrinterDevice(address: device.address, name: device.name);
+    await ref.read(settingsProvider.notifier).setPrinterDevice(
+          address: device.address,
+          name: device.name,
+          driver: device.driver.key,
+        );
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text('Saved "${device.name}" as the active printer')),
+        SnackBar(content: Text('Saved "${device.name}" as the active printer')),
       );
     }
   }
@@ -84,15 +122,13 @@ class _PrinterSetupScreenState extends ConsumerState<PrinterSetupScreen> {
     await withErrorSnackbar(
       context,
       () async {
-        final bytes = await renderTestPageBytes(
-          storeName: storeName,
-          paperMm: paper,
-        );
-        await _printer.printBytes(
-          address: address,
-          name: name,
-          bytes: bytes,
-        );
+        // Print with the driver the device was saved under, not the one the
+        // scan list happens to be showing.
+        await ref.read(receiptPrinterProvider).printTestPage(
+              PrinterTarget(address: address, name: name),
+              storeName: storeName,
+              paperMm: paper,
+            );
         return true;
       },
       failurePrefix: 'Test print failed',
@@ -109,6 +145,7 @@ class _PrinterSetupScreenState extends ConsumerState<PrinterSetupScreen> {
     final tt = Theme.of(context).textTheme;
     final savedAddr = ref.watch(printerDeviceAddressProvider);
     final savedName = ref.watch(printerDeviceNameProvider);
+    final savedDriver = PrinterDriver.fromKey(ref.watch(printerDriverProvider));
     final paper = ref.watch(printerPaperWidthProvider);
 
     return Scaffold(
@@ -127,14 +164,15 @@ class _PrinterSetupScreenState extends ConsumerState<PrinterSetupScreen> {
                   const SizedBox(height: 8),
                   if (savedAddr == null)
                     Text('None paired yet',
-                        style: tt.bodyMedium
-                            ?.copyWith(color: cs.onSurfaceVariant))
+                        style:
+                            tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant))
                   else ...[
-                    Text(savedName ?? 'Unknown',
-                        style: tt.titleSmall),
-                    Text(savedAddr,
-                        style: tt.bodySmall
-                            ?.copyWith(color: cs.onSurfaceVariant)),
+                    Text(savedName ?? 'Unknown', style: tt.titleSmall),
+                    Text(
+                      '$savedAddr · ${_driverLabel(savedDriver)}',
+                      style:
+                          tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                    ),
                     const SizedBox(height: 12),
                     Row(
                       children: [
@@ -169,6 +207,42 @@ class _PrinterSetupScreenState extends ConsumerState<PrinterSetupScreen> {
           ),
           const SizedBox(height: 12),
 
+          // ── Printer type ──────────────────────────────────────────────
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Printer Type', style: tt.titleMedium),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Star prints receipts as images — the TSP100III cannot be '
+                    'sent text. Pair the printer in Android Bluetooth settings '
+                    'first, then scan here.',
+                    style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                  const SizedBox(height: 12),
+                  SegmentedButton<PrinterDriver>(
+                    segments: const [
+                      ButtonSegment(
+                        value: PrinterDriver.escPos,
+                        label: Text('ESC/POS'),
+                      ),
+                      ButtonSegment(
+                        value: PrinterDriver.star,
+                        label: Text('Star'),
+                      ),
+                    ],
+                    selected: {_driver},
+                    onSelectionChanged: (s) => _switchDriver(s.first),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+
           // ── Paper width ───────────────────────────────────────────────
           Card(
             child: Padding(
@@ -180,8 +254,7 @@ class _PrinterSetupScreenState extends ConsumerState<PrinterSetupScreen> {
                   const SizedBox(height: 4),
                   Text(
                     'Match your printer roll. Receipts are reformatted automatically.',
-                    style: tt.bodySmall
-                        ?.copyWith(color: cs.onSurfaceVariant),
+                    style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                   ),
                   const SizedBox(height: 12),
                   SegmentedButton<int>(
@@ -207,9 +280,14 @@ class _PrinterSetupScreenState extends ConsumerState<PrinterSetupScreen> {
                 children: [
                   Row(
                     children: [
-                      Text('Nearby Bluetooth Printers',
-                          style: tt.titleMedium),
-                      const Spacer(),
+                      Expanded(
+                        child: Text(
+                          _driver == PrinterDriver.star
+                              ? 'Paired Star Printers'
+                              : 'Nearby Bluetooth Printers',
+                          style: tt.titleMedium,
+                        ),
+                      ),
                       if (_scanning)
                         TextButton.icon(
                           onPressed: _stopScan,
@@ -232,8 +310,8 @@ class _PrinterSetupScreenState extends ConsumerState<PrinterSetupScreen> {
                         _scanning
                             ? 'Scanning for printers…'
                             : 'Tap Scan to find a printer.',
-                        style: tt.bodyMedium
-                            ?.copyWith(color: cs.onSurfaceVariant),
+                        style:
+                            tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
                       ),
                     )
                   else
@@ -241,9 +319,11 @@ class _PrinterSetupScreenState extends ConsumerState<PrinterSetupScreen> {
                       final isActive = d.address == savedAddr;
                       return ListTile(
                         leading: Icon(
-                          d.transport == PrinterTransport.ble
-                              ? Icons.bluetooth_rounded
-                              : Icons.usb_rounded,
+                          switch (d.transport) {
+                            PrinterTransport.usb => Icons.usb_rounded,
+                            PrinterTransport.network => Icons.lan_rounded,
+                            _ => Icons.bluetooth_rounded,
+                          },
                           color: isActive ? cs.primary : cs.onSurfaceVariant,
                         ),
                         title: Text(d.name),
@@ -263,4 +343,9 @@ class _PrinterSetupScreenState extends ConsumerState<PrinterSetupScreen> {
       ),
     );
   }
+
+  String _driverLabel(PrinterDriver driver) => switch (driver) {
+        PrinterDriver.escPos => 'ESC/POS',
+        PrinterDriver.star => 'Star',
+      };
 }
