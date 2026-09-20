@@ -468,9 +468,9 @@
     "semantic_hash": ""
   },
   "lib/features/printing/presentation/printer_setup_screen.dart": {
-    "mtime": 1789887925.4674237,
-    "seen": 1789888586.9079769,
-    "ast_hash": "04f15fa198ab2fea27c8031df5c185d1",
+    "mtime": 1789897334.9853628,
+    "seen": 1789897533.951515,
+    "ast_hash": "c5a653e11045912699463e21c13116db",
     "semantic_hash": ""
   },
   "lib/features/tax/presentation/tax_settings_screen.dart": {
@@ -804,10 +804,10 @@
     "semantic_hash": "7989d4a0f7a8fd76f0c50af90f6836b6"
   },
   "pubspec.yaml": {
-    "mtime": 1787049824.5222492,
-    "seen": 1787549093.426893,
-    "ast_hash": "d3e255f62177edea2f9ba587ca736080",
-    "semantic_hash": "d3e255f62177edea2f9ba587ca736080"
+    "mtime": 1789897174.6740277,
+    "seen": 1789897533.951573,
+    "ast_hash": "fae18b4abebaae31903427f257ea2750",
+    "semantic_hash": ""
   },
   "test/features/products/product_units_test.dart": {
     "mtime": 1787480727.0248806,
@@ -876,9 +876,9 @@
     "semantic_hash": "a62323b757ea49684e822ad07d5adca4"
   },
   "test/core/providers/settings_notifier_test.dart": {
-    "mtime": 1789888011.9371033,
-    "seen": 1789888586.908028,
-    "ast_hash": "63a948d3f28d60a4252974cdedbfcd04",
+    "mtime": 1789895514.6597097,
+    "seen": 1789897533.951545,
+    "ast_hash": "6e1e09225a6788cb7b711602235a9be1",
     "semantic_hash": ""
   },
   "lib/features/cart/data/ticket_sequence.dart": {
@@ -1080,15 +1080,15 @@
     "semantic_hash": "51ab4e48d44838768d9db98552a660cd"
   },
   "lib/features/printing/data/thermal_plugin_printer.dart": {
-    "mtime": 1789887873.0607774,
-    "seen": 1789888586.907973,
-    "ast_hash": "61189adff323cff9dc03e5db7e64fc7e",
+    "mtime": 1789897236.7591817,
+    "seen": 1789897533.95151,
+    "ast_hash": "5e0abb76172e7a5d146f1a098bbd8a2d",
     "semantic_hash": ""
   },
   "lib/features/printing/domain/receipt_printer.dart": {
-    "mtime": 1789888011.9376304,
-    "seen": 1789888586.907975,
-    "ast_hash": "4cfde995258d7bae1f4378eda5974592",
+    "mtime": 1789897273.6837425,
+    "seen": 1789897533.951513,
+    "ast_hash": "068e64f1ac282748194ced149055350a",
     "semantic_hash": ""
   },
   "test/features/printing/auto_print_test.dart": {
@@ -1266,27 +1266,57 @@
     "semantic_hash": "a0c067daa18f757df1e2f3366bf25069"
   },
   "lib/features/printing/data/star_printer.dart": {
-    "mtime": 1789888011.9373503,
-    "seen": 1789888586.907972,
-    "ast_hash": "bbcf8913ab3202db6d0c9598ef491d89",
+    "mtime": 1789897273.6841838,
+    "seen": 1789897533.951509,
+    "ast_hash": "71913688212fd2a7b97d4916814b6b83",
     "semantic_hash": ""
   },
   "lib/features/printing/domain/receipt_roll_pdf.dart": {
-    "mtime": 1789887821.6776729,
-    "seen": 1789888586.907975,
-    "ast_hash": "0d0e2c65adf34bd14fe87dba3a7f5d95",
+    "mtime": 1789897174.6743336,
+    "seen": 1789897533.951514,
+    "ast_hash": "94293a5da17987ee0d29d4f254fbccb8",
     "semantic_hash": ""
   },
   "lib/features/printing/domain/render_receipt_image.dart": {
-    "mtime": 1789887837.292116,
-    "seen": 1789888586.9079769,
-    "ast_hash": "3d6ddab056a161a1fd67401e3362ed81",
+    "mtime": 1789897186.350577,
+    "seen": 1789897533.951515,
+    "ast_hash": "44ff2f6a7842c203bd92b3dc664a8b75",
     "semantic_hash": ""
   },
   "test/features/printing/receipt_roll_pdf_test.dart": {
-    "mtime": 1789888079.419703,
-    "seen": 1789888586.908043,
-    "ast_hash": "fcf80ddebf784cfe3f6ac7c971c80e0e",
+    "mtime": 1789897372.2309368,
+    "seen": 1789897533.95156,
+    "ast_hash": "e349b78d6f5d28115cafff86a329e0db",
+    "semantic_hash": ""
+  },
+  "lib/features/printing/data/spp_printer.dart": {
+    "mtime": 1789897316.0869174,
+    "seen": 1789897533.951508,
+    "ast_hash": "3abc621ba083c4dc62eaf88751013bc2",
+    "semantic_hash": ""
+  },
+  "lib/features/printing/domain/escpos_raster.dart": {
+    "mtime": 1789897196.1660657,
+    "seen": 1789897533.951512,
+    "ast_hash": "d31f867248f094c7fbc67cc79ff71591",
+    "semantic_hash": ""
+  },
+  "lib/features/printing/domain/printer_errors.dart": {
+    "mtime": 1789897209.441416,
+    "seen": 1789897533.951512,
+    "ast_hash": "949d55a8ad695a3f6aa6450f387566d3",
+    "semantic_hash": ""
+  },
+  "test/features/printing/escpos_raster_test.dart": {
+    "mtime": 1789897396.2885754,
+    "seen": 1789897533.9515588,
+    "ast_hash": "c9b3dbe599fd0082e1d82c75253c7aa0",
+    "semantic_hash": ""
+  },
+  "test/features/printing/printer_errors_test.dart": {
+    "mtime": 1789897415.6838722,
+    "seen": 1789897533.9515588,
+    "ast_hash": "4ec30e5920ad8128e47cfd33f3ee7f01",
     "semantic_hash": ""
   }
 }

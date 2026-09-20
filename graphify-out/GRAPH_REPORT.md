@@ -1,16 +1,16 @@
 # Graph Report - offlinePOS  (2026-09-20)
 
 ## Corpus Check
-- 212 files · ~168,217 words
+- 217 files · ~170,114 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 3746 nodes · 5916 edges · 146 communities (141 shown, 5 thin omitted)
-- Extraction: 98% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 85 edges (avg confidence: 0.87)
+- 3788 nodes · 5981 edges · 147 communities (143 shown, 4 thin omitted)
+- Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 85 edges (avg confidence: 0.87)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `32e36b57`
+- Built from commit: `60cfd34f`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -44,7 +44,7 @@
 - orders_screen.dart
 - customer_picker_sheet.dart
 - receipt_pdf_service.dart
-- ColorScheme
+- escpos_raster_test.dart
 - snapshot_service.dart
 - order_taxes_table.dart
 - held_ticket_number_test.dart
@@ -58,13 +58,13 @@
 - orders_dao.dart
 - tax_settings_screen.dart
 - store_profile_edit_screen.dart
-- package:pos_app/core/theme/tokens.dart
+- package:flutter/services.dart
 - onboarding_screen.dart
 - products_screen.dart
 - held_tickets_bar.dart
 - order_detail_screen.dart
 - products_dao.dart
-- schema.dart
+- _
 - receipt_screen.dart
 - tables_screen.dart
 - package:drift/drift.dart
@@ -73,7 +73,7 @@
 - cartSessionProvider
 - grid_product_tile.dart
 - products_table.dart
-- currencySymbolProvider
+- cart_session.dart
 - occupied_tables_test.dart
 - product_tile.dart
 - inventory_card.dart
@@ -91,17 +91,17 @@
 - pos_filter_provider.dart
 - article_detail_screen.dart
 - held_orders_notifier.dart
-- package:pos_app/features/cart/presentation/providers/cart_notifier.dart
+- package:flutter_test/flutter_test.dart
 - package:flutter_riverpod/flutter_riverpod.dart
 - learn_screen.dart
 - app_root.dart
-- dashboard_screen.dart
+- tax_section.dart
 - String?
 - order_summary.dart
 - package:pos_app/core/utils/currency_formatter.dart
 - dashboard_body.dart
 - pos_app Package Manifest (v1.0.0+9)
-- ConsumerState
+- loyalty_section.dart
 - money.dart
 - Milestone 1 — v1 Foundation & Core POS
 - databaseProvider
@@ -122,10 +122,10 @@
 - app_sheet.dart
 - star_printer.dart
 - receipt_printer.dart
-- List
-- build
+- confirm_step.dart
+- posFilterProvider
 - package:intl/intl.dart
-- table_selector.dart
+- tables_provider.dart
 - Riverpod Architecture Decision (provider type per concern)
 - Feature-First Layered Architecture
 - GeneratedDatabase
@@ -133,7 +133,7 @@
 - products_provider.dart
 - audit_log_table.dart
 - country_default.dart
-- Route /pos
+- categories_table.dart
 - Banned Runtime-Fetching Packages
 - tax_dao.dart
 - audit_service.dart
@@ -145,22 +145,23 @@
 - _PrinterSetupScreenState
 - Hardware Integration Pillar (ESC/POS + PDF)
 - Open POS Brand Logo
-- package:flutter/services.dart
+- tax_step.dart
 - int get
 - thermal_plugin_printer.dart
 - render_receipt_image.dart
 - currencies.dart
 - receipt_roll_pdf_test.dart
 - _StoreProfileEditScreenState
-- dismiss_keyboard_test.dart
+- table_selector.dart
 - onboarding_notifier.dart
 - country_step.dart
-- Notifier
+- dismiss_keyboard.dart
 - ReceiptPrinter
 - string_utils.dart
-- _RouterRefresh
-- AppScrollBehavior
-- ReportPeriod
+- place_order_test.dart
+- printer_errors.dart
+- Set
+- demoDataServiceProvider
 
 ## God Nodes (most connected - your core abstractions)
 1. `databaseProvider` - 34 edges
@@ -170,21 +171,21 @@
 5. `currencyFormatterProvider` - 20 edges
 6. `DataClass` - 19 edges
 7. `cartProvider` - 18 edges
-8. `CurrencyFormatter` - 16 edges
-9. `Return` - 14 edges
+8. `Return` - 17 edges
+9. `CurrencyFormatter` - 16 edges
 10. `_PaymentScreenState` - 14 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `Banned Runtime-Fetching Packages` --semantically_similar_to--> `Bundled Fonts Policy (google_fonts banned)`  [INFERRED] [semantically similar]
   CLAUDE.md → .planning/codebase/DEPENDENCIES.md
-- `ROADMAP Phase 1 — Core Foundation & Shared Logic` --semantically_similar_to--> `v1 Phase 0 — Foundation (no UI)`  [INFERRED] [semantically similar]
-  ROADMAP.md → v1_roadmap.md
-- `ROADMAP Phase 4 — POS Interface (Main Flow)` --semantically_similar_to--> `v1 Phase 3 — Core Sales Loop`  [INFERRED] [semantically similar]
-  ROADMAP.md → v1_roadmap.md
-- `Offline-First Non-Negotiable Constraint` --semantically_similar_to--> `Offline Reliability + Hardware Integration Focus`  [INFERRED] [semantically similar]
-  CLAUDE.md → .planning/codebase/DEPENDENCIES.md
+- `riverpod_generator Omitted` --semantically_similar_to--> `Hand-written Providers, No Riverpod Codegen`  [INFERRED] [semantically similar]
+  pubspec.yaml → .planning/codebase/DEPENDENCIES.md
 - `flutter_launcher_icons Config (android/ios/web)` --conceptually_related_to--> `Offline-First Non-Negotiable Constraint`  [AMBIGUOUS]
   pubspec.yaml → CLAUDE.md
+- `Offline-First Non-Negotiable Constraint` --semantically_similar_to--> `Offline Reliability + Hardware Integration Focus`  [INFERRED] [semantically similar]
+  CLAUDE.md → .planning/codebase/DEPENDENCIES.md
+- `ROADMAP Phase 1 — Core Foundation & Shared Logic` --semantically_similar_to--> `v1 Phase 0 — Foundation (no UI)`  [INFERRED] [semantically similar]
+  ROADMAP.md → v1_roadmap.md
 
 ## Import Cycles
 - None detected.
@@ -198,7 +199,7 @@
 - **Open POS Brand Identity System** — assets_images_logo_open_pos_brand_logo, assets_images_logo_open_pos_wordmark, assets_images_logo_circular_arrow_mark, assets_images_logo_green_blue_gradient_palette [INFERRED 0.85]
 - **Riverpod State & DI Layer Contract** — _planning_codebase_architecture_state_management_riverpod, _planning_codebase_conventions_provider_naming, v1_roadmap_riverpod_decision_table, v1_roadmap_provider_hierarchy, v1_roadmap_cart_notifier, project_riverpod_sole_di, pubspec_riverpod_generator_omitted [INFERRED 0.85]
 
-## Communities (146 total, 5 thin omitted)
+## Communities (147 total, 4 thin omitted)
 
 ### Community 0 - "Drift Database Core"
 Cohesion: 0.01
@@ -210,55 +211,55 @@ Nodes (157): Table, TableInfo, AuditLog, Categories, Customers, ExpenseCategorie
 
 ### Community 2 - "schema_v10.dart"
 Cohesion: 0.02
-Nodes (119): TaxGroups, action, actualTableName, address, _alias, aliasedName, allSchemaEntities, allTables (+111 more)
+Nodes (120): Index, ProductVariants, action, actualTableName, address, _alias, aliasedName, allSchemaEntities (+112 more)
 
 ### Community 3 - "schema_v11.dart"
 Cohesion: 0.02
-Nodes (101): OrderTaxes, action, actualTableName, address, _alias, aliasedName, allSchemaEntities, allTables (+93 more)
+Nodes (101): Categories, action, actualTableName, address, _alias, aliasedName, allSchemaEntities, allTables (+93 more)
 
 ### Community 4 - "schema_v13.dart"
 Cohesion: 0.02
-Nodes (101): Index, Tables, action, actualTableName, address, _alias, aliasedName, allSchemaEntities (+93 more)
+Nodes (100): Orders, action, actualTableName, address, _alias, aliasedName, allSchemaEntities, allTables (+92 more)
 
 ### Community 5 - "schema_v12.dart"
 Cohesion: 0.02
-Nodes (99): Customers, GeneratedColumn, action, actualTableName, address, _alias, aliasedName, allSchemaEntities (+91 more)
+Nodes (98): Iterable, action, actualTableName, address, _alias, aliasedName, allSchemaEntities, allTables (+90 more)
 
 ### Community 6 - "schema_v9.dart"
 Cohesion: 0.02
-Nodes (95): Orders, action, actualTableName, address, _alias, aliasedName, allSchemaEntities, allTables (+87 more)
+Nodes (96): OrderItems, OrderTaxOverrides, action, actualTableName, address, _alias, aliasedName, allSchemaEntities (+88 more)
 
 ### Community 7 - "schema_v8.dart"
 Cohesion: 0.02
-Nodes (93): ExpenseCategories, Products, Returns, action, actualTableName, address, _alias, aliasedName (+85 more)
+Nodes (93): Expenses, OrderTaxes, ProductTaxes, action, actualTableName, address, _alias, aliasedName (+85 more)
 
 ### Community 8 - "schema_v4.dart"
 Cohesion: 0.02
-Nodes (92): ProductComponents, ProductModifiers, ProductVariants, TaxGroupMembers, action, actualTableName, address, _alias (+84 more)
+Nodes (92): Customers, ProductModifiers, Products, TaxGroups, action, actualTableName, address, _alias (+84 more)
 
 ### Community 9 - "schema_v7.dart"
 Cohesion: 0.02
-Nodes (91): AuditLog, Expenses, Iterable, ProductTaxes, action, actualTableName, address, _alias (+83 more)
+Nodes (91): ExpenseCategories, ProductComponents, StockAdjustments, Tables, action, actualTableName, address, _alias (+83 more)
 
 ### Community 10 - "schema_v6.dart"
 Cohesion: 0.02
-Nodes (90): Categories, OrderItems, OrderTaxOverrides, StockAdjustments, TaxRates, action, actualTableName, address (+82 more)
+Nodes (90): AuditLog, GeneratedColumn, Returns, TaxGroupMembers, TaxRates, action, actualTableName, address (+82 more)
 
 ### Community 11 - "hive_provider.dart"
 Cohesion: 0.03
 Nodes (71): autoBackupEnabled, autoBackupLastAt, _box, build, businessAddress, businessName, businessNameOrDefault, businessPan (+63 more)
 
 ### Community 12 - "ConsumerWidget"
-Cohesion: 0.11
-Nodes (19): ConsumerWidget, themeModeProvider, OrderSummary, _TaxPickerSheet, InventoryCard, SettingsScreen, AppearanceSection, build (+11 more)
+Cohesion: 0.16
+Nodes (14): ConsumerWidget, currencyCodeProvider, currencySymbolProvider, OrderSummary, _TaxPickerSheet, InventoryCard, SettingsScreen, build (+6 more)
 
 ### Community 13 - "package:pos_app/core/database/app_database.dart"
 Cohesion: 0.06
-Nodes (46): AuditService, invoicePrefix, placeOrder, transaction, transaction, voidOrder, package:flutter_test/flutter_test.dart, package:pos_app/core/database/app_database.dart (+38 more)
+Nodes (41): AuditService, invoicePrefix, placeOrder, transaction, customerId, customers, watch, transaction (+33 more)
 
 ### Community 14 - "product_form_screen.dart"
 Cohesion: 0.06
-Nodes (34): _categoryId, _ComponentEntry, _components, _conversionCtrl, createState, _delete, didChangeDependencies, dispose (+26 more)
+Nodes (36): _categoryId, _ComponentEntry, _components, _conversionCtrl, createState, _delete, didChangeDependencies, dispose (+28 more)
 
 ### Community 15 - "expenses_screen.dart"
 Cohesion: 0.05
@@ -277,36 +278,36 @@ Cohesion: 0.08
 Nodes (28): build, cs, key_, _KeyChip, keys, label, _SectionHeader, _ShortcutRow (+20 more)
 
 ### Community 19 - "app.dart"
-Cohesion: 0.06
-Nodes (31): GoRouter, getKeyboardDismissBehavior, ping, refresh, _slide, Offset, package:pos_app/features/audit/presentation/audit_log_screen.dart, package:pos_app/features/backup/presentation/backup_screen.dart (+23 more)
+Cohesion: 0.04
+Nodes (44): ChangeNotifier, EditableText, GoRouter, AppScrollBehavior, getKeyboardDismissBehavior, ping, POSApp, refresh (+36 more)
 
 ### Community 20 - "inventory_screen.dart"
 Cohesion: 0.09
-Nodes (25): lowStockThresholdProvider, build, createState, dispose, _filter, _filtered, InventoryScreen, _InventoryScreenState (+17 more)
+Nodes (24): lowStockThresholdProvider, build, createState, dispose, _filter, _filtered, InventoryScreen, _InventoryScreenState (+16 more)
 
 ### Community 21 - "home.dart"
 Cohesion: 0.06
 Nodes (34): _applyFilter, cart, categories, _CategoryRow, _Chip, createState, dispose, favorites (+26 more)
 
 ### Community 22 - "report_data.dart"
-Cohesion: 0.06
-Nodes (30): avgOrder, chartDates, chartHighlightIndex, chartTitle, chartTotals, count, days, db (+22 more)
+Cohesion: 0.05
+Nodes (45): DateTimeRange?, avgOrder, chartDates, chartHighlightIndex, chartTitle, chartTotals, count, days (+37 more)
 
 ### Community 23 - "auto_print_test.dart"
 Cohesion: 0.12
 Nodes (16): Object?, package:pos_app/features/printing/domain/auto_print.dart, box, db, devices, failWith, main, makeContainer (+8 more)
 
 ### Community 24 - "payment_screen.dart"
-Cohesion: 0.09
-Nodes (25): build, createState, customer, dispose, fmt, icon, initState, label (+17 more)
+Cohesion: 0.07
+Nodes (26): dart:ui, createState, customer, dispose, fmt, icon, initState, label (+18 more)
 
 ### Community 25 - "printer_setup_screen.dart"
-Cohesion: 0.10
-Nodes (20): PrinterDriver, createState, _devices, _devicesSub, _disconnectSavedPrinter, dispose, _driver, _driverLabel (+12 more)
+Cohesion: 0.09
+Nodes (21): PrinterDriver, printerForDriverProvider, createState, _devices, _devicesSub, _disconnectSavedPrinter, dispose, _driver (+13 more)
 
 ### Community 26 - "orders_screen.dart"
 Cohesion: 0.08
-Nodes (28): build, createState, cs, customerName, _filter, fmt, _groupByDate, icon (+20 more)
+Nodes (24): createState, cs, customerName, _filter, fmt, _groupByDate, icon, label (+16 more)
 
 ### Community 27 - "customer_picker_sheet.dart"
 Cohesion: 0.20
@@ -316,9 +317,9 @@ Nodes (10): build, createState, CustomerPickerSheet, _CustomerPickerSheetState, 
 Cohesion: 0.08
 Nodes (24): baseStyle, billRow, boldStyle, buildReceiptPdf, bytes, customerName, data, _dataCell (+16 more)
 
-### Community 29 - "ColorScheme"
-Cohesion: 0.13
-Nodes (13): ColorScheme, build, cs, highlightIndex, labels, MiniBarChart, values, cs (+5 more)
+### Community 29 - "escpos_raster_test.dart"
+Cohesion: 0.11
+Nodes (17): dart:typed_data, bytes, escPosRasterBytes, generator, profile, package:esc_pos_utils_plus/esc_pos_utils_plus.dart, package:image/image.dart, package:pos_app/features/printing/domain/escpos_raster.dart (+9 more)
 
 ### Community 30 - "snapshot_service.dart"
 Cohesion: 0.07
@@ -329,32 +330,32 @@ Cohesion: 0.08
 Nodes (24): createdAt, id, orderId, OrderTaxOverrides, originalTax, overrideTax, reason, id (+16 more)
 
 ### Community 32 - "held_ticket_number_test.dart"
-Cohesion: 0.12
-Nodes (17): Box, dart:io, Directory, _box, _kFavoriteProductIds, toggle, package:hive_flutter/hive_flutter.dart, package:pos_app/features/cart/data/ticket_sequence.dart (+9 more)
+Cohesion: 0.09
+Nodes (21): Box, dart:io, Directory, _box, _kFavoriteProductIds, toggle, initFlutter, main (+13 more)
 
 ### Community 33 - "package:flutter/material.dart"
-Cohesion: 0.07
-Nodes (23): BackupSection, build, build, SettingsSectionHeader, title, build, i, _indexFor (+15 more)
+Cohesion: 0.08
+Nodes (22): BackupSection, build, build, SettingsSectionHeader, title, cs, icon, _ProfileTag (+14 more)
 
 ### Community 34 - "cart_notifier.dart"
-Cohesion: 0.06
-Nodes (34): _, CartCalculator, compute, _roundingModeFor, add, addItem, addProduct, addProductInSecondaryUnit (+26 more)
+Cohesion: 0.09
+Nodes (26): defaultTaxIdProvider, add, addItem, addProduct, addProductInSecondaryUnit, allRates, build, CartNotifier (+18 more)
 
 ### Community 35 - "audit_log_screen.dart"
 Cohesion: 0.09
 Nodes (23): action, _ActionChip, _actionColor, _actionIcon, AuditLogScreen, _auditLogsProvider, build, color (+15 more)
 
 ### Community 36 - "TextColumn get"
-Cohesion: 0.09
-Nodes (22): @DataClassName, DateTimeColumn get, createdAt, delta, id, notes, productId, reasonCode (+14 more)
+Cohesion: 0.12
+Nodes (15): @DataClassName, DateTimeColumn get, capacity, createdAt, id, name, notes, Tables (+7 more)
 
 ### Community 37 - "orders_table.dart"
 Cohesion: 0.08
 Nodes (24): @TableIndex, changeAmount, createdAt, customerId, discountIsPercent, discountTotal, discountValue, id (+16 more)
 
 ### Community 38 - "IntColumn get"
-Cohesion: 0.09
-Nodes (22): IntColumn get, Categories, createdAt, id, name, parentId, sortOrder, taxRateId (+14 more)
+Cohesion: 0.11
+Nodes (17): IntColumn get, componentProductId, compositeProductId, id, ProductComponents, quantity, primaryKey, productId (+9 more)
 
 ### Community 39 - "snapshot_providers.dart"
 Cohesion: 0.09
@@ -365,40 +366,40 @@ Cohesion: 0.06
 Nodes (32): addLoyaltyPoints, getAll, getById, redeemLoyaltyPoints, search, upsert, watchAll, getAllOrdersWithItems (+24 more)
 
 ### Community 41 - "tax_settings_screen.dart"
-Cohesion: 0.09
-Nodes (26): FormState, defaultTaxIdProvider, invoicePrefixProvider, _placeOrder, build, reset, taxRatesStreamProvider, build (+18 more)
+Cohesion: 0.10
+Nodes (20): FormState, taxRatesStreamProvider, build, createState, dispose, existing, _formKey, _inclusionType (+12 more)
 
 ### Community 42 - "store_profile_edit_screen.dart"
 Cohesion: 0.15
 Nodes (12): class, _addressCtrl, build, createState, dispose, _initialised, _label, _loading (+4 more)
 
-### Community 43 - "package:pos_app/core/theme/tokens.dart"
+### Community 43 - "package:flutter/services.dart"
 Cohesion: 0.13
-Nodes (13): build, icon, isDestructive, onTap, StepButton, build, emphasis, icon (+5 more)
+Nodes (14): dart:async, _devices, dispose, _methods, _print, printReceipt, printTestPage, _requireAndroid (+6 more)
 
 ### Community 44 - "onboarding_screen.dart"
 Cohesion: 0.08
-Nodes (29): onboardingNotifierProvider, _back, build, _businessNameCtrl, _canProceed, _countries, createState, dispose (+21 more)
+Nodes (33): build, onboardingNotifierProvider, _back, build, _businessNameCtrl, _canProceed, _countries, createState (+25 more)
 
 ### Community 45 - "products_screen.dart"
 Cohesion: 0.09
 Nodes (22): _applyFilter, categories, _CategoryChips, categoryName, _Chip, createState, cs, dispose (+14 more)
 
 ### Community 46 - "held_tickets_bar.dart"
-Cohesion: 0.13
-Nodes (19): AnimationController, archivedHeldOrdersProvider, heldOrdersProvider, build, _buildActiveList, _buildArchivedList, createState, _ctrl (+11 more)
+Cohesion: 0.09
+Nodes (29): AnimationController, ConsumerState, ConsumerStatefulWidget, CartScreen, _EmptyProductsState, _EmptyProductsStateState, PaymentScreen, activeHeldOrdersProvider (+21 more)
 
 ### Community 47 - "order_detail_screen.dart"
 Cohesion: 0.09
-Nodes (25): auditServiceProvider, build, businessName, customer, data, db, _DetailBody, _DetailData (+17 more)
+Nodes (24): auditServiceProvider, build, businessName, customer, data, db, _DetailBody, _DetailData (+16 more)
 
 ### Community 48 - "products_dao.dart"
 Cohesion: 0.09
 Nodes (21): adjustStock, deductStock, deleteCategory, getAllCategories, getById, getBySku, getComponents, replaceComponents (+13 more)
 
-### Community 49 - "schema.dart"
-Cohesion: 0.13
-Nodes (14): package:drift/internal/migrations.dart, schema_v10.dart, schema_v11.dart, schema_v12.dart, schema_v13.dart, schema_v4.dart, schema_v6.dart, schema_v7.dart (+6 more)
+### Community 49 - "_"
+Cohesion: 0.14
+Nodes (14): _, CartCalculator, compute, _roundingModeFor, package:pos_app/core/utils/tax_calculator.dart, package:pos_app/features/cart/domain/cart_calculator.dart, package:pos_app/features/cart/domain/cart_session.dart, package:pos_app/features/cart/domain/cart_summary.dart (+6 more)
 
 ### Community 50 - "receipt_screen.dart"
 Cohesion: 0.10
@@ -409,8 +410,8 @@ Cohesion: 0.10
 Nodes (21): _assignToCart, _capacityCtrl, createState, dispose, existing, initState, isCurrentCartTable, isOccupied (+13 more)
 
 ### Community 52 - "package:drift/drift.dart"
-Cohesion: 0.10
-Nodes (17): openConnection, getAdjustmentsForProduct, logAdjustment, watchLowStock, componentProductId, compositeProductId, id, ProductComponents (+9 more)
+Cohesion: 0.09
+Nodes (19): openConnection, getAdjustmentsForProduct, logAdjustment, watchLowStock, createdAt, delta, id, notes (+11 more)
 
 ### Community 53 - "inventory_filter_bar.dart"
 Cohesion: 0.17
@@ -421,8 +422,8 @@ Cohesion: 0.16
 Nodes (21): _, @DriftAccessor, @DriftDatabase, _$AuditDaoMixin, _$CustomersDaoMixin, DatabaseAccessor, _$ExpensesDaoMixin, _$InventoryDaoMixin (+13 more)
 
 ### Community 55 - "cartSessionProvider"
-Cohesion: 0.12
-Nodes (21): dart:ui, build, CartDetailScreen, cartProvider, cartSessionProvider, clear, build, CartLineItem (+13 more)
+Cohesion: 0.21
+Nodes (19): heldOrdersBoxProvider, build, CartDetailScreen, build, _PaymentActionBar, _PaymentScreenState, _placeOrder, cartProvider (+11 more)
 
 ### Community 56 - "grid_product_tile.dart"
 Cohesion: 0.10
@@ -432,9 +433,9 @@ Nodes (18): CurrencyFormatter, build, fmt, GridProductTile, isFavorite, onDecrem
 Cohesion: 0.10
 Nodes (19): categoryId, conversionRate, createdAt, id, imagePath, isActive, isComposite, isHiddenInPos (+11 more)
 
-### Community 58 - "currencySymbolProvider"
-Cohesion: 0.67
-Nodes (4): currencyCodeProvider, currencySymbolProvider, build, CurrencySection
+### Community 58 - "cart_session.dart"
+Cohesion: 0.14
+Nodes (13): bool get, copyWith, customerId, fresh, heldTicketId, isEditingHeldTicket, loyaltyPointsToRedeem, openedAt (+5 more)
 
 ### Community 59 - "occupied_tables_test.dart"
 Cohesion: 0.12
@@ -457,20 +458,20 @@ Cohesion: 0.11
 Nodes (16): Color, _Badge, bg, customer, CustomerCard, fg, icon, label (+8 more)
 
 ### Community 64 - "customers_screen.dart"
-Cohesion: 0.12
-Nodes (18): IconData get, build, createState, CustomersScreen, _CustomersScreenState, dispose, _filterAndSort, icon (+10 more)
+Cohesion: 0.07
+Nodes (30): IconData get, build, _pickCustomer, session, TicketHeader, customersStreamProvider, build, createState (+22 more)
 
 ### Community 65 - "app_theme.dart"
-Cohesion: 0.11
-Nodes (18): AppTheme, backgroundGradient, _build, ctaButtonStyle, dark, _darkGrad, _darkScheme, _fontFamily (+10 more)
+Cohesion: 0.05
+Nodes (41): themeModeProvider, AppTheme, backgroundGradient, _build, ctaButtonStyle, dark, _darkGrad, _darkScheme (+33 more)
 
 ### Community 66 - "tokens.dart"
 Cohesion: 0.11
 Nodes (18): AppFonts, AppOpacity, heavy, lg, md, medium, mono, Radii (+10 more)
 
 ### Community 67 - "held_order.dart"
-Cohesion: 0.06
-Nodes (31): bool get, copyWith, customerId, fresh, heldTicketId, isEditingHeldTicket, loyaltyPointsToRedeem, openedAt (+23 more)
+Cohesion: 0.11
+Nodes (18): archivedAt, copyWith, createdAt, customerId, customerName, fromJson, id, isArchived (+10 more)
 
 ### Community 68 - "Dependency Audit (2026-04-22)"
 Cohesion: 0.18
@@ -485,48 +486,48 @@ Cohesion: 0.14
 Nodes (16): DateTime, BackupRepository, db, exportCustomers, exportExpenses, exportOrders, exportProducts, exportSalesReport (+8 more)
 
 ### Community 71 - "customer_form.dart"
-Cohesion: 0.11
-Nodes (18): _addressCtrl, build, createState, customer, CustomerForm, _CustomerFormState, _delete, _discountCtrl (+10 more)
+Cohesion: 0.12
+Nodes (17): _addressCtrl, build, createState, customer, CustomerForm, _CustomerFormState, _delete, _discountCtrl (+9 more)
 
 ### Community 72 - "cart_summary.dart"
 Cohesion: 0.11
 Nodes (17): amount, CartSummary, isInclusive, loyaltyDiscount, name, orderDiscount, pointsToEarn, rate (+9 more)
 
 ### Community 73 - "pos_filter_provider.dart"
-Cohesion: 0.12
-Nodes (16): clearSearch, copyWith, favoritesOnly, isGrid, PosFilterNotifier, PosFilterState, PosSortMode, search (+8 more)
+Cohesion: 0.13
+Nodes (15): clearSearch, copyWith, favoritesOnly, isGrid, PosFilterNotifier, PosFilterState, PosSortMode, search (+7 more)
 
 ### Community 74 - "article_detail_screen.dart"
 Cohesion: 0.11
 Nodes (17): ArticleDetailScreen, ArticleSection, build, category, cs, heading, icon, readTime (+9 more)
 
 ### Community 75 - "held_orders_notifier.dart"
-Cohesion: 0.12
-Nodes (16): heldOrdersBoxProvider, HeldOrder, archive, archiveAll, _box, build, delete, deleteAllArchived (+8 more)
+Cohesion: 0.15
+Nodes (12): HeldOrder, archive, archiveAll, _box, build, delete, deleteAllArchived, hold (+4 more)
 
-### Community 76 - "package:pos_app/features/cart/presentation/providers/cart_notifier.dart"
-Cohesion: 0.16
-Nodes (12): build, _pickCustomer, session, TicketHeader, customerId, customers, customersStreamProvider, watch (+4 more)
+### Community 76 - "package:flutter_test/flutter_test.dart"
+Cohesion: 0.20
+Nodes (10): _, compoundTax, lineItemTax, priceBeforeTax, _round, TaxCalculator, package:flutter_test/flutter_test.dart, package:pos_app/core/utils/money.dart (+2 more)
 
 ### Community 77 - "package:flutter_riverpod/flutter_riverpod.dart"
-Cohesion: 0.10
-Nodes (21): int?, db, _db, DemoDataService, seed, _settings, autoPrintOrder, AutoPrintService (+13 more)
+Cohesion: 0.11
+Nodes (17): db, _db, DemoDataService, seed, _settings, autoPrintOrder, AutoPrintService, autoPrintServiceProvider (+9 more)
 
 ### Community 78 - "learn_screen.dart"
 Cohesion: 0.12
 Nodes (16): _Article, _ArticleCard, _articles, build, category, cs, description, icon (+8 more)
 
 ### Community 79 - "app_root.dart"
-Cohesion: 0.10
-Nodes (19): build, child, _container, createState, dispose, initState, message, _notice (+11 more)
+Cohesion: 0.12
+Nodes (15): build, child, _container, createState, dispose, initState, message, _notice (+7 more)
 
-### Community 80 - "dashboard_screen.dart"
-Cohesion: 0.16
-Nodes (13): DateTimeRange?, reportProvider, build, createState, _customRange, DashboardScreen, _DashboardScreenState, _period (+5 more)
+### Community 80 - "tax_section.dart"
+Cohesion: 0.22
+Nodes (9): int?, invoicePrefixProvider, build, currentId, _editInvoicePrefix, rates, _showTaxPicker, _TaxPickerSheet (+1 more)
 
 ### Community 81 - "String?"
-Cohesion: 0.09
-Nodes (21): double?, IconData?, CartItem, fmt, icon, item, onPressed, _QtyButton (+13 more)
+Cohesion: 0.07
+Nodes (28): double?, IconData?, action, AppEmptyState, build, icon, subtitle, title (+20 more)
 
 ### Community 82 - "order_summary.dart"
 Cohesion: 0.11
@@ -537,16 +538,16 @@ Cohesion: 0.12
 Nodes (15): buildReceiptText, dateFmt, join, lines, o, package:pos_app/core/utils/currency_formatter.dart, package:pos_app/features/printing/domain/render_receipt.dart, package:pos_app/features/receipts/presentation/receipt_body.dart (+7 more)
 
 ### Community 84 - "dashboard_body.dart"
-Cohesion: 0.12
-Nodes (15): ReportData, build, _buildKpiRows, cs, DashboardBody, data, _fmt, isCustomRange (+7 more)
+Cohesion: 0.08
+Nodes (22): ColorScheme, ReportData, build, _buildKpiRows, cs, DashboardBody, data, _fmt (+14 more)
 
 ### Community 85 - "pos_app Package Manifest (v1.0.0+9)"
 Cohesion: 0.17
 Nodes (15): Technology Stack (Dart 3.5+, Flutter 3.24+), pos_app Package Manifest (v1.0.0+9), ROADMAP Phase 1 — Core Foundation & Shared Logic, ROADMAP Phase 3 — Product Management (The Catalog), ROADMAP Phase 4 — POS Interface (Main Flow), Append-Only Audit Log, Connectivity Detection task (0.5, connectivity_plus), Drift Schema — Full v1 Table List (+7 more)
 
-### Community 86 - "ConsumerState"
-Cohesion: 0.08
-Nodes (29): ConsumerState, ConsumerStatefulWidget, demoDataServiceProvider, _EmptyProductsState, _EmptyProductsStateState, _loadDemo, _HeldTicketsSheet, categoriesStreamProvider (+21 more)
+### Community 86 - "loyalty_section.dart"
+Cohesion: 0.22
+Nodes (9): createState, dispose, _earnCtrl, earnRate, _LoyaltyRateSheet, _LoyaltyRateSheetState, pointValue, _showRateSheet (+1 more)
 
 ### Community 87 - "money.dart"
 Cohesion: 0.13
@@ -557,16 +558,16 @@ Cohesion: 0.18
 Nodes (14): Dual Data Layer (Drift + Hive), Navigation Pillar (GoRouter routerProvider), Drift Layout Convention (tables, daos, AppDatabase migrations), Responsive Desktop POS Layout Rule, No Hardcoded Colors (AppTheme / colorScheme), Local Auth (no external identity provider), Platform Requirements (Android API 21+, iOS 12+), Premium Glassmorphic Dark Aesthetic (+6 more)
 
 ### Community 89 - "databaseProvider"
-Cohesion: 0.10
-Nodes (22): databaseProvider, _delete, _save, _showAddCategoryDialog, productsByCategoryProvider, build, category, _CategoryCard (+14 more)
+Cohesion: 0.09
+Nodes (25): databaseProvider, _save, _delete, _save, _showAddCategoryDialog, categoriesStreamProvider, productsByCategoryProvider, build (+17 more)
 
 ### Community 90 - "tron_border.dart"
 Cohesion: 0.14
 Nodes (13): CustomPainter, dart:math, color, e, extractWrappedPath, f, len, p (+5 more)
 
 ### Community 91 - "migration_test.dart"
-Cohesion: 0.13
-Nodes (14): generated/schema.dart, _, compoundTax, lineItemTax, priceBeforeTax, _round, TaxCalculator, package:drift_dev/api/migrations_common.dart (+6 more)
+Cohesion: 0.22
+Nodes (8): generated/schema.dart, package:drift_dev/api/migrations_common.dart, package:drift_dev/api/migrations_native.dart, package:drift/native.dart, SchemaVerifier, main, shipped, verifier
 
 ### Community 92 - "customers_table.dart"
 Cohesion: 0.14
@@ -577,8 +578,8 @@ Cohesion: 0.14
 Nodes (13): copyWith, isSecondaryUnit, isTaxable, lineDiscount, lineSubtotal, mainUnitQty, name, productId (+5 more)
 
 ### Community 94 - "render_receipt.dart"
-Cohesion: 0.11
-Nodes (16): bytes, customerName, g, isCopy, _kv, method, methodLabel, profile (+8 more)
+Cohesion: 0.12
+Nodes (15): bytes, customerName, g, isCopy, _kv, method, methodLabel, profile (+7 more)
 
 ### Community 95 - "receipt_roll_pdf.dart"
 Cohesion: 0.10
@@ -590,7 +591,7 @@ Nodes (13): Zero External APIs / Services, Deleted Sync / Cloud-Backup Scaffoldi
 
 ### Community 97 - "settingsProvider"
 Cohesion: 0.15
-Nodes (18): loyaltyEarnRateProvider, loyaltyEnabledProvider, loyaltyPointValueProvider, settingsBoxProvider, settingsProvider, OnboardingState, finish, OnboardingNotifier (+10 more)
+Nodes (19): @immutable, AppSettings, loyaltyEarnRateProvider, loyaltyEnabledProvider, loyaltyPointValueProvider, settingsBoxProvider, SettingsNotifier, settingsProvider (+11 more)
 
 ### Community 98 - "discount_sheet.dart"
 Cohesion: 0.18
@@ -613,8 +614,8 @@ Cohesion: 0.15
 Nodes (12): discount, id, lineTotal, orderId, OrderItems, productId, productName, quantity (+4 more)
 
 ### Community 103 - "build"
-Cohesion: 0.25
-Nodes (8): build, POSApp, routerProvider, Route /expenses, Route /help/shortcuts, Route /inventory, Route /products, Route /settings
+Cohesion: 0.12
+Nodes (23): build, build, _CartScreenState, build, favoritesProvider, productSalesCountProvider, productsFilterProvider, productsStreamProvider (+15 more)
 
 ### Community 104 - "app_sheet.dart"
 Cohesion: 0.17
@@ -622,28 +623,24 @@ Nodes (10): cs, failurePrefix, messenger, draggable, initialSize, minSize, packa
   bool (+2 more)
 
 ### Community 105 - "star_printer.dart"
-Cohesion: 0.12
-Nodes (16): dart:async, _devices, _discovery, dispose, _events, _found, _isAndroid, _methods (+8 more)
+Cohesion: 0.13
+Nodes (14): _devices, _discovery, dispose, _events, _found, _isSupported, _methods, _printImages (+6 more)
 
 ### Community 106 - "receipt_printer.dart"
-Cohesion: 0.08
-Nodes (25): address, data, devices, DiscoveredPrinter, driver, escPosPrinterProvider, fmt, fromKey (+17 more)
+Cohesion: 0.07
+Nodes (28): address, data, devices, DiscoveredPrinter, driver, escPosPrinterProvider, fmt, fromKey (+20 more)
 
-### Community 107 - "List"
-Cohesion: 0.12
-Nodes (15): CartNotifier, clearItems, selectedTaxRatesProvider, build, children, ConfirmStep, icon, isLast (+7 more)
-
-### Community 108 - "build"
-Cohesion: 0.32
-Nodes (8): posFilterProvider, build, CartScreen, _CartScreenState, initState, favoritesProvider, productSalesCountProvider, Route /orders
+### Community 107 - "confirm_step.dart"
+Cohesion: 0.17
+Nodes (11): build, children, ConfirmStep, icon, isLast, label, state, _SummaryCard (+3 more)
 
 ### Community 109 - "package:intl/intl.dart"
 Cohesion: 0.20
 Nodes (9): decimalDigits, _fmt, format, formatPlain, locale, symbol, tryParse, NumberFormat (+1 more)
 
-### Community 110 - "table_selector.dart"
-Cohesion: 0.13
-Nodes (20): activeHeldOrdersProvider, build, occupied, onSelect, selectedId, session, _TablePickerSheet, tables (+12 more)
+### Community 110 - "tables_provider.dart"
+Cohesion: 0.23
+Nodes (12): build, TableSelectorRow, activeHeld, cartTableId, cartTableProvider, occupiedTableIdsProvider, tableId, tables (+4 more)
 
 ### Community 111 - "Riverpod Architecture Decision (provider type per concern)"
 Cohesion: 0.24
@@ -670,12 +667,12 @@ Cohesion: 0.20
 Nodes (9): action, AuditLog, createdAt, entityId, entityType, id, metadata, newValue (+1 more)
 
 ### Community 117 - "country_default.dart"
-Cohesion: 0.20
-Nodes (9): code, CountryDefault, currency, fromJson, name, symbol, taxName, taxRate (+1 more)
+Cohesion: 0.22
+Nodes (8): code, currency, fromJson, name, symbol, taxName, taxRate, timezone
 
-### Community 118 - "Route /pos"
-Cohesion: 0.50
-Nodes (4): build, _finish, _skip, Route /pos
+### Community 118 - "categories_table.dart"
+Cohesion: 0.22
+Nodes (8): Categories, createdAt, id, name, parentId, sortOrder, taxRateId, updatedAt
 
 ### Community 119 - "Banned Runtime-Fetching Packages"
 Cohesion: 0.28
@@ -686,12 +683,12 @@ Cohesion: 0.22
 Nodes (8): getAll, getById, getRatesForProduct, setProductTaxes, upsertRate, watchActive, package:pos_app/core/database/tables/product_taxes_table.dart, _
 
 ### Community 121 - "audit_service.dart"
-Cohesion: 0.14
-Nodes (12): dart:convert, _db, log, orderPlaced, orderRefunded, orderVoided, settingChanged, taxOverridden (+4 more)
+Cohesion: 0.13
+Nodes (13): dart:convert, _db, log, orderPlaced, orderRefunded, orderVoided, settingChanged, taxOverridden (+5 more)
 
 ### Community 122 - "onboarding_state.dart"
 Cohesion: 0.22
-Nodes (8): businessName, copyWith, country, saving, step, taxName, taxRate, package:pos_app/features/onboarding/domain/country_default.dart
+Nodes (8): CountryDefault, businessName, copyWith, country, saving, step, taxName, taxRate
 
 ### Community 123 - "tables_dao.dart"
 Cohesion: 0.25
@@ -702,16 +699,16 @@ Cohesion: 0.29
 Nodes (7): build_runner Code Generation Workflow, Code Generation Dev Dependencies (riverpod_generator, drift_dev, build_runner), build.yaml Code Generation Config, custom_lint Analyzer Plugin (enabled in analysis_options), Generated-File Exclusion (*.g.dart, *.freezed.dart), custom_lint / riverpod_lint Commented Out, riverpod_generator Omitted
 
 ### Community 125 - "VoidCallback?"
-Cohesion: 0.13
-Nodes (13): build, _labels, onSkip, step, WizardHeader, build, canNext, onBack (+5 more)
+Cohesion: 0.08
+Nodes (21): CartItem, build, CartLineItem, fmt, icon, item, onPressed, _QtyButton (+13 more)
 
 ### Community 126 - "audit_dao.dart"
 Cohesion: 0.29
 Nodes (6): log, queryByDateRange, queryByEntity, watchRecent, package:pos_app/core/database/tables/audit_log_table.dart, _
 
 ### Community 127 - "_PrinterSetupScreenState"
-Cohesion: 0.24
-Nodes (13): printerDeviceAddressProvider, printerDeviceNameProvider, printerDriverProvider, printerPaperWidthProvider, printerForDriverProvider, receiptPrinterProvider, build, PrinterSetupScreen (+5 more)
+Cohesion: 0.30
+Nodes (11): printerDeviceAddressProvider, printerDeviceNameProvider, printerDriverProvider, printerPaperWidthProvider, receiptPrinterProvider, build, _PrinterSetupScreenState, _printTestPage (+3 more)
 
 ### Community 128 - "Hardware Integration Pillar (ESC/POS + PDF)"
 Cohesion: 0.47
@@ -721,21 +718,21 @@ Nodes (6): Hardware Integration Pillar (ESC/POS + PDF), PrintingService Abstract
 Cohesion: 0.53
 Nodes (6): Interlocking Circular Arrow Mark, Green-to-Blue Gradient Brand Palette, Open POS Brand Logo, OPEN POS Wordmark, Point-of-Sale Product Identity, Transaction Cycle Visual Metaphor
 
-### Community 130 - "package:flutter/services.dart"
-Cohesion: 0.17
-Nodes (10): build, BusinessNameStep, controller, build, currencySymbol, nameController, rateController, TaxStep (+2 more)
+### Community 130 - "tax_step.dart"
+Cohesion: 0.18
+Nodes (9): build, BusinessNameStep, controller, build, currencySymbol, nameController, rateController, TaxStep (+1 more)
 
 ### Community 131 - "int get"
 Cohesion: 0.40
 Nodes (4): int get, billNo, displayNo, String get
 
 ### Community 132 - "thermal_plugin_printer.dart"
-Cohesion: 0.17
-Nodes (11): devices, _ftp, _printBytes, printReceipt, printTestPage, startScan, stopScan, package:flutter_thermal_printer/flutter_thermal_printer.dart (+3 more)
+Cohesion: 0.18
+Nodes (10): devices, _ftp, _printPages, printReceipt, printTestPage, startScan, stopScan, package:flutter_thermal_printer/flutter_thermal_printer.dart (+2 more)
 
 ### Community 133 - "render_receipt_image.dart"
-Cohesion: 0.18
-Nodes (10): dart:typed_data, doc, isCopy, kReceiptDpi, pages, _rasterise, renderReceiptImages, renderTestPageImages (+2 more)
+Cohesion: 0.17
+Nodes (11): doc, escPosPrintWidthDots, isCopy, kReceiptDpi, pages, _rasterise, renderReceiptImages, renderTestPageImages (+3 more)
 
 ### Community 135 - "receipt_roll_pdf_test.dart"
 Cohesion: 0.18
@@ -745,55 +742,67 @@ Nodes (10): package:pdf/pdf.dart, package:pos_app/features/printing/domain/recei
 Cohesion: 0.42
 Nodes (10): businessAddressProvider, businessNameProvider, businessPanProvider, businessPhoneProvider, businessTaglineProvider, didChangeDependencies, _StoreProfileEditScreenState, build (+2 more)
 
-### Community 137 - "dismiss_keyboard_test.dart"
+### Community 137 - "table_selector.dart"
 Cohesion: 0.22
-Nodes (7): EditableText, package:pos_app/app.dart, package:pos_app/shared/widgets/dismiss_keyboard.dart, harness, main, main, textFieldHasFocus
+Nodes (8): occupied, onSelect, _pickTable, selectedId, session, _TablePickerSheet, tables, package:pos_app/features/tables/domain/tables_provider.dart
 
 ### Community 138 - "onboarding_notifier.dart"
-Cohesion: 0.22
-Nodes (8): back, build, next, setBusinessName, setCountry, setSaving, setTaxName, setTaxRate
+Cohesion: 0.20
+Nodes (9): back, build, next, setBusinessName, setCountry, setSaving, setTaxName, setTaxRate (+1 more)
 
 ### Community 139 - "country_step.dart"
 Cohesion: 0.22
 Nodes (8): build, countries, CountryStep, loading, onSearch, onSelect, searchController, selected
 
-### Community 140 - "Notifier"
-Cohesion: 0.40
-Nodes (5): @immutable, AppSettings, SettingsNotifier, SelectedTaxRatesNotifier, Notifier
+### Community 140 - "dismiss_keyboard.dart"
+Cohesion: 0.22
+Nodes (7): build, child, DismissKeyboardOnTap, build, child, KeyboardSafe, Widget
 
 ### Community 141 - "ReceiptPrinter"
-Cohesion: 0.50
-Nodes (4): StarBluetoothPrinter, ThermalPluginPrinter, ReceiptPrinter, FakeReceiptPrinter
+Cohesion: 0.40
+Nodes (5): SppPrinter, StarBluetoothPrinter, ThermalPluginPrinter, ReceiptPrinter, FakeReceiptPrinter
+
+### Community 143 - "place_order_test.dart"
+Cohesion: 0.25
+Nodes (7): audit, db, main, makeItem, makeSession, makeSummary, seedProduct
+
+### Community 144 - "printer_errors.dart"
+Cohesion: 0.33
+Nodes (5): friendlyPrinterError, known, _match, null, raw
+
+### Community 145 - "Set"
+Cohesion: 0.67
+Nodes (3): FavoritesNotifier, Set, StateNotifier
 
 ## Ambiguous Edges - Review These
+- `flutter_launcher_icons Config (android/ios/web)` → `Offline-First Non-Negotiable Constraint`  [AMBIGUOUS]
+  pubspec.yaml · relation: conceptually_related_to
 - `v1 Phase 3 — Core Sales Loop` → `pos_app Package Manifest (v1.0.0+9)`  [AMBIGUOUS]
   v1_roadmap.md · relation: references
 - `v1 Phase 7 — Customers, Loyalty & Audit` → `pos_app Package Manifest (v1.0.0+9)`  [AMBIGUOUS]
   v1_roadmap.md · relation: references
 - `Responsive Desktop POS Layout Rule` → `Platform Requirements (Android API 21+, iOS 12+)`  [AMBIGUOUS]
   .planning/codebase/CONVENTIONS.md · relation: conceptually_related_to
-- `Offline-First Non-Negotiable Constraint` → `flutter_launcher_icons Config (android/ios/web)`  [AMBIGUOUS]
-  pubspec.yaml · relation: conceptually_related_to
 
 ## Knowledge Gaps
-- **2528 isolated node(s):** `refresh`, `getKeyboardDismissBehavior`, `_slide`, `ping`, `_container` (+2523 more)
+- **2558 isolated node(s):** `refresh`, `getKeyboardDismissBehavior`, `_slide`, `ping`, `_container` (+2553 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **5 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **4 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
+- **What is the exact relationship between `flutter_launcher_icons Config (android/ios/web)` and `Offline-First Non-Negotiable Constraint`?**
+  _Edge tagged AMBIGUOUS (relation: conceptually_related_to) - confidence is low._
 - **What is the exact relationship between `v1 Phase 3 — Core Sales Loop` and `pos_app Package Manifest (v1.0.0+9)`?**
   _Edge tagged AMBIGUOUS (relation: references) - confidence is low._
 - **What is the exact relationship between `v1 Phase 7 — Customers, Loyalty & Audit` and `pos_app Package Manifest (v1.0.0+9)`?**
   _Edge tagged AMBIGUOUS (relation: references) - confidence is low._
 - **What is the exact relationship between `Responsive Desktop POS Layout Rule` and `Platform Requirements (Android API 21+, iOS 12+)`?**
   _Edge tagged AMBIGUOUS (relation: conceptually_related_to) - confidence is low._
-- **What is the exact relationship between `Offline-First Non-Negotiable Constraint` and `flutter_launcher_icons Config (android/ios/web)`?**
-  _Edge tagged AMBIGUOUS (relation: conceptually_related_to) - confidence is low._
-- **Why does `Return` connect `DataClass` to `Drift Database Core`, `render_receipt_image.dart`, `receipt_printer.dart`, `package:flutter_riverpod/flutter_riverpod.dart`, `string_utils.dart`, `products_provider.dart`, `money.dart`, `tron_border.dart`, `receipt_pdf_service.dart`, `render_receipt.dart`, `receipt_roll_pdf.dart`?**
-  _High betweenness centrality (0.031) - this node is a cross-community bridge._
-- **Why does `CurrencyFormatter` connect `grid_product_tile.dart` to `receipt_printer.dart`, `package:intl/intl.dart`, `products_screen.dart`, `expenses_screen.dart`, `order_detail_screen.dart`, `String?`, `order_summary.dart`, `products_provider.dart`, `receipt_screen.dart`, `home.dart`, `payment_screen.dart`, `orders_screen.dart`, `product_tile.dart`, `receipt_body.dart`?**
-  _High betweenness centrality (0.011) - this node is a cross-community bridge._
-- **Why does `_` connect `migration_test.dart` to `cart_notifier.dart`?**
-  _High betweenness centrality (0.011) - this node is a cross-community bridge._
+- **Why does `Return` connect `DataClass` to `Drift Database Core`, `render_receipt_image.dart`, `receipt_printer.dart`, `package:flutter_riverpod/flutter_riverpod.dart`, `string_utils.dart`, `printer_errors.dart`, `products_provider.dart`, `money.dart`, `tron_border.dart`, `receipt_pdf_service.dart`, `escpos_raster_test.dart`, `render_receipt.dart`, `receipt_roll_pdf.dart`?**
+  _High betweenness centrality (0.034) - this node is a cross-community bridge._
+- **Why does `InventoryDao` connect `AppDatabase` to `Drift Database Core`, `package:drift/drift.dart`?**
+  _High betweenness centrality (0.010) - this node is a cross-community bridge._
+- **What connects `refresh`, `getKeyboardDismissBehavior`, `_slide` to the rest of the system?**
+  _2558 weakly-connected nodes found - possible documentation gaps or missing edges._
