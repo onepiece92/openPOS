@@ -83,13 +83,15 @@ class OrderDetailScreen extends ConsumerWidget {
         title: Text(
             'Order ${detailAsync.valueOrNull?.order.billNo ?? '#$orderId'}'),
         actions: [
-          PopupMenuButton<String>(
+          // The Builder gives the PDF share the menu button's own rectangle
+          // to anchor to (iPad shows the share sheet as a popover).
+          Builder(builder: (menuContext) => PopupMenuButton<String>(
             onSelected: (v) async {
               final data = detailAsync.valueOrNull;
               if (data == null) return;
               switch (v) {
                 case 'pdf':
-                  await downloadReceiptPdf(context, data.receipt, fmt);
+                  await downloadReceiptPdf(menuContext, data.receipt, fmt);
                 case 'print':
                   // With no printer paired, printOrder is a silent no-op
                   // (right for auto-print, confusing for a tapped Print).
@@ -133,7 +135,7 @@ class OrderDetailScreen extends ConsumerWidget {
                 ),
               ),
             ],
-          ),
+          )),
         ],
       ),
       body: detailAsync.when(

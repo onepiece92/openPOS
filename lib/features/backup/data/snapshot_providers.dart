@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:isolate';
+import 'dart:ui' show Rect;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,6 +12,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
+import 'package:pos_app/features/backup/data/share_files.dart';
 import 'package:pos_app/features/backup/data/snapshot_service.dart';
 
 /// Names of the Hive boxes that travel with a snapshot. Must match main().
@@ -79,12 +81,16 @@ class SnapshotCoordinator {
 
   /// User-initiated "Back up everything": zip to the temp dir and hand the
   /// file to the OS share sheet (Files / Drive / AirDrop / mail…).
-  Future<File> createAndShare() async {
+  ///
+  /// [shareOrigin] is the on-screen rectangle of the button that was tapped;
+  /// iPad anchors the share sheet to it and refuses to share without one.
+  Future<File> createAndShare({required Rect shareOrigin}) async {
     final zip = await create(await getTemporaryDirectory());
-    await Share.shareXFiles(
+    await _ref.read(shareFilesProvider)(
       [XFile(zip.path, mimeType: 'application/zip')],
       subject: p.basename(zip.path),
       text: 'POS full backup',
+      sharePositionOrigin: shareOrigin,
     );
     return zip;
   }

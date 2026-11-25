@@ -1,3 +1,7 @@
+import 'dart:typed_data';
+import 'dart:ui' show Rect;
+
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/material.dart' show BuildContext;
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
@@ -7,6 +11,7 @@ import 'package:printing/printing.dart';
 import 'package:pos_app/features/receipts/domain/receipt_labels.dart';
 import 'package:pos_app/core/utils/bundled_fonts.dart';
 import 'package:pos_app/core/utils/currency_formatter.dart';
+import 'package:pos_app/core/utils/share_origin.dart';
 import 'package:pos_app/features/receipts/presentation/receipt_body.dart';
 import 'package:pos_app/features/orders/domain/order_number.dart';
 
@@ -193,14 +198,29 @@ Future<pw.Document> buildReceiptPdf(
 
 // ─── Action: save / share PDF ─────────────────────────────────────────────────
 
+/// [context] should belong to the button that was tapped: on iPad the share
+/// sheet is a popover anchored to that widget's rectangle. (Left to its
+/// default, the printing package anchors it to the screen's top-left corner.)
 Future<void> downloadReceiptPdf(
-    BuildContext context, ReceiptBodyData data, CurrencyFormatter fmt) async {
+  BuildContext context,
+  ReceiptBodyData data,
+  CurrencyFormatter fmt, {
+  @visibleForTesting SharePdf sharePdf = Printing.sharePdf,
+}) async {
+  // Read before the first await, while the button is still laid out.
+  final origin = shareOriginFor(context);
   final doc = await buildReceiptPdf(data, fmt);
   final bytes = await doc.save();
   final fileName = 'receipt_${data.order.displayNo}.pdf';
 
-  await Printing.sharePdf(bytes: bytes, filename: fileName);
+  await sharePdf(bytes: bytes, filename: fileName, bounds: origin);
 }
+
+typedef SharePdf = Future<bool> Function({
+  required Uint8List bytes,
+  String filename,
+  Rect? bounds,
+});
 
 // ─── Private helpers ──────────────────────────────────────────────────────────
 

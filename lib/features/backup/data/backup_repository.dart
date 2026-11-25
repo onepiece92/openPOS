@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui' show Rect;
 import 'package:csv/csv.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart' show visibleForTesting;
@@ -11,10 +12,11 @@ import 'package:uuid/uuid.dart';
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/features/backup/data/csv_text.dart';
+import 'package:pos_app/features/backup/data/share_files.dart';
 
 final backupRepositoryProvider = Provider((ref) {
   final db = ref.watch(databaseProvider);
-  return BackupRepository(db);
+  return BackupRepository(db, share: ref.watch(shareFilesProvider));
 });
 
 /// What each CSV import does to records that are already here, as the
@@ -85,13 +87,24 @@ class CsvImportReport {
 }
 
 class BackupRepository {
-  BackupRepository(this._db);
+  BackupRepository(
+    this._db, {
+    ShareFiles share = shareFilesWithOs,
+    Future<Directory> Function() tempDirectory = getTemporaryDirectory,
+  })  : _share = share,
+        _tempDirectory = tempDirectory;
   final AppDatabase _db;
+  final ShareFiles _share;
+  final Future<Directory> Function() _tempDirectory;
+
+  // Every export takes a `shareOrigin`: the on-screen rectangle of the tile
+  // that was tapped. iPad anchors the share sheet to it and share_plus fails
+  // the share without one.
 
   // ── Products Export ────────────────────────────────────────────────────────
 
-  Future<void> exportProducts() async =>
-      _shareCsv(await productsCsv(), 'products_backup.csv');
+  Future<void> exportProducts({required Rect shareOrigin}) async =>
+      _shareCsv(await productsCsv(), 'products_backup.csv', shareOrigin);
 
   /// The products CSV: one row per active product.
   @visibleForTesting
@@ -289,8 +302,8 @@ class BackupRepository {
 
   // ── Customers Export ───────────────────────────────────────────────────────
 
-  Future<void> exportCustomers() async =>
-      _shareCsv(await customersCsv(), 'customers_backup.csv');
+  Future<void> exportCustomers({required Rect shareOrigin}) async =>
+      _shareCsv(await customersCsv(), 'customers_backup.csv', shareOrigin);
 
   /// The customers CSV: one row per customer.
   @visibleForTesting
@@ -416,8 +429,8 @@ class BackupRepository {
 
   // ── Expenses Export ────────────────────────────────────────────────────────
 
-  Future<void> exportExpenses() async =>
-      _shareCsv(await expensesCsv(), 'expenses_backup.csv');
+  Future<void> exportExpenses({required Rect shareOrigin}) async =>
+      _shareCsv(await expensesCsv(), 'expenses_backup.csv', shareOrigin);
 
   /// The expenses CSV: one row per expense. It carries no id.
   @visibleForTesting
@@ -535,10 +548,10 @@ class BackupRepository {
     'Item Total'
   ];
 
-  Future<void> exportOrders() async {
+  Future<void> exportOrders({required Rect shareOrigin}) async {
     final file = await _tempFile('order_history_backup.csv');
     await writeOrdersCsv(file);
-    await _shareFile(file);
+    await _shareFile(file, shareOrigin);
   }
 
   /// Writes the whole order history to [file] as CSV, one row per order
@@ -806,10 +819,10 @@ class BackupRepository {
 
   // ── Sales Report Export ────────────────────────────────────────────────────
 
-  Future<void> exportSalesReport() async {
+  Future<void> exportSalesReport({required Rect shareOrigin}) async {
     final file = await _tempFile('sales_report.csv');
     await writeSalesReportCsv(file);
-    await _shareFile(file);
+    await _shareFile(file, shareOrigin);
   }
 
   /// Same paged, flat-memory write as [writeOrdersCsv].
@@ -845,19 +858,23 @@ class BackupRepository {
   // ── Helpers ────────────────────────────────────────────────────────────────
 
   Future<File> _tempFile(String fileName) async {
-    final directory = await getTemporaryDirectory();
+    final directory = await _tempDirectory();
     if (!await directory.exists()) {
       await directory.create(recursive: true);
     }
     return File(p.join(directory.path, fileName));
   }
 
-  Future<void> _shareFile(File file) =>
-      Share.shareXFiles([XFile(file.path)], text: 'POS Data Backup');
+  Future<void> _shareFile(File file, Rect shareOrigin) => _share(
+        [XFile(file.path)],
+        text: 'POS Data Backup',
+        sharePositionOrigin: shareOrigin,
+      );
 
-  Future<void> _shareCsv(String content, String fileName) async {
+  Future<void> _shareCsv(
+      String content, String fileName, Rect shareOrigin) async {
     final file = await _tempFile(fileName);
     await file.writeAsString(content);
-    await _shareFile(file);
+    await _shareFile(file, shareOrigin);
   }
 }

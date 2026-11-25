@@ -8,6 +8,7 @@ import 'package:path/path.dart' as p;
 
 import 'package:pos_app/app_root.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
+import 'package:pos_app/core/utils/share_origin.dart';
 import 'package:pos_app/features/backup/data/backup_repository.dart';
 import 'package:pos_app/features/backup/data/snapshot_providers.dart';
 import 'package:pos_app/features/backup/data/snapshot_service.dart';
@@ -26,10 +27,14 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
 
   // ── Full backup (zip snapshot) ─────────────────────────────────────────────
 
-  Future<void> _createFullBackup() async {
+  /// [shareOrigin] is the tapped button's rectangle: iPad anchors the share
+  /// sheet to it and will not share without one.
+  Future<void> _createFullBackup(Rect shareOrigin) async {
     setState(() => _isSnapshotting = true);
     try {
-      await ref.read(snapshotCoordinatorProvider).createAndShare();
+      await ref
+          .read(snapshotCoordinatorProvider)
+          .createAndShare(shareOrigin: shareOrigin);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -232,10 +237,14 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
       appBar: AppBar(
         title: const Text('Backup & Restore'),
         actions: [
-          IconButton(
-            tooltip: 'Back up everything',
-            icon: const Icon(Icons.archive_outlined),
-            onPressed: _isSnapshotting ? null : _createFullBackup,
+          Builder(
+            builder: (buttonContext) => IconButton(
+              tooltip: 'Back up everything',
+              icon: const Icon(Icons.archive_outlined),
+              onPressed: _isSnapshotting
+                  ? null
+                  : () => _createFullBackup(shareOriginFor(buttonContext)),
+            ),
           ),
         ],
       ),
@@ -256,7 +265,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
             subtitle: 'Replace all data with a backup .zip, then restart',
             icon: Icons.settings_backup_restore_rounded,
             color: cs.error,
-            onTap: _isSnapshotting ? null : _restoreFromFile,
+            onTap: _isSnapshotting ? null : (_) => _restoreFromFile(),
           ),
           _AutoBackupTile(onOpen: _showLocalSnapshots),
           const SizedBox(height: 20),
@@ -270,7 +279,8 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
             color: cs.primary,
             onTap: _isExporting
                 ? null
-                : () => _runExport('Products', repo.exportProducts),
+                : (origin) => _runExport(
+                    'Products', () => repo.exportProducts(shareOrigin: origin)),
             isLoading: _isExporting,
           ),
           _BackupTile(
@@ -278,8 +288,9 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
             subtitle: 'Upload CSV to restore or update catalog',
             icon: Icons.download_rounded,
             color: cs.secondary,
-            onTap:
-                _isImporting ? null : () => _confirmAndImport('Products', true),
+            onTap: _isImporting
+                ? null
+                : (_) => _confirmAndImport('Products', true),
             isLoading: _isImporting,
           ),
           const SizedBox(height: 20),
@@ -291,7 +302,8 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
             color: cs.primary,
             onTap: _isExporting
                 ? null
-                : () => _runExport('Customers', repo.exportCustomers),
+                : (origin) => _runExport(
+                    'Customers', () => repo.exportCustomers(shareOrigin: origin)),
             isLoading: _isExporting,
           ),
           _BackupTile(
@@ -301,7 +313,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
             color: cs.secondary,
             onTap: _isImporting
                 ? null
-                : () => _confirmAndImport('Customers', false),
+                : (_) => _confirmAndImport('Customers', false),
             isLoading: _isImporting,
           ),
           const SizedBox(height: 20),
@@ -313,7 +325,8 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
             color: cs.primary,
             onTap: _isExporting
                 ? null
-                : () => _runExport('Expenses', repo.exportExpenses),
+                : (origin) => _runExport(
+                    'Expenses', () => repo.exportExpenses(shareOrigin: origin)),
             isLoading: _isExporting,
           ),
           _BackupTile(
@@ -323,7 +336,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
             color: cs.secondary,
             onTap: _isImporting
                 ? null
-                : () => _confirmAndImport('Expenses', false, isExpenses: true),
+                : (_) => _confirmAndImport('Expenses', false, isExpenses: true),
             isLoading: _isImporting,
           ),
           const SizedBox(height: 20),
@@ -335,7 +348,8 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
             color: cs.primary,
             onTap: _isExporting
                 ? null
-                : () => _runExport('Order History', repo.exportOrders),
+                : (origin) => _runExport(
+                    'Order History', () => repo.exportOrders(shareOrigin: origin)),
             isLoading: _isExporting,
           ),
           _BackupTile(
@@ -345,7 +359,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
             color: cs.secondary,
             onTap: _isImporting
                 ? null
-                : () => _confirmAndImport('Orders', false, isOrders: true),
+                : (_) => _confirmAndImport('Orders', false, isOrders: true),
             isLoading: _isImporting,
           ),
           _BackupTile(
@@ -355,7 +369,8 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
             color: cs.tertiary,
             onTap: _isExporting
                 ? null
-                : () => _runExport('Sales Report', repo.exportSalesReport),
+                : (origin) => _runExport(
+                    'Sales Report', () => repo.exportSalesReport(shareOrigin: origin)),
             isLoading: _isExporting,
           ),
         ],
@@ -433,7 +448,10 @@ class _BackupTile extends StatelessWidget {
   final String subtitle;
   final IconData icon;
   final Color color;
-  final VoidCallback? onTap;
+
+  /// Called with this tile's on-screen rectangle, which exports pass on as
+  /// the share sheet's anchor (required on iPad).
+  final ValueChanged<Rect>? onTap;
   final bool isLoading;
 
   @override
@@ -444,7 +462,7 @@ class _BackupTile extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
-        onTap: onTap,
+        onTap: onTap == null ? null : () => onTap!(shareOriginFor(context)),
         borderRadius: BorderRadius.circular(20),
         child: Padding(
           padding: const EdgeInsets.all(16),
