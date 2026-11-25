@@ -4,6 +4,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
+import 'package:pos_app/features/receipts/domain/receipt_labels.dart';
 import 'package:pos_app/core/utils/bundled_fonts.dart';
 import 'package:pos_app/core/utils/currency_formatter.dart';
 import 'package:pos_app/features/receipts/presentation/receipt_body.dart';
@@ -123,7 +124,7 @@ Future<pw.Document> buildReceiptPdf(
           billRow('Total', fmt.format(order.subtotal)),
           billRow('Discount', fmt.format(order.discountTotal)),
           ...data.taxes.map((t) => billRow(
-                '${t.taxRateName} (${(t.taxRatePercent * 100).toStringAsFixed(1)}%)',
+                taxLineLabel(t),
                 fmt.format(t.taxAmount),
               )),
           if (order.loyaltyDiscount > 0)

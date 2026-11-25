@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import 'package:pos_app/features/receipts/domain/receipt_labels.dart';
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/theme/tokens.dart';
 import 'package:pos_app/core/utils/currency_formatter.dart';
@@ -150,8 +151,7 @@ class ReceiptBody extends StatelessWidget {
                 ),
                 if (data.taxes.isNotEmpty) ...[
                   ...data.taxes.map((t) => _BillRow(
-                        label:
-                            '${t.taxRateName} (${(t.taxRatePercent * 100).toStringAsFixed(1)}%)',
+                        label: taxLineLabel(t),
                         value: fmt.format(t.taxAmount),
                         labelStyle: labelStyle.copyWith(color: cs.onSurface),
                         valueStyle: bodyStyle.copyWith(color: cs.onSurface),

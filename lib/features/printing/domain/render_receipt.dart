@@ -1,5 +1,6 @@
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 
+import 'package:pos_app/features/receipts/domain/receipt_labels.dart';
 import 'package:pos_app/core/utils/currency_formatter.dart';
 import 'package:pos_app/features/receipts/presentation/receipt_body.dart';
 import 'package:pos_app/features/orders/domain/order_number.dart';
@@ -102,8 +103,7 @@ Future<List<int>> renderReceiptBytes(
         _kv(g, 'Discount', '- ${fmt.format(data.order.discountTotal)}'));
   }
   for (final t in data.taxes) {
-    final pct = (t.taxRatePercent * 100).toStringAsFixed(1);
-    bytes.addAll(_kv(g, '${t.taxRateName} ($pct%)', fmt.format(t.taxAmount)));
+    bytes.addAll(_kv(g, taxLineLabel(t), fmt.format(t.taxAmount)));
   }
   if (data.order.loyaltyDiscount > 0) {
     bytes.addAll(_kv(

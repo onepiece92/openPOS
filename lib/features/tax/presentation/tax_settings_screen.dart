@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:pos_app/core/utils/percent.dart';
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
@@ -37,7 +38,7 @@ class TaxSettingsScreen extends ConsumerWidget {
                       backgroundColor:
                           isDefault ? cs.primary : cs.surfaceContainerHighest,
                       child: Text(
-                        '${(t.rate * 100).toStringAsFixed(0)}%',
+                        formatRatePercent(t.rate),
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,

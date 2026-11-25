@@ -2,6 +2,7 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import 'package:pos_app/features/receipts/domain/receipt_labels.dart';
 import 'package:pos_app/core/utils/bundled_fonts.dart';
 import 'package:pos_app/core/utils/currency_formatter.dart';
 import 'package:pos_app/features/orders/domain/order_number.dart';
@@ -139,7 +140,7 @@ Future<pw.Document> buildReceiptRollPdf(
           if (order.discountTotal > 0)
             kv('Discount', '- ${fmt.format(order.discountTotal)}'),
           ...data.taxes.map((t) => kv(
-                '${t.taxRateName} (${(t.taxRatePercent * 100).toStringAsFixed(1)}%)',
+                taxLineLabel(t),
                 fmt.format(t.taxAmount),
               )),
           if (order.loyaltyDiscount > 0)

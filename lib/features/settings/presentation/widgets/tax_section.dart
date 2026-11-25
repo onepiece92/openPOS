@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:pos_app/core/utils/percent.dart';
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/shared/widgets/app_sheet.dart';
@@ -25,7 +26,7 @@ class TaxSection extends ConsumerWidget {
         data: (rates) {
           final defaultRate = rates.where((t) => t.id == defaultTaxId).firstOrNull;
           final label = defaultRate != null
-              ? '${defaultRate.name} · ${(defaultRate.rate * 100).toStringAsFixed(0)}%'
+              ? '${defaultRate.name} · ${formatRatePercent(defaultRate.rate)}'
               : 'None';
           return ListTile(
             leading: const Icon(Icons.percent_rounded),
@@ -160,7 +161,7 @@ class _TaxPickerSheet extends ConsumerWidget {
         ...rates.map((t) => ListTile(
               title: Text(t.name),
               subtitle: Text(
-                  '${(t.rate * 100).toStringAsFixed(1)}% · ${t.inclusionType}'),
+                  '${formatRatePercent(t.rate)} · ${t.inclusionType}'),
               trailing: t.id == currentId
                   ? Icon(Icons.check_rounded, color: cs.primary)
                   : null,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:pos_app/core/utils/percent.dart';
 import 'package:pos_app/features/onboarding/domain/onboarding_state.dart';
 
 class ConfirmStep extends StatelessWidget {
@@ -69,7 +70,7 @@ class ConfirmStep extends StatelessWidget {
               _SummaryRow(
                 icon: Icons.percent_rounded,
                 label: state.taxName.isNotEmpty ? state.taxName : 'Tax',
-                value: '${state.taxRate.toStringAsFixed(1)}%',
+                value: formatPercent(state.taxRate),
                 isLast: true,
               ),
             ],
