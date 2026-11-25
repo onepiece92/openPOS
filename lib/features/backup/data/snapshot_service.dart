@@ -1358,6 +1358,5 @@ class PendingRestoreException implements Exception {
   const PendingRestoreException(this.journalPath);
   final String journalPath;
   @override
-  String toString() =>
-      'an interrupted restore has not been undone yet ($journalPath)';
+  String toString() => 'an interrupted restore has not been undone yet';
 }

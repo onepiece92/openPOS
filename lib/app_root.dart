@@ -13,6 +13,7 @@ import 'package:pos_app/core/database/connection/native.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/features/backup/data/snapshot_providers.dart';
 import 'package:pos_app/features/backup/data/snapshot_service.dart';
+import 'package:pos_app/features/help/support_contact.dart';
 import 'package:pos_app/features/review/data/review_state_store.dart';
 
 /// Owns the Riverpod container so the whole app can be hot-restarted —
@@ -356,7 +357,7 @@ class _RestoreFailedScreen extends StatelessWidget {
         home: Scaffold(
           body: SafeArea(
             child: Center(
-              child: Padding(
+              child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -374,6 +375,13 @@ class _RestoreFailedScreen extends StatelessWidget {
                     FilledButton(
                       onPressed: onRetry,
                       child: const Text('Try again'),
+                    ),
+                    const SizedBox(height: 8),
+                    TextButton.icon(
+                      onPressed: openSupportWhatsApp,
+                      icon: const Icon(Icons.chat_rounded),
+                      label: const Text(
+                          'Contact support on WhatsApp ($kSupportWhatsAppDisplay)'),
                     ),
                   ],
                 ),

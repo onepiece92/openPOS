@@ -63,9 +63,9 @@ Future<RestoreRecovery?> recoverInterruptedRestoreAtStartup(
 /// Shown instead of the app when [recoverInterruptedRestoreAtStartup]
 /// returns null.
 const kRecoveryFailedMessage =
-    'A restore was interrupted and could not be undone yet, so the app has '
-    'not opened your data. Tap "Try again"; if this persists, contact '
-    'support — your previous data is kept in the .bak files.';
+    "A restore was interrupted and the app couldn't finish undoing it, so "
+    "it hasn't opened your data yet. Your previous data is still saved on "
+    'this device. Tap "Try again". If this keeps happening, contact support.';
 
 /// Toast for the first frame after [recoverInterruptedRestoreAtStartup].
 String? restoreRecoveryNotice(RestoreRecovery? r) => switch (r) {

@@ -98,6 +98,9 @@ void main() {
 
     expect(find.text('Restore failed'), findsOneWidget);
     expect(find.text(kRecoveryFailedMessage), findsOneWidget);
+    expect(find.textContaining('.bak'), findsNothing);
+    expect(find.text('Contact support on WhatsApp (+977 9802850777)'),
+        findsOneWidget);
     expect(Hive.isBoxOpen('settings'), isFalse);
 
     await tester.tap(find.text('Try again'));

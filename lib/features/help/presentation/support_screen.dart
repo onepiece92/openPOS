@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pos_app/core/app_version.dart';
+import 'package:pos_app/features/help/support_contact.dart';
 import 'package:pos_app/features/review/domain/review_prompter.dart';
 import 'package:pos_app/features/review/review_providers.dart';
 import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
@@ -34,18 +35,10 @@ class SupportScreen extends ConsumerWidget {
           _SupportTile(
             icon: Icons.chat_rounded,
             title: 'WhatsApp Chat',
-            subtitle: '+977 9802850777',
+            subtitle: kSupportWhatsAppDisplay,
             cs: cs,
             tt: tt,
-            onTap: () async {
-              final native = Uri.parse('whatsapp://send?phone=9779802850777');
-              final web = Uri.parse('https://wa.me/9779802850777');
-              if (await canLaunchUrl(native)) {
-                await launchUrl(native, mode: LaunchMode.externalApplication);
-              } else {
-                await launchUrl(web, mode: LaunchMode.externalApplication);
-              }
-            },
+            onTap: openSupportWhatsApp,
           ),
           const SizedBox(height: 20),
           _SectionHeader('Resources', tt, cs),
