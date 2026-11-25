@@ -89,13 +89,33 @@ class SnapshotService {
 
   /// Reads and validates the manifest without touching the live data.
   /// Throws [SnapshotFormatException] on anything that isn't a POS snapshot.
-  Future<SnapshotManifest> inspect(File zip) async {
-    final archive = _decode(await zip.readAsBytes());
-    final manifest = _manifestOf(archive);
-    if (archive.find(dbEntryName) == null) {
-      throw const SnapshotFormatException('Snapshot has no database file');
+  ///
+  /// Cheap by design: the zip is read through a file stream, only its
+  /// central directory is parsed and only `manifest.json` is inflated — the
+  /// database entry is never read or CRC-checked here. [restore] does the
+  /// full validation. Synchronous file IO: callers on the UI isolate should
+  /// wrap it in `Isolate.run` (see `SnapshotCoordinator.inspect`).
+  Future<SnapshotManifest> inspect(File zip) async => inspectSync(zip.path);
+
+  /// Synchronous body of [inspect], so it can run inside `Isolate.run`
+  /// with only a path captured.
+  static SnapshotManifest inspectSync(String zipPath) {
+    final input = InputFileStream(zipPath);
+    try {
+      final Archive archive;
+      try {
+        archive = ZipDecoder().decodeStream(input);
+      } catch (e) {
+        throw SnapshotFormatException('Not a valid zip file: $e');
+      }
+      final manifest = _manifestOf(archive);
+      if (archive.find(dbEntryName) == null) {
+        throw const SnapshotFormatException('Snapshot has no database file');
+      }
+      return manifest;
+    } finally {
+      input.closeSync();
     }
-    return manifest;
   }
 
   // ── Restore ───────────────────────────────────────────────────────────────
@@ -383,7 +403,7 @@ class SnapshotService {
     }
   }
 
-  SnapshotManifest _manifestOf(Archive archive) {
+  static SnapshotManifest _manifestOf(Archive archive) {
     final entry = archive.find(manifestName);
     if (entry == null) {
       throw const SnapshotFormatException(
