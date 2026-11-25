@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'package:pos_app/core/utils/percent.dart';
+
 class TaxStep extends StatelessWidget {
   const TaxStep({
     super.key,
@@ -65,11 +67,11 @@ class TaxStep extends StatelessWidget {
             keyboardType:
                 const TextInputType.numberWithOptions(decimal: true),
             inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+              FilteringTextInputFormatter.allow(kPercentInputPattern),
             ],
             decoration: const InputDecoration(
               labelText: 'Tax rate (%)',
-              hintText: '13.0',
+              hintText: '13',
               prefixIcon: Icon(Icons.percent_rounded),
               border: OutlineInputBorder(),
               suffixText: '%',

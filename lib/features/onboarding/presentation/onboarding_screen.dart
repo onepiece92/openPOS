@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:pos_app/core/utils/percent.dart';
 import 'package:pos_app/features/onboarding/data/country_repository.dart';
 import 'package:pos_app/features/onboarding/domain/country_default.dart';
 import 'package:pos_app/features/onboarding/domain/onboarding_state.dart';
@@ -62,7 +63,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     );
     ref.read(onboardingNotifierProvider.notifier).setCountry(nepal);
     _taxNameCtrl.text = nepal.taxName;
-    _taxRateCtrl.text = nepal.taxRate.toStringAsFixed(1);
+    _taxRateCtrl.text = formatPercentNumber(nepal.taxRate);
     setState(() {
       _countries = countries;
       _filtered = countries;
@@ -89,7 +90,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   void _selectCountry(CountryDefault c) {
     ref.read(onboardingNotifierProvider.notifier).setCountry(c);
     _taxNameCtrl.text = c.taxName;
-    _taxRateCtrl.text = c.taxRate.toStringAsFixed(1);
+    _taxRateCtrl.text = formatPercentNumber(c.taxRate);
   }
 
   bool _canProceed(OnboardingState state) {

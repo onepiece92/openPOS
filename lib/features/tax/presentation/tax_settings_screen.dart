@@ -135,25 +135,29 @@ class TaxSettingsScreen extends ConsumerWidget {
   void _showForm(BuildContext context, WidgetRef ref, TaxRate? existing) {
     showAppSheet(
       context: context,
-      builder: (ctx) => _TaxForm(existing: existing),
+      builder: (ctx) => TaxRateForm(existing: existing),
     );
   }
 }
 
-class _TaxForm extends ConsumerStatefulWidget {
-  const _TaxForm({this.existing});
+/// The add / edit sheet for one tax rate. Public so it can be pumped on its
+/// own in tests.
+class TaxRateForm extends ConsumerStatefulWidget {
+  const TaxRateForm({super.key, this.existing});
   final TaxRate? existing;
 
   @override
-  ConsumerState<_TaxForm> createState() => _TaxFormState();
+  ConsumerState<TaxRateForm> createState() => TaxRateFormState();
 }
 
-class _TaxFormState extends ConsumerState<_TaxForm> {
+class TaxRateFormState extends ConsumerState<TaxRateForm> {
   final _formKey = GlobalKey<FormState>();
   late final _nameCtrl = TextEditingController(text: widget.existing?.name ?? '');
   late final _rateCtrl = TextEditingController(
     text: widget.existing != null
-        ? (widget.existing!.rate * 100).toStringAsFixed(2)
+        // The exact stored rate: a rounded pre-fill would be written back
+        // on save and silently change the rate.
+        ? formatRateForEdit(widget.existing!.rate)
         : '',
   );
   late String _inclusionType =
@@ -217,7 +221,7 @@ class _TaxFormState extends ConsumerState<_TaxForm> {
               keyboardType:
                   const TextInputType.numberWithOptions(decimal: true),
               inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                FilteringTextInputFormatter.allow(kPercentInputPattern),
               ],
               decoration: const InputDecoration(
                 labelText: 'Rate (%)',
