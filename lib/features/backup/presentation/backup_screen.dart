@@ -146,9 +146,13 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text('Import $type?'),
-        content: Text(
-            'This will add new records to your database. Existing items with the same identifiers may be updated. Are you sure you want to proceed?'
-            '${isOrders ? "\n\nNote: Ensure Products and Customers are imported first for consistent order history." : ""}'),
+        content: Text(isOrders
+            ? csvImportExplanation.orders
+            : isExpenses
+                ? csvImportExplanation.expenses
+                : isProducts
+                    ? csvImportExplanation.products
+                    : csvImportExplanation.customers),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -182,30 +186,35 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
       final file = File(result.files.single.path!);
       final content = await file.readAsString();
 
-      final int count;
+      final CsvImportReport report;
       final repo = ref.read(backupRepositoryProvider);
 
       if (isOrders) {
-        count = await repo.importOrders(content);
+        report = await repo.importOrdersReport(content);
       } else if (isExpenses) {
-        count = await repo.importExpenses(content);
+        report = await repo.importExpensesReport(content);
       } else if (isProducts) {
-        count = await repo.importProducts(content);
+        report = await repo.importProductsReport(content);
       } else {
-        count = await repo.importCustomers(content);
+        report = await repo.importCustomersReport(content);
       }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text(
-                  'Successfully imported $count ${isOrders ? "orders" : (isExpenses ? "expenses" : (isProducts ? "products" : "customers"))}')),
+              content: Text(report.summary(isOrders
+                  ? 'orders'
+                  : (isExpenses
+                      ? 'expenses'
+                      : (isProducts ? 'products' : 'customers'))))),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Import failed: $e')),
+          SnackBar(
+              content: Text(
+                  'Import failed, nothing was changed: ${e is FormatException ? e.message : e}')),
         );
       }
     } finally {

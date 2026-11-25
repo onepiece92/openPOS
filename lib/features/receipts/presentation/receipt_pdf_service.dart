@@ -143,7 +143,7 @@ Future<pw.Document> buildReceiptPdf(
             children: [
               pw.Expanded(
                 child: pw.Text(
-                  'Payment Mode: ${order.paymentMethod[0].toUpperCase()}${order.paymentMethod.substring(1)}',
+                  'Payment Mode: ${order.paymentLabel}',
                   style: baseStyle,
                 ),
               ),

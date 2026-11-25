@@ -6,14 +6,83 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:uuid/uuid.dart';
 
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
+import 'package:pos_app/features/backup/data/csv_text.dart';
 
 final backupRepositoryProvider = Provider((ref) {
   final db = ref.watch(databaseProvider);
   return BackupRepository(db);
 });
+
+/// What each CSV import does to records that are already here, as the
+/// import screen tells it before the file is picked.
+const csvImportExplanation = (
+  products: 'Each row is matched to a product by SKU, or by exact name when '
+      'the row has no SKU. A matching product is updated in place with the '
+      "file's name, price, category, stock and flags, and a deleted product "
+      'is restored. Rows with no match are added as new products.\n\n'
+      'Importing the same file again creates no duplicates; it sets the '
+      "file's values again.",
+  customers: 'Each row is matched to a customer by phone number, or by exact '
+      'name and email when the row has no phone. A matching customer is '
+      "updated in place, including their loyalty points, with the file's "
+      'values. Rows with no match are added as new customers.\n\n'
+      'Importing the same file again creates no duplicates; it sets the '
+      "file's values again.",
+  expenses: 'Every row is added as a new expense. Expense files carry no '
+      'identifier, so nothing is matched or updated: importing a file that '
+      'was imported before records every expense in it a second time.',
+  orders: 'Orders already in this database (same Order ID, date and total) '
+      'are skipped, so importing the same file again adds nothing. The rest '
+      'are added as new orders numbered IMP-<Order ID>, separate from your own '
+      'invoice numbers. Stock and loyalty points are not changed.\n\n'
+      'Import Products and Customers first: an order line whose product is '
+      'not found by SKU or name is left out and listed in the order notes.',
+);
+
+/// What a CSV import did.
+class CsvImportReport {
+  const CsvImportReport({
+    this.added = 0,
+    this.updated = 0,
+    this.skipped = 0,
+    this.unmatchedLines = 0,
+  });
+
+  /// Rows that became new records.
+  final int added;
+
+  /// Rows that matched an existing record, which now holds the file's values.
+  final int updated;
+
+  /// Rows left alone: orders already present, rows with no name.
+  final int skipped;
+
+  /// Order lines left out because their product is not in this database.
+  final int unmatchedLines;
+
+  /// Records written to the database.
+  int get written => added + updated;
+
+  /// One line for the cashier, e.g. `Products: 3 added, 5 updated`.
+  String summary(String noun) {
+    final parts = [
+      if (added > 0 || written + skipped == 0) '$added added',
+      if (updated > 0) '$updated updated',
+      if (skipped > 0)
+        noun == 'orders'
+            ? '$skipped already here (skipped)'
+            : '$skipped skipped',
+    ];
+    final title = '${noun[0].toUpperCase()}${noun.substring(1)}';
+    final lines = unmatchedLines == 1 ? '1 line' : '$unmatchedLines lines';
+    return '$title: ${parts.join(', ')}'
+        '${unmatchedLines > 0 ? '. $lines left out: product not found (see order notes)' : ''}';
+  }
+}
 
 class BackupRepository {
   BackupRepository(this._db);
@@ -21,7 +90,12 @@ class BackupRepository {
 
   // ── Products Export ────────────────────────────────────────────────────────
 
-  Future<void> exportProducts() async {
+  Future<void> exportProducts() async =>
+      _shareCsv(await productsCsv(), 'products_backup.csv');
+
+  /// The products CSV: one row per active product.
+  @visibleForTesting
+  Future<String> productsCsv() async {
     final products = await (_db.select(_db.products)
           ..where((p) => p.isActive.equals(true)))
         .get();
@@ -60,104 +134,167 @@ class BackupRepository {
       ]);
     }
 
-    final csvString = const ListToCsvConverter().convert(rows);
-    await _shareCsv(csvString, 'products_backup.csv');
+    return const ListToCsvConverter().convert(rows);
   }
 
   // ── Products Import ────────────────────────────────────────────────────────
 
-  Future<int> importProducts(String csvContent) async {
-    final rows = const CsvToListConverter().convert(csvContent);
-    if (rows.length <= 1) return 0;
+  /// Number of products added or updated. See [importProductsReport].
+  Future<int> importProducts(String csvContent) async =>
+      (await importProductsReport(csvContent)).written;
 
-    final header = rows[0].map((e) => e.toString().toLowerCase()).toList();
-    final skuIdx = header.indexOf('sku');
-    final nameIdx = header.indexOf('name');
-    final priceIdx = header.indexOf('price');
-    final catIdx = header.indexOf('category');
-    final stockIdx = header.indexOf('stock');
-    final taxableIdx = header.indexOf('is taxable');
-    final taxesIdx = header.indexOf('tax rates');
-    final hiddenIdx = header.indexOf('is hidden');
-    final compositeIdx = header.indexOf('is composite');
+  /// Adds or updates products from a products CSV.
+  ///
+  /// A row is matched to an existing product — active, hidden or deleted —
+  /// by SKU when it has one, otherwise by exact name. A match is updated in
+  /// place, keeping its id (orders and stock history point at it), and is
+  /// made active again if it had been deleted. Only columns the file has are
+  /// written; a blank cell leaves the product's value alone. Rows without a
+  /// match are added, with a generated SKU when the row has none.
+  ///
+  /// A row with no SKU whose name fits several products is refused rather
+  /// than guessed at. Any error rolls the whole import back.
+  Future<CsvImportReport> importProductsReport(String csvContent) async {
+    final table = CsvTable.parse(csvContent);
+    if (table.rows.isEmpty) return const CsvImportReport();
+    table.require(['SKU', 'Name', 'Price']);
 
-    if (skuIdx == -1 || nameIdx == -1 || priceIdx == -1) {
-      throw Exception('Missing required columns: SKU, Name, Price');
-    }
-
-    int count = 0;
+    var added = 0, updated = 0, skipped = 0;
     await _db.transaction(() async {
-      for (var i = 1; i < rows.length; i++) {
-        final row = rows[i];
-        if (row.length < 3) continue;
+      for (final row in table.rows) {
+        if (row.isBlank) continue;
 
-        final sku = row[skuIdx].toString();
-        final name = row[nameIdx].toString();
-        final price = double.tryParse(row[priceIdx].toString()) ?? 0.0;
-        final catName = catIdx != -1 ? row[catIdx].toString() : 'Uncategorized';
-        final stock =
-            stockIdx != -1 ? int.tryParse(row[stockIdx].toString()) ?? 0 : 0;
-        final isTaxable = taxableIdx != -1 ? _parseBool(row[taxableIdx]) : true;
-        final taxNames =
-            taxesIdx != -1 ? row[taxesIdx].toString().split('|') : <String>[];
-        final isHidden = hiddenIdx != -1 ? _parseBool(row[hiddenIdx]) : false;
-        final isComposite =
-            compositeIdx != -1 ? _parseBool(row[compositeIdx]) : false;
+        final sku = row.text('sku');
+        final name = row.text('name');
+        final price = row.numberOf('price');
+        final stock = row.intOf('stock');
+        final isTaxable = row.boolOf('is taxable');
+        final isHidden = row.boolOf('is hidden');
+        final isComposite = row.boolOf('is composite');
 
-        // 1. Handle Category
+        // 1. Category. 'Uncategorized' is how the export writes "none".
+        final catName = row.text('category');
+        final noCategory = catName == 'Uncategorized';
         int? catId;
-        if (catName.isNotEmpty && catName != 'Uncategorized') {
+        if (catName.isNotEmpty && !noCategory) {
           final existingCat = await (_db.select(_db.categories)
-                ..where((c) => c.name.equals(catName)))
+                ..where((c) => c.name.equals(catName))
+                ..orderBy([(c) => OrderingTerm.asc(c.id)])
+                ..limit(1))
               .getSingleOrNull();
-          if (existingCat != null) {
-            catId = existingCat.id;
-          } else {
-            catId = await _db.productsDao
-                .upsertCategory(CategoriesCompanion.insert(name: catName));
-          }
+          catId = existingCat?.id ??
+              await _db.productsDao
+                  .upsertCategory(CategoriesCompanion.insert(name: catName));
         }
 
-        // 2. Handle Product
-        final productId = await _db.productsDao.upsert(ProductsCompanion.insert(
-          sku: sku,
-          name: name,
-          price: price,
-          categoryId: Value(catId),
-          stockQuantity: Value(stock),
-          isTaxable: Value(isTaxable),
-          isHiddenInPos: Value(isHidden),
-          isComposite: Value(isComposite),
-          isActive: const Value(true),
-        ));
-
-        // 3. Handle Taxes
-        if (taxNames.isNotEmpty) {
-          final taxIds = <int>[];
-          for (final tName in taxNames) {
-            if (tName.trim().isEmpty) continue;
-            final existingTax = await (_db.select(_db.taxRates)
-                  ..where((t) => t.name.equals(tName.trim())))
-                .getSingleOrNull();
-            if (existingTax != null) {
-              taxIds.add(existingTax.id);
-            }
+        // 2. Product: update the match, or add.
+        final existing = await _matchProduct(row, sku: sku, name: name);
+        final int productId;
+        if (existing != null) {
+          productId = existing.id;
+          await _db.productsDao.updateProduct(
+            existing.id,
+            ProductsCompanion(
+              name: name.isEmpty ? const Value.absent() : Value(name),
+              price: Value.absentIfNull(price),
+              categoryId: catId != null
+                  ? Value(catId)
+                  : (noCategory ? const Value(null) : const Value.absent()),
+              stockQuantity: Value.absentIfNull(stock),
+              isTaxable: Value.absentIfNull(isTaxable),
+              isHiddenInPos: Value.absentIfNull(isHidden),
+              isComposite: Value.absentIfNull(isComposite),
+              isActive: const Value(true),
+              updatedAt: Value(DateTime.now()),
+            ),
+          );
+          if (stock != null && stock != existing.stockQuantity) {
+            await _db.inventoryDao.logAdjustment(
+              StockAdjustmentsCompanion.insert(
+                productId: existing.id,
+                delta: stock - existing.stockQuantity,
+                reasonCode: 'count',
+                notes: const Value('CSV import'),
+              ),
+            );
           }
-          if (taxIds.isNotEmpty) {
-            await _db.taxDao.setProductTaxes(productId, taxIds);
-          }
+          updated++;
+        } else if (name.isEmpty) {
+          skipped++; // nothing to match and nothing to call it
+          continue;
+        } else {
+          productId = await _db.into(_db.products).insert(
+                ProductsCompanion.insert(
+                  sku: sku.isEmpty ? await _newSku() : sku,
+                  name: name,
+                  price: price ?? 0.0,
+                  categoryId: Value(catId),
+                  stockQuantity: Value(stock ?? 0),
+                  isTaxable: Value(isTaxable ?? true),
+                  isHiddenInPos: Value(isHidden ?? false),
+                  isComposite: Value(isComposite ?? false),
+                ),
+              );
+          added++;
         }
 
-        count++;
+        // 3. Taxes: only rates that already exist here, matched by name.
+        final taxIds = <int>[];
+        for (final tName in row.text('tax rates').split('|')) {
+          if (tName.trim().isEmpty) continue;
+          final existingTax = await (_db.select(_db.taxRates)
+                ..where((t) => t.name.equals(tName.trim()))
+                ..orderBy([(t) => OrderingTerm.asc(t.id)])
+                ..limit(1))
+              .getSingleOrNull();
+          if (existingTax != null) taxIds.add(existingTax.id);
+        }
+        if (taxIds.isNotEmpty) {
+          await _db.taxDao.setProductTaxes(productId, taxIds);
+        }
       }
     });
 
-    return count;
+    return CsvImportReport(added: added, updated: updated, skipped: skipped);
+  }
+
+  /// The product a products-CSV row refers to, if it exists already.
+  Future<Product?> _matchProduct(
+    CsvRow row, {
+    required String sku,
+    required String name,
+  }) async {
+    if (sku.isNotEmpty) return _db.productsDao.getBySku(sku);
+    if (name.isEmpty) return null;
+    final sameName = await (_db.select(_db.products)
+          ..where((p) => p.name.equals(name)))
+        .get();
+    if (sameName.length <= 1) return sameName.firstOrNull;
+    // Several share the name. One live product among deleted ones is
+    // unambiguous; anything else would be a guess.
+    final active = sameName.where((p) => p.isActive).toList();
+    if (active.length == 1) return active.single;
+    throw row.error(
+        '"$name" has no SKU and ${sameName.length} products have that '
+        'name. Add the SKU so the right one is updated');
+  }
+
+  /// A SKU for a row that came without one, as the product form makes them.
+  Future<String> _newSku() async {
+    while (true) {
+      final sku = const Uuid().v4().substring(0, 8).toUpperCase();
+      if (await _db.productsDao.getBySku(sku) == null) return sku;
+    }
   }
 
   // ── Customers Export ───────────────────────────────────────────────────────
 
-  Future<void> exportCustomers() async {
+  Future<void> exportCustomers() async =>
+      _shareCsv(await customersCsv(), 'customers_backup.csv');
+
+  /// The customers CSV: one row per customer.
+  @visibleForTesting
+  Future<String> customersCsv() async {
     final customers = await _db.customersDao.getAll();
     final List<List<dynamic>> rows = [
       ['Name', 'Phone', 'Email', 'Loyalty Points', 'Is Tax Exempt'],
@@ -173,55 +310,118 @@ class BackupRepository {
       ]);
     }
 
-    final csvString = const ListToCsvConverter().convert(rows);
-    await _shareCsv(csvString, 'customers_backup.csv');
+    return const ListToCsvConverter().convert(rows);
   }
 
   // ── Customers Import ───────────────────────────────────────────────────────
 
-  Future<int> importCustomers(String csvContent) async {
-    final rows = const CsvToListConverter().convert(csvContent);
-    if (rows.length <= 1) return 0;
+  /// Number of customers added or updated. See [importCustomersReport].
+  Future<int> importCustomers(String csvContent) async =>
+      (await importCustomersReport(csvContent)).written;
 
-    final header = rows[0].map((e) => e.toString().toLowerCase()).toList();
-    final nameIdx = header.indexOf('name');
-    final phoneIdx = header.indexOf('phone');
-    final emailIdx = header.indexOf('email');
-    final pointsIdx = header.indexOf('loyalty points');
-    final exemptIdx = header.indexOf('is tax exempt');
+  /// Adds or updates customers from a customers CSV.
+  ///
+  /// A row with a phone number is matched to the customer with that exact
+  /// phone: the one with the row's name if several share the number, or the
+  /// only one (whose name the row then replaces). A row with no phone is
+  /// matched on exact name plus email. A match is updated in place —
+  /// including its loyalty points, when the file has that column — and a
+  /// blank cell leaves the customer's value alone. Rows without a match are
+  /// added.
+  ///
+  /// No customer is matched by two rows of one file, so a file listing two
+  /// people on one phone, or the same name twice, yields two customers.
+  Future<CsvImportReport> importCustomersReport(String csvContent) async {
+    final table = CsvTable.parse(csvContent);
+    if (table.rows.isEmpty) return const CsvImportReport();
+    table.require(['Name']);
 
-    if (nameIdx == -1) throw Exception('Missing required column: Name');
-
-    int count = 0;
+    var added = 0, updated = 0, skipped = 0;
+    final written = <int>{}; // customers this file has already produced
     await _db.transaction(() async {
-      for (var i = 1; i < rows.length; i++) {
-        final row = rows[i];
-        final name = row[nameIdx].toString();
-        if (name.isEmpty) continue;
+      for (final row in table.rows) {
+        if (row.isBlank) continue;
+        final name = row.text('name');
+        if (name.isEmpty) {
+          skipped++;
+          continue;
+        }
 
-        final phone = phoneIdx != -1 ? row[phoneIdx].toString() : null;
-        final email = emailIdx != -1 ? row[emailIdx].toString() : null;
-        final points = pointsIdx != -1
-            ? (double.tryParse(row[pointsIdx].toString()) ?? 0.0).toInt()
-            : 0;
-        final isExempt = exemptIdx != -1 ? _parseBool(row[exemptIdx]) : false;
+        final phone = row.textOrNull('phone');
+        final email = row.textOrNull('email');
+        // Whole points; a spreadsheet may have written 12.0.
+        final points = row.numberOf('loyalty points')?.toInt();
+        final isExempt = row.boolOf('is tax exempt');
 
-        await _db.customersDao.upsert(CustomersCompanion.insert(
-          name: name,
-          phone: Value(phone),
-          email: Value(email),
-          loyaltyPoints: Value(points),
-          isTaxExempt: Value(isExempt),
-        ));
-        count++;
+        final existing = await _matchCustomer(
+            name: name, phone: phone, email: email, taken: written);
+        if (existing != null) {
+          written.add(existing.id);
+          await (_db.update(_db.customers)
+                ..where((c) => c.id.equals(existing.id)))
+              .write(CustomersCompanion(
+            name: Value(name),
+            phone: Value.absentIfNull(phone),
+            email: Value.absentIfNull(email),
+            loyaltyPoints: Value.absentIfNull(points),
+            isTaxExempt: Value.absentIfNull(isExempt),
+            updatedAt: Value(DateTime.now()),
+          ));
+          updated++;
+        } else {
+          written.add(
+              await _db.into(_db.customers).insert(CustomersCompanion.insert(
+                    name: name,
+                    phone: Value(phone),
+                    email: Value(email),
+                    loyaltyPoints: Value(points ?? 0),
+                    isTaxExempt: Value(isExempt ?? false),
+                  )));
+          added++;
+        }
       }
     });
-    return count;
+    return CsvImportReport(added: added, updated: updated, skipped: skipped);
+  }
+
+  /// The customer a customers-CSV row refers to, if they exist already.
+  /// Customers in [taken] were matched by an earlier row of the same file.
+  Future<Customer?> _matchCustomer({
+    required String name,
+    required String? phone,
+    required String? email,
+    required Set<int> taken,
+  }) async {
+    if (phone != null) {
+      final samePhone = await (_db.select(_db.customers)
+            ..where((c) => c.phone.equals(phone))
+            ..orderBy([(c) => OrderingTerm.asc(c.id)]))
+          .get();
+      final free = samePhone.where((c) => !taken.contains(c.id)).toList();
+      final sameName = free.where((c) => c.name == name).firstOrNull;
+      if (sameName != null) return sameName;
+      // One customer on this number under another name: the same person,
+      // renamed. Several (a household, a business): one more person.
+      return samePhone.length == 1 && free.length == 1 ? free.single : null;
+    }
+    final sameName = await (_db.select(_db.customers)
+          ..where((c) => c.name.equals(name))
+          ..orderBy([(c) => OrderingTerm.asc(c.id)]))
+        .get();
+    return sameName
+        .where((c) =>
+            !taken.contains(c.id) && (c.email ?? '').trim() == (email ?? ''))
+        .firstOrNull;
   }
 
   // ── Expenses Export ────────────────────────────────────────────────────────
 
-  Future<void> exportExpenses() async {
+  Future<void> exportExpenses() async =>
+      _shareCsv(await expensesCsv(), 'expenses_backup.csv');
+
+  /// The expenses CSV: one row per expense. It carries no id.
+  @visibleForTesting
+  Future<String> expensesCsv() async {
     final expenses = await _db.expensesDao.getAll();
     final categories = await _db.expensesDao.getAllCategories();
     final categoryMap = {for (var c in categories) c.id: c.name};
@@ -252,75 +452,62 @@ class BackupRepository {
       ]);
     }
 
-    final csvString = const ListToCsvConverter().convert(rows);
-    await _shareCsv(csvString, 'expenses_backup.csv');
+    return const ListToCsvConverter().convert(rows);
   }
 
   // ── Expenses Import ────────────────────────────────────────────────────────
 
-  Future<int> importExpenses(String csvContent) async {
-    final rows = const CsvToListConverter().convert(csvContent);
-    if (rows.length <= 1) return 0;
+  /// Number of expenses added. See [importExpensesReport].
+  Future<int> importExpenses(String csvContent) async =>
+      (await importExpensesReport(csvContent)).written;
 
-    final header = rows[0].map((e) => e.toString().toLowerCase()).toList();
-    final amountIdx = header.indexOf('amount');
-    final dateIdx = header.indexOf('date');
-    final catIdx = header.indexOf('category');
-    final notesIdx = header.indexOf('notes');
-    final recurIdx = header.indexOf('is recurring');
-    final freqIdx = header.indexOf('frequency');
-    final taxIdx = header.indexOf('tax deductible');
-    final statusIdx = header.indexOf('status');
+  /// Adds every row of an expenses CSV as a new expense.
+  ///
+  /// The file has no id or other stable key, and two expenses of the same
+  /// amount, day and category are ordinary, so rows are never matched to
+  /// existing expenses: importing a file twice records its expenses twice.
+  Future<CsvImportReport> importExpensesReport(String csvContent) async {
+    final table = CsvTable.parse(csvContent);
+    if (table.rows.isEmpty) return const CsvImportReport();
+    table.require(['Amount', 'Date']);
 
-    if (amountIdx == -1 || dateIdx == -1) {
-      throw Exception('Missing required columns: Amount, Date');
-    }
-
-    int count = 0;
+    var added = 0;
     await _db.transaction(() async {
-      for (var i = 1; i < rows.length; i++) {
-        final row = rows[i];
-        if (row.length < 2) continue;
+      for (final row in table.rows) {
+        if (row.isBlank) continue;
 
-        final amount = double.tryParse(row[amountIdx].toString()) ?? 0.0;
-        final date =
-            DateTime.tryParse(row[dateIdx].toString()) ?? DateTime.now();
-        final catName = catIdx != -1 ? row[catIdx].toString() : 'General';
-        final notes = notesIdx != -1 ? row[notesIdx].toString() : null;
-        final isRecurring = recurIdx != -1 ? _parseBool(row[recurIdx]) : false;
-        final frequency = freqIdx != -1 ? row[freqIdx].toString() : null;
-        final isTaxIdx = taxIdx != -1 ? _parseBool(row[taxIdx]) : false;
-        final status = statusIdx != -1 ? row[statusIdx].toString() : 'approved';
+        final amount = row.numberOf('amount');
+        if (amount == null) throw row.error('Amount is blank');
+        final date = row.dateOf('date');
+        if (date == null) throw row.error('Date is blank');
+        final catName = row.textOrNull('category') ?? 'General';
 
-        // 1. Handle Category
-        int catId;
+        // 1. Category
         final existingCat = await (_db.select(_db.expenseCategories)
-              ..where((c) => c.name.equals(catName)))
+              ..where((c) => c.name.equals(catName))
+              ..orderBy([(c) => OrderingTerm.asc(c.id)])
+              ..limit(1))
             .getSingleOrNull();
-        if (existingCat != null) {
-          catId = existingCat.id;
-        } else {
-          catId = await _db.expensesDao
-              .upsertCategory(ExpenseCategoriesCompanion.insert(name: catName));
-        }
+        final catId = existingCat?.id ??
+            await _db.expensesDao.upsertCategory(
+                ExpenseCategoriesCompanion.insert(name: catName));
 
-        // 2. Insert Expense (ID is auto-inc, so this is always a new record)
+        // 2. Always a new record.
         await _db.expensesDao.insert(ExpensesCompanion.insert(
           amount: amount,
           date: date,
           categoryId: catId,
-          notes: Value(notes),
-          isRecurring: Value(isRecurring),
-          recurringFrequency: Value(frequency),
-          isTaxDeductible: Value(isTaxIdx),
-          status: Value(status),
+          notes: Value(row.textOrNull('notes')),
+          isRecurring: Value(row.boolOf('is recurring') ?? false),
+          recurringFrequency: Value(row.textOrNull('frequency')),
+          isTaxDeductible: Value(row.boolOf('tax deductible') ?? false),
+          status: Value(row.textOrNull('status') ?? 'approved'),
         ));
-
-        count++;
+        added++;
       }
     });
 
-    return count;
+    return CsvImportReport(added: added);
   }
 
   // ── Orders Export ─────────────────────────────────────────────────────────
@@ -429,128 +616,192 @@ class BackupRepository {
 
   // ── Orders Import ──────────────────────────────────────────────────────────
 
-  Future<int> importOrders(String csvContent) async {
-    final rows = const CsvToListConverter().convert(csvContent);
-    if (rows.length <= 1) return 0;
+  /// Invoice prefix carried by every order that came from a CSV file. Bill
+  /// numbers are `prefix-number`, so these read `IMP-17` and can never be
+  /// taken for the shop's own invoice `#17`. Invoice sequences run per
+  /// prefix, so imports never advance a real one.
+  static const importedOrderPrefix = 'IMP';
 
-    final header = rows[0].map((e) => e.toString().toLowerCase()).toList();
-    final oIdIdx = header.indexOf('order id');
-    final statusIdx = header.indexOf('status');
-    final totalIdx = header.indexOf('total');
-    final methodIdx = header.indexOf('payment method');
-    final customerIdx = header.indexOf('customer name');
-    final dateIdx = header.indexOf('created at');
+  /// Number of orders added. See [importOrdersReport].
+  Future<int> importOrders(String csvContent) async =>
+      (await importOrdersReport(csvContent)).written;
 
-    final itemNameIdx = header.indexOf('item name');
-    final itemSkuIdx = header.indexOf('item sku');
-    final itemPriceIdx = header.indexOf('item price');
-    final itemQtyIdx = header.indexOf('item qty');
-    final itemTotalIdx = header.indexOf('item total');
+  /// Adds the orders of an order-history CSV (one row per order line; rows
+  /// sharing an Order ID are one order).
+  ///
+  /// **Already present → skipped.** An order is taken to be here already
+  /// when an order with the file's Order ID — as its own id, or as the
+  /// number it was imported under — also has the same date and total. So
+  /// re-importing a file, or importing a shop's export back into that shop,
+  /// adds nothing.
+  ///
+  /// **Numbering.** Imported orders get prefix [importedOrderPrefix] and the
+  /// file's Order ID as their number (`IMP-17`). If that number is taken by
+  /// a different imported order (files from two shops), the order gets no
+  /// number and shows as `IMP-<its row id>`.
+  ///
+  /// **Lines.** A line is tied to a product by SKU, else by name. A line
+  /// whose product cannot be found is left out — an order line must point
+  /// at a product — and the order's notes say which, since its total still
+  /// includes it. Stock, loyalty points and tax lines are not touched.
+  Future<CsvImportReport> importOrdersReport(String csvContent) async {
+    final table = CsvTable.parse(csvContent);
+    if (table.rows.isEmpty) return const CsvImportReport();
+    table.require(['Order ID', 'Created At', 'Item Name', 'Total']);
 
-    if (oIdIdx == -1 || dateIdx == -1 || itemNameIdx == -1) {
-      throw Exception(
-          'Format invalid. Missing required columns (Order ID, Created At, Item Name)');
-    }
-
-    // Group rows by Order ID to reconstruct orders
-    final Map<String, List<List<dynamic>>> orderGroups = {};
-    for (var i = 1; i < rows.length; i++) {
-      final row = rows[i];
-      final key = row[oIdIdx].toString();
+    // Group rows by Order ID to reconstruct orders (file order kept).
+    final orderGroups = <String, List<CsvRow>>{};
+    for (final row in table.rows) {
+      if (row.isBlank) continue;
+      final key = row.text('order id');
+      if (key.isEmpty) throw row.error('Order ID is blank');
       orderGroups.putIfAbsent(key, () => []).add(row);
     }
 
-    int count = 0;
+    var added = 0, skipped = 0, unmatchedLines = 0;
     await _db.transaction(() async {
-      for (final oId in orderGroups.keys) {
-        final group = orderGroups[oId]!;
+      for (final MapEntry(key: fileId, value: group) in orderGroups.entries) {
         final first = group.first;
 
-        // 1. Find/Match Customer
-        int? customerId;
-        final cName = first[customerIdx].toString();
-        if (cName.isNotEmpty) {
-          final existing = await (_db.select(_db.customers)
-                ..where((c) => c.name.equals(cName)))
+        final createdAt = first.dateOf('created at');
+        if (createdAt == null) throw first.error('Created At is blank');
+        final total = first.numberOf('total');
+        if (total == null) throw first.error('Total is blank');
+
+        // 1. Already here?
+        final sourceId = int.tryParse(fileId);
+        var invoiceNo = sourceId;
+        if (sourceId != null) {
+          bool sameSale(Order o) =>
+              o.createdAt.difference(createdAt).inSeconds == 0 &&
+              (o.total - total).abs() < 0.005;
+
+          final own = await _db.ordersDao.getById(sourceId);
+          final imported = await (_db.select(_db.orders)
+                ..where((o) =>
+                    o.invoicePrefix.equals(importedOrderPrefix) &
+                    o.invoiceNo.equals(sourceId)))
               .getSingleOrNull();
-          customerId = existing?.id;
+          if ((own != null && sameSale(own)) ||
+              (imported != null && sameSale(imported))) {
+            skipped++;
+            continue;
+          }
+          // IMP-<n> belongs to a different sale: go without a number.
+          if (imported != null) invoiceNo = null;
         }
 
-        // 2. Insert Order
-        final orderId = await _db.ordersDao.insertOrder(OrdersCompanion.insert(
-          status: Value(first[statusIdx].toString()),
-          subtotal:
-              double.tryParse(first[header.indexOf('subtotal')].toString()) ??
-                  0.0,
-          taxTotal: Value(
-              double.tryParse(first[header.indexOf('tax total')].toString()) ??
-                  0.0),
-          discountTotal: Value(
-              double.tryParse(first[header.indexOf('discount')].toString()) ??
-                  0.0),
-          total: double.tryParse(first[totalIdx].toString()) ?? 0.0,
-          paymentMethod: first[methodIdx].toString(),
-          tenderedAmount: Value(
-              double.tryParse(first[header.indexOf('tendered')].toString()) ??
-                  0.0),
-          changeAmount: Value(
-              double.tryParse(first[header.indexOf('change')].toString()) ??
-                  0.0),
-          customerId: Value(customerId),
-          notes: Value(first[header.indexOf('notes')].toString()),
-          createdAt: Value(
-              DateTime.tryParse(first[dateIdx].toString()) ?? DateTime.now()),
-        ));
+        // 2. Customer, by exact name — only when exactly one has it.
+        int? customerId;
+        final cName = first.text('customer name');
+        if (cName.isNotEmpty) {
+          final matches = await (_db.select(_db.customers)
+                ..where((c) => c.name.equals(cName))
+                ..limit(2))
+              .get();
+          if (matches.length == 1) customerId = matches.single.id;
+        }
 
-        // 3. Insert Items
-        final items = <OrderItemsCompanion>[];
+        // 3. Payment. The export writes 0 where nothing was recorded, so a
+        // zero that cannot be a real cash payment is read back as "none".
+        final method = first.textOrNull('payment method') ?? 'cash';
+        var tendered = first.numberOf('tendered');
+        var change = first.numberOf('change');
+        final nothingTendered = tendered == null ||
+            (tendered == 0 && (method != 'cash' || total > 0));
+        if (nothingTendered) tendered = change = null;
+
+        // 4. Lines.
+        final items = <OrderItemsCompanion Function(int orderId)>[];
+        final leftOut = <String>[];
         for (final row in group) {
-          // Attempt to match product by SKU or Name to get ID
-          int? productId;
-          final sku = row[itemSkuIdx].toString();
-          final name = row[itemNameIdx].toString();
+          final sku = row.text('item sku');
+          final name = row.text('item name');
+          // An order with no lines is exported as one row with no item.
+          if (sku.isEmpty && name.isEmpty) continue;
 
-          if (sku.isNotEmpty) {
-            final p = await (_db.select(_db.products)
-                  ..where((p) => p.sku.equals(sku)))
-                .getSingleOrNull();
-            productId = p?.id;
-          }
-          if (productId == null && name.isNotEmpty) {
-            final p = await (_db.select(_db.products)
-                  ..where((p) => p.name.equals(name)))
-                .getSingleOrNull();
-            productId = p?.id;
-          }
+          final unitPrice = row.numberOf('item price') ?? 0.0;
+          final quantity = row.intOf('item qty') ?? 1;
+          final discount = row.numberOf('item discount') ?? 0.0;
+          final taxAmount = row.numberOf('item tax') ?? 0.0;
+          final lineTotal =
+              row.numberOf('item total') ?? unitPrice * quantity - discount;
 
+          final productId = await _matchOrderLineProduct(sku: sku, name: name);
           if (productId == null) {
-            continue; // Skip if product doesn't exist? Or allow null?
+            leftOut.add('${name.isEmpty ? sku : name} ×$quantity = '
+                '${lineTotal.toStringAsFixed(2)}');
+            continue;
           }
-
-          items.add(OrderItemsCompanion.insert(
-            orderId: orderId,
-            productId: productId,
-            productName: name,
-            unitPrice: double.tryParse(row[itemPriceIdx].toString()) ?? 0.0,
-            quantity: int.tryParse(row[itemQtyIdx].toString()) ?? 1,
-            discount: Value(double.tryParse(
-                    row[header.indexOf('item discount')].toString()) ??
-                0.0),
-            taxAmount: Value(
-                double.tryParse(row[header.indexOf('item tax')].toString()) ??
-                    0.0),
-            lineTotal: double.tryParse(row[itemTotalIdx].toString()) ?? 0.0,
-          ));
+          items.add((orderId) => OrderItemsCompanion.insert(
+                orderId: orderId,
+                productId: productId,
+                productName: name.isEmpty ? sku : name,
+                unitPrice: unitPrice,
+                quantity: quantity,
+                discount: Value(discount),
+                taxAmount: Value(taxAmount),
+                lineTotal: lineTotal,
+              ));
         }
 
+        var notes = first.textOrNull('notes');
+        if (leftOut.isNotEmpty) {
+          unmatchedLines += leftOut.length;
+          final lines = leftOut.length == 1 ? '1 line' : '${leftOut.length} lines';
+          notes = [
+            if (notes != null) notes,
+            'CSV import: $lines left out, product not found — '
+                '${leftOut.join('; ')}',
+          ].join('\n');
+        }
+
+        // 5. Insert.
+        final orderId = await _db.ordersDao.insertOrder(OrdersCompanion.insert(
+          invoiceNo: Value(invoiceNo),
+          invoicePrefix: const Value(importedOrderPrefix),
+          status: Value(first.textOrNull('status') ?? 'completed'),
+          subtotal: first.numberOf('subtotal') ?? total,
+          taxTotal: Value(first.numberOf('tax total') ?? 0.0),
+          discountTotal: Value(first.numberOf('discount') ?? 0.0),
+          total: total,
+          paymentMethod: method,
+          tenderedAmount: Value(tendered),
+          changeAmount: Value(change),
+          customerId: Value(customerId),
+          notes: Value(notes),
+          createdAt: Value(createdAt),
+        ));
         if (items.isNotEmpty) {
-          await _db.ordersDao.insertItems(items);
+          await _db.ordersDao
+              .insertItems([for (final item in items) item(orderId)]);
         }
-        count++;
+        added++;
       }
     });
 
-    return count;
+    return CsvImportReport(
+        added: added, skipped: skipped, unmatchedLines: unmatchedLines);
+  }
+
+  /// The product an order line was a sale of: by SKU (deleted products
+  /// included — old sales still point at them), else by name when the name
+  /// picks out one product.
+  Future<int?> _matchOrderLineProduct({
+    required String sku,
+    required String name,
+  }) async {
+    if (sku.isNotEmpty) {
+      final bySku = await _db.productsDao.getBySku(sku);
+      if (bySku != null) return bySku.id;
+    }
+    if (name.isEmpty) return null;
+    final sameName = await (_db.select(_db.products)
+          ..where((p) => p.name.equals(name)))
+        .get();
+    if (sameName.length == 1) return sameName.single.id;
+    final active = sameName.where((p) => p.isActive).toList();
+    return active.length == 1 ? active.single.id : null;
   }
 
   // ── Sales Report Export ────────────────────────────────────────────────────
@@ -590,14 +841,6 @@ class BackupRepository {
           row.read<String>('status'),
         ],
       );
-
-  // ── Helpers ────────────────────────────────────────────────────────────────
-
-  bool _parseBool(dynamic value) {
-    if (value == null) return false;
-    final s = value.toString().toLowerCase();
-    return s == '1' || s == 'true' || s == 'yes';
-  }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 

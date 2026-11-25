@@ -184,7 +184,7 @@ class ReceiptBody extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        'Payment Mode: ${order.paymentMethod[0].toUpperCase()}${order.paymentMethod.substring(1)}',
+                        'Payment Mode: ${order.paymentLabel}',
                         style: bodyStyle.copyWith(color: cs.onSurface),
                       ),
                     ),

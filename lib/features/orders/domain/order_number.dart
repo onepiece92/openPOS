@@ -9,4 +9,10 @@ extension OrderNumberX on Order {
   /// e.g. `#17`, or `2082/83-17` when the order carries a prefix.
   String get billNo =>
       invoicePrefix.isEmpty ? '#$displayNo' : '$invoicePrefix-$displayNo';
+
+  /// The payment method as a receipt prints it: `Cash`, `Card`. An order
+  /// with none on record (an old CSV import) reads `Not recorded`.
+  String get paymentLabel => paymentMethod.isEmpty
+      ? 'Not recorded'
+      : '${paymentMethod[0].toUpperCase()}${paymentMethod.substring(1)}';
 }
