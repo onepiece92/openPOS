@@ -1,8 +1,8 @@
 # Open POS
 
-**A free, 100% offline point-of-sale app. Your sales data never leaves your device.**
+**A free, 100% offline point-of-sale app that never sends your data anywhere.**
 
-No subscription. No account. No internet connection needed. Ring up sales, manage tables and track your takings on an Android or iOS phone or tablet, with everything stored on that device.
+No subscription. No account. No internet connection needed. Ring up sales, manage tables and track your takings on an Android or iOS phone or tablet, with your data kept in the app on that device.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Platforms: Android | iOS](https://img.shields.io/badge/platforms-Android%20%7C%20iOS-informational.svg)](#get-open-pos)
@@ -13,7 +13,7 @@ No subscription. No account. No internet connection needed. Ring up sales, manag
 
 ## Get Open POS
 
-<a href="https://play.google.com/store/apps/details?id=com.brandbuilder.openpos&referrer=utm_source%3Dgithub%26utm_medium%3Dreadme"><img alt="Get it on Google Play" src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" height="80"></a> <a href="https://apps.apple.com/app/open-pos-offline/id6761003751?ct=github_readme"><img alt="Download on the App Store" src="https://tools.applemediaservices.com/api/badges/download-on-the-app-store/black/en-us?size=250x83" height="54"></a>
+<a href="https://play.google.com/store/apps/details?id=com.brandbuilder.openpos&referrer=utm_source%3Dgithub%26utm_medium%3Dreadme"><img alt="Get it on Google Play" src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" height="80"></a> <a href="https://apps.apple.com/app/open-pos-offline/id6761003751?ct=github_readme"><img alt="Download on the App Store" src="https://toolbox.marketingtools.apple.com/api/badges/download-on-the-app-store/black/en-us?size=250x83" height="54"></a>
 
 **Android:** install Open POS from [Google Play](https://play.google.com/store/apps/details?id=com.brandbuilder.openpos&referrer=utm_source%3Dgithub%26utm_medium%3Dreadme).
 
@@ -23,7 +23,7 @@ The current store versions date from May 2026. The features below describe the u
 
 You can also [build Android or iOS from source](#build-from-source).
 
-<sub>Google Play and the Google Play logo are trademarks of Google LLC. Apple and the Apple logo are trademarks of Apple Inc. App Store is a service mark of Apple Inc.</sub>
+<sub>Google Play and the Google Play logo are trademarks of Google LLC. Apple and the Apple logo are trademarks of Apple Inc., registered in the U.S. and other countries. App Store is a service mark of Apple Inc.</sub>
 
 <!-- HOLD: restore at first release (replace the section above)
 **[Download the latest release](https://github.com/onepiece92/openPOS/releases/latest)**
@@ -61,14 +61,14 @@ HOLD -->
 | --- | --- |
 | ![Sell screen with product grid and cart](docs/screenshots/sell.png) | ![Table management for cafes and restaurants](docs/screenshots/tables.png) |
 | **Reports** | **Receipt** |
-| ![Reports dashboard with revenue and profit](docs/screenshots/reports.png) | ![Receipt preview](docs/screenshots/receipt.png) |
+| ![Reports dashboard with revenue and expenses](docs/screenshots/reports.png) | ![Receipt preview](docs/screenshots/receipt.png) |
 HOLD -->
 
 ---
 
 ## Why Open POS
 
-- **Your data stays with you.** The app's own code makes no network calls: no accounts, no cloud, no analytics. Sales, customers and stock live in a database on your device and nowhere else.
+- **The app never sends your data anywhere.** Its own code makes no network calls: no accounts, no cloud, no analytics. Sales, customers and stock live in a database on your device. Your phone's own backup (Google or iCloud), if you have it turned on, may include app data.
 - **Free, for good.** No subscription, no per-device fee, no premium tier. MIT licensed.
 - **Works with no internet.** A dropped connection never stops a sale, because the app never needed one.
 - **Made for small shops and cafes.** Tables, held tickets and simple reports, without the setup of a big system.
@@ -79,7 +79,7 @@ HOLD -->
 
 ### Selling
 - Product grid or list, with search, category filter and favourites
-- Cart with per-line and whole-order discounts
+- Cart with whole-order discounts (amount or percent)
 - Cash payment with tendered amount and change, or card
 - Held tickets: park an order and resume it later
 - Table management for restaurants and cafes
@@ -88,7 +88,7 @@ HOLD -->
 HOLD -->
 
 ### Products
-- Categories, SKU/barcode field and product photos
+- Categories and a SKU/barcode field
 <!-- HOLD: not in the May 2026 Play build; restore at next release
 - Secondary units (for example, sell by the piece or by the dozen)
 HOLD -->
@@ -106,16 +106,15 @@ HOLD -->
 
 ### Orders and receipts
 - Order history and voids
-- PDF receipts
-- Share receipts by SMS or email through your device's own apps, or copy them as text
+- PDF receipts you can save or share, or copy the receipt as text
 <!-- HOLD: pending fix confirmation
 - Refunds, with optional restock
 HOLD -->
 
 ### Money and reports
-- Tax rates and tax groups, with per-product taxes
+- Tax rates, with tax switched on or off per product
 - Expense tracking
-- Reports dashboard: revenue, expenses, net profit, average order value, with charts
+- Reports dashboard: revenue and expenses, average order value, with charts
 - Audit log of important actions
 
 ### Your data
@@ -173,7 +172,7 @@ codesign -d --entitlements - "/Applications/Open POS.app"
 ```
 HOLD -->
 
-**What this means in practice:** no analytics, no crash reporting, no cloud backup, no update checks, no account. Receipts you share by SMS or email go through your device's own Messages or Mail app, which you control.
+**What this means in practice:** no analytics, no crash reporting, no cloud backup built into the app, no update checks, no account. Receipts you share by SMS or email go through your device's own Messages or Mail app, which you control.
 
 ---
 
@@ -199,7 +198,7 @@ flutter build ios --release      # iOS (needs a Mac with Xcode and your own sign
 
 ## Need cloud sync and multi-device?
 
-Open POS is deliberately single-device and offline, and it will stay that way. It will also stay free. If your business needs sync across several devices, online ordering or a back office in the cloud, the same team makes [RebuzzPOS](https://rebuzzpos.com), an online POS with 40+ additional features. It is a separate product; nothing in Open POS depends on it or connects to it.
+Open POS is deliberately single-device and offline, and it will stay that way. It will also stay free. If your business needs sync across several devices, the same team makes [RebuzzPOS](https://rebuzzpos.com), a separate online POS. The Support screen in Open POS links to it. Open POS exchanges no data with it, and you never need it to use Open POS.
 
 ---
 
