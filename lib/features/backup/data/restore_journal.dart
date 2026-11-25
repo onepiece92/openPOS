@@ -66,6 +66,15 @@ class RestoreJournalContents {
 class RestoreJournal {
   const RestoreJournal._();
 
+  /// Journal format version.
+  ///
+  /// IF YOU BUMP THIS: [read] rejects any other version, and the caller
+  /// then treats the journal as corrupt and falls back to
+  /// prefer-every-`.bak` recovery (`SnapshotService._recoverFromBaks`),
+  /// which ignores the plan. A new version must NOT end up there — teach
+  /// [read] to parse every version still in the field (older ones at
+  /// least; a downgrade can meet a newer one) and keep that fallback for
+  /// genuinely unreadable files only.
   static const version = 1;
 
   /// Writes (truncating) [file] with the `begin` record and flushes it.
@@ -136,6 +145,8 @@ class RestoreJournal {
       if (begin['op'] != 'begin') {
         throw const RestoreJournalFormatException('no begin record');
       }
+      // See [version]: a future bump must parse old versions here instead
+      // of sending them to the corrupt-journal fallback.
       if (begin['v'] != version) {
         throw RestoreJournalFormatException(
             'unsupported version ${begin['v']}');

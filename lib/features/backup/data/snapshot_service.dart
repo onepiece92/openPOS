@@ -585,13 +585,15 @@ class SnapshotService {
           overLive: false);
       await _deleteAll(leftovers);
       return changed
-          ? RestoreRecovery.recoveredWithoutJournal
+          ? RestoreRecovery.missingFilesPutBack
           : RestoreRecovery.none;
     }
     final RestoreJournalContents c;
     try {
       c = RestoreJournal.read(journal);
     } on RestoreJournalFormatException {
+      // Corrupt or unknown-version journal. A future journal version must
+      // never land here: see RestoreJournal.version.
       await _recoverFromBaks(
           dbFile: dbFile,
           hivePaths: hivePaths,
@@ -1262,9 +1264,15 @@ enum RestoreRecovery {
   /// A restore had been accepted; only its cleanup was left to do.
   completed,
 
-  /// The journal was unreadable; missing files were put back from their
-  /// `.bak` copies where that was unambiguous.
+  /// The journal was unreadable (or of an unknown version); each `.bak`
+  /// was put back over its live file, which normally restores the
+  /// previous data. Receipt photos the restore added may remain.
   recoveredWithoutJournal,
+
+  /// No journal, but the DB or a box was missing while its `.bak` existed
+  /// (a kill in a pre-journal build, or a lost journal); the `.bak` was
+  /// put back.
+  missingFilesPutBack,
 }
 
 // ─── Manifest ────────────────────────────────────────────────────────────────

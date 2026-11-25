@@ -123,8 +123,18 @@ void main() {
     expect(restoreRecoveryNotice(RestoreRecovery.none), isNull);
     expect(restoreRecoveryNotice(RestoreRecovery.completed), isNull);
     expect(restoreRecoveryNotice(RestoreRecovery.rolledBack),
-        contains('put back'));
+        'A restore was interrupted. Your previous data was put back.');
     expect(restoreRecoveryNotice(RestoreRecovery.recoveredWithoutJournal),
-        contains('check'));
+        "A restore was interrupted and its progress record couldn't be read. "
+        'Your previous data was put back, but some receipt photos from the '
+        'backup may remain. Please check your recent records.');
+    expect(restoreRecoveryNotice(RestoreRecovery.missingFilesPutBack),
+        'Data left from an interrupted restore was missing and has been put '
+        'back. Please check your recent records.');
+    // Every outcome is handled explicitly (no catch-all), and none of the
+    // texts point users at files they can't reach.
+    for (final r in RestoreRecovery.values) {
+      expect(restoreRecoveryNotice(r) ?? '', isNot(contains('.bak')));
+    }
   });
 }

@@ -72,9 +72,13 @@ String? restoreRecoveryNotice(RestoreRecovery? r) => switch (r) {
       RestoreRecovery.rolledBack =>
         'A restore was interrupted. Your previous data was put back.',
       RestoreRecovery.recoveredWithoutJournal =>
-        'A restore was interrupted. The app may be showing backup data or a '
-            'mix — check recent records, or restore again.',
-      _ => null,
+        "A restore was interrupted and its progress record couldn't be "
+            'read. Your previous data was put back, but some receipt photos '
+            'from the backup may remain. Please check your recent records.',
+      RestoreRecovery.missingFilesPutBack =>
+        'Data left from an interrupted restore was missing and has been '
+            'put back. Please check your recent records.',
+      RestoreRecovery.none || RestoreRecovery.completed || null => null,
     };
 
 const kReceiptsDirName = 'receipts';

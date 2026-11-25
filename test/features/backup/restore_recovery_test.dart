@@ -625,7 +625,8 @@ void main() {
       );
       expect(order, ['initHive', 'openStores']);
       expect(r.fatal, isNull);
-      expect(r.notice, contains('may be showing'));
+      expect(r.notice,
+          restoreRecoveryNotice(RestoreRecovery.missingFilesPutBack));
       final db = dbFileIn(live).path;
       expect(File('$db-wal').readAsStringSync(), 'ORIGINAL WAL');
       File('$db-wal').deleteSync(); // not a real WAL; let SQLite open
