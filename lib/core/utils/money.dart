@@ -34,6 +34,38 @@ double roundMoney(double value, [RoundingMode mode = RoundingMode.halfUp]) {
   }
 }
 
+/// Splits [amount] across [weights] in proportion, to the cent, so the parts
+/// always add up to [amount] exactly (largest-remainder method: every part
+/// is rounded down, then the leftover cents go to the parts that lost the
+/// most, earliest first on a tie). Zero or negative weights get nothing.
+///
+///   prorateMoney(0.20, [0.5, 0.5, 0.5]) → [0.07, 0.07, 0.06]
+List<double> prorateMoney(double amount, List<double> weights) {
+  final cents = (amount * 100).round();
+  final usable = [for (final w in weights) w > 0 && w.isFinite ? w : 0.0];
+  final totalWeight = usable.fold(0.0, (s, w) => s + w);
+  if (cents <= 0 || totalWeight <= 0) {
+    return List<double>.filled(weights.length, 0.0);
+  }
+  final exact = [for (final w in usable) cents * w / totalWeight];
+  // The nudge keeps a share that is a whole number of cents from flooring
+  // one short (6.999999… → 7).
+  final parts = [for (final e in exact) (e + 1e-9).floor()];
+  var left = cents - parts.fold(0, (s, p) => s + p);
+  final byLoss = [for (var i = 0; i < parts.length; i++) i]
+    ..sort((a, b) {
+      final c = (exact[b] - parts[b]).compareTo(exact[a] - parts[a]);
+      return c != 0 ? c : a.compareTo(b);
+    });
+  for (final i in byLoss) {
+    if (left <= 0) break;
+    if (usable[i] <= 0) continue;
+    parts[i]++;
+    left--;
+  }
+  return [for (final p in parts) p / 100];
+}
+
 /// The largest amount any money input accepts.
 ///
 /// Picked so a value stays far inside the range where a double holds whole

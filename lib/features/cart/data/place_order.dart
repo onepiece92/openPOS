@@ -22,6 +22,23 @@ Future<int> placeOrder(
   String invoicePrefix = '',
 }) {
   return db.transaction(() async {
+    // Read once: needed for the cost snapshot and again for stock below.
+    final products = <int, Product?>{};
+    for (final item in cart) {
+      products[item.productId] ??=
+          await db.productsDao.getById(item.productId);
+    }
+    final unitCosts = <int, double?>{
+      for (final entry in products.entries)
+        entry.key: await _unitCostNow(db, entry.value),
+    };
+    // Tax is an invoice-level figure, so a line has no tax of its own —
+    // each taxable line stores its share, and the shares sum to the total.
+    final lineTax = prorateMoney(
+      summary.taxEnabled ? summary.taxAmount : 0,
+      [for (final item in cart) item.isTaxable ? item.lineSubtotal : 0.0],
+    );
+
     // Gap-free: computed inside the transaction, never reused (voids keep it).
     final invoiceNo =
         await db.ordersDao.nextInvoiceNo(prefix: invoicePrefix);
@@ -53,12 +70,15 @@ Future<int> placeOrder(
         // was actually computed from (capped by balance and order total).
         pointsRedeemed: Value(summary.pointsRedeemed),
         loyaltyDiscount: Value(summary.loyaltyDiscount),
-        pointsEarned: Value(summary.pointsToEarn),
+        // Points go to a customer; a walk-in sale earns none, so none are
+        // recorded against it.
+        pointsEarned:
+            Value(session.customerId != null ? summary.pointsToEarn : 0),
       ),
     );
 
     await db.ordersDao.insertItems([
-      for (final item in cart)
+      for (final (index, item) in cart.indexed)
         OrderItemsCompanion.insert(
           orderId: id,
           productId: item.productId,
@@ -72,7 +92,11 @@ Future<int> placeOrder(
           unitLabel: Value(item.unitLabel),
           unitsPerQty: Value(item.unitsPerQty),
           discount: Value(item.lineDiscount),
+          taxAmount: Value(lineTax[index]),
           lineTotal: item.lineSubtotal,
+          // What a main unit cost today — the product's price may change
+          // tomorrow, the profit on this sale must not.
+          unitCost: Value(unitCosts[item.productId]),
         ),
     ]);
 
@@ -87,6 +111,7 @@ Future<int> placeOrder(
               taxRatePercent: line.rate,
               taxableAmount: line.taxableAmount,
               taxAmount: line.amount,
+              isInclusive: Value(line.isInclusive),
             ),
       ]);
     }
@@ -107,7 +132,7 @@ Future<int> placeOrder(
     }
 
     for (final item in cart) {
-      final product = await db.productsDao.getById(item.productId);
+      final product = products[item.productId];
       // Stock is tracked in main units — a secondary-unit line deducts
       // quantity × conversion (e.g. 2 dozen → 24 pcs).
       final mainUnits = item.mainUnitQty;
@@ -141,4 +166,25 @@ Future<int> placeOrder(
 
     return id;
   });
+}
+
+/// What one main unit of [product] costs the shop right now, or null when
+/// that is not known: no purchase price, or — for a composite, which costs
+/// the sum of its components — a component without one. Null rather than a
+/// partial figure, so reports can say "no cost recorded" instead of quietly
+/// overstating the profit.
+Future<double?> _unitCostNow(AppDatabase db, Product? product) async {
+  if (product == null) return null;
+  if (!product.isComposite) {
+    return product.purchasePrice > 0 ? product.purchasePrice : null;
+  }
+  final components = await db.productsDao.getComponents(product.id);
+  if (components.isEmpty) return null;
+  var cost = 0.0;
+  for (final comp in components) {
+    final part = await db.productsDao.getById(comp.componentProductId);
+    if (part == null || part.purchasePrice <= 0) return null;
+    cost += comp.quantity * part.purchasePrice;
+  }
+  return roundMoney(cost);
 }

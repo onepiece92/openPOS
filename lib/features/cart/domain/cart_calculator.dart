@@ -13,7 +13,7 @@ import 'package:pos_app/features/cart/domain/cart_summary.dart';
 ///   1. subtotal        = Σ line subtotals (unit × qty − line discount)
 ///   2. order discount  = % or flat, clamped to [0, subtotal]
 ///   3. each line's net = line subtotal × (1 − discount ratio)   ← prorated
-///   4. tax per rate    = Σ over taxable lines of tax(net), rounded once/line
+///   4. tax per rate    = rate × Σ taxable lines' net, rounded once per invoice
 ///   5. total           = discounted subtotal + exclusive tax − loyalty
 ///      (loyalty needs a customer, and never takes more points than the
 ///      customer has or than the amount due can use)
@@ -56,38 +56,43 @@ class CartCalculator {
         (item.lineSubtotal * keepRatio).clamp(0.0, double.infinity),
     ];
 
-    // 4. One TaxLine per selected rate (always computed, even if taxEnabled
+    // 4. Tax is an invoice-level figure: per rate, applied once to the
+    //    order's whole taxable base and rounded once — never per line, which
+    //    drifts by a cent per few lines (3 × 0.50 at 13 % is 0.20, not
+    //    3 × 0.07). The base is rounded first so that the printed base times
+    //    the rate reproduces the printed tax.
+    //    One TaxLine per selected rate (always computed, even if taxEnabled
     //    is off — the UI shows the would-be amount greyed out).
+    double taxableSum = 0;
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].isTaxable) taxableSum += netByLine[i];
+    }
+    final taxableGross = roundMoney(taxableSum);
     final taxLines = <TaxLine>[];
     for (final rate in selectedRates) {
       final isInclusive = rate.inclusionType == 'inclusive';
       final mode = _roundingModeFor(rate.roundingMode);
       double amount = 0;
       double taxable = 0;
-      if (rate.rate > 0) {
-        for (var i = 0; i < items.length; i++) {
-          if (!items[i].isTaxable) continue;
-          final net = netByLine[i];
-          if (net <= 0) continue;
-          // Single rounding per line per rate.
-          final lineTax = TaxCalculator.lineItemTax(
-            unitPrice: net,
-            quantity: 1,
-            rate: rate.rate,
-            isInclusive: isInclusive,
-            roundingMode: mode,
-          );
-          amount += lineTax;
-          taxable += isInclusive ? net - lineTax : net;
-        }
+      if (rate.rate > 0 && taxableGross > 0) {
+        amount = TaxCalculator.invoiceTax(
+          amount: taxableGross,
+          rate: rate.rate,
+          isInclusive: isInclusive,
+          roundingMode: mode,
+        );
+        // Inclusive: the summed amount already holds the tax, so the base
+        // is what is left once it is taken out (base + tax = amount).
+        taxable =
+            isInclusive ? roundMoney(taxableGross - amount) : taxableGross;
       }
       taxLines.add(TaxLine(
         taxRateId: rate.id,
         name: rate.name,
         rate: rate.rate,
-        amount: roundMoney(amount),
+        amount: amount,
         isInclusive: isInclusive,
-        taxableAmount: roundMoney(taxable),
+        taxableAmount: taxable,
       ));
     }
 
@@ -120,8 +125,10 @@ class CartCalculator {
     final total = roundMoney(
       (due - loyaltyDiscount).clamp(0.0, double.infinity),
     );
+    // Same nudge as the redemption above: 4.35 × 100 is 434.99999… in
+    // binary and must still earn 435.
     final pointsToEarn =
-        loyaltyEnabled ? (total * loyaltyEarnRate).floor() : 0;
+        loyaltyEnabled ? (total * loyaltyEarnRate + 1e-9).floor() : 0;
 
     return CartSummary(
       subtotal: subtotal,

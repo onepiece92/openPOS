@@ -277,9 +277,10 @@ void main() {
         session: session(),
         selectedRates: [rate(1, 0.13), rate(2, 0.02)],
       );
-      // 0.16 + 0.13 and 0.02 + 0.02 — float sums would carry …0004 noise.
-      expect(s.taxAmount, 0.33);
-      expect(s.total, 2.19 + 0.33);
+      // Invoice-level: base 2.19 → 13 % = 0.2847 → 0.28, 2 % = 0.0438 → 0.04.
+      // (Per line it used to be 0.16 + 0.13 and 0.02 + 0.02 = 0.33.)
+      expect(s.taxAmount, 0.32);
+      expect(s.total, 2.51);
       for (final l in s.taxLines) {
         expect(l.amount, roundTripsAt2dp);
         expect(l.taxableAmount, roundTripsAt2dp);
