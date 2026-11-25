@@ -41,9 +41,9 @@
 	<key>NSBluetoothPeripheralUsageDescription</key>
 	<string>This app uses Bluetooth to connect to thermal receipt printers.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>This app uses the camera to scan barcodes and take product photos.</string>
+	<string>Open POS uses the camera to take photos of expense receipts and bills that you attach to an expense.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>This app accesses the photo library to select product images.</string>
+	<string>Open POS lets you choose a photo of a receipt or bill from your photo library to attach to an expense.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
