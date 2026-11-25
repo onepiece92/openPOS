@@ -7,6 +7,7 @@ import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothSocket
 import android.content.Context
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import io.flutter.plugin.common.BinaryMessenger
@@ -52,6 +53,9 @@ class SppPrinterChannel(
         when (call.method) {
             "pairedDevices" -> pairedDevices(result)
             "printBytes" -> printBytes(call, result)
+            // Lets Dart ask for location only where BLE scanning needs it
+            // (API 30 and older) without pulling in device_info_plus.
+            "sdkInt" -> result.success(Build.VERSION.SDK_INT)
             else -> result.notImplemented()
         }
     }

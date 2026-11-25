@@ -5,7 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/core/utils/async_feedback.dart';
+import 'package:pos_app/features/printing/data/android_sdk.dart';
 import 'package:pos_app/features/printing/domain/receipt_printer.dart';
+import 'package:pos_app/features/printing/domain/scan_permissions.dart';
 
 class PrinterSetupScreen extends ConsumerStatefulWidget {
   const PrinterSetupScreen({super.key});
@@ -61,24 +63,88 @@ class _PrinterSetupScreenState extends ConsumerState<PrinterSetupScreen> {
   }
 
   /// Android 12+ gates Bluetooth scanning and connecting behind runtime
-  /// permissions; without them the scan silently finds nothing.
+  /// permissions; without them the scan silently finds nothing. Android 11
+  /// and older gate BLE scan results behind fine location instead, so that
+  /// is asked for too — for the BLE driver only, and only on API 30 and
+  /// older (see [permissionsForScan]). Shows its own feedback on denial.
   Future<bool> _ensureBluetoothPermission() async {
-    final statuses = await [
-      Permission.bluetoothScan,
-      Permission.bluetoothConnect,
-    ].request();
-    return statuses.values.every((s) => s.isGranted || s.isLimited);
+    final permissions = permissionsForScan(await AndroidSdk.sdkInt(), _driver);
+    final needsLocation = permissions.contains(Permission.locationWhenInUse);
+
+    final statuses = await permissions
+        .where((p) => p != Permission.locationWhenInUse)
+        .toList()
+        .request();
+    if (!statuses.values.every((s) => s.isGranted || s.isLimited)) {
+      _showPermissionSnackBar(
+        'Bluetooth permission is required',
+        offerSettings: statuses.values.any((s) => s.isPermanentlyDenied),
+      );
+      return false;
+    }
+
+    if (needsLocation) return _ensureLocationForBle();
+    return true;
+  }
+
+  /// Fine location for BLE scanning on Android 11 and older.
+  Future<bool> _ensureLocationForBle() async {
+    const location = Permission.locationWhenInUse;
+    var status = await location.status;
+    if (status.isGranted || status.isLimited) return true;
+
+    if (!status.isPermanentlyDenied) {
+      if (!mounted) return false;
+      final proceed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Location access'),
+          content: const Text(
+            'Android 11 and older require location access to find Bluetooth '
+            'printers. This app has no internet access, so your location '
+            'never leaves this device.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Not now'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Continue'),
+            ),
+          ],
+        ),
+      );
+      if (proceed == true) status = await location.request();
+    }
+
+    if (status.isGranted || status.isLimited) return true;
+    _showPermissionSnackBar(
+      'Bluetooth printers can\'t be found without location access. '
+      'Paired printers still work.',
+      offerSettings: status.isPermanentlyDenied,
+    );
+    return false;
+  }
+
+  void _showPermissionSnackBar(String message, {required bool offerSettings}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        action: offerSettings
+            ? const SnackBarAction(
+                label: 'Open settings',
+                onPressed: openAppSettings,
+              )
+            : null,
+      ),
+    );
   }
 
   Future<void> _startScan() async {
-    if (!await _ensureBluetoothPermission()) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Bluetooth permission is required')),
-        );
-      }
-      return;
-    }
+    if (!await _ensureBluetoothPermission()) return;
     setState(() {
       _scanning = true;
       _devices = [];
