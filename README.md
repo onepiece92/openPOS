@@ -79,7 +79,7 @@ HOLD -->
 
 ### Selling
 - Product grid or list, with search, category filter and favourites
-- Cart with per-line and whole-order discounts
+- Cart with whole-order discounts (amount or percent)
 - Cash payment with tendered amount and change, or card
 - Held tickets: park an order and resume it later
 - Table management for restaurants and cafes
