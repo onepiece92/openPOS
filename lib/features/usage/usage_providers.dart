@@ -23,8 +23,30 @@ import 'package:pos_app/features/usage/usage_constants.dart';
 /// The on-device usage counter of this container. Count with
 /// `ref.read(usageCounterProvider).record(UsageEvent.x)` — synchronous,
 /// never awaited.
+///
+/// On/off is the Usage counting feature switch (the same flag as "Stop
+/// counting"), followed with `listen` so the counter itself is never
+/// rebuilt. Without a settings box (Hive not open: an error screen, some
+/// tests) it keeps the default.
 final usageCounterProvider = Provider<UsageCounter>((ref) {
-  final c = UsageCounter();
+  var on = kUsageCountingDefaultOn;
+  try {
+    on = ref.read(featureOnProvider(Feature.usageCounting));
+  } catch (_) {/* no settings box */}
+  final c = UsageCounter(
+    countingOn: on,
+    onCarriedCountingChoice: (v) async {
+      try {
+        await ref
+            .read(settingsProvider.notifier)
+            .setFeature(Feature.usageCounting, v);
+      } catch (_) {/* no settings box */}
+    },
+  );
+  try {
+    ref.listen(featureOnProvider(Feature.usageCounting),
+        (_, on) => c.countingEnabled = on);
+  } catch (_) {/* no settings box */}
   ref.onDispose(c.dispose);
   return c;
 });

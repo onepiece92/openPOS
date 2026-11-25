@@ -91,26 +91,55 @@ void main() {
     final c = counter();
     await c.ensureLoaded();
     c.record(UsageEvent.expenseAdded);
-    await c.setCountingEnabled(false);
-    expect(box.get(kUsageCountingOnKey), isFalse);
+    c.countingEnabled = false; // the Usage counting switch, via the provider
+    expect(box.containsKey(kUsageCountingOnKey), isFalse,
+        reason: 'the switch lives in the settings box, not here');
     c.record(UsageEvent.expenseAdded);
     c.record(UsageEvent.backupCreated);
     expect(c.counts[UsageEvent.expenseAdded]!.count, 1);
     expect(c.counts[UsageEvent.backupCreated], isNull);
-    await c.setCountingEnabled(true);
+    c.countingEnabled = true;
     c.record(UsageEvent.backupCreated);
     expect(c.counts[UsageEvent.backupCreated]!.count, 1);
   });
 
-  test('a stored "off" drops counts buffered before the load', () async {
+  test('a carried "off" (older install, restore merge) turns the switch '
+      'off, drops counts buffered before the load, and is deleted', () async {
     await box.put(kUsageCountingOnKey, false);
-    final c = counter();
+    final applied = <bool>[];
+    final c = UsageCounter(
+        openBox: () async => box,
+        clock: () => now,
+        onCarriedCountingChoice: (v) async => applied.add(v));
     c.record(UsageEvent.saleCompleted);
     await c.ensureLoaded();
+    expect(applied, [false]);
     expect(c.countingEnabled, isFalse);
     expect(c.counts, isEmpty);
+    expect(box.containsKey(kUsageCountingOnKey), isFalse);
     await c.flush();
     expect(stored(), isEmpty);
+  });
+
+  test('a carried "on" turns the switch back on', () async {
+    await box.put(kUsageCountingOnKey, true);
+    final applied = <bool>[];
+    final c = UsageCounter(
+        openBox: () async => box,
+        countingOn: false,
+        onCarriedCountingChoice: (v) async => applied.add(v));
+    await c.ensureLoaded();
+    expect(applied, [true]);
+    expect(c.countingEnabled, isTrue);
+    expect(box.containsKey(kUsageCountingOnKey), isFalse);
+  });
+
+  test('switch off from the start: nothing is counted', () async {
+    final c = UsageCounter(openBox: () async => box, countingOn: false);
+    c.record(UsageEvent.saleCompleted);
+    await c.ensureLoaded();
+    c.record(UsageEvent.saleCompleted);
+    expect(c.counts, isEmpty);
   });
 
   test('months: first and last month are tracked, even if the clock goes back',
@@ -149,7 +178,6 @@ void main() {
     for (final e in UsageEvent.values) {
       c.record(e);
     }
-    await c.setCountingEnabled(true);
     await c.markDisclosureShown();
     await c.markAsked('1.1.0+10');
     await c.flush();
@@ -158,6 +186,7 @@ void main() {
       kUsageCountingOnKey,
       kUsageDisclosureShownKey,
       kUsageAskedVersionKey,
+      kUsageReviewUnavailableSinceKey,
     };
     expect(box.keys.toSet().difference(allowed), isEmpty);
   });

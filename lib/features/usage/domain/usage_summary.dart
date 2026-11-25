@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart' show immutable;
 // `characters` comes with Flutter (re-exported by widgets.dart).
 import 'package:flutter/widgets.dart' show StringCharacters;
 
+import 'package:pos_app/features/onboarding/domain/business_type.dart';
 import 'package:pos_app/features/usage/domain/usage_event.dart';
 import 'package:pos_app/features/usage/usage_constants.dart';
 
@@ -110,6 +111,7 @@ class UsageSelection {
     this.tickedAreas = const {},
     this.appInfo = false,
     this.shopSize = false,
+    this.businessType = false,
   });
 
   /// Areas the shopkeeper wants improved (the "Improve:" line).
@@ -124,6 +126,9 @@ class UsageSelection {
   /// Include the shop-size ranges.
   final bool shopSize;
 
+  /// Include the business type chosen in setup (one fixed label).
+  final bool businessType;
+
   /// Picking an area pre-ticks its counters; un-picking unticks them.
   UsageSelection togglePicked(FeatureArea a) {
     final on = !picked.contains(a);
@@ -132,6 +137,7 @@ class UsageSelection {
       tickedAreas: on ? {...tickedAreas, a} : ({...tickedAreas}..remove(a)),
       appInfo: appInfo,
       shopSize: shopSize,
+      businessType: businessType,
     );
   }
 
@@ -142,16 +148,33 @@ class UsageSelection {
             : {...tickedAreas, a},
         appInfo: appInfo,
         shopSize: shopSize,
+        businessType: businessType,
       );
 
   UsageSelection withAppInfo(bool v) => UsageSelection(
-      picked: picked, tickedAreas: tickedAreas, appInfo: v, shopSize: shopSize);
+      picked: picked,
+      tickedAreas: tickedAreas,
+      appInfo: v,
+      shopSize: shopSize,
+      businessType: businessType);
 
   UsageSelection withShopSize(bool v) => UsageSelection(
-      picked: picked, tickedAreas: tickedAreas, appInfo: appInfo, shopSize: v);
+      picked: picked,
+      tickedAreas: tickedAreas,
+      appInfo: appInfo,
+      shopSize: v,
+      businessType: businessType);
+
+  UsageSelection withBusinessType(bool v) => UsageSelection(
+      picked: picked,
+      tickedAreas: tickedAreas,
+      appInfo: appInfo,
+      shopSize: shopSize,
+      businessType: v);
 
   /// Any usage data ticked at all.
-  bool get hasData => tickedAreas.isNotEmpty || appInfo || shopSize;
+  bool get hasData =>
+      tickedAreas.isNotEmpty || appInfo || shopSize || businessType;
 }
 
 /// The message as it will be sent: trimmed and cut to
@@ -198,6 +221,7 @@ String buildUsageSummary({
   required Map<UsageEvent, UsageCount> counts,
   required UsageEnvironment env,
   required ShopSizeCounts? shop,
+  BusinessType? businessType,
 }) {
   final lines = <String>[kUsageSummaryHeader];
   final picked = [
@@ -239,6 +263,11 @@ String buildUsageSummary({
     lines.add('Shop size: products ${sizeBucket(shop.products)}'
         ', orders in last 7 days ${sizeBucket(shop.ordersLast7Days)}'
         ', customers ${sizeBucket(shop.customers)}');
+  }
+
+  // A fixed label from the enum, never stored text.
+  if (selection.businessType && businessType != null) {
+    lines.add('Business type: ${businessType.usageLabel}');
   }
 
   final text = normalizeFeedbackMessage(message);

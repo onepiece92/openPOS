@@ -72,7 +72,10 @@ void main() {
         DateTime(2026, 1, 1).toIso8601String());
     final box = Hive.box<dynamic>(kUsageBoxName);
     expect(readUsageCounts(box)[UsageEvent.csvExported]!.count, 9);
-    expect(box.get(kUsageCountingOnKey), isFalse);
+    // The device's counting choice is back on the Usage counting switch.
+    expect(box.containsKey(kUsageCountingOnKey), isFalse);
+    expect((Hive.box<dynamic>('settings').get('features_v1') as Map)
+        ['usageCounting'], isFalse);
     expect(box.get(kUsageAskedVersionKey), '1.1.0+10');
   });
 

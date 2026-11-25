@@ -115,6 +115,9 @@ class _UsageHostState extends ConsumerState<UsageHost> {
     if (restartNoticeShowing.value) return; // retried when it ends
     if (!_counter.isLoaded || _counter.disclosureShown) return;
     if (!ref.read(onboardingCompleteProvider)) return;
+    // Nothing is counted: nothing to disclose (yet — it shows if counting
+    // is switched on later and the app restarts).
+    if (!ref.read(featureOnProvider(Feature.usageCounting))) return;
     final messenger = ScaffoldMessenger.maybeOf(context);
     if (messenger == null) return;
     _disclosing = true;

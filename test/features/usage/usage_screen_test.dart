@@ -123,6 +123,27 @@ void main() {
     expect(preview(tester), isNot(contains('offline')));
   });
 
+  testWidgets('Business type box: only with a stored type; unticked',
+      (tester) async {
+    await pump(tester);
+    expect(find.byKey(const ValueKey('tick-business-type')), findsNothing);
+
+    await settings.put(kBusinessType, 'restaurant');
+    await tester.pumpWidget(const SizedBox());
+    await pump(tester);
+    final box = find.byKey(const ValueKey('tick-business-type'));
+    expect(tester.widget<CheckboxListTile>(box).value, isFalse);
+    expect(preview(tester), isNot(contains('Business type')));
+    await tap(tester, 'tick-business-type');
+    expect(preview(tester), contains('Business type: restaurant with tables'));
+  });
+
+  testWidgets('a corrupted stored type: no box, no line', (tester) async {
+    await settings.put(kBusinessType, 'pub');
+    await pump(tester);
+    expect(find.byKey(const ValueKey('tick-business-type')), findsNothing);
+  });
+
   testWidgets('says screen counts are times shown (UI only, not sent)',
       (tester) async {
     await pump(tester);
@@ -284,15 +305,22 @@ void main() {
     expect(splitSummary(preview(tester)).message, 'y' * 500);
   });
 
-  testWidgets('"Stop counting" is honoured at once; Reset asks first',
-      (tester) async {
+  testWidgets(
+      '"Stop counting" is the Usage counting feature switch; off hides the '
+      'counts and Reset; Reset asks first', (tester) async {
     await pump(tester);
     await tap(tester, 'stop-counting');
-    expect(counter.countingEnabled, isFalse);
-    expect(usageBox.get(kUsageCountingOnKey), isFalse);
-    counter.record(UsageEvent.saleCompleted);
-    expect(counter.counts[UsageEvent.saleCompleted]!.count, 2);
+    expect((settings.get(kFeaturesKey) as Map)['usageCounting'], isFalse,
+        reason: 'one flag: features_v1, the same as Features');
+    expect(usageBox.containsKey(kUsageCountingOnKey), isFalse);
+    expect(find.byKey(const ValueKey('counting-off-note')), findsOneWidget);
+    expect(find.byKey(const ValueKey('reset-usage')), findsNothing);
+    expect(find.text('saleCompleted: 2'), findsNothing);
+    expect(counter.counts[UsageEvent.saleCompleted]!.count, 2,
+        reason: 'counts are kept');
 
+    await tap(tester, 'stop-counting');
+    expect((settings.get(kFeaturesKey) as Map)['usageCounting'], isTrue);
     await tap(tester, 'reset-usage');
     expect(find.text('Reset usage counts?'), findsOneWidget);
     await tester.tap(find.text('Cancel'));
