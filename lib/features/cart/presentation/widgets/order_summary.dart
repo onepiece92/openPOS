@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pos_app/core/utils/percent.dart';
 import 'package:pos_app/core/theme/tokens.dart';
 import 'package:pos_app/core/utils/currency_formatter.dart';
 import 'package:pos_app/shared/widgets/app_sheet.dart';
@@ -37,7 +38,7 @@ class OrderSummary extends ConsumerWidget {
           // ── Discount row ─────────────────────────────────────────────
           _TappableRow(
             label: summary.orderDiscount > 0
-                ? 'Discount${session.orderDiscountIsPercent ? ' (${session.orderDiscount.toStringAsFixed(1)}%)' : ''}'
+                ? 'Discount${session.orderDiscountIsPercent ? ' (${formatPercent(session.orderDiscount)})' : ''}'
                 : '+ Add Discount',
             value: summary.orderDiscount > 0
                 ? '− ${fmt.format(summary.orderDiscount)}'
@@ -49,10 +50,10 @@ class OrderSummary extends ConsumerWidget {
             onTap: () => _showDiscountSheet(context, ref, session, summary.subtotal),
           ),
           const SizedBox(height: 6),
-          // ── Tax rows (one per selected rate) ─────────────────────────
+          // ── Tax row (a cart carries one rate) ────────────────────────
           ...summary.taxLines.map((line) {
             final label =
-                '${line.name} (${(line.rate * 100).toStringAsFixed(1)}%'
+                '${line.name} (${formatRatePercent(line.rate)}'
                 '${line.isInclusive ? ', incl.' : ''})';
             return Padding(
               padding: const EdgeInsets.only(bottom: 4),
@@ -82,9 +83,8 @@ class OrderSummary extends ConsumerWidget {
                   ),
                   const SizedBox(width: 4),
                   GestureDetector(
-                    onTap: () => ref
-                        .read(selectedTaxRatesProvider.notifier)
-                        .remove(line.taxRateId),
+                    onTap: () =>
+                        ref.read(selectedTaxRatesProvider.notifier).clear(),
                     child: Icon(Icons.close_rounded,
                         size: 14, color: cs.onSurfaceVariant),
                   ),
@@ -104,7 +104,7 @@ class OrderSummary extends ConsumerWidget {
           }),
           // ── Add Tax button ────────────────────────────────────────────
           _TappableRow(
-            label: '+ Add Tax',
+            label: summary.taxLines.isEmpty ? '+ Add Tax' : 'Change Tax',
             value: null,
             addColor: cs.primary,
             tt: tt,
@@ -175,7 +175,7 @@ class _TaxPickerSheet extends ConsumerWidget {
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-          child: Text('Select Tax Rates', style: tt.titleMedium),
+          child: Text('Select Tax Rate', style: tt.titleMedium),
         ),
         Expanded(
           child: allRates.isEmpty
@@ -190,18 +190,26 @@ class _TaxPickerSheet extends ConsumerWidget {
                     final rate = allRates[i];
                     final selected = selectedIds.contains(rate.id);
                     final label =
-                        '${rate.name} (${(rate.rate * 100).toStringAsFixed(1)}%'
+                        '${rate.name} (${formatRatePercent(rate.rate)}'
                         '${rate.inclusionType == 'inclusive' ? ', incl.' : ''})';
-                    return CheckboxListTile(
-                      value: selected,
+                    // One rate per sale: choosing a rate replaces the
+                    // previous one; tapping the chosen rate removes it.
+                    return ListTile(
+                      leading: Icon(
+                        selected
+                            ? Icons.radio_button_checked_rounded
+                            : Icons.radio_button_unchecked_rounded,
+                        color: selected ? cs.primary : cs.onSurfaceVariant,
+                      ),
                       title: Text(label),
-                      onChanged: (v) {
+                      selected: selected,
+                      onTap: () {
                         final notifier = innerRef
                             .read(selectedTaxRatesProvider.notifier);
-                        if (v == true) {
-                          notifier.add(rate.id);
+                        if (selected) {
+                          notifier.clear();
                         } else {
-                          notifier.remove(rate.id);
+                          notifier.select(rate.id);
                         }
                       },
                     );

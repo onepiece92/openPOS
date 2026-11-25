@@ -67,18 +67,60 @@ void main() {
     expect(c.read(cartSessionProvider).taxEnabled, isFalse);
   });
 
-  test('selected tax rates survive hold → resume', () {
+  test('choosing a rate replaces the previous one: one rate per cart', () {
+    final rates = c.read(selectedTaxRatesProvider.notifier);
+    rates.select(7);
+    expect(c.read(selectedTaxRatesProvider), [7]);
+    rates.select(9);
+    expect(c.read(selectedTaxRatesProvider), [9]);
+    rates.clear();
+    expect(c.read(selectedTaxRatesProvider), isEmpty);
+  });
+
+  test('the selected tax rate survives hold → resume', () {
     c.read(cartProvider.notifier).addItem(item(1));
-    c.read(selectedTaxRatesProvider.notifier)
-      ..add(7)
-      ..add(9);
+    c.read(selectedTaxRatesProvider.notifier).select(9);
     c.read(heldOrdersProvider.notifier).holdCurrentCart();
     c.read(cartProvider.notifier).clear();
     expect(c.read(selectedTaxRatesProvider), isEmpty);
 
     resume(c.read(heldOrdersProvider).single);
 
-    expect(c.read(selectedTaxRatesProvider), [7, 9]);
+    expect(c.read(selectedTaxRatesProvider), [9]);
+  });
+
+  test('a ticket parked with several rates still loads, and resumes with '
+      'the first', () {
+    // Exactly what a build that allowed several rates per cart wrote.
+    box.put(
+        '#0008',
+        jsonEncode({
+          'id': '#0008',
+          'ticketNumber': '#0008',
+          'label': 'Ticket #0008',
+          'createdAt': DateTime(2026, 1, 1).toIso8601String(),
+          'taxRateIds': [7, 9],
+          'items': [
+            {
+              'productId': 1,
+              'name': 'P1',
+              'unitPrice': 10.0,
+              'quantity': 2,
+              'isTaxable': true,
+              'lineDiscount': 0.0,
+            }
+          ],
+        }));
+    final ticket = c.read(heldOrdersProvider).single;
+    expect(ticket.taxRateIds, [7, 9], reason: 'the ticket itself is untouched');
+
+    resume(ticket);
+    expect(c.read(selectedTaxRatesProvider), [7]);
+    expect(c.read(cartProvider).single.quantity, 2);
+
+    // Saving it again writes the single rate it now carries.
+    c.read(heldOrdersProvider.notifier).holdCurrentCart();
+    expect(c.read(heldOrdersProvider).single.taxRateIds, [7]);
   });
 
   test('a ticket held with every rate removed resumes with none', () {
@@ -86,7 +128,7 @@ void main() {
     c.read(heldOrdersProvider.notifier).holdCurrentCart();
     c.read(cartProvider.notifier).clear();
     // Something else is selected by the time the ticket comes back.
-    c.read(selectedTaxRatesProvider.notifier).add(3);
+    c.read(selectedTaxRatesProvider.notifier).select(3);
 
     resume(c.read(heldOrdersProvider).single);
 
@@ -97,7 +139,7 @@ void main() {
       () {
     c.read(cartProvider.notifier).addItem(item(1));
     c.read(cartSessionProvider.notifier).setTaxEnabled(false);
-    c.read(selectedTaxRatesProvider.notifier).add(7);
+    c.read(selectedTaxRatesProvider.notifier).select(7);
     c.read(heldOrdersProvider.notifier).holdCurrentCart();
     c.read(cartProvider.notifier).clear();
 
@@ -141,7 +183,7 @@ void main() {
     expect(ticket.items.single.quantity, 2);
 
     c.read(cartSessionProvider.notifier).setTaxEnabled(false);
-    c.read(selectedTaxRatesProvider.notifier).add(3);
+    c.read(selectedTaxRatesProvider.notifier).select(3);
     resume(ticket);
 
     // Old behaviour: tax on, rates back to the store default (none here).

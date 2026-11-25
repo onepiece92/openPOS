@@ -52,8 +52,9 @@ class CartSessionNotifier extends Notifier<CartSession> {
   /// metadata so a later save updates that ticket rather than minting a new
   /// one. No counter value is consumed — the ticket already owns its number.
   ///
-  /// The tax switch and selected rates come back with it, so the total is
-  /// what it was when the ticket was parked. Tickets saved before tax state
+  /// The tax switch and selected rate come back with it, so the total is
+  /// what it was when the ticket was parked (a ticket parked with several
+  /// rates, from before carts were limited to one, keeps its first). Tickets saved before tax state
   /// was stored carry none: they resume with tax on and whatever rates are
   /// currently selected (the store default after a clearItems).
   void resumeTicket(HeldOrder ticket) {
@@ -79,6 +80,9 @@ final cartSessionProvider =
 
 // ─── Selected tax rates ───────────────────────────────────────────────────────
 
+/// The tax rate applied to the cart. A sale carries one rate, so the list
+/// holds at most one id (it stays a list because held tickets and the
+/// calculator are written in terms of "the selected rates").
 class SelectedTaxRatesNotifier extends Notifier<List<int>> {
   @override
   List<int> build() {
@@ -86,14 +90,15 @@ class SelectedTaxRatesNotifier extends Notifier<List<int>> {
     return defaultId != null ? [defaultId] : [];
   }
 
-  void add(int id) {
-    if (!state.contains(id)) state = [...state, id];
-  }
+  /// Makes [id] the cart's rate, replacing whichever was selected.
+  void select(int id) => state = [id];
 
-  void remove(int id) => state = state.where((x) => x != id).toList();
+  /// No tax rate on this cart.
+  void clear() => state = [];
 
-  /// Reinstates the rates a held ticket was parked with.
-  void restore(List<int> ids) => state = [...ids];
+  /// Reinstates the rate a held ticket was parked with. Tickets saved when
+  /// a cart could carry several rates come back with the first of them.
+  void restore(List<int> ids) => state = ids.isEmpty ? [] : [ids.first];
 
   void reset() {
     final defaultId = ref.read(defaultTaxIdProvider);
@@ -156,7 +161,7 @@ class CartNotifier extends Notifier<List<CartItem>> {
     state = [
       for (final item in state)
         if (item.sameLine(productId, unitLabel))
-          item.copyWith(quantity: qty)
+          item.withQuantity(qty)
         else
           item,
     ];
@@ -189,11 +194,14 @@ class CartNotifier extends Notifier<List<CartItem>> {
         state.where((i) => !i.sameLine(productId, unitLabel)).toList();
   }
 
+  /// Sets a line's flat discount, capped at the line's gross amount (unit
+  /// price × quantity) — not at what a previous discount left of it.
+  /// [setQuantity] re-applies the cap when the line shrinks.
   void setDiscount(int productId, double discount, {String unitLabel = ''}) {
     state = [
       for (final item in state)
         if (item.sameLine(productId, unitLabel))
-          item.copyWith(lineDiscount: discount.clamp(0, item.lineSubtotal))
+          item.withDiscount(discount)
         else
           item,
     ];

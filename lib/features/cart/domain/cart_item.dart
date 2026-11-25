@@ -43,7 +43,20 @@ class CartItem {
   bool sameLine(int productId, String unitLabel) =>
       this.productId == productId && this.unitLabel == unitLabel;
 
+  /// The line before its discount: unit price × quantity.
+  double get grossAmount => roundMoney(unitPrice * quantity);
+
   double get lineSubtotal => roundMoney((unitPrice * quantity) - lineDiscount);
+
+  /// This line with [discount] as its flat discount, held between nothing
+  /// and the whole line ([grossAmount]) so the line can never go negative.
+  CartItem withDiscount(double discount) => copyWith(
+      lineDiscount: roundMoney(discount.clamp(0.0, grossAmount).toDouble()));
+
+  /// This line at [quantity], with its discount re-capped: a discount that
+  /// fitted 4 units may be more than 1 unit is worth.
+  CartItem withQuantity(int quantity) =>
+      copyWith(quantity: quantity).withDiscount(lineDiscount);
 
   CartItem copyWith({int? quantity, double? lineDiscount}) => CartItem(
         productId: productId,
