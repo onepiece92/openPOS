@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pos_app/core/app_version.dart';
 import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -109,8 +110,8 @@ class SupportScreen extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           _SectionHeader('App Info', tt, cs),
-          _InfoRow(label: 'Version', value: '1.0.0', cs: cs, tt: tt),
-          _InfoRow(label: 'Build', value: '2026.03', cs: cs, tt: tt),
+          _InfoRow(label: 'Version', value: kAppVersion, cs: cs, tt: tt),
+          _InfoRow(label: 'Build', value: kAppBuildNumber, cs: cs, tt: tt),
         ],
       ),
     );
