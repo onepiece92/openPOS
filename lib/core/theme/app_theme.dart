@@ -147,10 +147,14 @@ abstract final class AppTheme {
 
   // ── Light theme ───────────────────────────────────────────────────────────
 
-  static ThemeData light() {
-    final scheme = _lightScheme();
-    return _build(scheme, _textTheme(Brightness.light));
-  }
+  // Both themes depend on nothing at runtime, so each is built once and
+  // reused: POSApp.build asks for them on every rebuild.
+  static final ThemeData _light =
+      _build(_lightScheme(), _textTheme(Brightness.light));
+  static final ThemeData _dark =
+      _build(_darkScheme(), _textTheme(Brightness.dark));
+
+  static ThemeData light() => _light;
 
   static ColorScheme _lightScheme() =>
       ColorScheme.fromSeed(seedColor: _seed, brightness: Brightness.light)
@@ -174,10 +178,7 @@ abstract final class AppTheme {
 
   // ── Dark theme ────────────────────────────────────────────────────────────
 
-  static ThemeData dark() {
-    final scheme = _darkScheme();
-    return _build(scheme, _textTheme(Brightness.dark));
-  }
+  static ThemeData dark() => _dark;
 
   static ColorScheme _darkScheme() =>
       ColorScheme.fromSeed(seedColor: _seed, brightness: Brightness.dark)

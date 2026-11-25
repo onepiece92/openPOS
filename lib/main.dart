@@ -10,9 +10,9 @@ Future<void> main() async {
   // Open Hive boxes before the ProviderContainer exists so providers can
   // read synchronously. The DB itself is owned by databaseProvider.
   await Hive.initFlutter();
-  for (final name in kSnapshotHiveBoxes) {
-    await Hive.openBox<dynamic>(name);
-  }
+  await Future.wait([
+    for (final name in kSnapshotHiveBoxes) Hive.openBox<dynamic>(name),
+  ]);
 
   runApp(const AppRoot());
 }
