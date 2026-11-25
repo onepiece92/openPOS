@@ -34,7 +34,22 @@ class _HeldTicketsBarState extends ConsumerState<HeldTicketsBar>
     _ctrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2800),
-    )..repeat();
+    );
+    // The comet only runs while there is a bar to draw it on. Left running
+    // unconditionally it scheduled a frame every vsync on the sell screen
+    // even with no held tickets. (While another page covers this route the
+    // framework's TickerMode mutes the ticker on its own.)
+    ref.listenManual(
+      activeHeldOrdersProvider.select((tickets) => tickets.isNotEmpty),
+      (_, hasTickets) {
+        if (hasTickets) {
+          if (!_ctrl.isAnimating) _ctrl.repeat();
+        } else {
+          _ctrl.stop();
+        }
+      },
+      fireImmediately: true,
+    );
   }
 
   @override
@@ -98,11 +113,15 @@ class _HeldTicketsBarState extends ConsumerState<HeldTicketsBar>
                   ],
                 ),
               ),
+              // Own layer: the border repaints every frame, the bar's
+              // text and everything around it does not.
               Positioned.fill(
-                child: AnimatedBuilder(
-                  animation: _ctrl,
-                  builder: (_, __) => CustomPaint(
-                    painter: TronBorderPainter(_ctrl.value),
+                child: RepaintBoundary(
+                  child: AnimatedBuilder(
+                    animation: _ctrl,
+                    builder: (_, __) => CustomPaint(
+                      painter: TronBorderPainter(_ctrl.value),
+                    ),
                   ),
                 ),
               ),
