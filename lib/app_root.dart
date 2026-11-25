@@ -15,6 +15,7 @@ import 'package:pos_app/features/backup/data/snapshot_providers.dart';
 import 'package:pos_app/features/backup/data/snapshot_service.dart';
 import 'package:pos_app/features/help/support_contact.dart';
 import 'package:pos_app/features/review/data/review_state_store.dart';
+import 'package:pos_app/features/review/domain/review_policy.dart';
 import 'package:pos_app/features/usage/data/usage_counter.dart';
 import 'package:pos_app/features/usage/domain/usage_event.dart';
 import 'package:pos_app/features/usage/usage_providers.dart';
@@ -63,6 +64,19 @@ class AppRootState extends State<AppRoot> {
   Future<void>? _autoBackupRun; // in flight; a restore waits for it
 
   late final DatabaseExitGuard _exitGuard;
+
+  /// Bookkeeping captured by a restore that ended on the error screen. If
+  /// "Try again" then finds the restore was in fact accepted
+  /// ([RestoreRecovery.completed]: its commit line was written but could
+  /// not be confirmed), it is merged back as after a normal restore.
+  ReviewState? _pendingReviewMerge;
+  UsageSnapshot? _pendingUsageMerge;
+
+  @visibleForTesting
+  void debugSetPendingRestoreMerge(ReviewState? review, UsageSnapshot? usage) {
+    _pendingReviewMerge = review;
+    _pendingUsageMerge = usage;
+  }
 
   @visibleForTesting
   bool get autoBackupScheduledForTest => _autoBackupTimer != null;
@@ -204,6 +218,9 @@ class AppRootState extends State<AppRoot> {
         } on RestoreFatalException catch (e) {
           error = e;
           fatal = '$e';
+          // The disk may hold the backup (see _retryOpen).
+          _pendingReviewMerge = reviewBefore;
+          _pendingUsageMerge = usageBefore;
         } on RestoreRolledBackException catch (e) {
           error = e;
           notice = 'Restore failed: $e';
@@ -303,6 +320,19 @@ class AppRootState extends State<AppRoot> {
       // startUp() skipped this when recovery failed; no-op otherwise.
       await startReviewClock();
       notice = restoreRecoveryNotice(recovered);
+      final review = _pendingReviewMerge;
+      final usage = _pendingUsageMerge;
+      _pendingReviewMerge = null;
+      _pendingUsageMerge = null;
+      if (recovered == RestoreRecovery.completed &&
+          (review != null || usage != null)) {
+        // The restore this error screen came from was accepted after all:
+        // say so, and finish it like a normal one.
+        notice = kRestoreCompletedOnRetryNotice;
+        await mergeReviewStateAfterRestore(review); // never throws
+        await mergeUsageAfterRestore(usage); // never throws
+        _container.read(usageCounterProvider).record(UsageEvent.backupRestored);
+      }
     } catch (e) {
       fatal = 'Still unable to open the app data: $e';
     } finally {
@@ -393,11 +423,13 @@ class _RestoreFailedScreen extends StatelessWidget {
                       child: const Text('Try again'),
                     ),
                     const SizedBox(height: 8),
-                    TextButton.icon(
-                      onPressed: openSupportWhatsApp,
-                      icon: const Icon(Icons.chat_rounded),
-                      label: const Text(
-                          'Contact support on WhatsApp ($kSupportWhatsAppDisplay)'),
+                    Builder(
+                      builder: (context) => TextButton.icon(
+                        onPressed: () => openSupportWhatsAppOrExplain(context),
+                        icon: const Icon(Icons.chat_rounded),
+                        label: const Text('Contact support on WhatsApp '
+                            '($kSupportWhatsAppDisplay)'),
+                      ),
                     ),
                   ],
                 ),
@@ -428,7 +460,7 @@ class _NoticeOverlayState extends State<_NoticeOverlay> {
   @override
   void initState() {
     super.initState();
-    Future<void>.delayed(const Duration(seconds: 4), () {
+    Future<void>.delayed(restartNoticeDuration(widget.message), () {
       if (mounted) widget.onDone();
     });
   }

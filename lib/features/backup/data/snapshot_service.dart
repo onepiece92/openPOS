@@ -573,15 +573,22 @@ class SnapshotService {
   /// * No journal: removes staged leftovers of a restore killed before its
   ///   swap began, and puts back a DB or box that is missing while its
   ///   `.bak` exists (a kill in a pre-journal build, or a power cut that
-  ///   lost the journal's directory entry) → `recoveredWithoutJournal` if
-  ///   anything was put back, else [RestoreRecovery.none]. A few `exists`
-  ///   checks when there is nothing to do.
+  ///   lost the journal's directory entry) →
+  ///   [RestoreRecovery.missingFilesPutBack] if anything was put back,
+  ///   else [RestoreRecovery.none]. A few `exists` checks when there is
+  ///   nothing to do.
   /// * Committed journal: finishes the cleanup → `completed`.
   /// * Otherwise every planned move is undone from the disk's state, so
   ///   the app comes back on the data it had before → `rolledBack`.
   /// * Unreadable journal: state-based recovery that prefers each `.bak`
   ///   ([_recoverFromBaks]), journal moved to `*.corrupt` →
-  ///   `recoveredWithoutJournal`.
+  ///   [RestoreRecovery.recoveredWithoutJournal] when a `.bak` was put
+  ///   back, [RestoreRecovery.recoveredWithoutJournalUncertain] when there
+  ///   was none to put back (the disk may hold either data set).
+  ///
+  /// Leftovers removed in every case: staged `*.restore.tmp` files and the
+  /// journal's own `*.tmp` from an interrupted [RestoreJournal]
+  /// rewrite.
   ///
   /// Throws if the disk can't be put right; the journal then stays, so a
   /// retry picks up where this left off.
@@ -596,6 +603,8 @@ class SnapshotService {
       for (final s in _sidecars) '${dbFile.path}$_tmpSuffix$s',
       for (final h in hivePaths) '$h$_tmpSuffix',
       if (receiptsDir != null) '${receiptsDir.path}$_tmpSuffix',
+      // RestoreJournal.rewriteUncommitted writes beside the journal first.
+      '${journal.path}.tmp',
     ];
     if (!journal.existsSync()) {
       // Only missing files: a live file beside a `.bak` is normal after a
@@ -617,15 +626,20 @@ class SnapshotService {
     } on RestoreJournalFormatException {
       // Corrupt or unknown-version journal. A future journal version must
       // never land here: see RestoreJournal.version.
-      await _recoverFromBaks(
+      final changed = await _recoverFromBaks(
           dbFile: dbFile,
           hivePaths: hivePaths,
           receiptsDir: receiptsDir,
           overLive: true);
       await _deleteAll(leftovers);
       await journal.rename('${journal.path}$corruptJournalSuffix');
-      return RestoreRecovery.recoveredWithoutJournal;
+      return changed
+          ? RestoreRecovery.recoveredWithoutJournal
+          : RestoreRecovery.recoveredWithoutJournalUncertain;
     }
+    // A rewrite killed before its rename: the journal above is the real
+    // one, the temp copy is garbage.
+    await _deleteIfExists(File('${journal.path}.tmp'));
     if (c.committed) {
       await _finishCommitted(
           plan: c.plan,
@@ -1291,6 +1305,10 @@ enum RestoreRecovery {
   /// was put back over its live file, which normally restores the
   /// previous data. Receipt photos the restore added may remain.
   recoveredWithoutJournal,
+
+  /// The journal was unreadable and there was no `.bak` to put back, so
+  /// it is not certain which data the disk holds.
+  recoveredWithoutJournalUncertain,
 
   /// No journal, but the DB or a box was missing while its `.bak` existed
   /// (a kill in a pre-journal build, or a lost journal); the `.bak` was

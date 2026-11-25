@@ -41,7 +41,7 @@ class SupportScreen extends ConsumerWidget {
             subtitle: kSupportWhatsAppDisplay,
             cs: cs,
             tt: tt,
-            onTap: openSupportWhatsApp,
+            onTap: () => openSupportWhatsAppOrExplain(context),
           ),
           const SizedBox(height: 20),
           _SectionHeader('Resources', tt, cs),

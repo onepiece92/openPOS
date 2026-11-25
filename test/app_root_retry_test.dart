@@ -12,6 +12,10 @@ import 'package:pos_app/features/backup/data/restore_journal.dart';
 import 'package:pos_app/features/backup/data/snapshot_providers.dart';
 import 'package:pos_app/features/backup/data/snapshot_service.dart';
 import 'package:pos_app/features/review/data/review_state_store.dart';
+import 'package:pos_app/features/review/domain/review_policy.dart';
+import 'package:pos_app/features/usage/data/usage_counter.dart';
+import 'package:pos_app/features/usage/domain/usage_event.dart';
+import 'package:pos_app/features/usage/domain/usage_summary.dart';
 
 /// Pumps, letting real async work (file IO, isolates) run between frames,
 /// until [done] holds. Fails rather than hangs if it never does.
@@ -94,6 +98,60 @@ void main() {
         await Future<void>.delayed(const Duration(milliseconds: 200));
       });
     });
+
+    testWidgets(
+        'retry that finds the restore committed says so and merges back',
+        (tester) async {
+      await tester.pumpWidget(AppRoot(
+        startupFatal: 'Restore failed (x) and the app could not reopen',
+        recoverForRetry: () async => RestoreRecovery.completed,
+      ));
+      tester
+          .state<AppRootState>(find.byType(AppRoot))
+          .debugSetPendingRestoreMerge(
+            ReviewState(
+                firstLaunchAt: DateTime(2026, 1, 1),
+                lastPromptAt: DateTime(2026, 10, 1),
+                lastPromptVersion: '1.1.0+10',
+                lastPromptShownAt: DateTime(2026, 10, 1)),
+            const UsageSnapshot(counts: {
+              UsageEvent.saleCompleted:
+                  UsageCount(42, firstMonth: '2026-05', lastMonth: '2026-11'),
+            }, countingOn: true),
+          );
+      await tester.runAsync(() => tester.tap(find.text('Try again')));
+      final toast = find.text(kRestoreCompletedOnRetryNotice);
+      await pumpUntil(tester, () => toast.evaluate().isNotEmpty);
+      expect(kRestoreCompletedOnRetryNotice, 'The backup was restored.');
+      final review = ReviewStateStore(Hive.box<dynamic>('settings')).read();
+      expect(review.lastPromptAt, DateTime(2026, 10, 1));
+      expect(review.lastPromptShownAt, DateTime(2026, 10, 1));
+      final usage = Hive.box<dynamic>(kUsageBoxName);
+      expect(readUsageCounts(usage)[UsageEvent.saleCompleted]!.count, 42);
+      expect(usage.get(kUsageCountingOnKey), isTrue);
+
+      await tester.pump(const Duration(seconds: 5));
+      await tester.runAsync(() async {
+        await tester.pumpWidget(const SizedBox());
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+      });
+    });
+
+    testWidgets('a completed retry without a pending restore stays quiet',
+        (tester) async {
+      await tester.pumpWidget(AppRoot(
+        startupFatal: kRecoveryFailedMessage,
+        recoverForRetry: () async => RestoreRecovery.completed,
+      ));
+      await tester.runAsync(() => tester.tap(find.text('Try again')));
+      await pumpUntil(tester, () => Hive.isBoxOpen('settings'));
+      await tester.pump();
+      expect(find.text(kRestoreCompletedOnRetryNotice), findsNothing);
+      await tester.runAsync(() async {
+        await tester.pumpWidget(const SizedBox());
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+      });
+    });
   });
 
   testWidgets('failed recovery → error screen; retry reruns recovery first',
@@ -142,8 +200,28 @@ void main() {
         'backup may remain. Please check your recent records.');
     expect(
         restoreRecoveryNotice(RestoreRecovery.missingFilesPutBack),
-        'Data left from an interrupted restore was missing and has been put '
-        'back. Please check your recent records.');
+        'A restore was interrupted and some data was missing. The saved copy '
+        'was put back. Please check your recent records.');
+    expect(
+        restoreRecoveryNotice(RestoreRecovery.recoveredWithoutJournalUncertain),
+        "A restore was interrupted and its progress record couldn't be read. "
+        'Your previous data may have been put back. Please check your recent '
+        'records.');
+    // The two long recovery notices stay up twice as long.
+    for (final r in [
+      RestoreRecovery.recoveredWithoutJournal,
+      RestoreRecovery.recoveredWithoutJournalUncertain,
+      RestoreRecovery.missingFilesPutBack,
+    ]) {
+      expect(restartNoticeDuration(restoreRecoveryNotice(r)!),
+          const Duration(seconds: 8));
+    }
+    expect(
+        restartNoticeDuration('Backup restored'), const Duration(seconds: 4));
+    expect(
+        restartNoticeDuration(
+            restoreRecoveryNotice(RestoreRecovery.rolledBack)!),
+        const Duration(seconds: 4));
     // Every outcome is handled explicitly (no catch-all), and none of the
     // texts point users at files they can't reach.
     for (final r in RestoreRecovery.values) {

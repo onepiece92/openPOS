@@ -85,9 +85,7 @@ Future<UsageSendResult> sendUsageViaWhatsApp(
     );
     return UsageSendResult.sharedAsFile;
   }
-  return await launch(Uri.parse(link))
-      ? UsageSendResult.launched
-      : UsageSendResult.noApp;
+  return _tryLaunch(launch, link);
 }
 
 /// Hands [text] to the mail app, addressed to [kUsageEmailAddress].
@@ -97,9 +95,19 @@ Future<UsageSendResult> sendUsageViaEmail(
 }) async {
   final link =
       mailtoLink(kUsageEmailAddress, subject: kUsageEmailSubject, body: text);
-  return await launch(Uri.parse(link))
-      ? UsageSendResult.launched
-      : UsageSendResult.noApp;
+  return _tryLaunch(launch, link);
+}
+
+/// `launchUrl` returning false and a `PlatformException` (no app handles
+/// the link) both mean nothing opened.
+Future<UsageSendResult> _tryLaunch(LinkLauncher launch, String link) async {
+  try {
+    return await launch(Uri.parse(link))
+        ? UsageSendResult.launched
+        : UsageSendResult.noApp;
+  } catch (_) {
+    return UsageSendResult.noApp;
+  }
 }
 
 /// The summary as a UTF-8 .txt (named [kUsageSummaryFileName]) in [dir],

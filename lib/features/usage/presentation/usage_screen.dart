@@ -64,18 +64,24 @@ class _UsageScreenState extends ConsumerState<UsageScreen> {
       );
 
   Future<void> _send(String text, Future<UsageSendResult> Function() send,
-      ScaffoldMessengerState messenger) async {
+      ScaffoldMessengerState messenger,
+      {required String unavailable}) async {
     if (_sending) return;
     setState(() => _sending = true);
     try {
-      final r = await send();
+      var r = UsageSendResult.noApp;
+      try {
+        r = await send();
+      } catch (_) {/* e.g. the share sheet failed: same as nothing opened */}
       if (r == UsageSendResult.noApp) {
-        await Clipboard.setData(ClipboardData(text: text));
-        messenger.showSnackBar(const SnackBar(
-            content: Text('No app found. The summary was copied instead.')));
+        try {
+          await Clipboard.setData(ClipboardData(text: text));
+        } catch (_) {/* still say where to send it */}
+        messenger.showSnackBar(SnackBar(
+          content: Text(unavailable),
+          duration: const Duration(seconds: 8),
+        ));
       }
-    } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text('Could not send: $e')));
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -220,7 +226,8 @@ class _UsageScreenState extends ConsumerState<UsageScreen> {
                                     share: ref.read(shareFilesProvider),
                                     shareOrigin: origin,
                                     tempDir: ref.read(usageTempDirProvider)),
-                                messenger);
+                                messenger,
+                                unavailable: kUsageWhatsAppUnavailable);
                           },
                   ),
                 ),
@@ -237,7 +244,8 @@ class _UsageScreenState extends ConsumerState<UsageScreen> {
                           text,
                           () => sendUsageViaEmail(text,
                               launch: ref.read(linkLauncherProvider)),
-                          ScaffoldMessenger.of(context)),
+                          ScaffoldMessenger.of(context),
+                          unavailable: kUsageEmailUnavailable),
                 ),
               ),
             ],

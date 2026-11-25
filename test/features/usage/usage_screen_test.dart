@@ -1,7 +1,7 @@
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -37,6 +37,7 @@ void main() {
   late List<Uri> launched;
   late List<_Shared> shared;
   late Directory tmp;
+  late bool Function() launchBehaviour;
 
   setUp(() async {
     Hive.init('.');
@@ -54,6 +55,7 @@ void main() {
     launched = [];
     shared = [];
     tmp = Directory.systemTemp.createTempSync('pos_usage_share_');
+    launchBehaviour = () => true;
   });
   tearDown(() async {
     await db.close();
@@ -72,7 +74,7 @@ void main() {
         usageCounterProvider.overrideWithValue(counter),
         linkLauncherProvider.overrideWithValue((uri) async {
           launched.add(uri);
-          return true;
+          return launchBehaviour();
         }),
         usageTempDirProvider.overrideWithValue(() async => tmp),
         shareFilesProvider.overrideWithValue((files,
@@ -258,4 +260,39 @@ void main() {
     expect(counter.counts, isEmpty);
     expect(readUsageCounts(usageBox), isEmpty);
   });
+
+  for (final (label, behaviour) in <(String, bool Function())>[
+    ('returns false', () => false),
+    ('throws PlatformException',
+        () => throw PlatformException(code: 'ACTIVITY_NOT_FOUND')),
+  ]) {
+    testWidgets('when WhatsApp $label: copied, and the number is shown',
+        (tester) async {
+      final clip = <String>[];
+      tester.binding.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+        if (call.method == 'Clipboard.setData') {
+          clip.add((call.arguments as Map)['text'] as String);
+        }
+        return null;
+      });
+      addTearDown(() => tester.binding.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, null));
+      launchBehaviour = behaviour;
+      await pump(tester);
+      await tester.enterText(
+          find.byKey(const ValueKey('feedback-message')), 'Hello');
+      await tester.pumpAndSettle();
+      await tap(tester, 'send-whatsapp');
+      expect(find.text(kUsageWhatsAppUnavailable), findsOneWidget);
+      expect(kUsageWhatsAppUnavailable, contains('+977 9802850777'));
+      expect(clip, [preview(tester)]);
+
+      await tester.pump(const Duration(seconds: 10));
+      await tester.pumpAndSettle();
+      await tap(tester, 'send-email');
+      expect(find.text(kUsageEmailUnavailable), findsOneWidget);
+      expect(kUsageEmailUnavailable, contains(kUsageEmailAddress));
+    });
+  }
 }

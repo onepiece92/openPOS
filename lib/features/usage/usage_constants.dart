@@ -68,3 +68,12 @@ const kWhatsAppMaxUrlLength = 2000;
 
 /// File name of the .txt handed to the share sheet.
 const kUsageSummaryFileName = 'open-pos-usage-summary.txt';
+
+/// Shown (with the summary copied to the clipboard) when WhatsApp or the
+/// mail app did not open.
+const kUsageWhatsAppUnavailable =
+    "WhatsApp didn't open. The summary was copied. Send it on WhatsApp to "
+    '+977 9802850777.';
+const kUsageEmailUnavailable =
+    "No mail app opened. The summary was copied. Email it to "
+    '$kUsageEmailAddress.';

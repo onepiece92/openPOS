@@ -83,11 +83,25 @@ String? restoreRecoveryNotice(RestoreRecovery? r) => switch (r) {
         "A restore was interrupted and its progress record couldn't be "
             'read. Your previous data was put back, but some receipt photos '
             'from the backup may remain. Please check your recent records.',
+      RestoreRecovery.recoveredWithoutJournalUncertain =>
+        "A restore was interrupted and its progress record couldn't be "
+            'read. Your previous data may have been put back. Please check '
+            'your recent records.',
       RestoreRecovery.missingFilesPutBack =>
-        'Data left from an interrupted restore was missing and has been '
-            'put back. Please check your recent records.',
+        'A restore was interrupted and some data was missing. The saved '
+            'copy was put back. Please check your recent records.',
       RestoreRecovery.none || RestoreRecovery.completed || null => null,
     };
+
+/// Shown after "Try again" finds that the restore had in fact been
+/// accepted (its commit was recorded but the app could not confirm it).
+const kRestoreCompletedOnRetryNotice = 'The backup was restored.';
+
+/// How long a restart notice stays up: long ones (the recovery notices
+/// that ask the shopkeeper to check their records) get twice as long.
+Duration restartNoticeDuration(String message) => message.length > 60
+    ? const Duration(seconds: 8)
+    : const Duration(seconds: 4);
 
 const kReceiptsDirName = 'receipts';
 

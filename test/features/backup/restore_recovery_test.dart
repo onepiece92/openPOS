@@ -881,4 +881,38 @@ void main() {
       expect((r.notice, r.fatal), (null, null));
     });
   });
+
+  group('recovery follow-ups', () {
+    test('an unreadable journal with nothing to put back is "uncertain"',
+        () async {
+      await standardSetup();
+      journalIn(live).writeAsStringSync('}{');
+      expect(await recoverLive(),
+          RestoreRecovery.recoveredWithoutJournalUncertain);
+      File('${journalIn(live).path}.corrupt').deleteSync();
+      await expectLiveIsOriginal();
+      expect(
+          restoreRecoveryNotice(
+              RestoreRecovery.recoveredWithoutJournalUncertain),
+          contains('may have been put back'));
+    });
+
+    test('a journal rewrite killed before its rename leaves no .tmp',
+        () async {
+      final zip = await standardSetup();
+      final tmpJournal = File('${journalIn(live).path}.tmp');
+      expect(p.basename(tmpJournal.path),
+          'pos_database.db.restore.journal.tmp');
+      // No journal at all.
+      tmpJournal.writeAsStringSync('{"op":"begin"');
+      expect(await recoverLive(), RestoreRecovery.none);
+      expect(tmpJournal.existsSync(), isFalse);
+      // Beside a real, uncommitted journal.
+      await killAt(zip, 'db-aside');
+      tmpJournal.writeAsStringSync('junk');
+      expect(await recoverLive(), RestoreRecovery.rolledBack);
+      expect(tmpJournal.existsSync(), isFalse);
+      await expectLiveIsOriginal();
+    });
+  });
 }
