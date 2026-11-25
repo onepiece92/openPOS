@@ -13,6 +13,7 @@ import 'package:pos_app/core/database/connection/native.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/features/backup/data/snapshot_providers.dart';
 import 'package:pos_app/features/backup/data/snapshot_service.dart';
+import 'package:pos_app/features/review/data/review_state_store.dart';
 
 /// Owns the Riverpod container so the whole app can be hot-restarted —
 /// needed to restore a backup: close DB + Hive, swap files on disk, then
@@ -112,6 +113,10 @@ class AppRootState extends State<AppRoot> {
     final dbPath = (await databaseFile()).path;
     final hiveFiles = snapshotHiveBoxFiles();
     final zipPath = zip.path;
+    // Review-reminder bookkeeping lives in the settings box, which the
+    // restore replaces: remember it now, merge it back after the reopen so
+    // an older backup cannot move the last-prompt date backwards.
+    final reviewBefore = reviewStateBeforeRestore();
 
     // 1. Unmount the app tree so no widget can issue queries mid-swap.
     setState(() {
@@ -153,12 +158,15 @@ class AppRootState extends State<AppRoot> {
             release: _releaseStores,
           );
           notice = 'Backup restored';
+          await mergeReviewStateAfterRestore(reviewBefore); // never throws
         } on RestoreFatalException catch (e) {
           error = e;
           fatal = '$e';
         } on RestoreRolledBackException catch (e) {
           error = e;
           notice = 'Restore failed: $e';
+          // Back on the old box: the merge finds nothing to change.
+          await mergeReviewStateAfterRestore(reviewBefore);
         } catch (e) {
           error = e;
           notice = 'Restore failed: $e. Your data was not changed.';

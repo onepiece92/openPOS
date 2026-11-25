@@ -14,8 +14,9 @@ import 'package:pos_app/features/review/domain/review_policy.dart';
 /// request per version; the OS rate limits (iOS: 3 per 365 days; Play:
 /// quota-based) still apply. Intended behaviour after a restore is to keep
 /// the EARLIEST first-launch date and the LATEST prompt date/version from
-/// the two boxes. Merging needs a hook in the restore path, which lives in
-/// `AppRoot` — left as a follow-up (call [mergeAfterRestore] there).
+/// the two boxes: `AppRoot.restoreFrom` captures the state with
+/// [reviewStateBeforeRestore] before the files are swapped and calls
+/// [mergeReviewStateAfterRestore] once the box is open again.
 class ReviewStateStore {
   ReviewStateStore(this._box);
   final Box<dynamic> _box;
@@ -53,7 +54,9 @@ class ReviewStateStore {
     DateTime? earliest(DateTime? a, DateTime? b) =>
         a == null ? b : (b == null || a.isBefore(b) ? a : b);
     final first = earliest(before.firstLaunchAt, after.firstLaunchAt);
-    if (first != null) {
+    // Nothing is written when the box already holds the merged values (e.g.
+    // after a rollback, when it is the pre-restore box again).
+    if (first != null && first != after.firstLaunchAt) {
       await _box.put(kReviewFirstLaunchAt, first.toIso8601String());
     }
     final b = before.lastPromptAt;
@@ -64,3 +67,30 @@ class ReviewStateStore {
     }
   }
 }
+
+/// The review state of the open `settings` box, captured by the restore flow
+/// BEFORE the Hive files are swapped. Null (and never an exception) when the
+/// box is not open or cannot be read: the restore then simply skips the merge.
+ReviewState? reviewStateBeforeRestore() {
+  try {
+    if (!Hive.isBoxOpen(_settingsBox)) return null;
+    return ReviewStateStore(Hive.box<dynamic>(_settingsBox)).read();
+  } catch (_) {
+    return null;
+  }
+}
+
+/// Called by the restore flow once the `settings` box is open again — on the
+/// restored data, or on the old data after a rollback (where it changes
+/// nothing). Never throws: review bookkeeping must not be able to fail or
+/// undo a restore.
+Future<void> mergeReviewStateAfterRestore(ReviewState? before) async {
+  if (before == null) return;
+  try {
+    if (!Hive.isBoxOpen(_settingsBox)) return;
+    await ReviewStateStore(Hive.box<dynamic>(_settingsBox))
+        .mergeAfterRestore(before);
+  } catch (_) {/* best effort */}
+}
+
+const _settingsBox = 'settings';
