@@ -29,29 +29,6 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     super.dispose();
   }
 
-  List<Product> _applyFilter(List<Product> all, ProductsFilterState f) {
-    var list = f.selectedCategoryId == null
-        ? all
-        : all.where((p) => p.categoryId == f.selectedCategoryId).toList();
-    if (f.outOfStockOnly) {
-      // is_out_of_stock flag OR qty < 0 (over-sold). 0 = unlimited.
-      list = list
-          .where((p) => p.isOutOfStock || p.stockQuantity < 0)
-          .toList();
-    }
-    if (f.search.isNotEmpty) {
-      final q = f.search.toLowerCase();
-      list = list
-          .where((p) =>
-              p.name.toLowerCase().contains(q) ||
-              p.sku.toLowerCase().contains(q))
-          .toList();
-    }
-    list.sort((a, b) =>
-        f.sortAZ ? a.name.compareTo(b.name) : b.name.compareTo(a.name));
-    return list;
-  }
-
   @override
   Widget build(BuildContext context) {
     final productsAsync = ref.watch(productsStreamProvider);
@@ -203,7 +180,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                       in categoriesAsync.valueOrNull ?? const <Category>[])
                     c.id: c.name
                 };
-                final filtered = _applyFilter(all, f);
+                final filtered = applyProductsFilter(all, f);
 
                 if (all.isEmpty) {
                   return AppEmptyState(

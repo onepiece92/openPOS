@@ -106,3 +106,27 @@ final productsFilterProvider =
     StateNotifierProvider<ProductsFilterNotifier, ProductsFilterState>(
   (_) => ProductsFilterNotifier(),
 );
+
+/// The Products screen's list: [all] narrowed by [f] and sorted by name.
+///
+/// Always a new list. [all] is the list held by [productsStreamProvider],
+/// which the sell and Inventory screens read too — sorting it in place
+/// would reorder their source.
+List<Product> applyProductsFilter(List<Product> all, ProductsFilterState f) {
+  Iterable<Product> list = all;
+  if (f.selectedCategoryId != null) {
+    list = list.where((p) => p.categoryId == f.selectedCategoryId);
+  }
+  if (f.outOfStockOnly) {
+    // is_out_of_stock flag OR qty < 0 (over-sold). 0 = unlimited.
+    list = list.where((p) => p.isOutOfStock || p.stockQuantity < 0);
+  }
+  if (f.search.isNotEmpty) {
+    final q = f.search.toLowerCase();
+    list = list.where((p) =>
+        p.name.toLowerCase().contains(q) || p.sku.toLowerCase().contains(q));
+  }
+  return list.toList()
+    ..sort((a, b) =>
+        f.sortAZ ? a.name.compareTo(b.name) : b.name.compareTo(a.name));
+}

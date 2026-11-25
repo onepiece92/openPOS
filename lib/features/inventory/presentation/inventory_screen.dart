@@ -32,31 +32,14 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
     super.dispose();
   }
 
-  List<Product> _filtered(List<Product> all, int threshold) {
-    var list = switch (_filter) {
-      'out' => all
-          .where((p) => p.isOutOfStock || p.stockQuantity < 0)
-          .toList(),
-      'low' => all
-          .where((p) =>
-              !p.isOutOfStock &&
-              p.stockQuantity > 0 &&
-              p.stockQuantity <= threshold)
-          .toList(),
-      _ => all,
-    };
-    if (_search.isNotEmpty) {
-      final q = _search.toLowerCase();
-      list = list
-          .where((p) =>
-              p.name.toLowerCase().contains(q) ||
-              p.sku.toLowerCase().contains(q))
-          .toList();
-    }
-    list.sort((a, b) =>
-        _sortAZ ? a.name.compareTo(b.name) : b.name.compareTo(a.name));
-    return list;
-  }
+  List<Product> _filtered(List<Product> all, int threshold) =>
+      filterInventoryProducts(
+        all,
+        stockFilter: _filter,
+        search: _search,
+        sortAZ: _sortAZ,
+        lowStockThreshold: threshold,
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -162,3 +145,34 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
 }
 
 // ─── Filter bar ───────────────────────────────────────────────────────────────
+
+/// The Inventory screen's list: [all] narrowed by stock state ('out', 'low'
+/// or null for everything) and [search], sorted by name.
+///
+/// Always a new list. [all] is the list held by productsStreamProvider,
+/// which the sell and Products screens read too — sorting it in place would
+/// reorder their source.
+List<Product> filterInventoryProducts(
+  List<Product> all, {
+  required String? stockFilter,
+  required String search,
+  required bool sortAZ,
+  required int lowStockThreshold,
+}) {
+  Iterable<Product> list = switch (stockFilter) {
+    'out' => all.where((p) => p.isOutOfStock || p.stockQuantity < 0),
+    'low' => all.where((p) =>
+        !p.isOutOfStock &&
+        p.stockQuantity > 0 &&
+        p.stockQuantity <= lowStockThreshold),
+    _ => all,
+  };
+  if (search.isNotEmpty) {
+    final q = search.toLowerCase();
+    list = list.where((p) =>
+        p.name.toLowerCase().contains(q) || p.sku.toLowerCase().contains(q));
+  }
+  return list.toList()
+    ..sort((a, b) =>
+        sortAZ ? a.name.compareTo(b.name) : b.name.compareTo(a.name));
+}
