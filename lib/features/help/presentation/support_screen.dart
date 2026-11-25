@@ -26,6 +26,14 @@ class SupportScreen extends ConsumerWidget {
         children: [
           _SectionHeader('Contact', tt, cs),
           _SupportTile(
+            icon: Icons.chat_rounded,
+            title: 'WhatsApp Chat',
+            subtitle: kSupportWhatsAppDisplay,
+            cs: cs,
+            tt: tt,
+            onTap: () => openSupportWhatsAppOrExplain(context),
+          ),
+          _SupportTile(
             icon: Icons.email_outlined,
             title: 'Email Support',
             subtitle: 'support@rebuzzpos.com',
@@ -35,16 +43,10 @@ class SupportScreen extends ConsumerWidget {
               Uri.parse('mailto:support@rebuzzpos.com'),
             ),
           ),
-          _SupportTile(
-            icon: Icons.chat_rounded,
-            title: 'WhatsApp Chat',
-            subtitle: kSupportWhatsAppDisplay,
-            cs: cs,
-            tt: tt,
-            onTap: () => openSupportWhatsAppOrExplain(context),
-          ),
           const SizedBox(height: 20),
           _SectionHeader('Resources', tt, cs),
+          // Replaces the old "Report a Bug" / "Request a Feature" rows.
+          // Always shown: feedback is welcome even with usage counting off.
           _SupportTile(
             key: const ValueKey('support-feedback-usage'),
             icon: Icons.forum_outlined,
@@ -65,30 +67,6 @@ class SupportScreen extends ConsumerWidget {
                   .read(reviewPrompterProvider)
                   .openStoreListing(appStoreId: kAppStoreId),
             ),
-          _SupportTile(
-            icon: Icons.bug_report_outlined,
-            title: 'Report a Bug',
-            subtitle: 'Let us know what went wrong',
-            cs: cs,
-            tt: tt,
-            onTap: () => launchUrl(
-              Uri.parse(
-                'mailto:support@rebuzzpos.com?subject=${Uri.encodeComponent('openPOS Bug')}',
-              ),
-            ),
-          ),
-          _SupportTile(
-            icon: Icons.lightbulb_outline_rounded,
-            title: 'Request a Feature',
-            subtitle: 'Suggest improvements',
-            cs: cs,
-            tt: tt,
-            onTap: () => launchUrl(
-              Uri.parse(
-                'mailto:support@rebuzzpos.com?subject=${Uri.encodeComponent('openPOS Feature Request')}',
-              ),
-            ),
-          ),
           _SupportTile(
             icon: Icons.article_outlined,
             title: 'Documentation',
