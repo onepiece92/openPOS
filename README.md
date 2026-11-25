@@ -6,16 +6,22 @@ No subscription. No account. No internet connection needed. Ring up sales, manag
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Platforms: Android | iOS](https://img.shields.io/badge/platforms-Android%20%7C%20iOS-informational.svg)](#get-open-pos)
-[![No internet permission](https://img.shields.io/badge/network-no%20internet%20permission-success.svg)](#privacy-you-can-check-yourself)
+[![100% offline](https://img.shields.io/badge/network-100%25%20offline-success.svg)](#privacy-you-can-check-yourself)
 [![Built with Flutter](https://img.shields.io/badge/built%20with-Flutter-02569B.svg)](#build-from-source)
 
 ---
 
 ## Get Open POS
 
-**The first Android release is coming soon.** Click **Watch → Custom → Releases** at the top of this page to be notified when it is published.
+<a href="https://play.google.com/store/apps/details?id=com.brandbuilder.openpos&referrer=utm_source%3Dgithub%26utm_medium%3Dreadme"><img alt="Get it on Google Play" src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" height="80"></a>
 
-Until then, you can [build it from source](#build-from-source).
+**Android:** install Open POS from [Google Play](https://play.google.com/store/apps/details?id=com.brandbuilder.openpos&referrer=utm_source%3Dgithub%26utm_medium%3Dreadme).
+
+The Google Play version dates from May 2026. The features below describe the upcoming release, which also fixes known issues in refunds, stock and printing. The next release also ships as a direct APK here, in a build you can verify yourself. Click **Watch → Custom → Releases** at the top of this page to be notified.
+
+**iOS:** no public build yet. You can also [build Android or iOS from source](#build-from-source).
+
+<sub>Google Play and the Google Play logo are trademarks of Google LLC.</sub>
 
 <!-- HOLD: restore at first release (replace the section above)
 **[Download the latest release](https://github.com/onepiece92/openPOS/releases/latest)**
@@ -60,7 +66,7 @@ HOLD -->
 
 ## Why Open POS
 
-- **Your data stays with you.** The Android release build has no network access at all. Sales, customers and stock live in a database on your device and nowhere else.
+- **Your data stays with you.** The app's own code makes no network calls: no accounts, no cloud, no analytics. Sales, customers and stock live in a database on your device and nowhere else.
 - **Free, for good.** No subscription, no per-device fee, no premium tier. MIT licensed.
 - **Works with no internet.** A dropped connection never stops a sale, because the app never needed one.
 - **Made for small shops and cafes.** Tables, held tickets and simple reports, without the setup of a big system.
@@ -81,11 +87,13 @@ HOLD -->
 
 ### Products
 - Categories, SKU/barcode field and product photos
+<!-- HOLD: not in the May 2026 Play build; restore at next release
 - Secondary units (for example, sell by the piece or by the dozen)
+HOLD -->
 - Bundle and composite products
 <!-- HOLD: pending fix confirmation
 - Stock tracking with adjustments
-- Low-stock alerts
+- Low-stock badges
 HOLD -->
 
 ### Customers
@@ -142,9 +150,9 @@ HOLD -->
 
 ## Privacy you can check yourself
 
-Open POS does not ask you to trust a privacy policy. The Android release build is configured so the operating system blocks it from the network.
+Open POS does not ask you to trust a privacy policy. The app's own code makes no network calls and has never included analytics or cloud services. Starting with the next release, the Android build also goes a step further: the operating system itself blocks it from the network, so you don't have to take our word for it.
 
-**Android.** The release build removes the `INTERNET` and `ACCESS_NETWORK_STATE` permissions (see [`android/app/src/release/AndroidManifest.xml`](android/app/src/release/AndroidManifest.xml)). Without `INTERNET`, Android does not let an app open network connections. You can check a release build yourself:
+**Android (next release onwards).** The release build removes the `INTERNET` and `ACCESS_NETWORK_STATE` permissions (see [`android/app/src/release/AndroidManifest.xml`](android/app/src/release/AndroidManifest.xml)). Without `INTERNET`, Android does not let an app open network connections. You can check a release build yourself:
 
 ```sh
 # Android SDK build-tools
@@ -153,7 +161,7 @@ aapt dump permissions open-pos.apk
 apkanalyzer manifest permissions open-pos.apk
 ```
 
-`android.permission.INTERNET` will not be in the list. Debug builds made with `flutter run` keep `INTERNET` because Flutter's hot reload needs it; the release build does not.
+`android.permission.INTERNET` will not be in the list. The current Google Play version predates this change. Debug builds made with `flutter run` keep `INTERNET` because Flutter's hot reload needs it; the release build does not.
 
 <!-- HOLD: pending notarisation decision
 **macOS.** The app runs in Apple's App Sandbox with no network entitlement (`com.apple.security.network.client` is absent; see [`macos/Runner/Release.entitlements`](macos/Runner/Release.entitlements)). Check the installed app:
