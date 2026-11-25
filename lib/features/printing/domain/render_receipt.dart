@@ -118,7 +118,7 @@ Future<List<int>> renderReceiptBytes(
   bytes.addAll(g.hr(ch: '='));
   bytes.addAll(_kv(
     g,
-    data.order.hasTip ? 'TOTAL PAID' : 'TOTAL',
+    data.order.totalRowLabel('TOTAL', shout: true),
     fmt.format(data.order.paidTotal),
     bold: true,
   ));

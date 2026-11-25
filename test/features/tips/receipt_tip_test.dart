@@ -5,6 +5,7 @@ import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/utils/currency_formatter.dart';
 import 'package:pos_app/features/printing/domain/receipt_roll_pdf.dart';
 import 'package:pos_app/features/printing/domain/render_receipt.dart';
+import 'package:pos_app/features/receipts/domain/receipt_labels.dart';
 import 'package:pos_app/features/receipts/domain/receipt_text.dart';
 import 'package:pos_app/features/receipts/presentation/receipt_body.dart';
 import 'package:pos_app/features/receipts/presentation/receipt_pdf_service.dart';
@@ -109,6 +110,17 @@ void main() {
     expect(plain, isNot(contains('Tip')));
     expect(plain, contains('TOTAL'));
     expect(plain, isNot(contains('TOTAL PAID')));
+  });
+
+  test('the closing total row is total + tip, labelled for each format', () {
+    final tipped = _data(tip: 10).order;
+    expect(tipped.paidTotal, 123); // what both PDFs print as the total
+    expect(tipped.totalRowLabel('Grand Total'), 'Total Paid'); // A4
+    expect(tipped.totalRowLabel('TOTAL', shout: true), 'TOTAL PAID'); // roll
+    final plain = _data().order;
+    expect(plain.paidTotal, 113);
+    expect(plain.totalRowLabel('Grand Total'), 'Grand Total');
+    expect(plain.totalRowLabel('TOTAL', shout: true), 'TOTAL');
   });
 
   test('roll PDF (what ESC/POS and Star print) gains the Tip row', () async {

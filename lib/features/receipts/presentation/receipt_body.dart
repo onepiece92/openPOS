@@ -176,7 +176,7 @@ class ReceiptBody extends StatelessWidget {
 
                 // ── Grand total ───────────────────────────────────────────
                 _BillRow(
-                  label: order.hasTip ? 'Total Paid' : 'Grand Total',
+                  label: order.totalRowLabel('Grand Total'),
                   value: fmt.format(order.paidTotal),
                   labelStyle: boldStyle.copyWith(color: cs.onSurface),
                   valueStyle: boldStyle.copyWith(color: cs.onSurface),

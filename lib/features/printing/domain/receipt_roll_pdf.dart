@@ -153,7 +153,7 @@ Future<pw.Document> buildReceiptRollPdf(
                 '- ${fmt.format(order.loyaltyDiscount)}'),
           if (order.hasTip) kv('Tip', fmt.format(order.tipAmount)),
           rule(ch: '='),
-          kv(order.hasTip ? 'TOTAL PAID' : 'TOTAL', fmt.format(order.paidTotal),
+          kv(order.totalRowLabel('TOTAL', shout: true), fmt.format(order.paidTotal),
               strong: true),
           rule(),
 

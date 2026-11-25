@@ -122,62 +122,65 @@ class OrderDetailScreen extends ConsumerWidget {
         actions: [
           // The Builder gives the PDF share the menu button's own rectangle
           // to anchor to (iPad shows the share sheet as a popover).
-          Builder(builder: (menuContext) => PopupMenuButton<String>(
-            onSelected: (v) async {
-              final data = detailAsync.valueOrNull;
-              if (data == null) return;
-              switch (v) {
-                case 'pdf':
-                  await downloadReceiptPdf(menuContext, data.receipt, fmt);
-                case 'print':
-                  // With no printer paired, printOrder is a silent no-op
-                  // (right for auto-print, confusing for a tapped Print).
-                  if (ref.read(printerDeviceAddressProvider) == null) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                      content: const Text('No printer set up yet'),
-                      action: SnackBarAction(
-                        label: 'Set up',
-                        onPressed: () => context.push('/settings/printer'),
+          Builder(
+              builder: (menuContext) => PopupMenuButton<String>(
+                    onSelected: (v) async {
+                      final data = detailAsync.valueOrNull;
+                      if (data == null) return;
+                      switch (v) {
+                        case 'pdf':
+                          await downloadReceiptPdf(
+                              menuContext, data.receipt, fmt);
+                        case 'print':
+                          // With no printer paired, printOrder is a silent no-op
+                          // (right for auto-print, confusing for a tapped Print).
+                          if (ref.read(printerDeviceAddressProvider) == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                              content: const Text('No printer set up yet'),
+                              action: SnackBarAction(
+                                label: 'Set up',
+                                onPressed: () =>
+                                    context.push('/settings/printer'),
+                              ),
+                            ));
+                            return;
+                          }
+                          final err = await ref
+                              .read(autoPrintServiceProvider)
+                              .printOrder(orderId);
+                          if (err != null && context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(err)),
+                            );
+                          } else {
+                            ref.invalidate(_orderDetailProvider(orderId));
+                          }
+                      }
+                    },
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(
+                        value: 'pdf',
+                        child: ListTile(
+                          leading: Icon(Icons.picture_as_pdf_outlined),
+                          title: Text('Download PDF'),
+                          contentPadding: EdgeInsets.zero,
+                        ),
                       ),
-                    ));
-                    return;
-                  }
-                  final err = await ref
-                      .read(autoPrintServiceProvider)
-                      .printOrder(orderId);
-                  if (err != null && context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(err)),
-                    );
-                  } else {
-                    ref.invalidate(_orderDetailProvider(orderId));
-                  }
-              }
-            },
-            itemBuilder: (_) => const [
-              PopupMenuItem(
-                value: 'pdf',
-                child: ListTile(
-                  leading: Icon(Icons.picture_as_pdf_outlined),
-                  title: Text('Download PDF'),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-              PopupMenuItem(
-                value: 'print',
-                child: ListTile(
-                  leading: Icon(Icons.print_outlined),
-                  title: Text('Print'),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-            ],
-          )),
+                      PopupMenuItem(
+                        value: 'print',
+                        child: ListTile(
+                          leading: Icon(Icons.print_outlined),
+                          title: Text('Print'),
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                      ),
+                    ],
+                  )),
         ],
       ),
       body: detailAsync.when(
-        data: (data) => _DetailBody(
-            data: data, fmt: fmt, orderId: orderId, ref: ref),
+        data: (data) =>
+            _DetailBody(data: data, fmt: fmt, orderId: orderId, ref: ref),
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
       ),
@@ -214,9 +217,8 @@ class _DetailBody extends StatelessWidget {
           child: Row(
             children: [
               _StatusChip(
-                  status: data.isPartlyRefunded
-                      ? 'partly_refunded'
-                      : order.status),
+                  status:
+                      data.isPartlyRefunded ? 'partly_refunded' : order.status),
               const Spacer(),
               Row(
                 children: [
@@ -229,13 +231,12 @@ class _DetailBody extends StatelessWidget {
                   ),
                   const SizedBox(width: 6),
                   Text(order.paymentMethod.toUpperCase(),
-                      style: tt.labelMedium
-                          ?.copyWith(color: cs.onSurfaceVariant)),
+                      style:
+                          tt.labelMedium?.copyWith(color: cs.onSurfaceVariant)),
                   const SizedBox(width: 12),
                   Text(
                     DateFormat('dd MMM yyyy  HH:mm').format(order.createdAt),
-                    style:
-                        tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                    style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                   ),
                 ],
               ),
@@ -252,8 +253,7 @@ class _DetailBody extends StatelessWidget {
         if (isActionable)
           SafeArea(
             child: Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
                 children: [
                   Expanded(
@@ -369,15 +369,21 @@ class _DetailBody extends StatelessWidget {
     final trackStock = ref.read(featureOnProvider(Feature.stockTracking));
     // "Restock items" only when the refund would put something back.
     final canRestock = data.restockPlan(trackStock: trackStock).any;
-    bool refundTip = false;
     final tipLeft = data.tipLeft;
+    // Nothing of the goods left (e.g. a zero-total order) but a tip still to
+    // give back: the dialog is just that.
+    final tipOnlyOrder = refundable <= 0 && tipLeft > 0;
+    bool refundTip = tipOnlyOrder;
+    if (tipOnlyOrder) amountCtrl.text = '0';
 
     // Mirrors processReturn's rules so the cashier sees the problem before
     // confirming rather than as a failure afterwards.
     String? amountError(String raw) {
       final value = double.tryParse(raw.trim());
       if (value == null) return 'Enter the amount to refund';
-      if (value <= 0) return 'Amount must be greater than zero';
+      if (value < 0 || (value == 0 && !(refundTip && tipLeft > 0))) {
+        return 'Amount must be greater than zero';
+      }
       if (value > refundable) {
         return 'At most ${fmt.format(refundable)} can be refunded';
       }
@@ -388,30 +394,33 @@ class _DetailBody extends StatelessWidget {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setState) {
-          final error = amountError(amountCtrl.text);
+          final error = tipOnlyOrder ? null : amountError(amountCtrl.text);
           return AlertDialog(
-            title: const Text('Refund order?'),
+            title: Text(tipOnlyOrder ? 'Refund tip?' : 'Refund order?'),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(
-                  controller: amountCtrl,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(
-                        RegExp(r'^\d*\.?\d{0,2}')),
-                  ],
-                  onChanged: (_) => setState(() {}),
-                  decoration: InputDecoration(
-                    labelText: 'Refund amount',
-                    border: const OutlineInputBorder(),
-                    errorText: error,
-                    helperText: alreadyRefunded > 0
-                        ? '${fmt.format(alreadyRefunded)} already refunded'
-                        : 'Refund less than the total for a partial refund',
+                if (tipOnlyOrder)
+                  Text('Refund tip only (${fmt.format(tipLeft)})')
+                else
+                  TextField(
+                    controller: amountCtrl,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(
+                          RegExp(r'^\d*\.?\d{0,2}')),
+                    ],
+                    onChanged: (_) => setState(() {}),
+                    decoration: InputDecoration(
+                      labelText: 'Refund amount',
+                      border: const OutlineInputBorder(),
+                      errorText: error,
+                      helperText: alreadyRefunded > 0
+                          ? '${fmt.format(alreadyRefunded)} already refunded'
+                          : 'Refund less than the total for a partial refund',
+                    ),
                   ),
-                ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: reasonCtrl,
@@ -421,12 +430,13 @@ class _DetailBody extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                if (tipLeft > 0)
+                if (tipLeft > 0 && !tipOnlyOrder)
                   if ((double.tryParse(amountCtrl.text.trim()) ?? 0) <
                       refundable - 0.005)
                     CheckboxListTile(
                       title: const Text('Also refund tip'),
-                      subtitle: Text(fmt.format(tipLeft)),
+                      subtitle: Text(
+                          '${fmt.format(tipLeft)} · amount 0 refunds the tip only'),
                       value: refundTip,
                       onChanged: (v) => setState(() => refundTip = v ?? false),
                       contentPadding: EdgeInsets.zero,
@@ -438,7 +448,7 @@ class _DetailBody extends StatelessWidget {
                       child: Text(
                           'The tip of ${fmt.format(tipLeft)} is refunded too'),
                     ),
-                if (canRestock)
+                if (canRestock && !tipOnlyOrder)
                   SwitchListTile(
                     key: const ValueKey('refund-restock'),
                     title: const Text('Restock items'),
@@ -456,7 +466,7 @@ class _DetailBody extends StatelessWidget {
               FilledButton(
                 onPressed:
                     error == null ? () => Navigator.pop(ctx, true) : null,
-                child: const Text('Refund'),
+                child: Text(tipOnlyOrder ? 'Refund tip' : 'Refund'),
               ),
             ],
           );
@@ -493,13 +503,18 @@ class _DetailBody extends StatelessWidget {
 
     if (context.mounted) {
       ref.invalidate(_orderDetailProvider(orderId));
-      // With "Restock items" ticked, say what the transaction put back.
-      final stock = restock
+      // The tip handed back: as the transaction applied it.
+      final tipBack = result.tipReturned;
+      final stock = restock && !tipOnlyOrder && amount > 0
           ? ' ${restockedText(result.restocked, none: 'No stock was put back.')}'
           : '';
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content:
-              Text('Refund of ${fmt.format(amount)} recorded.$stock')));
+      final text = tipOnlyOrder || amount == 0
+          ? 'Tip of ${fmt.format(tipBack)} refunded.'
+          : tipBack > 0
+              ? 'Refund of ${fmt.format(amount)} '
+                  '(+ tip ${fmt.format(tipBack)}) recorded.$stock'
+              : 'Refund of ${fmt.format(amount)} recorded.$stock';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
       Navigator.pop(context);
     }
   }

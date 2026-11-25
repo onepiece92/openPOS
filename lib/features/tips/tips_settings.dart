@@ -93,9 +93,6 @@ String? parseTipPresets(String raw, List<double> out) {
   final parts =
       raw.split(RegExp(r'[,\s]+')).where((p) => p.isNotEmpty).toList();
   if (parts.isEmpty) return 'Enter at least one percentage';
-  if (parts.length > kMaxTipPresets) {
-    return 'At most $kMaxTipPresets percentages';
-  }
   final values = <double>[];
   for (final p in parts) {
     final v = double.tryParse(p.replaceAll('%', ''));
@@ -103,7 +100,10 @@ String? parseTipPresets(String raw, List<double> out) {
     if (v <= 0 || v > 100) {
       return 'Each percentage must be above 0 and at most 100';
     }
-    values.add(v);
+    if (!values.contains(v)) values.add(v);
+  }
+  if (values.length > kMaxTipPresets) {
+    return 'At most $kMaxTipPresets percentages';
   }
   out
     ..clear()

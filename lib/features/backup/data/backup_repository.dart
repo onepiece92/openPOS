@@ -784,7 +784,9 @@ class BackupRepository {
           taxTotal: Value(first.numberOf('tax total') ?? 0.0),
           discountTotal: Value(first.numberOf('discount') ?? 0.0),
           total: total,
-          // Older exports have no Tip column: no tip.
+          // Older exports have no Tip column: no tip. (A fully refunded
+          // order imports with no refund rows; netTipsForPeriod counts it
+          // as keeping nothing.)
           tipAmount: Value(
               (first.numberOf('tip') ?? 0.0).clamp(0.0, double.infinity)),
           paymentMethod: method,

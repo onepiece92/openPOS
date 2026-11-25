@@ -27,7 +27,7 @@ void main() {
   });
   tearDown(() => db.close());
 
-  /// A 100.00 sale (VAT 13 inside, so a total of 100) with [tip].
+  /// A 100.00 sale (no tax, total 100) with [tip].
   Future<int> sale({double tip = 0, String method = 'cash'}) {
     final items = [line(pid, price: 100)];
     return placeOrder(
@@ -139,6 +139,89 @@ void main() {
           orderId: id, amount: 100, restock: false, refundTip: true);
       expect((await returnsOf(id)).single.tipAmount, 0);
     });
+  });
+
+
+  group('tip-only refunds', () {
+    Future<int> zeroTotalSale(double tip) => placeOrder(
+          db,
+          audit,
+          cart: [line(pid, price: 0)],
+          summary: const CartSummary(
+            subtotal: 0,
+            orderDiscount: 0,
+            loyaltyDiscount: 0,
+            taxLines: [],
+            taxAmount: 0,
+            total: 0,
+            taxEnabled: false,
+            pointsToEarn: 0,
+          ),
+          session:
+              CartSession(ticketNumber: '#z', openedAt: DateTime(2026, 1, 1)),
+          paymentMethod: 'cash',
+          tenderedAmount: tip,
+          tipAmount: tip,
+        );
+
+    test('a zero-total order can have its tip refunded', () async {
+      final id = await zeroTotalSale(6);
+      expect(await netTips(), 6);
+      await processReturn(db, audit,
+          orderId: id, amount: 0, restock: false, refundTip: true);
+      final r = (await returnsOf(id)).single;
+      expect((r.amount, r.tipAmount), (0, 6));
+      expect(await netTips(), 0);
+      expect((await db.ordersDao.getById(id))!.status, 'completed');
+      // Nothing left: a second one is refused.
+      expect(
+          () => processReturn(db, audit,
+              orderId: id, amount: 0, restock: false, refundTip: true),
+          throwsA(isA<StateError>()));
+    });
+
+    test('tip-only on a normal order, then a goods refund returns no tip',
+        () async {
+      final id = await sale(tip: 15);
+      await processReturn(db, audit,
+          orderId: id, amount: 0, restock: true, refundTip: true);
+      var rs = await returnsOf(id);
+      expect((rs.single.amount, rs.single.tipAmount, rs.single.restock),
+          (0, 15, false));
+      expect(await netTips(), 0);
+      final order = (await db.ordersDao.getById(id))!;
+      expect(await refundableAmount(db, order), 100);
+      expect(order.status, 'completed');
+
+      await processReturn(db, audit,
+          orderId: id, amount: 100, restock: false);
+      rs = await returnsOf(id);
+      expect(rs.last.tipAmount, 0);
+      expect((await db.ordersDao.getById(id))!.status, 'refunded');
+    });
+
+    test('amount 0 without the tip ticked is still refused', () async {
+      final id = await sale(tip: 15);
+      expect(
+          () => processReturn(db, audit,
+              orderId: id, amount: 0, restock: false),
+          throwsA(isA<ArgumentError>()));
+      final plain = await sale();
+      expect(
+          () => processReturn(db, audit,
+              orderId: plain, amount: 0, restock: false, refundTip: true),
+          throwsA(isA<ArgumentError>()));
+    });
+  });
+
+  test('a fully refunded order with no returns rows (CSV import) keeps no tip',
+      () async {
+    final id = await sale(tip: 15);
+    // As an import writes it: refunded, tip stored, no refund rows.
+    await db.ordersDao.refundOrder(id);
+    expect(await netTips(), 0);
+    expect(
+        await db.ordersDao.totalRevenueForPeriod(from, to), 0);
   });
 
   group('voids', () {

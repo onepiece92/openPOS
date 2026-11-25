@@ -281,6 +281,10 @@ class OrdersDao extends DatabaseAccessor<AppDatabase> with _$OrdersDaoMixin {
       '  0.0)), 0.0) AS tips '
       'FROM orders o '
       "WHERE o.status IN ('completed', 'refunded') AND o.tip_amount > 0 "
+      // A 'refunded' order with no returns rows (a CSV import of a fully
+      // refunded sale) kept nothing, tip included — as in _netOrders.
+      "  AND NOT (o.status = 'refunded' AND NOT EXISTS "
+      '    (SELECT 1 FROM returns r2 WHERE r2.order_id = o.id)) '
       '  AND o.created_at >= ? AND o.created_at <= ?',
       variables: [Variable(from), Variable(to)],
       readsFrom: {orders, returns},

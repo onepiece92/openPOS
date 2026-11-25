@@ -58,11 +58,17 @@ Future<RefundResult> processReturn(
     }
 
     final refundable = await refundableAmount(db, order);
-    if (refundable <= 0) {
+    // Tip still with the shop: the order's tip less what earlier refunds
+    // returned. Handed back on request, and always by the closing refund.
+    final tipLeft = roundMoney(
+        order.tipAmount - await db.ordersDao.refundedTipTotal(orderId));
+    final refund = roundMoney(amount);
+    // A tip-only refund: no goods, just the tip still left.
+    final tipOnly = refund == 0 && refundTip && tipLeft > 0;
+    if (refundable <= 0 && !tipOnly) {
       throw StateError('Order #$orderId has nothing left to refund');
     }
-    final refund = roundMoney(amount);
-    if (!(refund > 0)) {
+    if (!tipOnly && !(refund > 0)) {
       throw ArgumentError.value(
           amount, 'amount', 'Refund amount must be greater than zero');
     }
@@ -71,17 +77,13 @@ Future<RefundResult> processReturn(
           'Refund amount exceeds the $refundable still refundable');
     }
     // Read inside the transaction: a concurrent void or refund can't
-    // restock twice.
-    final restocked = restock
+    // restock twice. A tip-only refund never restocks.
+    final restocked = restock && !tipOnly
         ? await applyRestock(
             db, order, await readRestockPlan(db, order, trackStock: trackStock),
             reasonCode: 'return', note: 'Refund for Order')
         : RestockResult.nothing;
 
-    // Tip still with the shop: the order's tip less what earlier refunds
-    // returned. Handed back on request, and always by the closing refund.
-    final tipLeft = roundMoney(
-        order.tipAmount - await db.ordersDao.refundedTipTotal(orderId));
     final tipBack = tipLeft > 0 && (refundTip || refund >= refundable)
         ? tipLeft
         : 0.0;
@@ -96,7 +98,7 @@ Future<RefundResult> processReturn(
       ),
     );
 
-    if (refund >= refundable) {
+    if (!tipOnly && refund >= refundable) {
       await db.ordersDao.refundOrder(orderId);
       await reverseLoyalty(db, order);
     }

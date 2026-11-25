@@ -1,9 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:pos_app/features/cart/domain/cart_summary.dart';
 import 'package:pos_app/features/tips/tip_math.dart';
 import 'package:pos_app/features/tips/tips_settings.dart';
 
 void main() {
+  tipBaseOfTests();
   group('tipBase', () {
     test('no tax, no discount: the subtotal', () {
       expect(
@@ -113,9 +115,77 @@ void main() {
       expect(parseTipPresets('abc', out), isNotNull);
       expect(parseTipPresets('100', out), isNull);
     });
+    test('duplicates are dropped, order kept', () {
+      final out = <double>[];
+      expect(parseTipPresets('20, 15, 20 15 18', out), isNull);
+      expect(out, [20, 15, 18]);
+    });
     test('label', () {
       expect(tipPercentLabel(15), '15%');
       expect(tipPercentLabel(12.5), '12.5%');
+    });
+  });
+}
+
+CartSummary _summary({
+  required double subtotal,
+  required double total,
+  required List<TaxLine> taxes,
+  bool taxEnabled = true,
+  double discount = 0,
+}) =>
+    CartSummary(
+      subtotal: subtotal,
+      orderDiscount: discount,
+      loyaltyDiscount: 0,
+      taxLines: taxes,
+      taxAmount: taxes.fold(0.0, (s, t) => s + t.amount),
+      total: total,
+      taxEnabled: taxEnabled,
+      pointsToEarn: 0,
+    );
+
+TaxLine _tax(double amount, {required bool inclusive}) => TaxLine(
+    taxRateId: 1,
+    name: 'VAT',
+    rate: 0.13,
+    amount: amount,
+    isInclusive: inclusive,
+    taxableAmount: 100);
+
+void tipBaseOfTests() {
+  group('tipBaseOf', () {
+    test('inclusive 13% on 113 gives a base of 100', () {
+      final s = _summary(
+          subtotal: 113, total: 113, taxes: [_tax(13, inclusive: true)]);
+      expect(tipBaseOf(s), 100);
+      expect(tipBaseOf(s, postTax: true), 113);
+    });
+    test('tax off: the whole 113 is the base', () {
+      final s = _summary(
+          subtotal: 113,
+          total: 113,
+          taxes: [_tax(13, inclusive: true)],
+          taxEnabled: false);
+      expect(tipBaseOf(s), 113);
+    });
+    test('mixed inclusive and exclusive: only the inclusive tax comes off',
+        () {
+      // 113 prices (13 inside) + 5 exclusive tax = 118 total.
+      final s = _summary(subtotal: 113, total: 118, taxes: [
+        _tax(13, inclusive: true),
+        _tax(5, inclusive: false),
+      ]);
+      expect(tipBaseOf(s), 100);
+      expect(tipBaseOf(s, postTax: true), 118);
+    });
+    test('order discount comes off too: 113 - 13 incl - 11.50 = 88.50', () {
+      final s = _summary(
+          subtotal: 113,
+          total: 101.5,
+          discount: 11.5,
+          taxes: [_tax(13, inclusive: true)]);
+      expect(tipBaseOf(s), 88.5);
     });
   });
 }

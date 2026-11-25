@@ -144,7 +144,7 @@ Future<pw.Document> buildReceiptPdf(
             ),
           if (order.hasTip) billRow('Tip', fmt.format(order.tipAmount)),
           divider(),
-          billRow(order.hasTip ? 'Total Paid' : 'Grand Total',
+          billRow(order.totalRowLabel('Grand Total'),
               fmt.format(order.paidTotal),
               bold: true),
           divider(),
