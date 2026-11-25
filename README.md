@@ -13,7 +13,7 @@ No subscription. No account. No internet connection needed. Ring up sales, manag
 
 ## Get Open POS
 
-<a href="https://play.google.com/store/apps/details?id=com.brandbuilder.openpos&referrer=utm_source%3Dgithub%26utm_medium%3Dreadme"><img alt="Get it on Google Play" src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" height="80"></a> <a href="https://apps.apple.com/app/open-pos-offline/id6761003751?ct=github_readme"><img alt="Download on the App Store" src="https://tools.applemediaservices.com/api/badges/download-on-the-app-store/black/en-us?size=250x83" height="54"></a>
+<a href="https://play.google.com/store/apps/details?id=com.brandbuilder.openpos&referrer=utm_source%3Dgithub%26utm_medium%3Dreadme"><img alt="Get it on Google Play" src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" height="80"></a> <a href="https://apps.apple.com/app/open-pos-offline/id6761003751?ct=github_readme"><img alt="Download on the App Store" src="https://toolbox.marketingtools.apple.com/api/badges/download-on-the-app-store/black/en-us?size=250x83" height="54"></a>
 
 **Android:** install Open POS from [Google Play](https://play.google.com/store/apps/details?id=com.brandbuilder.openpos&referrer=utm_source%3Dgithub%26utm_medium%3Dreadme).
 
@@ -23,7 +23,7 @@ The current store versions date from May 2026. The features below describe the u
 
 You can also [build Android or iOS from source](#build-from-source).
 
-<sub>Google Play and the Google Play logo are trademarks of Google LLC. Apple and the Apple logo are trademarks of Apple Inc. App Store is a service mark of Apple Inc.</sub>
+<sub>Google Play and the Google Play logo are trademarks of Google LLC. Apple and the Apple logo are trademarks of Apple Inc., registered in the U.S. and other countries. App Store is a service mark of Apple Inc.</sub>
 
 <!-- HOLD: restore at first release (replace the section above)
 **[Download the latest release](https://github.com/onepiece92/openPOS/releases/latest)**
@@ -88,7 +88,7 @@ HOLD -->
 HOLD -->
 
 ### Products
-- Categories, SKU/barcode field and product photos
+- Categories and a SKU/barcode field
 <!-- HOLD: not in the May 2026 Play build; restore at next release
 - Secondary units (for example, sell by the piece or by the dozen)
 HOLD -->
@@ -113,7 +113,7 @@ HOLD -->
 HOLD -->
 
 ### Money and reports
-- Tax rates and tax groups, with per-product taxes
+- Tax rates, with tax switched on or off per product
 - Expense tracking
 - Reports dashboard: revenue, expenses, net profit, average order value, with charts
 - Audit log of important actions
