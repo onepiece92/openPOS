@@ -193,6 +193,30 @@ Yes. The app itself never needs a signal. It gives change on cash sales and lets
 
 Yes. Open POS is on the App Store for iPhone and iPad, and on Google Play for Android phones and tablets.
 
+### Will I lose sales if I have no signal?
+
+Open POS never needs a connection, so the register, cash sales and your sales record keep working at a market, a festival or a food truck with no bars. Nothing waits to upload. If you take cards, your card reader needs its own connection, and Open POS cannot change that.
+
+### Can the price go up later?
+
+Open POS is free and open source under the MIT license. There is no subscription, no per-location fee and no paid plan to be moved onto, so there is no monthly bill that can be raised. You can read the source code on GitHub.
+
+### Can my account be locked or frozen?
+
+Open POS has no account to lock. There is no sign-up, login or password, so nobody can lock you out of your register, your products or your sales history. Open POS does not handle payouts of any kind.
+
+### Are there paid add-ons or features locked behind a higher plan?
+
+No. Everything in Open POS is included for free: discounts, held tickets, tables, customers, expenses, reports for today, this week or this month, and CSV export. There are no tiers and nothing to unlock. Open POS does not do everything, though. For example, it has no staff logins. If you outgrow it, the same team makes RebuzzPOS, a separate online POS with 40+ additional features; you never need it to use Open POS.
+
+### How long does setup take?
+
+Install the app, pick your country and currency, and add your products and categories. There is no sign-up, no email and no verification step to wait for, so you can ring up a first sale in minutes. A card reader, if you use one, has its own setup.
+
+### Am I tied to one card reader company?
+
+No. Open POS does not take card payments, so it is not tied to any reader. You take the payment on your own reader, then record the sale in Open POS as paid by card. The reader needs its own connection, and its company sets its own terms.
+
 ## Open the register in two minutes.
 
 Free point of sale for Android and iPhone. No account, no subscription, no internet needed.
