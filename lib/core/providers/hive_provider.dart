@@ -41,10 +41,19 @@ const kCountryCode = 'country_code';
 const kInvoicePrefix = 'invoice_prefix';
 const kTimezone = 'timezone';
 
+// Store-review trigger keys (owned by lib/features/review/data/
+// review_state_store.dart, which reads/writes them directly — they are
+// bookkeeping, not user-facing settings, so they stay out of AppSettings).
+const kReviewFirstLaunchAt = 'review_first_launch_at'; // ISO-8601
+const kReviewCompletedSales = 'review_completed_sales'; // int
+const kReviewLastPromptAt = 'review_last_prompt_at'; // ISO-8601
+const kReviewLastPromptVersion = 'review_last_prompt_version'; // e.g. '1.0.0+9'
+
 // ── Raw box provider ─────────────────────────────────────────────────────────
 
 /// The 'settings' box must be opened in main() before the container exists.
-/// Only [SettingsNotifier], the favorites store and backup touch it directly.
+/// Only [SettingsNotifier], the favorites store, the review-state store and
+/// backup touch it directly.
 final settingsBoxProvider = Provider<Box<dynamic>>((ref) {
   return Hive.box<dynamic>('settings');
 });

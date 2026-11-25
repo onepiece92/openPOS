@@ -1,0 +1,8 @@
+# FOSS stub for in_app_review — see lib/in_app_review.dart for how to use it.
+name: in_app_review
+description: No-op stand-in for in_app_review used by the F-Droid (foss) build.
+version: 2.0.12+foss
+publish_to: "none"
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"

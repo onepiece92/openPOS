@@ -50,6 +50,12 @@ dependencies:
   # ── External Links ────────────────────────────────────────────────────
   url_launcher: ^6.3.0
 
+  # ── App store review (see lib/features/review/) ──────────────────────
+  # Only lib/features/review/data/store_review_prompter.dart imports it.
+  # F-Droid/foss: swap in packages/in_app_review_stub via pubspec_overrides.yaml
+  # (drops the proprietary Play libraries; see that package's doc comment).
+  in_app_review: ^2.0.12
+
   # ── Utilities ─────────────────────────────────────────────────────────
   intl: ^0.19.0
   uuid: ^4.4.2
