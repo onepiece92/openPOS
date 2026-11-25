@@ -31,6 +31,9 @@ dependencies:
   esc_pos_utils_plus: ^2.0.4
   image: ^4.3.0 # rasterises rendered receipts for ESC/POS printers
   flutter_thermal_printer: ^0.0.9
+  # Already pulled in by flutter_thermal_printer; used directly so a failed
+  # BLE write raises instead of being swallowed by the plugin.
+  flutter_blue_plus: ^1.36.8
   pdf: ^3.11.1
   printing: ^5.13.2
 

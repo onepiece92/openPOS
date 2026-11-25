@@ -174,4 +174,25 @@ void main() {
     expect(err, 'Order not found for printing');
     expect(printer.printed, isEmpty);
   });
+
+  test('a failed print is not counted, so the retry is still the original',
+      () async {
+    final c = makeContainer();
+    addTearDown(c.dispose);
+    await c
+        .read(settingsProvider.notifier)
+        .setPrinterDevice(address: 'AA:BB', name: 'Rongta', driver: 'escpos');
+    final orderId = await seedOrder();
+    final svc = c.read(autoPrintServiceProvider);
+
+    printer.failWith = StateError('not connected');
+    expect(await svc.printOrder(orderId), contains('not connected'));
+    expect((await db.ordersDao.getById(orderId))!.printCount, 0);
+
+    printer.failWith = null;
+    expect(await svc.printOrder(orderId), isNull);
+    expect(printer.printed.single.job.isCopy, isFalse,
+        reason: 'nothing reached paper before, so this is the original');
+    expect((await db.ordersDao.getById(orderId))!.printCount, 1);
+  });
 }

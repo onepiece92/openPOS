@@ -101,8 +101,10 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
 
     // Fire-and-forget print. Failures surface via snackbar but don't block
     // navigation to the receipt screen — receipts work paperless too.
+    // `messenger` outlives this screen, which has navigated away by the time
+    // the print finishes, so no `mounted` check here.
     unawaited(autoPrintOrder(ref, orderId).then((err) {
-      if (err != null && mounted) {
+      if (err != null) {
         messenger.showSnackBar(SnackBar(content: Text(err)));
       }
     }));
