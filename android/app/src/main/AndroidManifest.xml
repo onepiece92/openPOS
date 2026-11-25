@@ -1,13 +1,20 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Camera (mobile_scanner, image_picker) -->
+    <!-- Camera: photos of expense receipts (image_picker) -->
     <uses-permission android:name="android.permission.CAMERA"/>
 
-    <!-- Bluetooth: BLE (flutter_thermal_printer), classic SPP and Star -->
-    <uses-permission android:name="android.permission.BLUETOOTH"/>
-    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"/>
+    <!-- Bluetooth: BLE (flutter_thermal_printer), classic SPP and Star.
+         Android 12+ uses the runtime BLUETOOTH_SCAN/BLUETOOTH_CONNECT pair;
+         scan results are only used to find printers, never to derive
+         location. Android 11 and older use the legacy pair, and a BLE scan
+         there returns nothing without location permission (requested at
+         runtime only when a BLE scan needs it, see scan_permissions.dart). -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30"/>
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
-    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation"/>
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30"/>
 
     <!-- Storage (file_picker, share_plus, image_picker — pre-Android 13) -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
@@ -15,19 +22,8 @@
     <!-- Android 13+: image_picker uses the system Photo Picker, which requires no permission. -->
     <!-- READ_MEDIA_IMAGES intentionally NOT declared (Google Play photo & video permissions policy). -->
 
-    <!-- Notifications (flutter_local_notifications, Android 13+) -->
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-
-    <!-- Background work (flutter_local_notifications) -->
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
-    <uses-permission android:name="android.permission.WAKE_LOCK"/>
-    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
-
-    <!-- Vibration (flutter_local_notifications) -->
-    <uses-permission android:name="android.permission.VIBRATE"/>
-
     <application
-        android:label="Open POS (Free &amp; Offline)"
+        android:label="Open POS"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:extractNativeLibs="false">
