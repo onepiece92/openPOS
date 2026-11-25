@@ -42,6 +42,12 @@ Future<void> openStartupStores() async {
   await Future.wait([
     for (final name in kSnapshotHiveBoxes) Hive.openBox<dynamic>(name),
   ]);
-  await ReviewStateStore(Hive.box<dynamic>('settings'))
-      .ensureFirstLaunch(DateTime.now());
+  await startReviewClock();
 }
+
+/// Starts the review-prompt clock (no-op after the first launch). Needs
+/// the settings box open. Also run by `AppRoot`'s retry, which opens the
+/// stores itself when startup recovery had failed.
+Future<void> startReviewClock() =>
+    ReviewStateStore(Hive.box<dynamic>('settings'))
+        .ensureFirstLaunch(DateTime.now());

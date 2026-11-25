@@ -11,6 +11,19 @@ import 'package:pos_app/core/database/connection/native.dart';
 import 'package:pos_app/features/backup/data/restore_journal.dart';
 import 'package:pos_app/features/backup/data/snapshot_providers.dart';
 import 'package:pos_app/features/backup/data/snapshot_service.dart';
+import 'package:pos_app/features/review/data/review_state_store.dart';
+
+/// Pumps, letting real async work (file IO, isolates) run between frames,
+/// until [done] holds. Fails rather than hangs if it never does.
+Future<void> pumpUntil(WidgetTester tester, bool Function() done) async {
+  for (var i = 0; i < 2000; i++) {
+    if (done()) return;
+    await tester
+        .runAsync(() => Future<void>.delayed(const Duration(milliseconds: 5)));
+    await tester.pump();
+  }
+  fail('condition not reached');
+}
 
 /// A failed startup recovery must land on the error screen with nothing
 /// opened, and "Try again" must rerun recovery before opening anything.
@@ -43,39 +56,37 @@ void main() {
         // Claims success but leaves the journal: _reopenStores must refuse.
         recoverForRetry: () async => RestoreRecovery.rolledBack,
       ));
-      await tester.runAsync(() async {
-        await tester.tap(find.text('Try again'));
-        await Future<void>.delayed(const Duration(milliseconds: 200));
-      });
-      await tester.pump();
+      await tester.runAsync(() => tester.tap(find.text('Try again')));
+      final refused = find.textContaining('has not been undone');
+      await pumpUntil(tester, () => refused.evaluate().isNotEmpty);
 
-      expect(find.textContaining('has not been undone'), findsOneWidget);
+      expect(refused, findsOneWidget);
       expect(Hive.isBoxOpen('settings'), isFalse);
       await tester.pumpWidget(const SizedBox());
     });
 
-    testWidgets('a successful retry opens the app, toasts, and schedules '
+    testWidgets(
+        'a successful retry opens the app, toasts, and schedules '
         'the auto-backup', (tester) async {
       await tester.pumpWidget(AppRoot(
         startupFatal: kRecoveryFailedMessage,
         recoverForRetry: () async => RestoreRecovery.rolledBack,
       ));
-      await tester.runAsync(() async {
-        await tester.tap(find.text('Try again'));
-        // Real Hive + Drift (background isolate) IO.
-        for (var i = 0; i < 50 && !Hive.isBoxOpen('settings'); i++) {
-          await Future<void>.delayed(const Duration(milliseconds: 50));
-        }
-        await Future<void>.delayed(const Duration(milliseconds: 500));
-      });
-      await tester.pump();
+      await tester.runAsync(() => tester.tap(find.text('Try again')));
+      // Real Hive + Drift (background isolate) IO: wait for the outcome.
+      final toast =
+          find.text(restoreRecoveryNotice(RestoreRecovery.rolledBack)!);
+      await pumpUntil(tester, () => toast.evaluate().isNotEmpty);
 
       expect(find.text('Restore failed'), findsNothing);
       expect(Hive.isBoxOpen('settings'), isTrue);
-      expect(find.text(restoreRecoveryNotice(RestoreRecovery.rolledBack)!),
-          findsOneWidget);
+      expect(toast, findsOneWidget);
       final state = tester.state<AppRootState>(find.byType(AppRoot));
       expect(state.autoBackupScheduledForTest, isTrue);
+      // The review clock startUp() skipped is started by the retry.
+      expect(
+          ReviewStateStore(Hive.box<dynamic>('settings')).read().firstLaunchAt,
+          isNotNull);
 
       await tester.pump(const Duration(seconds: 5)); // toast runs its course
       await tester.runAsync(() async {
@@ -124,11 +135,13 @@ void main() {
     expect(restoreRecoveryNotice(RestoreRecovery.completed), isNull);
     expect(restoreRecoveryNotice(RestoreRecovery.rolledBack),
         'A restore was interrupted. Your previous data was put back.');
-    expect(restoreRecoveryNotice(RestoreRecovery.recoveredWithoutJournal),
+    expect(
+        restoreRecoveryNotice(RestoreRecovery.recoveredWithoutJournal),
         "A restore was interrupted and its progress record couldn't be read. "
         'Your previous data was put back, but some receipt photos from the '
         'backup may remain. Please check your recent records.');
-    expect(restoreRecoveryNotice(RestoreRecovery.missingFilesPutBack),
+    expect(
+        restoreRecoveryNotice(RestoreRecovery.missingFilesPutBack),
         'Data left from an interrupted restore was missing and has been put '
         'back. Please check your recent records.');
     // Every outcome is handled explicitly (no catch-all), and none of the

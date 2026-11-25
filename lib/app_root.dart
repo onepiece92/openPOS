@@ -15,6 +15,7 @@ import 'package:pos_app/features/backup/data/snapshot_providers.dart';
 import 'package:pos_app/features/backup/data/snapshot_service.dart';
 import 'package:pos_app/features/help/support_contact.dart';
 import 'package:pos_app/features/review/data/review_state_store.dart';
+import 'package:pos_app/startup.dart' show startReviewClock;
 
 /// Owns the Riverpod container so the whole app can be hot-restarted —
 /// needed to restore a backup: close DB + Hive, swap files on disk, then
@@ -286,6 +287,8 @@ class AppRootState extends State<AppRoot> {
         throw StateError('the interrupted restore could not be undone');
       }
       await _reopenStores();
+      // startUp() skipped this when recovery failed; no-op otherwise.
+      await startReviewClock();
       notice = restoreRecoveryNotice(recovered);
     } catch (e) {
       fatal = 'Still unable to open the app data: $e';
