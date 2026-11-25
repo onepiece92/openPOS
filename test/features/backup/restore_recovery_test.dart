@@ -699,6 +699,31 @@ void main() {
     await expectLiveIsOriginal();
   }, skip: Platform.isWindows ? 'needs chmod' : false);
 
+  test('a rollback after a commit line that failed to flush is undone, '
+      'not "completed", if killed', () async {
+    final zip = await standardSetup();
+    final backup = await restoreLive(zip);
+    // markCommitted wrote its line, then flush/close threw: the journal
+    // reads committed although commit() failed and a rollback follows.
+    RestoreJournal.markCommitted(File(backup.journalPath));
+    expect(RestoreJournal.read(journalIn(live)).committed, isTrue);
+
+    // The rollback dies part-way (x.jpg can't be removed) — as good as a
+    // kill for what's left on disk.
+    final receipts = receiptsIn(live).path;
+    await Process.run('chmod', ['555', receipts]);
+    addTearDown(() => Process.run('chmod', ['755', receipts]));
+    await expectLater(svc.rollback(backup), throwsA(anything));
+
+    // It reset the journal to begin-only before undoing anything…
+    expect(RestoreJournal.read(journalIn(live)).committed, isFalse);
+    expect(File('${journalIn(live).path}.tmp').existsSync(), isFalse);
+    // …so the next launch rolls back instead of deleting the .bak files.
+    await Process.run('chmod', ['755', receipts]);
+    expect(await recoverLive(), RestoreRecovery.rolledBack);
+    await expectLiveIsOriginal();
+  }, skip: Platform.isWindows ? 'needs chmod' : false);
+
   group('never reopens while an uncommitted journal is on disk', () {
     test('a swap step fails and its rollback fails too', () async {
       final zip = await standardSetup();

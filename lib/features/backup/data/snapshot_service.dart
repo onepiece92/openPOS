@@ -522,12 +522,35 @@ class SnapshotService {
   /// Undoes [backup]'s swap from its plan and the state of the disk, then
   /// removes its staged files, photo backup and journal. Idempotent; if it
   /// throws, the journal stays for [recoverInterruptedRestore].
-  Future<void> rollback(RestoreBackup backup) => _rollback(
-        plan: backup.plan,
-        staged: backup.staged,
-        photoBakDir: backup.photoBakDir,
-        journal: File(backup.journalPath),
-      );
+  ///
+  /// A journal that already reads as committed (a commit line written but
+  /// its flush failed, so [commit] threw) or that can't be read is first
+  /// rewritten as begin-only. Otherwise a kill during this rollback would
+  /// make the next launch "finish the commit" and delete the `.bak` files
+  /// this rollback still needs.
+  Future<void> rollback(RestoreBackup backup) async {
+    final journal = File(backup.journalPath);
+    if (journal.existsSync()) {
+      bool committed;
+      try {
+        committed = RestoreJournal.read(journal).committed;
+      } on RestoreJournalFormatException {
+        committed = true; // can't tell: make it say "roll back" for sure
+      }
+      if (committed) {
+        RestoreJournal.rewriteUncommitted(journal,
+            plan: backup.plan,
+            staged: backup.staged,
+            photoBakDir: backup.photoBakDir);
+      }
+    }
+    await _rollback(
+      plan: backup.plan,
+      staged: backup.staged,
+      photoBakDir: backup.photoBakDir,
+      journal: journal,
+    );
+  }
 
   /// Accepts a restore whose data has opened: durably marks the journal
   /// committed (throws if it can't — the caller should then [rollback]),

@@ -109,6 +109,20 @@ class RestoreJournal {
     }
   }
 
+  /// Atomically replaces [file] with a fresh begin-only journal: written to
+  /// a temp file, flushed, then renamed over [file], so a crash leaves
+  /// either the old journal or the new one, never a torn one.
+  static void rewriteUncommitted(
+    File file, {
+    required List<PlannedMove> plan,
+    required List<String> staged,
+    String? photoBakDir,
+  }) {
+    final tmp = File('${file.path}.tmp');
+    begin(tmp, plan: plan, staged: staged, photoBakDir: photoBakDir);
+    tmp.renameSync(file.path);
+  }
+
   /// Durably appends the `commit` record.
   static void markCommitted(File file) {
     final raf = file.openSync(mode: FileMode.append);
