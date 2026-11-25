@@ -5,7 +5,9 @@ import 'package:go_router/go_router.dart';
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/utils/currency_formatter.dart';
 import 'package:pos_app/shared/widgets/app_empty_state.dart';
+import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
+import 'package:pos_app/features/products/domain/stock_level.dart';
 import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
 
 class ProductsScreen extends ConsumerStatefulWidget {
@@ -55,6 +57,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     final productsAsync = ref.watch(productsStreamProvider);
     final categoriesAsync = ref.watch(categoriesStreamProvider);
     final fmt = ref.watch(currencyFormatterProvider);
+    final lowStockThreshold = ref.watch(lowStockThresholdProvider);
     final f = ref.watch(productsFilterProvider);
     final filter = ref.read(productsFilterProvider.notifier);
     final cs = Theme.of(context).colorScheme;
@@ -232,6 +235,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                     product: filtered[i],
                     categoryName: catMap[filtered[i].categoryId],
                     fmt: fmt,
+                    lowStockThreshold: lowStockThreshold,
                     onTap: () =>
                         context.push('/products/${filtered[i].id}'),
                   ),
@@ -316,9 +320,13 @@ class _ProductTile extends StatelessWidget {
     required this.product,
     required this.fmt,
     required this.onTap,
+    required this.lowStockThreshold,
     this.categoryName,
   });
   final Product product;
+
+  /// The shop's own setting — the same one the inventory screen uses.
+  final int lowStockThreshold;
   final String? categoryName;
   final CurrencyFormatter fmt;
   final VoidCallback onTap;
@@ -329,9 +337,7 @@ class _ProductTile extends StatelessWidget {
     final tt = Theme.of(context).textTheme;
     // 0 = unlimited; < 0 = out of stock; > 0 = tracked
     final outOfStock = product.isOutOfStock || product.stockQuantity < 0;
-    final lowStock = !outOfStock &&
-        product.stockQuantity > 0 &&
-        product.stockQuantity <= 5;
+    final lowStock = isLowStock(product, lowStockThreshold);
 
     return ListTile(
       onTap: onTap,

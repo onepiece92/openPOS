@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 
+import 'package:pos_app/features/products/domain/unit_conversion.dart';
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/theme/app_theme.dart';
@@ -61,9 +62,10 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
       return 'Stock and prices are per $_unitLabel. '
           'Add a secondary unit to sell in bulk (e.g. box, dozen).';
     }
-    final rate = double.tryParse(_conversionCtrl.text);
-    final rateText = rate == null || rate <= 0 ? '?' : _fmtRate(rate);
-    return '1 ${_secondaryUnitCtrl.text.trim()} = $rateText $_unitLabel';
+    final rate = parseConversionRate(_conversionCtrl.text);
+    final rateText = rate == null ? '?' : '$rate';
+    return '1 ${_secondaryUnitCtrl.text.trim()} = $rateText $_unitLabel '
+        '(a whole number, $kMinConversionRate or more)';
   }
 
   /// 12.0 → "12", 2.5 → "2.5"
@@ -155,8 +157,10 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
           _unitCtrl.text.trim().isEmpty ? 'pcs' : _unitCtrl.text.trim();
       final secondaryUnit = _secondaryUnitCtrl.text.trim();
       final hasSecondary = secondaryUnit.isNotEmpty;
-      final conversionRate =
-          hasSecondary ? (double.tryParse(_conversionCtrl.text) ?? 1.0) : 1.0;
+      // The validator has already required a whole number ≥ 2 here.
+      final conversionRate = hasSecondary
+          ? (parseConversionRate(_conversionCtrl.text) ?? 1).toDouble()
+          : 1.0;
 
       int compositeId;
       if (_isEdit) {
@@ -500,23 +504,22 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                           child: TextFormField(
                             controller: _conversionCtrl,
                             enabled: _hasSecondaryUnit,
-                            keyboardType: const TextInputType.numberWithOptions(
-                                decimal: true),
+                            // Whole numbers only: stock is counted in whole
+                            // main units. A product saved earlier with a
+                            // fractional rate still shows it here, and the
+                            // validator asks for a whole one before saving.
+                            keyboardType: TextInputType.number,
                             inputFormatters: [
-                              FilteringTextInputFormatter.allow(
-                                  RegExp(r'^\d*\.?\d{0,3}')),
+                              FilteringTextInputFormatter.digitsOnly,
                             ],
                             decoration: const InputDecoration(
                               labelText: 'Conversion',
                               hintText: '12',
                               border: OutlineInputBorder(),
                             ),
-                            validator: (v) {
-                              if (!_hasSecondaryUnit) return null;
-                              final n = double.tryParse(v ?? '');
-                              if (n == null || n <= 0) return 'Must be > 0';
-                              return null;
-                            },
+                            validator: (v) => _hasSecondaryUnit
+                                ? validateConversionRate(v)
+                                : null,
                             onChanged: (_) => setState(() {}),
                           ),
                         ),
