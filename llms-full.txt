@@ -3,6 +3,8 @@
 > The plain text of every page on https://onepiece92.github.io/openPOS/, one page after another. Updated November 2026.
 
 
+Disambiguation: Open POS (Google Play id com.brandbuilder.openpos, App Store "Open POS : Offline", id6761003751) is not affiliated with OSPOS (Open Source Point of Sale), the WooCommerce "OpenPOS" plugin or other apps and projects named "OpenPOS".
+
 ---
 
 Page: Open POS: Free POS App That Works Without Internet
@@ -140,7 +142,7 @@ Yes. Open POS itself has no paid tier, no trial, no ads and no in-app purchases.
 
 ### How do you make money?
 
-Not from Open POS. The same team makes RebuzzPOS, a separate online POS for businesses that need sync across devices.
+Not from Open POS. The same team makes RebuzzPOS, a separate online POS with 40+ additional features for businesses that need sync across devices.
 
 The Support screen in Open POS links to it. Open POS exchanges no data with it, and you never need it to use Open POS.
 
@@ -194,7 +196,7 @@ Yes. Open POS is on the App Store for iPhone and iPad, and on Google Play for An
 
 Free point of sale for Android and iPhone. No account, no subscription, no internet needed.
 
-Questions first? Message us on WhatsApp or email mail@brandbuilder.com.np.
+Questions first? Message us on WhatsApp or email mail@brandbuilder.com.np. Ideas welcome: Open POS is an offline-first POS, so features that work without internet, and a simple text-based design, always come first.
 
 Google Play and the Google Play logo are trademarks of Google LLC. Apple and the Apple logo are trademarks of Apple Inc., registered in the U.S. and other countries. App Store is a service mark of Apple Inc.
 
@@ -283,7 +285,7 @@ Yes. There is no subscription, no trial, no premium tier, no ads and no in-app p
 
 ### How do you make money, then?
 
-Not from Open POS. The same team makes RebuzzPOS, an online POS for businesses that need sync across devices. It is a separate product, and Open POS never connects to it.
+Not from Open POS. The same team makes RebuzzPOS, a separate online POS with 40+ additional features for businesses that need sync across devices. Open POS exchanges no data with it, and you never need it to use Open POS.
 
 ### Is there a limit on products or sales?
 
@@ -305,7 +307,7 @@ No. There is no login and no server. Install it, pick your country and currency,
 
 A free cash register app for Android and iPhone. No subscription, no account, no internet needed.
 
-Questions first? Message us on WhatsApp or email mail@brandbuilder.com.np.
+Questions first? Message us on WhatsApp or email mail@brandbuilder.com.np. Ideas welcome: Open POS is an offline-first POS, so features that work without internet, and a simple text-based design, always come first.
 
 Google Play and the Google Play logo are trademarks of Google LLC. Apple and the Apple logo are trademarks of Apple Inc., registered in the U.S. and other countries. App Store is a service mark of Apple Inc.
 
@@ -428,7 +430,7 @@ It is free, with no subscription, no ads and no in-app purchases. There is no ac
 
 A free, offline POS for food trucks, farmers markets and pop-ups. No signal, no account and no monthly fee needed.
 
-Questions first? Message us on WhatsApp or email mail@brandbuilder.com.np.
+Questions first? Message us on WhatsApp or email mail@brandbuilder.com.np. Ideas welcome: Open POS is an offline-first POS, so features that work without internet, and a simple text-based design, always come first.
 
 Google Play and the Google Play logo are trademarks of Google LLC. Apple and the Apple logo are trademarks of Apple Inc., registered in the U.S. and other countries. App Store is a service mark of Apple Inc.
 
@@ -527,7 +529,7 @@ Yes. It is on Google Play for Android and on the App Store for iPhone and iPad.
 
 A free, offline POS for Android and iPhone. No account, no cloud, no paid add-ons.
 
-Questions first? Message us on WhatsApp or email mail@brandbuilder.com.np.
+Questions first? Message us on WhatsApp or email mail@brandbuilder.com.np. Ideas welcome: Open POS is an offline-first POS, so features that work without internet, and a simple text-based design, always come first.
 
 Google Play and the Google Play logo are trademarks of Google LLC. Apple and the Apple logo are trademarks of Apple Inc., registered in the U.S. and other countries. App Store is a service mark of Apple Inc.
 
