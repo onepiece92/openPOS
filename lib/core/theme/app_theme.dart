@@ -60,7 +60,9 @@ abstract final class AppTheme {
   // ── Frosted glass bottom bar decoration ───────────────────────────────────
   //
   // Applied to the container that holds checkout / payment bars at the bottom.
-  // Wrap the container in a ClipRect + BackdropFilter for the blur effect.
+  // No blur: these bars sit in the bottomNavigationBar slot over the static
+  // background gradient, where a BackdropFilter costs a pass per frame and
+  // changes nothing visible. Only add one if content really scrolls behind.
 
   static BoxDecoration frostedBar(ColorScheme cs) {
     final dark = cs.brightness == Brightness.dark;
