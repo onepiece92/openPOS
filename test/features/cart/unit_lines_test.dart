@@ -121,10 +121,10 @@ void main() {
 
       // A ticket saved before units existed loads as main-unit lines.
       final legacy = ticket.toJson();
-      (legacy['items'] as List).forEach((i) {
+      for (final i in legacy['items'] as List) {
         (i as Map).remove('unitLabel');
         i.remove('unitsPerQty');
-      });
+      }
       final old = HeldOrder.fromJson(legacy);
       expect(old.items.single.unitLabel, '');
       expect(old.items.single.unitsPerQty, 1.0);
