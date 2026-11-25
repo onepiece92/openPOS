@@ -71,11 +71,19 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
   Widget build(BuildContext context) {
     final history = ref.watch(orderHistoryProvider);
     final fmt = ref.watch(currencyFormatterProvider);
-    // Customers off: the customer list is not loaded (no names on rows).
-    final customers = ref.watch(featureOnProvider(Feature.customers))
-        ? ref.watch(customersStreamProvider).valueOrNull ?? const []
-        : const <Customer>[];
-    final customerNames = {for (final c in customers) c.id: c.name};
+    // Customers off: the list is not watched, but orders still show their
+    // stored customer (read once, just for the ids on screen).
+    final Map<int, String> customerNames;
+    if (ref.watch(featureOnProvider(Feature.customers))) {
+      final customers = ref.watch(customersStreamProvider).valueOrNull ?? [];
+      customerNames = {for (final c in customers) c.id: c.name};
+    } else {
+      customerNames = ref
+              .watch(customerNamesProvider(customerNamesKey(
+                  history.orders.map((o) => o.customerId))))
+              .valueOrNull ??
+          const {};
+    }
 
     return Scaffold(
       drawer: const PosDrawer(),

@@ -19,7 +19,7 @@ void main() {
   const offDestinations = ['Customers', 'Tables', 'Expenses', 'Inventory'];
 
   testWidgets('switched-off destinations are not listed', (tester) async {
-    await pump(tester, FeatureFlags.only({}));
+    await pump(tester, FeatureFlags.only(const {}));
     for (final label in offDestinations) {
       expect(find.text(label), findsNothing, reason: label);
     }

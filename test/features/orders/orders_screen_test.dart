@@ -10,6 +10,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
+import 'package:pos_app/features/customers/domain/customers_provider.dart';
 import 'package:pos_app/features/orders/domain/order_history.dart';
 import 'package:pos_app/features/orders/presentation/orders_screen.dart';
 
@@ -137,5 +138,31 @@ void main() {
     await tester.enterText(find.byType(TextField), 'zzz');
     await settle(tester);
     expect(find.text('No orders match "zzz"'), findsOneWidget);
+  });
+
+  testWidgets(
+      'Customers off: orders still show their stored customer, and the '
+      'customer list is never watched', (tester) async {
+    final id = await tester.runAsync(() => db.customersDao
+        .upsert(CustomersCompanion.insert(name: 'Asha Rai')));
+    await tester.runAsync(() => order(1, DateTime.now(), customerId: id));
+    await settingsBox.put(
+        kFeaturesKey, {for (final f in Feature.values) f.name: true}
+          ..['customers'] = false);
+    container.dispose();
+    var listReads = 0;
+    container = ProviderContainer(overrides: [
+      databaseProvider.overrideWithValue(db),
+      settingsBoxProvider.overrideWithValue(settingsBox),
+      orderHistoryProvider
+          .overrideWith((ref) => OrderHistoryNotifier(db, pageSize: 4)),
+      customersStreamProvider.overrideWith((ref) {
+        listReads++;
+        return const Stream<List<Customer>>.empty();
+      }),
+    ]);
+    await pumpScreen(tester);
+    expect(find.textContaining('Asha Rai'), findsOneWidget);
+    expect(listReads, 0);
   });
 }
