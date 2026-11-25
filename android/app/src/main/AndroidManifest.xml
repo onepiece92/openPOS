@@ -22,10 +22,20 @@
     <!-- Android 13+: image_picker uses the system Photo Picker, which requires no permission. -->
     <!-- READ_MEDIA_IMAGES intentionally NOT declared (Google Play photo & video permissions policy). -->
 
+    <!-- OS-level backup is off: the database and settings must not be
+         copied to the user's Google account or to another device by Android.
+         allowBackup=false covers Auto Backup and adb backup; Android 12+
+         additionally reads dataExtractionRules (device-to-device transfer
+         ignores allowBackup there); fullBackupContent=false is the same
+         statement for Android 11 and older. The app's own zip backup is a
+         separate, user-driven feature and is not affected. -->
     <application
         android:label="Open POS"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:extractNativeLibs="false">
         <activity
             android:name=".MainActivity"
