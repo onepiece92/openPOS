@@ -2,7 +2,7 @@
 
 **A free, 100% offline point-of-sale app. Your sales data never leaves your device.**
 
-No subscription. No account. No internet connection needed. Ring up sales, manage tables and track your takings on an Android phone or tablet, with everything stored on that device.
+No subscription. No account. No internet connection needed. Ring up sales, manage tables and track your takings on an Android or iOS phone or tablet, with everything stored on that device.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Platforms: Android | iOS](https://img.shields.io/badge/platforms-Android%20%7C%20iOS-informational.svg)](#get-open-pos)
@@ -13,15 +13,17 @@ No subscription. No account. No internet connection needed. Ring up sales, manag
 
 ## Get Open POS
 
-<a href="https://play.google.com/store/apps/details?id=com.brandbuilder.openpos&referrer=utm_source%3Dgithub%26utm_medium%3Dreadme"><img alt="Get it on Google Play" src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" height="80"></a>
+<a href="https://play.google.com/store/apps/details?id=com.brandbuilder.openpos&referrer=utm_source%3Dgithub%26utm_medium%3Dreadme"><img alt="Get it on Google Play" src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" height="80"></a> <a href="https://apps.apple.com/app/open-pos-offline/id6761003751?ct=github_readme"><img alt="Download on the App Store" src="https://tools.applemediaservices.com/api/badges/download-on-the-app-store/black/en-us?size=250x83" height="54"></a>
 
 **Android:** install Open POS from [Google Play](https://play.google.com/store/apps/details?id=com.brandbuilder.openpos&referrer=utm_source%3Dgithub%26utm_medium%3Dreadme).
 
-The Google Play version dates from May 2026. The features below describe the upcoming release, which also fixes known issues in refunds, stock and printing. The next release also ships as a direct APK here, in a build you can verify yourself. Click **Watch → Custom → Releases** at the top of this page to be notified.
+**iPhone and iPad:** install it from the [App Store](https://apps.apple.com/app/open-pos-offline/id6761003751?ct=github_readme).
 
-**iOS:** no public build yet. You can also [build Android or iOS from source](#build-from-source).
+The current store versions date from May 2026. The features below describe the upcoming release, which also fixes known issues in refunds, stock and printing. The next release also ships as a direct APK here, in a build you can verify yourself. Click **Watch → Custom → Releases** at the top of this page to be notified.
 
-<sub>Google Play and the Google Play logo are trademarks of Google LLC.</sub>
+You can also [build Android or iOS from source](#build-from-source).
+
+<sub>Google Play and the Google Play logo are trademarks of Google LLC. Apple and the Apple logo are trademarks of Apple Inc. App Store is a service mark of Apple Inc.</sub>
 
 <!-- HOLD: restore at first release (replace the section above)
 **[Download the latest release](https://github.com/onepiece92/openPOS/releases/latest)**
