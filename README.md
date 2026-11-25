@@ -11,6 +11,19 @@ No subscription. No account. No internet connection needed. Ring up sales, manag
 
 ---
 
+## Who it's for
+
+- [Small shops and cafes](https://onepiece92.github.io/openPOS/loyverse-alternative/) that want a simple register without the setup of a big system
+- [Food trucks and farmers markets](https://onepiece92.github.io/openPOS/food-trucks-farmers-markets/)
+- [Craft fairs and pop-ups](https://onepiece92.github.io/openPOS/pos-for-craft-fairs-pop-ups/)
+- Anyone who wants [a free register with no account](https://onepiece92.github.io/openPOS/cash-register-no-subscription/)
+
+If you outgrow it, the same team makes [RebuzzPOS](https://rebuzzpos.com), a separate online POS with 40+ additional features and sync across devices. Open POS exchanges no data with it, and you never need it.
+
+**Website:** [onepiece92.github.io/openPOS](https://onepiece92.github.io/openPOS/) · **Guides:** [Food trucks and farmers markets](https://onepiece92.github.io/openPOS/food-trucks-farmers-markets/) · [Craft fairs and pop-ups](https://onepiece92.github.io/openPOS/pos-for-craft-fairs-pop-ups/) · [Cash register with no subscription](https://onepiece92.github.io/openPOS/cash-register-no-subscription/) · [A Loyverse alternative](https://onepiece92.github.io/openPOS/loyverse-alternative/)
+
+---
+
 ## Get Open POS
 
 <a href="https://play.google.com/store/apps/details?id=com.brandbuilder.openpos&referrer=utm_source%3Dgithub%26utm_medium%3Dreadme"><img alt="Get it on Google Play" src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" height="80"></a> <a href="https://apps.apple.com/app/open-pos-offline/id6761003751?ct=github_readme"><img alt="Download on the App Store" src="https://toolbox.marketingtools.apple.com/api/badges/download-on-the-app-store/black/en-us?size=250x83" height="54"></a>
