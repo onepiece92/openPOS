@@ -54,11 +54,13 @@ class PosCartActions {
   }
 
   /// Moves [p]'s main-unit line by [delta] (the tile stepper: +1 / -1).
-  /// Reaching zero removes the line.
+  /// Reaching zero removes the line. Only a raise is checked against stock:
+  /// a line already above it (stock sold since, a resumed ticket) can always
+  /// be lowered.
   void step(Product p, int delta) {
     final current = _container.read(cartMainUnitQtyProvider)[p.id] ?? 0;
     final qty = current + delta;
-    if (qty > 0) {
+    if (delta > 0) {
       final otherLines = _committed(p) - current;
       if (!_allowQty(p, otherLines + qty)) return;
     }
