@@ -81,7 +81,7 @@ class SupportScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 20),
-          _SectionHeader('Upgrade POS', tt, cs),
+          _SectionHeader('More from the team', tt, cs),
           _UpgradeCard(
             icon: Icons.rocket_launch_rounded,
             title: 'RebuzzPOS',
