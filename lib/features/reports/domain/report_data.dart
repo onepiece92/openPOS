@@ -43,7 +43,8 @@ extension ReportPeriodX on ReportPeriod {
 // ── Query (period or custom range) ───────────────────────────────────────────
 
 class ReportQuery {
-  const ReportQuery({required this.from, required this.to, required this.label});
+  const ReportQuery(
+      {required this.from, required this.to, required this.label});
   final DateTime from;
   final DateTime to;
   final String label;
@@ -101,7 +102,16 @@ class ReportData {
     required this.chartDates,
     required this.chartTotals,
     required this.chartHighlightIndex,
+    this.taxLabel = genericTaxLabel,
   });
+
+  /// What the dashboard calls tax when the shop's own name for it is not
+  /// unambiguous.
+  static const genericTaxLabel = 'Tax';
+
+  /// The shop's own word for its tax ("VAT", "Sales Tax", "GST"), used in
+  /// the dashboard's labels — see [resolveTaxLabel].
+  final String taxLabel;
 
   /// Takings including VAT, net of refunds.
   final double revenue;
@@ -142,6 +152,28 @@ class ReportData {
   static double _round2(double v) => (v * 100).roundToDouble() / 100;
 }
 
+// ── Tax label ─────────────────────────────────────────────────────────────────
+
+/// The name the dashboard uses for tax: the single tax name on the period's
+/// orders if they all used one; with no taxed orders, the shop's one active
+/// tax rate; and the generic "Tax" when there are several names or none.
+String resolveTaxLabel({
+  required List<String> namesOnOrders,
+  required List<String> activeRateNames,
+}) {
+  List<String> distinct(List<String> names) => {
+        for (final n in names)
+          if (n.trim().isNotEmpty) n.trim()
+      }.toList();
+  final onOrders = distinct(namesOnOrders);
+  if (onOrders.length == 1) return onOrders.single;
+  if (onOrders.isEmpty) {
+    final rates = distinct(activeRateNames);
+    if (rates.length == 1) return rates.single;
+  }
+  return ReportData.genericTaxLabel;
+}
+
 // ── Provider ──────────────────────────────────────────────────────────────────
 
 String _hourLabel(int h) {
@@ -157,8 +189,14 @@ final reportProvider =
   // The key no longer moves during the day, so recompute when a sale, void,
   // refund or expense lands instead of serving the first answer until midnight.
   final changes = db
-      .tableUpdates(TableUpdateQuery.onAllTables(
-          [db.orders, db.orderItems, db.returns, db.expenses, db.products]))
+      .tableUpdates(TableUpdateQuery.onAllTables([
+        db.orders,
+        db.orderItems,
+        db.returns,
+        db.expenses,
+        db.products,
+        db.taxRates,
+      ]))
       .listen((_) => ref.invalidateSelf());
   ref.onDispose(changes.cancel);
   final from = query.from;
@@ -179,6 +217,14 @@ final reportProvider =
       TopProduct(
           productId: r.productId, name: r.name, qty: r.qty, sales: r.sales),
   ];
+
+  final taxLabel = resolveTaxLabel(
+    namesOnOrders: await db.ordersDao.taxNamesForPeriod(from, to),
+    activeRateNames: [
+      for (final r in await db.taxDao.getAll())
+        if (r.isActive) r.name,
+    ],
+  );
 
   final payRaw = await db.ordersDao.paymentBreakdownForPeriod(from, to);
   final payBreakdown = payRaw
@@ -304,5 +350,6 @@ final reportProvider =
     chartDates: chartDates,
     chartTotals: chartTotals,
     chartHighlightIndex: chartHighlightIndex,
+    taxLabel: taxLabel,
   );
 });

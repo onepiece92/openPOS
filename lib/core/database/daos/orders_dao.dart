@@ -361,6 +361,23 @@ class OrdersDao extends DatabaseAccessor<AppDatabase> with _$OrdersDaoMixin {
 
   static double _round2(double v) => (v * 100).roundToDouble() / 100;
 
+  /// The distinct tax names charged on revenue-carrying orders in the
+  /// period (at most [limit] — callers only need "none, one or several").
+  Future<List<String>> taxNamesForPeriod(DateTime from, DateTime to,
+      {int limit = 2}) async {
+    final rows = await customSelect(
+      'SELECT DISTINCT TRIM(t.tax_rate_name) AS name '
+      'FROM orders o JOIN order_taxes t ON t.order_id = o.id '
+      'WHERE o.created_at >= ? AND o.created_at <= ? '
+      "  AND o.status IN ('completed', 'refunded') "
+      "  AND TRIM(t.tax_rate_name) != '' "
+      'LIMIT ?',
+      variables: [Variable(from), Variable(to), Variable(limit)],
+      readsFrom: {orders, orderTaxes},
+    ).get();
+    return [for (final r in rows) r.read<String>('name')];
+  }
+
   /// Payment method breakdown for a period, net of refunds.
   /// Returns [{method, count, total}].
   Future<List<Map<String, dynamic>>> paymentBreakdownForPeriod(

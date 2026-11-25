@@ -128,7 +128,8 @@ class DashboardBody extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: Text(
-              'Units sold and sales excl. VAT, after discounts and refunds',
+              'Units sold and sales excl. ${data.taxLabel}, '
+              'after discounts and refunds',
               style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
             ),
           ),
@@ -220,14 +221,14 @@ class DashboardBody extends StatelessWidget {
   List<Widget> _buildKpiRows() => [
         _kpiRow(
           KpiCard(
-            label: 'Revenue (incl. VAT)',
+            label: 'Revenue (incl. ${data.taxLabel})',
             value: '$symbol ${_fmt(data.revenue)}',
             icon: Icons.trending_up_rounded,
             color: cs.primary,
             cs: cs,
           ),
           KpiCard(
-            label: 'VAT Collected',
+            label: '${data.taxLabel} Collected',
             value: '$symbol ${_fmt(data.vatCollected)}',
             icon: Icons.receipt_long_rounded,
             color: cs.tertiary,
@@ -271,7 +272,8 @@ class DashboardBody extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
           child: Text(
-            'Net profit = sales excl. VAT ($symbol ${_fmt(data.salesExVat)}) '
+            'Net profit = sales excl. ${data.taxLabel} '
+            '($symbol ${_fmt(data.salesExVat)}) '
             '− cost of goods − expenses.',
             style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
           ),
