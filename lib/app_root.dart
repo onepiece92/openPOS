@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -29,6 +30,7 @@ class AppRootState extends State<AppRoot> {
   ProviderContainer _container = ProviderContainer();
   bool _restoring = false;
   String? _notice; // one-shot toast shown after a restart
+  String? _fatal; // set when no data could be reopened after a restore
 
   @override
   void initState() {
@@ -47,56 +49,152 @@ class AppRootState extends State<AppRoot> {
   }
 
   /// Restores [zip] and restarts the app on the restored data.
-  /// Throws [SnapshotFormatException] (or IO errors) if the file is rejected;
-  /// in that case the app comes back up on its previous data.
+  ///
+  /// "Backup restored" is shown only once the restored DB has opened (which
+  /// runs any migrations) and answered a first query. Outcomes otherwise:
+  /// * the backup is rejected before any file is touched
+  ///   ([SnapshotFormatException], IO error, or the old DB failed to close)
+  ///   → app reopens on its unchanged data;
+  /// * the backup was swapped in but failed to open
+  ///   ([RestoreRolledBackException]) → the `.bak` DB and Hive files are
+  ///   put back and the app reopens on them;
+  /// * nothing can be reopened ([RestoreFatalException]) → an error screen
+  ///   with a retry button, never an endless splash.
+  /// The error is rethrown after the UI has been updated.
   Future<void> restoreFrom(File zip) async {
     if (_restoring) return;
     // Resolve paths while Hive is still open (box.path needs an open box).
-    final dbFile = await databaseFile();
+    final dbPath = (await databaseFile()).path;
     final hiveFiles = snapshotHiveBoxFiles();
+    final zipPath = zip.path;
 
     // 1. Unmount the app tree so no widget can issue queries mid-swap.
-    setState(() => _restoring = true);
-    await WidgetsBinding.instance.endOfFrame;
+    setState(() {
+      _restoring = true;
+      _fatal = null;
+    });
 
     Object? error;
+    String? notice;
+    String? fatal;
     try {
-      // 2. Release both stores.
-      await _container.read(databaseProvider).close();
-      _container.dispose();
-      await Hive.close();
+      await WidgetsBinding.instance.endOfFrame;
 
-      // 3. Swap files (atomic per file).
-      await const SnapshotService().restore(
-        zip: zip,
-        dbFile: dbFile,
-        hiveBoxFiles: hiveFiles,
-        currentSchemaVersion: AppDatabase.currentSchemaVersion,
-      );
-    } catch (e) {
-      error = e;
-    } finally {
-      // 4. Bring everything back — on the restored data, or the old data if
-      //    the restore was rejected before it touched anything.
-      for (final name in kSnapshotHiveBoxes) {
-        await Hive.openBox<dynamic>(name);
+      // 2. Release both stores. If that fails, nothing on disk is touched.
+      var released = false;
+      try {
+        await _releaseStores();
+        released = true;
+      } catch (e) {
+        error = e;
+        notice = 'Restore failed: $e. Your data was not changed.';
+        try {
+          await _reopenStores();
+        } catch (e2) {
+          fatal = '${RestoreFatalException(cause: e, reopenError: e2)}';
+        }
       }
-      _container = ProviderContainer();
+
+      if (released) {
+        // 3. Verify + swap off the UI isolate, reopen, roll back on failure.
+        try {
+          await const SnapshotService().restoreWithRollback(
+            swap: () => _swapInIsolate(zipPath, dbPath, hiveFiles),
+            reopen: _reopenStores,
+            release: _releaseStores,
+          );
+          notice = 'Backup restored';
+        } on RestoreFatalException catch (e) {
+          error = e;
+          fatal = '$e';
+        } on RestoreRolledBackException catch (e) {
+          error = e;
+          notice = 'Restore failed: $e';
+        } catch (e) {
+          error = e;
+          notice = 'Restore failed: $e. Your data was not changed.';
+        }
+      }
+    } catch (e) {
+      error ??= e;
+      fatal ??= 'Restore failed: $e';
+    } finally {
       if (mounted) {
         setState(() {
           _restoring = false;
-          _notice = error == null
-              ? 'Backup restored'
-              : 'Restore failed: $error';
+          _fatal = fatal;
+          _notice = fatal == null ? notice : null;
         });
+      } else {
+        _restoring = false;
       }
     }
     if (error != null) throw error;
   }
 
+  /// Static so the isolate closure captures only these plain values, never
+  /// `this` (State is not sendable).
+  static Future<RestoreBackup> _swapInIsolate(
+    String zipPath,
+    String dbPath,
+    Map<String, String> hiveFiles,
+  ) =>
+      Isolate.run(() => const SnapshotService().restore(
+            zip: File(zipPath),
+            dbFile: File(dbPath),
+            hiveBoxFiles: hiveFiles,
+            currentSchemaVersion: AppDatabase.currentSchemaVersion,
+          ));
+
+  /// Closes the DB and Hive. The old container is disposed even if closing
+  /// the DB throws.
+  Future<void> _releaseStores() async {
+    final old = _container;
+    try {
+      await old.read(databaseProvider).close();
+    } finally {
+      old.dispose();
+      await Hive.close();
+    }
+  }
+
+  /// Opens Hive + a fresh container and runs a first query, so a broken DB
+  /// or failed migration surfaces here rather than after "restored".
+  Future<void> _reopenStores() async {
+    for (final name in kSnapshotHiveBoxes) {
+      await Hive.openBox<dynamic>(name);
+    }
+    final c = ProviderContainer();
+    _container = c;
+    await c.read(databaseProvider).customSelect('SELECT 1').get();
+  }
+
+  Future<void> _retryOpen() async {
+    setState(() => _restoring = true);
+    String? fatal;
+    try {
+      try {
+        await _releaseStores();
+      } catch (_) {/* stores may already be half-closed */}
+      await _reopenStores();
+    } catch (e) {
+      fatal = 'Still unable to open the app data: $e';
+    } finally {
+      if (mounted) {
+        setState(() {
+          _restoring = false;
+          _fatal = fatal;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_restoring) return const _RestoringSplash();
+    if (_fatal != null) {
+      return _RestoreFailedScreen(message: _fatal!, onRetry: _retryOpen);
+    }
     return UncontrolledProviderScope(
       // New key per container → subtree is rebuilt from scratch on restart.
       key: ObjectKey(_container),
@@ -127,6 +225,45 @@ class _RestoringSplash extends StatelessWidget {
                 SizedBox(height: 16),
                 Text('Restoring backup…'),
               ],
+            ),
+          ),
+        ),
+      );
+}
+
+class _RestoreFailedScreen extends StatelessWidget {
+  const _RestoreFailedScreen({required this.message, required this.onRetry});
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) => MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: Scaffold(
+          body: SafeArea(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Restore failed',
+                      style:
+                          TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(message, textAlign: TextAlign.center),
+                    const SizedBox(height: 24),
+                    FilledButton(
+                      onPressed: onRetry,
+                      child: const Text('Try again'),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),

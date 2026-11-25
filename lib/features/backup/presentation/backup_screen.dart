@@ -531,6 +531,17 @@ class _AutoBackupTile extends ConsumerWidget {
                           : 'Auto-backup off · tap to browse',
                       style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                     ),
+                    ValueListenableBuilder<String?>(
+                      valueListenable: autoBackupLastError,
+                      builder: (context, err, _) => err == null
+                          ? const SizedBox.shrink()
+                          : Text(
+                              'Last auto-backup failed: $err',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: tt.bodySmall?.copyWith(color: cs.error),
+                            ),
+                    ),
                   ],
                 ),
               ),
