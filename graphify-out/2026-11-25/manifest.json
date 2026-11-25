@@ -48,10 +48,10 @@
     "semantic_hash": "efd02217050ccec5e04fc88c6971923b"
   },
   "lib/main.dart": {
-    "mtime": 1787044651.7015045,
-    "seen": 1787549093.426868,
-    "ast_hash": "1632432935e640a105d51b4215645367",
-    "semantic_hash": "1632432935e640a105d51b4215645367"
+    "mtime": 1795617642.3658187,
+    "seen": 1795617912.856838,
+    "ast_hash": "94e8247ad3e91c88fa010d2fce1b2544",
+    "semantic_hash": ""
   },
   "lib/app.dart": {
     "mtime": 1787049411.6452596,
@@ -300,10 +300,10 @@
     "semantic_hash": "37de75b2a9127d74db7f53c915af5204"
   },
   "lib/core/utils/currency_formatter.dart": {
-    "mtime": 1772874527.5940795,
-    "seen": 1787548275.6162019,
-    "ast_hash": "316cb512667731b2bbcd643845958470",
-    "semantic_hash": "316cb512667731b2bbcd643845958470"
+    "mtime": 1795617642.3654482,
+    "seen": 1795617912.8566499,
+    "ast_hash": "18ef21d0e3c762d135384c352c03c663",
+    "semantic_hash": ""
   },
   "lib/core/utils/tax_calculator.dart": {
     "mtime": 1795604602.037911,
@@ -330,10 +330,10 @@
     "semantic_hash": "0e682ee599afadc57b49a7da97310ef5"
   },
   "lib/core/theme/app_theme.dart": {
-    "mtime": 1778588487.3532999,
-    "seen": 1787548275.616199,
-    "ast_hash": "e63083163572240e10843aea979e83e4",
-    "semantic_hash": "e63083163572240e10843aea979e83e4"
+    "mtime": 1795617872.5722709,
+    "seen": 1795617912.85664,
+    "ast_hash": "fcce51a2d5981732cbdb7c300a549965",
+    "semantic_hash": ""
   },
   "lib/core/services/audit_service.dart": {
     "mtime": 1778589919.289434,
@@ -414,9 +414,9 @@
     "semantic_hash": "ab22b483427636d597830da8e39742a2"
   },
   "lib/features/products/domain/products_provider.dart": {
-    "mtime": 1795606029.855558,
-    "seen": 1795617159.358368,
-    "ast_hash": "28f7012fd5d9637005cba11c5bda60b9",
+    "mtime": 1795617799.7494934,
+    "seen": 1795617912.856781,
+    "ast_hash": "e687afe9bb639fc8ce52e50a3214f407",
     "semantic_hash": ""
   },
   "lib/features/products/domain/favorites_provider.dart": {
@@ -432,9 +432,9 @@
     "semantic_hash": "d3986b22c841d49871c946cdc10e5773"
   },
   "lib/features/products/presentation/products_screen.dart": {
-    "mtime": 1795605178.7813876,
-    "seen": 1795605285.045851,
-    "ast_hash": "2fe2dfef6087d165f7eba8d1e617ed17",
+    "mtime": 1795617642.3641534,
+    "seen": 1795617912.8567889,
+    "ast_hash": "d513596c18e81dab8e855446fcb652cd",
     "semantic_hash": ""
   },
   "lib/features/products/presentation/product_form_screen.dart": {
@@ -444,9 +444,9 @@
     "semantic_hash": ""
   },
   "lib/features/expenses/presentation/expenses_screen.dart": {
-    "mtime": 1795606248.3385932,
-    "seen": 1795617159.358343,
-    "ast_hash": "8a13b7832a7f22955b8b5e91397f7428",
+    "mtime": 1795617642.3674371,
+    "seen": 1795617912.856721,
+    "ast_hash": "40dc47f9273e2b4a9d0406abd5d6756b",
     "semantic_hash": ""
   },
   "lib/features/printing/domain/render_receipt.dart": {
@@ -486,10 +486,10 @@
     "semantic_hash": "fe4686c3b490e8e1d6aa574718e031d3"
   },
   "lib/features/inventory/presentation/inventory_screen.dart": {
-    "mtime": 1787479732.079485,
-    "seen": 1787549093.4268339,
-    "ast_hash": "67c4bc0c8b5b32bf099ef1aba5476936",
-    "semantic_hash": "67c4bc0c8b5b32bf099ef1aba5476936"
+    "mtime": 1795617642.3650866,
+    "seen": 1795617912.8567302,
+    "ast_hash": "bacb84480b724ca054f818bc07d6ae9f",
+    "semantic_hash": ""
   },
   "lib/features/cart/data/place_order.dart": {
     "mtime": 1795604685.8224266,
@@ -516,9 +516,9 @@
     "semantic_hash": ""
   },
   "lib/features/cart/presentation/home.dart": {
-    "mtime": 1795602022.0986931,
-    "seen": 1795602177.730339,
-    "ast_hash": "aa6ede816d11ada5f17db41d47464995",
+    "mtime": 1795617791.613338,
+    "seen": 1795617912.856687,
+    "ast_hash": "fc2d1b14bfca3197d73e5453cd84a835",
     "semantic_hash": ""
   },
   "lib/features/cart/presentation/cart_detail_screen.dart": {
@@ -546,27 +546,27 @@
     "semantic_hash": ""
   },
   "lib/features/cart/presentation/widgets/grid_product_tile.dart": {
-    "mtime": 1787547857.6216662,
-    "seen": 1787549093.4268239,
-    "ast_hash": "981c7afb4b4a857949c4048707c2be93",
-    "semantic_hash": "981c7afb4b4a857949c4048707c2be93"
+    "mtime": 1795617796.0557961,
+    "seen": 1795617912.856703,
+    "ast_hash": "c52e7a6d3e6e543b05345a4e9a80f1c7",
+    "semantic_hash": ""
   },
   "lib/features/cart/presentation/widgets/checkout_bar.dart": {
-    "mtime": 1778590606.0816205,
-    "seen": 1787548275.6162162,
-    "ast_hash": "a08107a38abaced3b816a9d2c3806e98",
-    "semantic_hash": "a08107a38abaced3b816a9d2c3806e98"
+    "mtime": 1795617612.746067,
+    "seen": 1795617912.856697,
+    "ast_hash": "f0acd626e1d1c53b954bd778896ecf37",
+    "semantic_hash": ""
   },
   "lib/features/cart/presentation/widgets/product_tile.dart": {
-    "mtime": 1787547918.5943444,
-    "seen": 1787549093.426826,
-    "ast_hash": "619baa64aee95153d030b70ca79224c5",
-    "semantic_hash": "619baa64aee95153d030b70ca79224c5"
+    "mtime": 1795617560.6695113,
+    "seen": 1795617912.856707,
+    "ast_hash": "0ad3ea90fc8fefdc6e24a2af369ad33e",
+    "semantic_hash": ""
   },
   "lib/features/cart/presentation/widgets/held_tickets_bar.dart": {
-    "mtime": 1795601997.0675402,
-    "seen": 1795602177.730345,
-    "ast_hash": "dcd3e6e0970a57ba163ac73a46814dad",
+    "mtime": 1795617787.4003754,
+    "seen": 1795617912.856704,
+    "ast_hash": "4042eeb0c165b9588ef3514863090a5b",
     "semantic_hash": ""
   },
   "lib/features/returns/domain/void_order.dart": {
@@ -1605,6 +1605,36 @@
     "mtime": 1795616966.298942,
     "seen": 1795617159.358434,
     "ast_hash": "eedf53ac29557cdaff79eb8be6c2cdde",
+    "semantic_hash": ""
+  },
+  "lib/features/cart/domain/pos_catalog_provider.dart": {
+    "mtime": 1795617799.7466319,
+    "seen": 1795617912.85668,
+    "ast_hash": "27c3cb3b7354a356d7b18d2a87fd4fca",
+    "semantic_hash": ""
+  },
+  "lib/features/cart/presentation/pos_cart_actions.dart": {
+    "mtime": 1795617550.6156385,
+    "seen": 1795617912.85669,
+    "ast_hash": "e622ca64f537e8d0f8fd17f16de1bbe5",
+    "semantic_hash": ""
+  },
+  "test/_support/fake_products.dart": {
+    "mtime": 1795617691.4532921,
+    "seen": 1795617912.856854,
+    "ast_hash": "302e36a2b2f4ec5f6885a5532b5cd5e4",
+    "semantic_hash": ""
+  },
+  "test/features/cart/sell_screen_rebuild_test.dart": {
+    "mtime": 1795617862.1883,
+    "seen": 1795617912.8569138,
+    "ast_hash": "fea1e4dac53ee823f0436c4c3100c458",
+    "semantic_hash": ""
+  },
+  "test/features/products/shared_product_list_test.dart": {
+    "mtime": 1795617691.4569006,
+    "seen": 1795617912.8569422,
+    "ast_hash": "4cc40fb6af22efc48380cdc3e38c410e",
     "semantic_hash": ""
   }
 }
