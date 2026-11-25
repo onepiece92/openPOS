@@ -3,6 +3,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 
 import 'package:pos_app/app_root.dart';
 import 'package:pos_app/features/backup/data/snapshot_providers.dart';
+import 'package:pos_app/features/review/data/review_state_store.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -13,6 +14,9 @@ Future<void> main() async {
   await Future.wait([
     for (final name in kSnapshotHiveBoxes) Hive.openBox<dynamic>(name),
   ]);
+  // Starts the review-prompt clock (no-op after the first launch).
+  await ReviewStateStore(Hive.box<dynamic>('settings'))
+      .ensureFirstLaunch(DateTime.now());
 
   runApp(const AppRoot());
 }

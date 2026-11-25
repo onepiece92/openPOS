@@ -1,0 +1,4 @@
+# Standalone package: don't inherit the app's options (its `include:` needs
+# the app's package config, which this package doesn't have).
+analyzer:
+  exclude: []

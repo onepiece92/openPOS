@@ -14,6 +14,8 @@ import 'package:pos_app/features/products/domain/products_provider.dart';
 import 'package:pos_app/features/receipts/domain/receipt_text.dart';
 import 'package:pos_app/features/receipts/presentation/receipt_body.dart';
 import 'package:pos_app/features/orders/domain/order_number.dart';
+import 'package:pos_app/features/review/application/review_controller.dart';
+import 'package:pos_app/features/review/review_providers.dart';
 
 final _receiptProvider =
     FutureProvider.family<ReceiptBodyData, int>((ref, orderId) async {
@@ -43,12 +45,37 @@ final _receiptProvider =
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-class ReceiptScreen extends ConsumerWidget {
+class ReceiptScreen extends ConsumerStatefulWidget {
   const ReceiptScreen({super.key, required this.orderId});
   final int orderId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ReceiptScreen> createState() => _ReceiptScreenState();
+}
+
+class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
+  // Captured up front: `ref` must not be used in dispose().
+  late final ReviewController _review;
+
+  @override
+  void initState() {
+    super.initState();
+    _review = ref.read(reviewControllerProvider);
+    // A receipt is only reached after a completed payment.
+    _review.recordCompletedSale();
+  }
+
+  @override
+  void dispose() {
+    // Fire-and-forget, after navigation settles — never during checkout or
+    // over the receipt, and never awaited on a UI path.
+    _review.onReceiptDismissed();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final orderId = widget.orderId;
     final receiptAsync = ref.watch(_receiptProvider(orderId));
     final fmt = ref.watch(currencyFormatterProvider);
 

@@ -59,3 +59,6 @@ graphify-out/.graphify_*.json
 # Per-machine Claude Code settings and agent worktrees
 .claude/settings.local.json
 .claude/worktrees/
+
+# Local/FOSS dependency swaps (see packages/in_app_review_stub/)
+pubspec_overrides.yaml
