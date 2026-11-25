@@ -5,8 +5,9 @@ const kReviewMinDaysSinceInstall = 7;
 const kReviewMinCompletedSales = 20;
 const kReviewMinDaysBetweenPrompts = 60;
 
-/// Shared spacing: no prompt of any kind (store review, feedback ask) within
-/// this many days of the last one. See [promptSpacingAllows].
+/// Spacing for the feedback ask: never within this many days of any other
+/// prompt (store review included), and never in the window before a review
+/// may become due. See [promptSpacingAllows] and [reviewEligibleWithin].
 const kMinDaysBetweenAnyPrompts = 14;
 
 /// True when at least [kMinDaysBetweenAnyPrompts] full days have passed since
@@ -54,9 +55,11 @@ class ReviewState {
 /// * [completedSales] ≥ [kReviewMinCompletedSales] (orders with status
 ///   'completed' in the database),
 /// * ≥ [kReviewMinDaysBetweenPrompts] days since the last request (or never),
-/// * [currentVersion] has not been prompted yet,
-/// * no other prompt was shown in the last [kMinDaysBetweenAnyPrompts]
-///   days ([promptSpacingAllows]).
+/// * [currentVersion] has not been prompted yet.
+///
+/// The feedback ask never delays this: it is the ask that yields (see
+/// [reviewEligibleWithin] and `shouldAskForFeedback`), so this rule is
+/// exactly what it was before the ask existed.
 ///
 /// "Days" are elapsed 24-hour periods, so a clock that jumps backwards (or a
 /// restored first-launch date in the future) simply reads as "not yet".
@@ -79,6 +82,35 @@ bool shouldRequestReview(
     return false;
   }
   if (s.lastPromptVersion == currentVersion) return false;
-  if (!promptSpacingAllows(s.lastAnyPromptAt, now)) return false;
+  return true;
+}
+
+/// Whether the store review could become due within [window] from [now],
+/// judging by its dates and version alone (the sale count is assumed met:
+/// the feedback ask that uses this needs more sales than the review).
+///
+/// The feedback ask yields to the review: it is skipped whenever this is
+/// true for the shared spacing window, so it never lands in the 14 days
+/// before a review request.
+bool reviewEligibleWithin(
+  ReviewState s, {
+  required DateTime now,
+  required String currentVersion,
+  required Duration window,
+}) {
+  if (s.lastPromptVersion == currentVersion) return false;
+  final first = s.firstLaunchAt;
+  if (first == null) return false;
+  final at = now.add(window);
+  if (at.difference(first) <
+      const Duration(days: kReviewMinDaysSinceInstall)) {
+    return false;
+  }
+  final last = s.lastPromptAt;
+  if (last != null &&
+      at.difference(last) <
+          const Duration(days: kReviewMinDaysBetweenPrompts)) {
+    return false;
+  }
   return true;
 }

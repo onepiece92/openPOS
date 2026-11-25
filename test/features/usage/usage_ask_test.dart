@@ -11,25 +11,34 @@ import 'package:pos_app/features/review/domain/review_prompter.dart';
 import 'package:pos_app/features/usage/application/usage_ask_controller.dart';
 import 'package:pos_app/features/usage/data/usage_counter.dart';
 import 'package:pos_app/features/usage/domain/usage_ask_policy.dart';
+import 'package:pos_app/features/usage/usage_constants.dart';
 
 const v = '1.1.0+10';
 final now = DateTime(2026, 11, 25, 12);
 
+/// A review already requested for [v] 20 days ago: the review is not due
+/// for 40 more days, so the ask has nothing to yield to.
+final reviewedThisVersion = ReviewState(
+  firstLaunchAt: now.subtract(const Duration(days: 45)),
+  lastPromptAt: now.subtract(const Duration(days: 20)),
+  lastPromptVersion: v,
+  lastPromptShownAt: now.subtract(const Duration(days: 20)),
+);
+
 bool ask({
-  DateTime? first,
-  DateTime? lastAny,
+  ReviewState? review,
   String? asked,
   int sales = 50,
   DateTime? at,
-  String version = v,
+  bool reviewCanShow = true,
 }) =>
     shouldAskForFeedback(
-      firstLaunchAt: first ?? now.subtract(const Duration(days: 30)),
-      lastAnyPromptAt: lastAny,
+      review: review ?? reviewedThisVersion,
       askedVersion: asked,
       completedSales: sales,
       now: at ?? now,
-      currentVersion: version,
+      currentVersion: v,
+      reviewCanShow: reviewCanShow,
     );
 
 class _Prompter implements ReviewPrompter {
@@ -50,18 +59,16 @@ void main() {
   group('shouldAskForFeedback', () {
     test('asks at 30 days AND 50 completed orders', () {
       expect(ask(), isTrue);
-      expect(ask(first: now.subtract(const Duration(days: 29, hours: 23))),
+      expect(
+          ask(
+              review: ReviewState(
+                  firstLaunchAt:
+                      now.subtract(const Duration(days: 29, hours: 23)),
+                  lastPromptAt: now.subtract(const Duration(days: 20)),
+                  lastPromptVersion: v)),
           isFalse);
       expect(ask(sales: 49), isFalse);
-      expect(
-          shouldAskForFeedback(
-              firstLaunchAt: null,
-              lastAnyPromptAt: null,
-              askedVersion: null,
-              completedSales: 999,
-              now: now,
-              currentVersion: v),
-          isFalse);
+      expect(ask(review: const ReviewState()), isFalse);
     });
 
     test('once per version (shown or dismissed counts the same)', () {
@@ -70,47 +77,106 @@ void main() {
     });
 
     test('never within 14 days of any other prompt', () {
-      expect(ask(lastAny: now.subtract(const Duration(days: 13, hours: 23))),
+      ReviewState shownAt(DateTime t) => ReviewState(
+          firstLaunchAt: reviewedThisVersion.firstLaunchAt,
+          lastPromptAt: reviewedThisVersion.lastPromptAt,
+          lastPromptVersion: v,
+          lastPromptShownAt: t);
+      expect(ask(review: shownAt(now.subtract(const Duration(days: 13)))),
           isFalse);
-      expect(ask(lastAny: now.subtract(const Duration(days: 14))), isTrue);
+      expect(
+          ask(review: shownAt(now.subtract(const Duration(days: 14)))), isTrue);
+    });
+
+    test('yields when the review is due now or within 14 days', () {
+      // This version never reviewed; last review long ago: due now.
+      final dueNow = ReviewState(
+          firstLaunchAt: now.subtract(const Duration(days: 100)),
+          lastPromptAt: now.subtract(const Duration(days: 90)),
+          lastPromptVersion: '1.0.0');
+      expect(ask(review: dueNow), isFalse);
+      // Due in 10 days (last review 50 days ago).
+      final dueSoon = ReviewState(
+          firstLaunchAt: now.subtract(const Duration(days: 100)),
+          lastPromptAt: now.subtract(const Duration(days: 50)),
+          lastPromptVersion: '1.0.0');
+      expect(ask(review: dueSoon), isFalse);
+      // Due in 15 days: the ask may go first.
+      final dueLater = ReviewState(
+          firstLaunchAt: now.subtract(const Duration(days: 100)),
+          lastPromptAt: now.subtract(const Duration(days: 45)),
+          lastPromptVersion: '1.0.0');
+      expect(ask(review: dueLater), isTrue);
+      // No store review on this device: nothing to yield to.
+      expect(ask(review: dueNow, reviewCanShow: false), isTrue);
     });
 
     test('a clock that moved backwards reads as "not yet"', () {
-      // Install date and last prompt both "in the future".
-      expect(ask(first: now.add(const Duration(days: 40))), isFalse);
-      expect(ask(lastAny: now.add(const Duration(days: 1))), isFalse);
-      expect(ask(lastAny: now.add(const Duration(days: 400))), isFalse);
+      expect(
+          ask(
+              review: ReviewState(
+                  firstLaunchAt: now.add(const Duration(days: 40)),
+                  lastPromptVersion: v)),
+          isFalse);
+      expect(
+          ask(
+              review: ReviewState(
+                  firstLaunchAt: reviewedThisVersion.firstLaunchAt,
+                  lastPromptAt: reviewedThisVersion.lastPromptAt,
+                  lastPromptVersion: v,
+                  lastPromptShownAt: now.add(const Duration(days: 1)))),
+          isFalse);
+    });
+
+    test('the ask text does not mention counting', () {
+      expect(kFeedbackAskText,
+          "What's the one thing you'd change about Open POS?");
+      expect(kOfflineFirstShortLine, 'Open POS works offline first.');
+      for (final t in [kFeedbackAskText, kOfflineFirstShortLine]) {
+        expect(t.toLowerCase(), isNot(contains('count')));
+        expect(t.toLowerCase(), isNot(contains('usage')));
+      }
     });
   });
 
-  group('shared spacing', () {
+  group('the review is never delayed by the ask', () {
     test('promptSpacingAllows', () {
       expect(promptSpacingAllows(null, now), isTrue);
       expect(promptSpacingAllows(now.subtract(const Duration(days: 14)), now),
           isTrue);
-      expect(
-          promptSpacingAllows(
-              now.subtract(const Duration(days: 13, hours: 23)), now),
+      expect(promptSpacingAllows(now.subtract(const Duration(days: 13)), now),
           isFalse);
       expect(promptSpacingAllows(now.add(const Duration(minutes: 1)), now),
           isFalse);
     });
 
-    test('the review rule also waits 14 days after the feedback ask', () {
+    test('shouldRequestReview ignores a recent ask', () {
       final s = ReviewState(
         firstLaunchAt: now.subtract(const Duration(days: 100)),
-        lastPromptShownAt: now.subtract(const Duration(days: 3)),
+        lastPromptShownAt: now.subtract(const Duration(days: 1)),
       );
       expect(
           shouldRequestReview(s,
               completedSales: 100, now: now, currentVersion: v),
-          isFalse);
-      expect(
-          shouldRequestReview(s,
-              completedSales: 100,
-              now: now.add(const Duration(days: 11)),
-              currentVersion: v),
           isTrue);
+    });
+
+    test('reviewEligibleWithin', () {
+      final s = ReviewState(
+          firstLaunchAt: now.subtract(const Duration(days: 1)),
+          lastPromptAt: null);
+      const w = Duration(days: 14);
+      expect(reviewEligibleWithin(s, now: now, currentVersion: v, window: w),
+          isTrue,
+          reason: 'install +7 days falls inside the window');
+      expect(
+          reviewEligibleWithin(
+              ReviewState(firstLaunchAt: s.firstLaunchAt, lastPromptVersion: v),
+              now: now,
+              currentVersion: v,
+              window: w),
+          isFalse,
+          reason: 'already requested for this version');
     });
 
     test('review thresholds are unchanged', () {
@@ -132,7 +198,7 @@ void main() {
     });
   });
 
-  group('UsageAskController + ReviewController', () {
+  group('controllers', () {
     late Directory tmp;
     late Box<dynamic> settings;
     late Box<dynamic> usageBox;
@@ -141,38 +207,46 @@ void main() {
     var clock = now;
     var sales = 60;
 
-    setUp(() async {
+    Future<void> openFresh() async {
       tmp = await Directory.systemTemp.createTemp('pos_usage_ask_');
       Hive.init(tmp.path);
       settings = await Hive.openBox<dynamic>('settings');
       usageBox = await Hive.openBox<dynamic>(kUsageBoxName);
       store = ReviewStateStore(settings);
       counter = UsageCounter(openBox: () async => usageBox);
+    }
+
+    Future<void> closeAll() async {
+      await Hive.close();
+      await tmp.delete(recursive: true);
+    }
+
+    setUp(() async {
+      await openFresh();
       clock = now;
       sales = 60;
       await store.ensureFirstLaunch(now.subtract(const Duration(days: 45)));
     });
-    tearDown(() async {
-      await Hive.close();
-      await tmp.delete(recursive: true);
-    });
+    tearDown(closeAll);
 
-    UsageAskController askCtl({bool reviewSupported = true}) =>
+    UsageAskController askCtl(
+            {bool reviewSupported = true, String version = v}) =>
         UsageAskController(
           reviewStore: store,
           counter: counter,
           completedSales: () async => sales,
-          appVersion: v,
+          appVersion: version,
           reviewSupported: reviewSupported,
           clock: () => clock,
         );
 
-    ReviewController reviewCtl(ReviewPrompter p, UsageAskController a) =>
+    ReviewController reviewCtl(ReviewPrompter p, UsageAskController a,
+            {String version = v}) =>
         ReviewController(
           store: store,
           prompter: p,
           completedSales: () async => sales,
-          appVersion: v,
+          appVersion: version,
           clock: () => clock,
           afterCheck: a.afterReviewCheck,
           settleDelay: Duration.zero,
@@ -180,93 +254,124 @@ void main() {
 
     test('review requested: no ask, for the rest of the session', () async {
       final a = askCtl();
-      final p = _Prompter(true);
-      final r = reviewCtl(p, a);
+      final r = reviewCtl(_Prompter(true), a);
       expect(await r.runCheck(), ReviewCheck.requested);
       expect(await a.evaluate(ReviewCheck.requested), isFalse);
-      expect(settings.get(kPromptLastShownAt), isNotNull,
-          reason: 'the review stamps the shared date');
-      // Even 30 days later in the same session, the ask stays away.
+      expect(settings.get(kPromptLastShownAt), isNotNull);
       clock = now.add(const Duration(days: 30));
       expect(await a.evaluate(ReviewCheck.notEligible), isFalse);
       expect(a.pending.value, isFalse);
     });
 
-    test('review eligible but unavailable (store present): no ask', () async {
+    test('review unavailable (F-Droid stub, no Play): the ask may show',
+        () async {
       final a = askCtl();
       final r = reviewCtl(_Prompter(false), a);
       expect(await r.runCheck(), ReviewCheck.unavailable);
-      expect(await a.evaluate(ReviewCheck.unavailable), isFalse);
-      expect(await a.evaluate(ReviewCheck.notEligible), isFalse);
-    });
-
-    test('no store at all (desktop): unavailable does not block', () async {
-      final a = askCtl(reviewSupported: false);
+      expect(store.read().lastPromptVersion, isNull,
+          reason: 'an unavailable review is never marked prompted');
       expect(await a.evaluate(ReviewCheck.unavailable), isTrue);
+      await a.markShown();
+      // …and on later days it does not repeat for this version.
+      clock = now.add(const Duration(days: 20));
+      expect(await a.evaluate(ReviewCheck.unavailable), isFalse);
     });
 
     test('review not eligible: the ask fires once, then never this version',
         () async {
-      // The review was already requested 20 days ago for this version.
       await store.markPrompted(now.subtract(const Duration(days: 20)), v);
       final a = askCtl();
       final r = reviewCtl(_Prompter(true), a);
       expect(await r.runCheck(), ReviewCheck.notEligible);
       expect(await a.evaluate(ReviewCheck.notEligible), isTrue);
-      expect(a.pending.value, isTrue);
-      await a.markShown(); // shown (and maybe dismissed)
-      expect(a.pending.value, isFalse);
+      await a.markShown();
       expect(counter.askedVersion, v);
       expect(store.read().lastPromptShownAt, now);
       clock = now.add(const Duration(days: 90));
       expect(await a.evaluate(ReviewCheck.notEligible), isFalse);
     });
 
-    test('after the ask, the review waits 14 days', () async {
-      await store.markPrompted(now.subtract(const Duration(days: 70)), '1.0.0');
-      final a = askCtl();
-      await a.markShown();
-      final p = _Prompter(true);
-      final r = reviewCtl(p, a);
-      expect(await r.runCheck(), ReviewCheck.notEligible);
-      expect(p.calls, 0);
-      clock = now.add(const Duration(days: 14));
-      expect(await r.runCheck(), ReviewCheck.requested);
-    });
-
-    test('too few orders: no ask', () async {
+    test('too few orders, or a skipped check: no ask', () async {
       await store.markPrompted(now.subtract(const Duration(days: 20)), v);
+      expect(await askCtl().evaluate(ReviewCheck.skipped), isFalse);
       sales = 49;
       expect(await askCtl().evaluate(ReviewCheck.notEligible), isFalse);
     });
 
+    test('no usage box: no ask (it could not be remembered)', () async {
+      await store.markPrompted(now.subtract(const Duration(days: 20)), v);
+      counter = UsageCounter(openBox: () async => throw StateError('no box'));
+      expect(await askCtl().evaluate(ReviewCheck.notEligible), isFalse);
+    });
+
     test('restore merge keeps the latest shared prompt date', () async {
-      final before = ReviewState(
-          firstLaunchAt: now.subtract(const Duration(days: 45)),
-          lastPromptShownAt: DateTime(2026, 11, 1));
       await settings.put(
           kPromptLastShownAt, DateTime(2026, 3, 1).toIso8601String());
-      await store.mergeAfterRestore(before);
+      await store.mergeAfterRestore(ReviewState(
+          firstLaunchAt: now.subtract(const Duration(days: 45)),
+          lastPromptShownAt: DateTime(2026, 11, 1)));
       expect(store.read().lastPromptShownAt, DateTime(2026, 11, 1));
       await store.mergeAfterRestore(
           ReviewState(lastPromptShownAt: DateTime(2026, 1, 1)));
       expect(store.read().lastPromptShownAt, DateTime(2026, 11, 1));
     });
 
-    test('a skipped review check never leads to an ask', () async {
-      await store.markPrompted(now.subtract(const Duration(days: 20)), v);
-      expect(await askCtl().evaluate(ReviewCheck.skipped), isFalse);
-    });
-
     test('onReceiptDismissed hands the review outcome to the ask', () async {
       await store.markPrompted(now.subtract(const Duration(days: 20)), v);
       final a = askCtl();
-      final r = reviewCtl(_Prompter(true), a);
-      r.onReceiptDismissed();
+      reviewCtl(_Prompter(true), a).onReceiptDismissed();
       for (var i = 0; i < 20 && !a.pending.value; i++) {
         await Future<void>.delayed(const Duration(milliseconds: 5));
       }
       expect(a.pending.value, isTrue);
+    });
+
+    /// One simulated year, a receipt closed every day, 3 orders a day and
+    /// a new app version every few weeks. Returns the days the store review
+    /// was requested (and the days the ask was shown).
+    Future<({List<int> reviews, List<int> asks})> simulateYear(
+        {required bool withAsk}) async {
+      await closeAll();
+      await openFresh();
+      final start = DateTime(2026, 1, 1, 18);
+      await store.ensureFirstLaunch(start);
+      const releases = [0, 25, 70, 96, 150, 170, 230, 262, 300, 340];
+      final reviews = <int>[];
+      final asks = <int>[];
+      for (var day = 0; day < 365; day++) {
+        clock = start.add(Duration(days: day));
+        sales = 3 * (day + 1);
+        final version = '1.${releases.lastIndexWhere((d) => d <= day)}.0';
+        // A fresh session each day.
+        final a = askCtl(version: version);
+        final p = _Prompter(true);
+        final r = reviewCtl(p, a, version: version);
+        final result = await r.runCheck();
+        if (result == ReviewCheck.requested) reviews.add(day);
+        if (withAsk && await a.evaluate(result)) {
+          await a.markShown(); // shown, then dismissed
+          asks.add(day);
+        }
+      }
+      return (reviews: reviews, asks: asks);
+    }
+
+    test('a year day by day: the review fires on exactly the same days',
+        () async {
+      final alone = await simulateYear(withAsk: false);
+      final both = await simulateYear(withAsk: true);
+      // ignore: avoid_print
+      print('review days: ${alone.reviews}; ask days: ${both.asks}');
+      expect(alone.reviews, isNotEmpty);
+      expect(both.asks, isNotEmpty, reason: 'the ask must get a turn');
+      expect(both.reviews, alone.reviews);
+      // And the ask never comes within 14 days before a review.
+      for (final ask in both.asks) {
+        for (final review in both.reviews) {
+          expect(review - ask >= 0 && review - ask < 14, isFalse,
+              reason: 'ask on day $ask, review on day $review');
+        }
+      }
     });
   });
 }

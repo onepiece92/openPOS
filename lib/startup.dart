@@ -1,5 +1,6 @@
 import 'package:hive_flutter/hive_flutter.dart';
 
+import 'package:pos_app/features/backup/data/restore_merge_marker.dart';
 import 'package:pos_app/features/backup/data/snapshot_providers.dart';
 import 'package:pos_app/features/backup/data/snapshot_service.dart';
 import 'package:pos_app/features/review/data/review_state_store.dart';
@@ -32,6 +33,11 @@ Future<StartupResult> startUp({
     return const StartupResult(fatal: kRecoveryFailedMessage);
   }
   await (openStores ?? openStartupStores)();
+  // A restore killed on its error screen: finish its merge (one exists
+  // check when there is none).
+  if (await finishPendingRestoreMerge(recovery)) {
+    return const StartupResult(notice: kRestoreCompletedOnRetryNotice);
+  }
   return StartupResult(notice: restoreRecoveryNotice(recovery));
 }
 

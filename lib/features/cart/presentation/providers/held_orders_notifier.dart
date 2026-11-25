@@ -122,7 +122,6 @@ class HeldOrdersNotifier extends Notifier<List<HeldOrder>> {
   /// the ticket the cart was resumed from when there is one, otherwise mints
   /// a new ticket off the persisted counter.
   HeldOrder holdCurrentCart() {
-    ref.read(usageCounterProvider).record(UsageEvent.ticketHeld);
     final cart = ref.read(cartProvider);
     final session = ref.read(cartSessionProvider);
     final customerName = ref.read(cartCustomerNameProvider);
@@ -131,8 +130,9 @@ class HeldOrdersNotifier extends Notifier<List<HeldOrder>> {
     // parked with the ticket.
     final taxRateIds = [...ref.read(selectedTaxRatesProvider)];
 
+    final HeldOrder held;
     if (existingId != null && _box.containsKey(existingId)) {
-      return update(
+      held = update(
         existingId,
         items: cart,
         customerName: customerName,
@@ -143,19 +143,22 @@ class HeldOrdersNotifier extends Notifier<List<HeldOrder>> {
         taxEnabled: session.taxEnabled,
         taxRateIds: taxRateIds,
       );
+    } else {
+      held = hold(
+        cart,
+        ticketNumber: session.ticketNumber,
+        customerName: customerName,
+        customerId: session.customerId,
+        tableId: session.tableId,
+        orderDiscount: session.orderDiscount,
+        orderDiscountIsPercent: session.orderDiscountIsPercent,
+        taxEnabled: session.taxEnabled,
+        taxRateIds: taxRateIds,
+      );
     }
-
-    return hold(
-      cart,
-      ticketNumber: session.ticketNumber,
-      customerName: customerName,
-      customerId: session.customerId,
-      tableId: session.tableId,
-      orderDiscount: session.orderDiscount,
-      orderDiscountIsPercent: session.orderDiscountIsPercent,
-      taxEnabled: session.taxEnabled,
-      taxRateIds: taxRateIds,
-    );
+    // Counted only once the ticket is saved (update/hold threw otherwise).
+    ref.read(usageCounterProvider).record(UsageEvent.ticketHeld);
+    return held;
   }
 
   /// Archives a held ticket by id.

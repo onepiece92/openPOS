@@ -73,6 +73,12 @@ class _UsageScreenState extends ConsumerState<UsageScreen> {
       try {
         r = await send();
       } catch (_) {/* e.g. the share sheet failed: same as nothing opened */}
+      if (r == UsageSendResult.sharedAsFile) {
+        messenger.showSnackBar(const SnackBar(
+          content: Text(kUsageSharedAsFileHint),
+          duration: Duration(seconds: 8),
+        ));
+      }
       if (r == UsageSendResult.noApp) {
         try {
           await Clipboard.setData(ClipboardData(text: text));
@@ -193,7 +199,7 @@ class _UsageScreenState extends ConsumerState<UsageScreen> {
             title: const Text(
                 'Shop size ranges (products, orders in last 7 days, customers)'),
           ),
-          header('Preview: exactly what will be sent'),
+          header(kUsagePreviewHeading),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(12),

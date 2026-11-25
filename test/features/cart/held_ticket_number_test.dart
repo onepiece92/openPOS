@@ -10,6 +10,8 @@ import 'package:pos_app/features/cart/domain/cart_item.dart';
 import 'package:pos_app/features/cart/presentation/providers/cart_notifier.dart';
 import 'package:pos_app/features/cart/presentation/providers/held_orders_notifier.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
+import 'package:pos_app/features/usage/domain/usage_event.dart';
+import 'package:pos_app/features/usage/usage_providers.dart';
 
 /// A held ticket keeps its number for life: resuming it, editing it and saving
 /// it again must rewrite the same row rather than mint a new ticket.
@@ -154,5 +156,18 @@ void main() {
 
     // The counter must clear the high-water mark it just found.
     expect(c.read(ticketSequenceProvider).next(), '#0124');
+  });
+
+  test('ticketHeld is counted after the ticket is saved', () {
+    final c = makeContainer();
+    addTearDown(c.dispose);
+    final usage = c.read(usageCounterProvider);
+    c.read(cartProvider.notifier).addItem(item(1));
+    c.read(heldOrdersProvider.notifier).holdCurrentCart();
+    expect(usage.counts[UsageEvent.ticketHeld]!.count, 1);
+    expect(c.read(heldOrdersProvider), hasLength(1));
+    // Saving the same ticket again counts again (it was held again).
+    c.read(heldOrdersProvider.notifier).holdCurrentCart();
+    expect(usage.counts[UsageEvent.ticketHeld]!.count, 2);
   });
 }

@@ -10,12 +10,12 @@ import 'package:pos_app/features/usage/domain/usage_ask_policy.dart';
 /// Decides when to show the gentle feedback ask, hanging off the review
 /// check that runs after a receipt is closed ([afterReviewCheck]).
 ///
-/// Store guidelines: the ask must never gate or precede the store review.
-/// So it is only considered when the review check found the review NOT
-/// eligible — never after a request, and never in a session where the
-/// review was eligible but the store could not show it (when a store
-/// exists, [reviewSupported]). It also shares the 14-day spacing with the
-/// review prompt (`kPromptLastShownAt`).
+/// Store guidelines: the ask must never gate, precede or delay the store
+/// review. It is never shown in a session where a review was requested,
+/// and it yields whenever the review may become due within 14 days
+/// (`shouldAskForFeedback`). When the store reports review unavailable
+/// (F-Droid stub, no Play services) there is nothing to yield to, so the
+/// ask may show. [reviewSupported] says whether a store exists at all.
 ///
 /// Showing is done by `UsageHost`, which listens to [pending] and calls
 /// [markShown] the moment the ask appears.
@@ -41,7 +41,7 @@ class UsageAskController {
   /// True while an ask is waiting to be shown.
   final ValueNotifier<bool> pending = ValueNotifier(false);
 
-  bool _reviewEligibleThisSession = false;
+  bool _reviewRequestedThisSession = false;
   bool _inFlight = false;
 
   /// Never throws; never awaited by a UI path.
@@ -52,38 +52,38 @@ class UsageAskController {
   /// One evaluation; completes after the (bounded) order count.
   Future<bool> evaluate(ReviewCheck result) async {
     try {
+      final bool reviewCanShow;
       switch (result) {
         case ReviewCheck.requested:
-          _reviewEligibleThisSession = true;
+          // Never in the session of a review request.
+          _reviewRequestedThisSession = true;
           return false;
-        case ReviewCheck.unavailable:
-          // The review was eligible; with a store present that blocks the
-          // ask for the whole session. Without one there is no review to
-          // precede.
-          if (reviewSupported) {
-            _reviewEligibleThisSession = true;
-            return false;
-          }
         case ReviewCheck.skipped:
           return false;
+        case ReviewCheck.unavailable:
+          // The store cannot show a review here (F-Droid stub, no Play):
+          // there is no review to yield to.
+          reviewCanShow = false;
         case ReviewCheck.notEligible:
-          break;
+          reviewCanShow = reviewSupported;
       }
-      if (_reviewEligibleThisSession || _inFlight || pending.value) {
+      if (_reviewRequestedThisSession || _inFlight || pending.value) {
         return false;
       }
       _inFlight = true;
       try {
         await counter.ensureLoaded();
+        // No box: "asked" could not be remembered, so never ask.
+        if (!counter.isLoaded) return false;
         final now = _clock();
         final s = reviewStore.read();
         bool passes(int sales) => shouldAskForFeedback(
-              firstLaunchAt: s.firstLaunchAt,
-              lastAnyPromptAt: s.lastAnyPromptAt,
+              review: s,
               askedVersion: counter.askedVersion,
               completedSales: sales,
               now: now,
               currentVersion: appVersion,
+              reviewCanShow: reviewCanShow,
             );
         if (!passes(kUsageAskMinCompletedSales)) return false;
         if (!passes(await completedSales().timeout(timeout))) return false;

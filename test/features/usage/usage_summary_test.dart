@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:flutter/widgets.dart' show StringCharacters;
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:pos_app/features/usage/domain/usage_event.dart';
@@ -193,6 +196,30 @@ Please add split payments.''');
       expect(msg.length, kFeedbackMessageMaxLength);
       expect(normalizeFeedbackMessage(long).length, kFeedbackMessageMaxLength);
     });
+
+    for (final (label, unit) in [
+      ('an emoji', '\u{1F600}'),
+      ('a ZWJ family', '\u{1F468}\u200D\u{1F469}\u200D\u{1F467}'),
+      ('a flag', '\u{1F1FA}\u{1F1F8}'),
+      ('a skin-tone emoji', '\u{1F44D}\u{1F3FD}'),
+    ]) {
+      test('the cap never splits $label at the boundary', () {
+        // 499 letters, then the cluster as character 500 and 501.
+        final msg = '${'a' * 499}$unit$unit';
+        final cut = normalizeFeedbackMessage(msg);
+        expect(cut.characters.length, kFeedbackMessageMaxLength);
+        expect(cut, '${'a' * 499}$unit');
+        // Well-formed UTF-16 (no lone surrogate): round-trips through UTF-8.
+        expect(utf8.decode(utf8.encode(cut)), cut);
+        expect(cut, isNot(contains('\uFFFD')));
+        // And all clusters: 500 of them, each kept whole.
+        final all = normalizeFeedbackMessage(unit * 600);
+        expect(all.characters.length, kFeedbackMessageMaxLength);
+        expect(all, unit * kFeedbackMessageMaxLength);
+        final out = build(const UsageSelection(), message: all);
+        expect(splitSummary(out).message, all);
+      });
+    }
 
     test('unexpected environment values are replaced, never passed on', () {
       final out = buildUsageSummary(

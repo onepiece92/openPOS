@@ -1,4 +1,6 @@
 import 'package:flutter/foundation.dart' show immutable;
+// `characters` comes with Flutter (re-exported by widgets.dart).
+import 'package:flutter/widgets.dart' show StringCharacters;
 
 import 'package:pos_app/features/usage/domain/usage_event.dart';
 import 'package:pos_app/features/usage/usage_constants.dart';
@@ -153,12 +155,14 @@ class UsageSelection {
 }
 
 /// The message as it will be sent: trimmed and cut to
-/// [kFeedbackMessageMaxLength].
+/// [kFeedbackMessageMaxLength] user-perceived characters (grapheme
+/// clusters, the unit the TextField's counter and limit use), so an emoji,
+/// a ZWJ sequence or a flag is never split.
 String normalizeFeedbackMessage(String message) {
   final t = message.trim();
-  return t.length <= kFeedbackMessageMaxLength
-      ? t
-      : t.substring(0, kFeedbackMessageMaxLength).trimRight();
+  final chars = t.characters;
+  if (chars.length <= kFeedbackMessageMaxLength) return t;
+  return chars.take(kFeedbackMessageMaxLength).toString().trimRight();
 }
 
 /// Send is allowed with a message, with ticked data, or both.

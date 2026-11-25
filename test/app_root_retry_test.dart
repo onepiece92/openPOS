@@ -9,6 +9,7 @@ import 'package:path/path.dart' as p;
 import 'package:pos_app/app_root.dart';
 import 'package:pos_app/core/database/connection/native.dart';
 import 'package:pos_app/features/backup/data/restore_journal.dart';
+import 'package:pos_app/features/backup/data/restore_merge_marker.dart';
 import 'package:pos_app/features/backup/data/snapshot_providers.dart';
 import 'package:pos_app/features/backup/data/snapshot_service.dart';
 import 'package:pos_app/features/review/data/review_state_store.dart';
@@ -102,23 +103,28 @@ void main() {
     testWidgets(
         'retry that finds the restore committed says so and merges back',
         (tester) async {
+      // What restoreFrom left on disk before it ended on the error screen.
+      await tester.runAsync(() async {
+        await Hive.openBox<dynamic>('settings');
+        writeRestoreMergeMarker(
+          ReviewState(
+              firstLaunchAt: DateTime(2026, 1, 1),
+              lastPromptAt: DateTime(2026, 10, 1),
+              lastPromptVersion: '1.1.0+10',
+              lastPromptShownAt: DateTime(2026, 10, 1)),
+          const UsageSnapshot(counts: {
+            UsageEvent.saleCompleted:
+                UsageCount(42, firstMonth: '2026-05', lastMonth: '2026-11'),
+          }, countingOn: true),
+        );
+        await Hive.close();
+      });
+      final marker = File(p.join(docs.path, kRestoreMergeMarkerName));
+      expect(marker.existsSync(), isTrue);
       await tester.pumpWidget(AppRoot(
         startupFatal: 'Restore failed (x) and the app could not reopen',
         recoverForRetry: () async => RestoreRecovery.completed,
       ));
-      tester
-          .state<AppRootState>(find.byType(AppRoot))
-          .debugSetPendingRestoreMerge(
-            ReviewState(
-                firstLaunchAt: DateTime(2026, 1, 1),
-                lastPromptAt: DateTime(2026, 10, 1),
-                lastPromptVersion: '1.1.0+10',
-                lastPromptShownAt: DateTime(2026, 10, 1)),
-            const UsageSnapshot(counts: {
-              UsageEvent.saleCompleted:
-                  UsageCount(42, firstMonth: '2026-05', lastMonth: '2026-11'),
-            }, countingOn: true),
-          );
       await tester.runAsync(() => tester.tap(find.text('Try again')));
       final toast = find.text(kRestoreCompletedOnRetryNotice);
       await pumpUntil(tester, () => toast.evaluate().isNotEmpty);
@@ -129,6 +135,7 @@ void main() {
       final usage = Hive.box<dynamic>(kUsageBoxName);
       expect(readUsageCounts(usage)[UsageEvent.saleCompleted]!.count, 42);
       expect(usage.get(kUsageCountingOnKey), isTrue);
+      expect(marker.existsSync(), isFalse);
 
       await tester.pump(const Duration(seconds: 5));
       await tester.runAsync(() async {

@@ -34,7 +34,9 @@ String _keyOf(UsageEvent e) => '$_eventPrefix${e.name}';
 ///
 /// The box is opened by [ensureLoaded] (after the first frame, see
 /// `UsageHost`). Counts made before that are buffered in memory and added
-/// on load — or dropped, when the stored flag says counting is off.
+/// on load — or dropped, when the stored flag says counting is off, or
+/// when the box cannot be opened (the flag is then unknown, and nothing is
+/// counted until it is).
 class UsageCounter {
   UsageCounter({
     Future<Box<dynamic>> Function()? openBox,
@@ -72,6 +74,10 @@ class UsageCounter {
   /// Counting on/off. Before load this is the default.
   bool get countingEnabled => _enabled;
 
+  /// True once opening the box has failed: the saved on/off flag is
+  /// unknown, so nothing is counted (not even in memory).
+  bool _unavailable = false;
+
   /// Every counter (after load); events never counted are absent.
   Map<UsageEvent, UsageCount> get counts => Map.unmodifiable(_counts);
 
@@ -80,7 +86,7 @@ class UsageCounter {
 
   /// Counts one [event]. See the class doc for the cost guarantees.
   void record(UsageEvent event) {
-    if (_disposed || !_enabled) return;
+    if (_disposed || _unavailable || !_enabled) return;
     final month = usageMonth(_clock());
     final c = _counts[event];
     _counts[event] = c == null
@@ -95,11 +101,13 @@ class UsageCounter {
   String? _lastRoute;
 
   /// Counts a screen opening for a go_router route template; repeated
-  /// notifications for the same location are ignored.
-  void recordRoute(String? fullPath) {
-    if (fullPath == _lastRoute) return;
-    _lastRoute = fullPath;
-    final e = usageEventForRoute(fullPath);
+  /// notifications for the same screen ([location], or the template when
+  /// no location is given) are ignored.
+  void recordRoute(String? template, {String? location}) {
+    final key = '$template|${location ?? template}';
+    if (key == _lastRoute) return;
+    _lastRoute = key;
+    final e = usageEventForRoute(template);
     if (e != null) record(e);
   }
 
@@ -136,9 +144,14 @@ class UsageCounter {
         });
       }
       _box = box;
+      _unavailable = false;
       if (_dirty.isNotEmpty) _schedule();
     } catch (e) {
       _loading = null; // allow a later retry
+      // The saved "off" flag could not be read: do not count until it can.
+      _unavailable = true;
+      _counts.clear();
+      _dirty.clear();
       debugPrint('usage: box not available ($e)');
     }
   }

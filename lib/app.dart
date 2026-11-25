@@ -31,6 +31,7 @@ import 'package:pos_app/features/settings/presentation/store_profile_edit_screen
 import 'package:pos_app/features/tax/presentation/tax_settings_screen.dart';
 import 'package:pos_app/features/theme/presentation/theme_preview_screen.dart';
 import 'package:pos_app/features/usage/presentation/usage_host.dart';
+import 'package:pos_app/features/usage/presentation/usage_route_counter.dart';
 import 'package:pos_app/features/usage/presentation/usage_screen.dart';
 import 'package:pos_app/features/usage/usage_providers.dart';
 import 'package:pos_app/shared/widgets/dismiss_keyboard.dart';
@@ -292,11 +293,8 @@ final routerProvider = Provider<GoRouter>((ref) {
     ],
   );
   // Screen-open counts: a synchronous map update per navigation.
-  final usage = ref.read(usageCounterProvider);
-  void onNavigate() =>
-      usage.recordRoute(router.routerDelegate.currentConfiguration.fullPath);
-  router.routerDelegate.addListener(onNavigate);
-  ref.onDispose(() => router.routerDelegate.removeListener(onNavigate));
+  ref.onDispose(
+      attachUsageRouteCounter(router, ref.read(usageCounterProvider)));
   return router;
 });
 

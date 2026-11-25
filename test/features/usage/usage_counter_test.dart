@@ -165,6 +165,10 @@ void main() {
   test('route notifications: one count per screen change', () async {
     final c = counter();
     await c.ensureLoaded();
+    c.recordRoute('/orders/:id', location: '/orders/1');
+    c.recordRoute('/orders/:id', location: '/orders/2'); // another order
+    c.recordRoute('/orders/:id', location: '/orders/2'); // same, again
+    expect(c.counts[UsageEvent.screenOrderDetail]!.count, 2);
     c.recordRoute('/pos');
     c.recordRoute('/pos'); // the same location notifying again
     c.recordRoute('/payment');
@@ -176,16 +180,33 @@ void main() {
     expect(c.counts[UsageEvent.screenReceipt]!.count, 1);
   });
 
-  test('no box (Hive not open): stays in memory, never throws', () async {
+  test('no box: the saved flag is unknown, so nothing is counted', () async {
     await Hive.close();
     final c = UsageCounter();
-    c.record(UsageEvent.saleCompleted);
-    await c.ensureLoaded();
-    await c.flush();
+    c.record(UsageEvent.saleCompleted); // buffered while the box opens
+    await c.ensureLoaded(); // …which fails
     expect(c.isLoaded, isFalse);
+    expect(c.counts, isEmpty, reason: 'the buffer is dropped');
+    c.record(UsageEvent.saleCompleted);
+    expect(c.counts, isEmpty, reason: 'not counting until the flag is known');
+    await c.flush();
     expect(c.flushScheduled, isFalse);
     c.dispose();
     c.record(UsageEvent.saleCompleted); // after dispose: ignored
+  });
+
+  test('a later successful load counts again', () async {
+    var fail = true;
+    final c = UsageCounter(
+        openBox: () async => fail ? throw StateError('locked') : box);
+    await c.ensureLoaded();
+    c.record(UsageEvent.ticketHeld);
+    expect(c.counts, isEmpty);
+    fail = false;
+    await c.ensureLoaded();
+    c.record(UsageEvent.ticketHeld);
+    expect(c.counts[UsageEvent.ticketHeld]!.count, 1);
+    c.dispose();
   });
 
   test('perf: per-record cost', () async {

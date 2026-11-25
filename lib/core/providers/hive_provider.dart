@@ -49,8 +49,9 @@ const kReviewLastPromptAt = 'review_last_prompt_at'; // ISO-8601
 const kReviewLastPromptVersion = 'review_last_prompt_version'; // kAppVersionFull, e.g. '1.1.0+10'
 
 /// When ANY prompt (store review or the feedback ask) was last shown.
-/// Read and written by both, so they never appear within
-/// `kMinDaysBetweenAnyPrompts` of each other. ISO-8601.
+/// Written by both; read by the feedback ask, which never shows within
+/// `kMinDaysBetweenAnyPrompts` of another prompt. The store review ignores
+/// it (it is never delayed by the ask). ISO-8601.
 const kPromptLastShownAt = 'prompt_last_shown_at';
 
 // ── Raw box provider ─────────────────────────────────────────────────────────

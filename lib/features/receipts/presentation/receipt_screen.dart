@@ -140,8 +140,7 @@ class _ShareMenu extends StatelessWidget {
         );
         if (phone == null || !context.mounted) return;
         final uri = Uri.parse(smsLink(phone, body: text));
-        onShared();
-        await _launch(context, uri, fallbackText: text);
+        if (await _launch(context, uri, fallbackText: text)) onShared();
       case _ShareAction.email:
         final addr = await _resolveContact(
           context,
@@ -156,15 +155,20 @@ class _ShareMenu extends StatelessWidget {
           subject: '${data.businessName} — Receipt ${data.order.billNo}',
           body: text,
         ));
-        onShared();
-        await _launch(context, uri, fallbackText: text);
+        if (await _launch(context, uri, fallbackText: text)) onShared();
     }
   }
 
-  Future<void> _launch(BuildContext context, Uri uri,
+  /// Whether an app took the link (the share is counted only then).
+  Future<bool> _launch(BuildContext context, Uri uri,
       {required String fallbackText}) async {
     final messenger = ScaffoldMessenger.of(context);
-    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    bool ok;
+    try {
+      ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      ok = false; // PlatformException: nothing handles the link
+    }
     if (!ok) {
       await Clipboard.setData(ClipboardData(text: fallbackText));
       messenger.showSnackBar(
@@ -173,6 +177,7 @@ class _ShareMenu extends StatelessWidget {
         ),
       );
     }
+    return ok;
   }
 
   Future<String?> _resolveContact(

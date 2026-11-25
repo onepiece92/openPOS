@@ -77,3 +77,14 @@ const kUsageWhatsAppUnavailable =
 const kUsageEmailUnavailable =
     "No mail app opened. The summary was copied. Email it to "
     '$kUsageEmailAddress.';
+
+/// Shown when a long summary went to the share sheet as a .txt file.
+const kUsageSharedAsFileHint =
+    'The summary is too long for a WhatsApp link, so it was shared as a '
+    'file. Send it on WhatsApp to +977 9802850777 or email it to '
+    '$kUsageEmailAddress.';
+
+/// Heading of the live preview. The email adds only the fixed subject.
+const kUsagePreviewHeading =
+    'Preview: the text that will be sent (email subject: '
+    '"$kUsageEmailSubject")';

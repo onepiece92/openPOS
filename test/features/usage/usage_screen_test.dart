@@ -224,10 +224,43 @@ void main() {
     await tap(tester, 'send-whatsapp');
     expect(launched, isEmpty);
     expect(shared, hasLength(1));
+    expect(find.text(kUsageSharedAsFileHint), findsOneWidget);
+    expect(kUsageSharedAsFileHint, contains('+977 9802850777'));
+    expect(kUsageSharedAsFileHint, contains(kUsageEmailAddress));
     final f = shared.single.files.single;
     expect(f.name, kUsageSummaryFileName);
     expect(f.mimeType, 'text/plain');
     expect(File(f.path).readAsStringSync(), text);
+  });
+
+  testWidgets('emoji at the 500 boundary: box, preview and email agree',
+      (tester) async {
+    await pump(tester);
+    const family = '\u{1F468}\u200D\u{1F469}\u200D\u{1F467}';
+    const flag = '\u{1F1FA}\u{1F1F8}';
+    await tester.enterText(find.byKey(const ValueKey('feedback-message')),
+        '${'a' * 498}$family$flag$family$flag');
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    final box = tester
+        .widget<TextField>(find.byKey(const ValueKey('feedback-message')))
+        .controller!
+        .text;
+    expect(box, '${'a' * 498}$family$flag', reason: 'TextField keeps 500');
+    expect(find.text('500/500'), findsOneWidget);
+    final text = preview(tester);
+    expect(splitSummary(text).message, box);
+    await tap(tester, 'send-email');
+    expect(launched.single.queryParameters['body']!.replaceAll('\r\n', '\n'),
+        text);
+    expect(launched.single.queryParameters['body'], isNot(contains('\uFFFD')));
+  });
+
+  testWidgets('the preview heading names the fixed email subject',
+      (tester) async {
+    await pump(tester);
+    expect(find.text(kUsagePreviewHeading), findsOneWidget);
+    expect(kUsagePreviewHeading, contains(kUsageEmailSubject));
   });
 
   testWidgets('the message box is capped at 500 characters with a counter',
@@ -263,8 +296,10 @@ void main() {
 
   for (final (label, behaviour) in <(String, bool Function())>[
     ('returns false', () => false),
-    ('throws PlatformException',
-        () => throw PlatformException(code: 'ACTIVITY_NOT_FOUND')),
+    (
+      'throws PlatformException',
+      () => throw PlatformException(code: 'ACTIVITY_NOT_FOUND')
+    ),
   ]) {
     testWidgets('when WhatsApp $label: copied, and the number is shown',
         (tester) async {

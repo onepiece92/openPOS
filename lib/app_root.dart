@@ -9,13 +9,14 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:pos_app/app.dart';
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/database/close_on_exit.dart';
+import 'package:pos_app/core/restart_notice.dart';
 import 'package:pos_app/core/database/connection/native.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
+import 'package:pos_app/features/backup/data/restore_merge_marker.dart';
 import 'package:pos_app/features/backup/data/snapshot_providers.dart';
 import 'package:pos_app/features/backup/data/snapshot_service.dart';
 import 'package:pos_app/features/help/support_contact.dart';
 import 'package:pos_app/features/review/data/review_state_store.dart';
-import 'package:pos_app/features/review/domain/review_policy.dart';
 import 'package:pos_app/features/usage/data/usage_counter.dart';
 import 'package:pos_app/features/usage/domain/usage_event.dart';
 import 'package:pos_app/features/usage/usage_providers.dart';
@@ -64,19 +65,6 @@ class AppRootState extends State<AppRoot> {
   Future<void>? _autoBackupRun; // in flight; a restore waits for it
 
   late final DatabaseExitGuard _exitGuard;
-
-  /// Bookkeeping captured by a restore that ended on the error screen. If
-  /// "Try again" then finds the restore was in fact accepted
-  /// ([RestoreRecovery.completed]: its commit line was written but could
-  /// not be confirmed), it is merged back as after a normal restore.
-  ReviewState? _pendingReviewMerge;
-  UsageSnapshot? _pendingUsageMerge;
-
-  @visibleForTesting
-  void debugSetPendingRestoreMerge(ReviewState? review, UsageSnapshot? usage) {
-    _pendingReviewMerge = review;
-    _pendingUsageMerge = usage;
-  }
 
   @visibleForTesting
   bool get autoBackupScheduledForTest => _autoBackupTimer != null;
@@ -165,6 +153,10 @@ class AppRootState extends State<AppRoot> {
     // restore replaces: remember it now, merge it back after the reopen so
     // an older backup cannot move the last-prompt date backwards.
     final reviewBefore = reviewStateBeforeRestore();
+    // Kept on disk until the merge has run: a restore that ends on the
+    // error screen (and maybe a kill) finishes it later, see _retryOpen
+    // and startUp.
+    writeRestoreMergeMarker(reviewBefore, usageBefore);
 
     // 1. Unmount the app tree so no widget can issue queries mid-swap.
     setState(() {
@@ -218,9 +210,8 @@ class AppRootState extends State<AppRoot> {
         } on RestoreFatalException catch (e) {
           error = e;
           fatal = '$e';
-          // The disk may hold the backup (see _retryOpen).
-          _pendingReviewMerge = reviewBefore;
-          _pendingUsageMerge = usageBefore;
+          // The disk may hold the backup: the merge marker stays for
+          // _retryOpen / the next launch.
         } on RestoreRolledBackException catch (e) {
           error = e;
           notice = 'Restore failed: $e';
@@ -236,6 +227,8 @@ class AppRootState extends State<AppRoot> {
       error ??= e;
       fatal ??= 'Restore failed: $e';
     } finally {
+      // Merged (or nothing was swapped): the marker has done its job.
+      if (fatal == null) deleteRestoreMergeMarker();
       if (mounted) {
         setState(() {
           _restoring = false;
@@ -320,17 +313,11 @@ class AppRootState extends State<AppRoot> {
       // startUp() skipped this when recovery failed; no-op otherwise.
       await startReviewClock();
       notice = restoreRecoveryNotice(recovered);
-      final review = _pendingReviewMerge;
-      final usage = _pendingUsageMerge;
-      _pendingReviewMerge = null;
-      _pendingUsageMerge = null;
-      if (recovered == RestoreRecovery.completed &&
-          (review != null || usage != null)) {
-        // The restore this error screen came from was accepted after all:
-        // say so, and finish it like a normal one.
+      // A restore that ended on this error screen may have been accepted
+      // after all (commit recorded, not confirmed): finish its merge and
+      // say so.
+      if (await finishPendingRestoreMerge(recovered)) {
         notice = kRestoreCompletedOnRetryNotice;
-        await mergeReviewStateAfterRestore(review); // never throws
-        await mergeUsageAfterRestore(usage); // never throws
         _container.read(usageCounterProvider).record(UsageEvent.backupRestored);
       }
     } catch (e) {
@@ -460,9 +447,16 @@ class _NoticeOverlayState extends State<_NoticeOverlay> {
   @override
   void initState() {
     super.initState();
+    restartNoticeShowing.value = true;
     Future<void>.delayed(restartNoticeDuration(widget.message), () {
       if (mounted) widget.onDone();
     });
+  }
+
+  @override
+  void dispose() {
+    restartNoticeShowing.value = false;
+    super.dispose();
   }
 
   @override
