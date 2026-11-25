@@ -125,6 +125,13 @@ class DashboardBody extends StatelessWidget {
         // ── Top products ──────────────────────────────────────────────────
         if (data.topProducts.isNotEmpty) ...[
           _SectionHeader('Top Products', cs),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              'Units sold and sales excl. VAT, after discounts and refunds',
+              style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+            ),
+          ),
           Card(
             child: Column(
               children: data.topProducts.indexed.map((entry) {
@@ -175,7 +182,7 @@ class DashboardBody extends StatelessWidget {
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                '$symbol ${_fmt(p.revenue)}',
+                                '$symbol ${_fmt(p.sales)}',
                                 style: TextStyle(
                                     fontWeight: FontWeight.w600,
                                     color: cs.primary,
@@ -207,55 +214,98 @@ class DashboardBody extends StatelessWidget {
     );
   }
 
+  /// Revenue is what came in (VAT included). Profit is worked out from the
+  /// part of it that is the shop's own: sales excluding VAT, less what the
+  /// goods cost, less expenses.
   List<Widget> _buildKpiRows() => [
-        Row(
-          children: [
-            Expanded(
-              child: KpiCard(
-                label: 'Revenue',
-                value: '$symbol ${_fmt(data.revenue)}',
-                icon: Icons.trending_up_rounded,
-                color: cs.primary,
-                cs: cs,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: KpiCard(
-                label: 'Expenses',
-                value: '$symbol ${_fmt(data.expenses)}',
-                icon: Icons.trending_down_rounded,
-                color: cs.error,
-                cs: cs,
-              ),
-            ),
-          ],
+        _kpiRow(
+          KpiCard(
+            label: 'Revenue (incl. VAT)',
+            value: '$symbol ${_fmt(data.revenue)}',
+            icon: Icons.trending_up_rounded,
+            color: cs.primary,
+            cs: cs,
+          ),
+          KpiCard(
+            label: 'VAT Collected',
+            value: '$symbol ${_fmt(data.vatCollected)}',
+            icon: Icons.receipt_long_rounded,
+            color: cs.tertiary,
+            cs: cs,
+          ),
         ),
         const SizedBox(height: 10),
-        Row(
-          children: [
-            Expanded(
-              child: KpiCard(
-                label: 'Net Profit',
-                value: '$symbol ${_fmt(data.profit)}',
-                icon: Icons.account_balance_rounded,
-                color: data.profit >= 0 ? const Color(0xFF16A34A) : cs.error,
-                cs: cs,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: KpiCard(
-                label: 'Orders',
-                value: '${data.orderCount}',
-                icon: Icons.shopping_bag_rounded,
-                color: cs.secondary,
-                cs: cs,
-              ),
-            ),
-          ],
+        _kpiRow(
+          KpiCard(
+            label: 'Cost of Goods',
+            value: '$symbol ${_fmt(data.costOfGoods)}',
+            icon: Icons.inventory_2_rounded,
+            color: cs.error,
+            cs: cs,
+          ),
+          KpiCard(
+            label: 'Expenses',
+            value: '$symbol ${_fmt(data.expenses)}',
+            icon: Icons.trending_down_rounded,
+            color: cs.error,
+            cs: cs,
+          ),
         ),
+        const SizedBox(height: 10),
+        _kpiRow(
+          KpiCard(
+            label: 'Net Profit',
+            value: '$symbol ${_fmt(data.profit)}',
+            icon: Icons.account_balance_rounded,
+            color: data.profit >= 0 ? const Color(0xFF16A34A) : cs.error,
+            cs: cs,
+          ),
+          KpiCard(
+            label: 'Orders',
+            value: '${data.orderCount}',
+            icon: Icons.shopping_bag_rounded,
+            color: cs.secondary,
+            cs: cs,
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
+          child: Text(
+            'Net profit = sales excl. VAT ($symbol ${_fmt(data.salesExVat)}) '
+            '− cost of goods − expenses.',
+            style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+          ),
+        ),
+        if (data.costIsIncomplete)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 6, 4, 0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.warning_amber_rounded, size: 14, color: cs.error),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    '${data.uncostedLines} of ${data.soldLines} sold '
+                    'item${data.soldLines == 1 ? '' : 's'} '
+                    'ha${data.uncostedLines == 1 ? 's' : 've'} no purchase '
+                    'price recorded and count as zero cost, so profit is '
+                    'overstated. Set purchase prices on your products.',
+                    style: TextStyle(fontSize: 11, color: cs.error),
+                  ),
+                ),
+              ],
+            ),
+          ),
       ];
+
+  Widget _kpiRow(Widget left, Widget right) => Row(
+        children: [
+          Expanded(child: left),
+          const SizedBox(width: 10),
+          Expanded(child: right),
+        ],
+      );
 
   String _fmt(double v) => _moneyFmt.format(v);
 }

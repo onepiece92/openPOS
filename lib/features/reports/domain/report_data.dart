@@ -59,11 +59,23 @@ class ReportQuery {
 // ── Data classes ──────────────────────────────────────────────────────────────
 
 class TopProduct {
-  const TopProduct(
-      {required this.name, required this.qty, required this.revenue});
+  const TopProduct({
+    required this.productId,
+    required this.name,
+    required this.qty,
+    required this.sales,
+  });
+  final int productId;
+
+  /// The product's current name.
   final String name;
+
+  /// Units sold, in the product's main unit.
   final int qty;
-  final double revenue;
+
+  /// Sales excluding VAT, after order discounts and refunds — see
+  /// `OrdersDao.topSellingProductsForPeriod`.
+  final double sales;
 }
 
 class PayRow {
@@ -77,6 +89,10 @@ class PayRow {
 class ReportData {
   const ReportData({
     required this.revenue,
+    required this.vatCollected,
+    required this.costOfGoods,
+    required this.soldLines,
+    required this.uncostedLines,
     required this.expenses,
     required this.orderCount,
     required this.topProducts,
@@ -86,7 +102,21 @@ class ReportData {
     required this.chartTotals,
     required this.chartHighlightIndex,
   });
+
+  /// Takings including VAT, net of refunds.
   final double revenue;
+
+  /// The VAT inside [revenue] — held for the tax office, not income.
+  final double vatCollected;
+
+  /// What the goods sold cost the shop at the time of each sale.
+  final double costOfGoods;
+
+  /// Order lines behind [revenue], and how many of them have no cost
+  /// recorded (they count as zero in [costOfGoods], overstating [profit]).
+  final int soldLines;
+  final int uncostedLines;
+
   final double expenses;
   final int orderCount;
   final List<TopProduct> topProducts;
@@ -96,8 +126,20 @@ class ReportData {
   final List<double> chartTotals;
   final int chartHighlightIndex;
 
-  double get profit => revenue - expenses;
+  /// Sales excluding VAT. Points redeemed are money that never came in, so
+  /// they are already out of [revenue] and therefore out of this.
+  double get salesExVat => _round2(revenue - vatCollected);
+
+  /// Net profit: sales excluding VAT, less what the goods cost, less
+  /// expenses.
+  double get profit => _round2(salesExVat - costOfGoods - expenses);
+
+  /// True when [costOfGoods] is missing the cost of some sold lines.
+  bool get costIsIncomplete => uncostedLines > 0;
+
   double get avgOrder => orderCount > 0 ? revenue / orderCount : 0;
+
+  static double _round2(double v) => (v * 100).roundToDouble() / 100;
 }
 
 // ── Provider ──────────────────────────────────────────────────────────────────
@@ -116,7 +158,7 @@ final reportProvider =
   // refund or expense lands instead of serving the first answer until midnight.
   final changes = db
       .tableUpdates(TableUpdateQuery.onAllTables(
-          [db.orders, db.orderItems, db.returns, db.expenses]))
+          [db.orders, db.orderItems, db.returns, db.expenses, db.products]))
       .listen((_) => ref.invalidateSelf());
   ref.onDispose(changes.cancel);
   final from = query.from;
@@ -127,15 +169,16 @@ final reportProvider =
 
   final periodOrders = await db.ordersDao.completedOrdersInPeriod(from, to);
 
+  final vatCollected = await db.ordersDao.vatCollectedForPeriod(from, to);
+  final goods = await db.ordersDao.costOfGoodsForPeriod(from, to);
+
   final topRaw =
       await db.ordersDao.topSellingProductsForPeriod(from, to, limit: 5);
-  final topProducts = topRaw
-      .map((r) => TopProduct(
-            name: r['name'] as String,
-            qty: r['qty'] as int,
-            revenue: r['revenue'] as double,
-          ))
-      .toList();
+  final topProducts = [
+    for (final r in topRaw)
+      TopProduct(
+          productId: r.productId, name: r.name, qty: r.qty, sales: r.sales),
+  ];
 
   final payRaw = await db.ordersDao.paymentBreakdownForPeriod(from, to);
   final payBreakdown = payRaw
@@ -147,13 +190,18 @@ final reportProvider =
       .toList();
 
   // ── Duration-aware chart data ────────────────────────────────────────────
-  final days = to.difference(from).inDays;
+  // Whole calendar days between the two dates (0 = the same day). Counted
+  // on the dates, not on elapsed hours: two days are 47h59m apart, which is
+  // "1 day" by the clock, and a 25-hour autumn day must not add a bucket.
+  final days = DateTime.utc(to.year, to.month, to.day)
+      .difference(DateTime.utc(from.year, from.month, from.day))
+      .inDays;
   String chartTitle;
   List<String> chartDates;
   List<double> chartTotals;
   int chartHighlightIndex;
 
-  if (days < 2) {
+  if (days < 1) {
     // ── Hourly (2-hour slots, full 24h) ──────────────────────────────────
     chartTitle = 'Hourly Sales';
     const slotCount = 12;
@@ -170,7 +218,8 @@ final reportProvider =
     final keyFmt = DateFormat('yyyy-MM-dd');
     final labelFmt = DateFormat('d/M');
     final daysList = <DateTime>[
-      for (int i = 0; i <= days; i++) from.add(Duration(days: i))
+      for (int i = 0; i <= days; i++)
+        DateTime(from.year, from.month, from.day + i)
     ];
     final dayTotals = <String, double>{
       for (final d in daysList) keyFmt.format(d): 0.0
@@ -243,6 +292,10 @@ final reportProvider =
 
   return ReportData(
     revenue: revenue,
+    vatCollected: vatCollected,
+    costOfGoods: goods.cost,
+    soldLines: goods.lines,
+    uncostedLines: goods.uncostedLines,
     expenses: expenses,
     orderCount: periodOrders.length,
     topProducts: topProducts,

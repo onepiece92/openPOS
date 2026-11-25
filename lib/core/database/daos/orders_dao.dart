@@ -5,6 +5,7 @@ import 'package:pos_app/core/database/tables/customers_table.dart';
 import 'package:pos_app/core/database/tables/order_items_table.dart';
 import 'package:pos_app/core/database/tables/order_taxes_table.dart';
 import 'package:pos_app/core/database/tables/orders_table.dart';
+import 'package:pos_app/core/database/tables/products_table.dart';
 import 'package:pos_app/core/database/tables/returns_table.dart';
 
 part 'orders_dao.g.dart';
@@ -12,7 +13,7 @@ part 'orders_dao.g.dart';
 // OrderTaxOverrides table stays in @DriftDatabase for v2 (tax override feature);
 // not exposed here because no method on this DAO touches it.
 @DriftAccessor(
-  tables: [Orders, OrderItems, OrderTaxes, Returns, Customers],
+  tables: [Orders, OrderItems, OrderTaxes, Returns, Customers, Products],
 )
 class OrdersDao extends DatabaseAccessor<AppDatabase> with _$OrdersDaoMixin {
   OrdersDao(super.db);
@@ -123,22 +124,31 @@ class OrdersDao extends DatabaseAccessor<AppDatabase> with _$OrdersDaoMixin {
 
   // ── Aggregates (for reports) ───────────────────────────────────────────
 
-  /// Orders that still carry revenue, each with `net` = total − refunds.
+  /// Orders that still carry revenue, each with `net` = total − refunds and
+  /// `kept` = the share of the sale that was not refunded (net ÷ total).
   ///
   /// A refund is netted against the original sale (so it lands on the sale's
   /// date and payment method). Partly refunded orders stay `completed`; a
   /// `refunded` order is fully refunded and carries nothing. The second
   /// branch only matters for rows written before partial refunds existed,
   /// when every refund flipped the status: those count for what was kept.
+  ///
+  /// Refunds are recorded per order, not per line, so a partial refund is
+  /// treated as handing back that share of the whole sale: every figure
+  /// derived from the order — revenue, VAT, cost of goods, each product's
+  /// sales — is multiplied by `kept`. Voided orders are not in here at all.
   static const _netOrders =
-      '(SELECT o.id, o.created_at, o.payment_method, '
-      '  ROUND(MAX(0.0, o.total - COALESCE(r.refunded, 0.0)), 2) AS net '
-      'FROM orders o '
-      'LEFT JOIN (SELECT order_id, SUM(amount) AS refunded '
-      '  FROM returns GROUP BY order_id) r ON r.order_id = o.id '
-      "WHERE o.status = 'completed' "
-      "  OR (o.status = 'refunded' AND r.refunded IS NOT NULL "
-      '    AND r.refunded < o.total - 0.005))';
+      '(SELECT n.*, '
+      '  CASE WHEN n.total > 0 THEN n.net / n.total ELSE 1.0 END AS kept '
+      'FROM (SELECT o.id, o.created_at, o.payment_method, o.total, '
+      '    o.subtotal, o.discount_total, o.loyalty_discount, o.tax_total, '
+      '    ROUND(MAX(0.0, o.total - COALESCE(r.refunded, 0.0)), 2) AS net '
+      '  FROM orders o '
+      '  LEFT JOIN (SELECT order_id, SUM(amount) AS refunded '
+      '    FROM returns GROUP BY order_id) r ON r.order_id = o.id '
+      "  WHERE o.status = 'completed' "
+      "    OR (o.status = 'refunded' AND r.refunded IS NOT NULL "
+      '      AND r.refunded < o.total - 0.005)) n)';
 
   /// Revenue for a period, net of refunds.
   Future<double> totalRevenueForPeriod(DateTime from, DateTime to) async {
@@ -170,31 +180,102 @@ class OrdersDao extends DatabaseAccessor<AppDatabase> with _$OrdersDaoMixin {
         .toList();
   }
 
-  /// Top-selling products by qty for a period. Returns [{name, qty, revenue}].
-  Future<List<Map<String, dynamic>>> topSellingProductsForPeriod(
-      DateTime from, DateTime to,
-      {int limit = 5}) async {
-    final rows = await customSelect(
-      'SELECT oi.product_name, '
-      '  CAST(SUM(oi.quantity) AS INTEGER) as qty, '
-      '  SUM(oi.line_total) as revenue '
+  /// VAT inside the period's revenue: each order's tax (inclusive and
+  /// exclusive alike), scaled by the share of the sale that was kept.
+  Future<double> vatCollectedForPeriod(DateTime from, DateTime to) async {
+    final row = await customSelect(
+      'SELECT COALESCE(SUM(ROUND(tax_total * kept, 2)), 0.0) AS vat '
+      'FROM $_netOrders WHERE created_at >= ? AND created_at <= ?',
+      variables: [Variable(from), Variable(to)],
+      readsFrom: {orders, returns},
+    ).getSingle();
+    return _round2(row.read<double>('vat'));
+  }
+
+  /// What the goods sold in the period cost the shop, from the per-line
+  /// `unit_cost` snapshot (quantity × units_per_qty × unit_cost, scaled by
+  /// the share of the sale kept). Lines with no cost recorded count as zero;
+  /// `uncostedLines` says how many of the `lines` sold that is, so the
+  /// caller can show that the figure is incomplete.
+  Future<({double cost, int lines, int uncostedLines})> costOfGoodsForPeriod(
+      DateTime from, DateTime to) async {
+    final row = await customSelect(
+      'SELECT '
+      '  COALESCE(SUM(n.kept * oi.quantity * oi.units_per_qty * '
+      '    COALESCE(oi.unit_cost, 0.0)), 0.0) AS cost, '
+      '  COUNT(oi.id) AS lines, '
+      '  COALESCE(SUM(oi.unit_cost IS NULL), 0) AS uncosted '
       'FROM order_items oi '
-      'JOIN orders o ON o.id = oi.order_id '
-      "WHERE o.status = 'completed' AND o.created_at >= ? AND o.created_at <= ? "
-      'GROUP BY oi.product_name '
-      'ORDER BY qty DESC '
+      'JOIN $_netOrders n ON n.id = oi.order_id '
+      'WHERE n.created_at >= ? AND n.created_at <= ?',
+      variables: [Variable(from), Variable(to)],
+      readsFrom: {orderItems, orders, returns},
+    ).getSingle();
+    return (
+      cost: _round2(row.read<double>('cost')),
+      lines: row.read<int>('lines'),
+      uncostedLines: row.read<int>('uncosted'),
+    );
+  }
+
+  /// Top-selling products for a period, one row per product (not per name:
+  /// a rename or a secondary-unit sale — "Eggs (dozen)" — is still Eggs),
+  /// shown under the product's current name.
+  ///
+  /// `qty` is in the product's main unit (2 dozen = 24). On a partly
+  /// refunded order the units still count in full — refunds do not say
+  /// which lines came back — while the money is scaled like everything else.
+  ///
+  /// `sales` is the product's share of sales excluding VAT: its line totals
+  /// after their share of the order discount and of any points redeemed,
+  /// less the VAT that was inside the prices (inclusive tax), times the
+  /// share of the sale kept after refunds. Summed over every product it
+  /// equals the dashboard's sales ex-VAT (revenue − VAT collected).
+  Future<List<({int productId, String name, int qty, double sales})>>
+      topSellingProductsForPeriod(DateTime from, DateTime to,
+          {int limit = 5}) async {
+    final rows = await customSelect(
+      'SELECT oi.product_id, '
+      '  COALESCE(p.name, MAX(oi.product_name)) AS name, '
+      '  SUM(oi.quantity * oi.units_per_qty) AS qty, '
+      '  SUM(n.kept * ('
+      '    CASE WHEN n.subtotal > 0 THEN oi.line_total / n.subtotal * '
+      '      (n.subtotal - n.discount_total - n.loyalty_discount) '
+      '    ELSE 0.0 END '
+      // The line's share of the VAT that sat inside the prices. Lines sold
+      // before v14 stored no tax share, so those fall back to the line's
+      // share of the order.
+      '    - COALESCE(it.inclusive, 0.0) * '
+      '      CASE WHEN ls.item_tax > 0 THEN oi.tax_amount / ls.item_tax '
+      '        WHEN n.subtotal > 0 THEN oi.line_total / n.subtotal '
+      '        ELSE 0.0 END)) AS sales '
+      'FROM order_items oi '
+      'JOIN $_netOrders n ON n.id = oi.order_id '
+      'LEFT JOIN products p ON p.id = oi.product_id '
+      'LEFT JOIN (SELECT order_id, SUM(tax_amount) AS inclusive '
+      '  FROM order_taxes WHERE is_inclusive = 1 GROUP BY order_id) it '
+      '  ON it.order_id = n.id '
+      'LEFT JOIN (SELECT order_id, SUM(tax_amount) AS item_tax '
+      '  FROM order_items GROUP BY order_id) ls ON ls.order_id = n.id '
+      'WHERE n.created_at >= ? AND n.created_at <= ? '
+      'GROUP BY oi.product_id '
+      'ORDER BY qty DESC, sales DESC, oi.product_id '
       'LIMIT ?',
       variables: [Variable(from), Variable(to), Variable(limit)],
-      readsFrom: {orderItems, orders},
+      readsFrom: {orderItems, orders, returns, orderTaxes, products},
     ).get();
-    return rows
-        .map((r) => {
-              'name': r.read<String>('product_name'),
-              'qty': r.read<int>('qty'),
-              'revenue': r.read<double>('revenue'),
-            })
-        .toList();
+    return [
+      for (final r in rows)
+        (
+          productId: r.read<int>('product_id'),
+          name: r.read<String>('name'),
+          qty: r.read<double>('qty').round(),
+          sales: _round2(r.read<double>('sales')),
+        ),
+    ];
   }
+
+  static double _round2(double v) => (v * 100).roundToDouble() / 100;
 
   /// Payment method breakdown for a period, net of refunds.
   /// Returns [{method, count, total}].
