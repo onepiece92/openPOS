@@ -59,6 +59,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   double get _tendered => double.tryParse(_tenderedCtrl.text) ?? 0.0;
 
   Future<void> _placeOrder() async {
+    // Checked synchronously: a second tap can arrive before the frame that
+    // disables the button, and must not write a second order.
+    if (_placing) return;
     final summary = ref.read(cartSummaryProvider);
     final cart = ref.read(cartProvider);
     if (cart.isEmpty) return;
@@ -72,9 +75,17 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     }
 
     setState(() => _placing = true);
+    // Everything the cleanup needs is taken from `ref` now: once the order
+    // is written the cart must be cleared and the held ticket retired even
+    // if this screen was closed while it was saving, and `ref` is unusable
+    // after dispose.
     final db = ref.read(databaseProvider);
     final audit = ref.read(auditServiceProvider);
     final session = ref.read(cartSessionProvider);
+    final invoicePrefix = ref.read(invoicePrefixProvider);
+    final cartNotifier = ref.read(cartProvider.notifier);
+    final heldOrders = ref.read(heldOrdersProvider.notifier);
+    final printer = ref.read(autoPrintServiceProvider);
     final messenger = ScaffoldMessenger.of(context);
 
     final int orderId;
@@ -87,13 +98,16 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         session: session,
         paymentMethod: _paymentMethod,
         tenderedAmount: _tendered,
-        invoicePrefix: ref.read(invoicePrefixProvider),
+        invoicePrefix: invoicePrefix,
       );
     } catch (e) {
-      if (mounted) setState(() => _placing = false);
-      messenger.showSnackBar(
-        SnackBar(content: Text('Order failed: $e')),
-      );
+      _placing = false;
+      if (mounted) setState(() {});
+      if (messenger.mounted) {
+        messenger.showSnackBar(
+          SnackBar(content: Text('Order failed: $e')),
+        );
+      }
       return;
     }
 
@@ -101,14 +115,14 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     // disk while it is edited — the sale is what retires it.
     final heldTicketId = session.heldTicketId;
     if (heldTicketId != null) {
-      ref.read(heldOrdersProvider.notifier).delete(heldTicketId);
+      heldOrders.delete(heldTicketId);
     }
-    ref.read(cartProvider.notifier).clear();
+    cartNotifier.clear();
 
     // Fire-and-forget print. Failures surface via snackbar but don't block
     // navigation to the receipt screen — receipts work paperless too.
-    unawaited(autoPrintOrder(ref, orderId).then((err) {
-      if (err != null && mounted) {
+    unawaited(printer.printOrder(orderId).then((err) {
+      if (err != null && messenger.mounted) {
         messenger.showSnackBar(SnackBar(content: Text(err)));
       }
     }));
