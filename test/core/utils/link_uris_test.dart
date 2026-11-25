@@ -142,4 +142,14 @@ void main() {
           'sms:9801234567');
     });
   });
+
+  group('whatsAppLink', () {
+    test('digits only, text percent-encoded with LF line breaks', () {
+      expect(whatsAppLink('+977 980-2850777'), 'https://wa.me/9779802850777');
+      final link = whatsAppLink('9779802850777', text: 'A & B\n50% #1 +x');
+      expect(link,
+          'https://wa.me/9779802850777?text=A%20%26%20B%0A50%25%20%231%20%2Bx');
+      expect(Uri.parse(link).queryParameters['text'], 'A & B\n50% #1 +x');
+    });
+  });
 }

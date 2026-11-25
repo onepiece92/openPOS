@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:pos_app/core/app_version.dart';
 import 'package:pos_app/features/help/support_contact.dart';
 import 'package:pos_app/features/review/domain/review_prompter.dart';
 import 'package:pos_app/features/review/review_providers.dart';
 import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
+import 'package:pos_app/features/usage/presentation/usage_host.dart';
+import 'package:pos_app/features/usage/usage_constants.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class SupportScreen extends ConsumerWidget {
@@ -42,6 +45,15 @@ class SupportScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 20),
           _SectionHeader('Resources', tt, cs),
+          _SupportTile(
+            key: const ValueKey('support-feedback-usage'),
+            icon: Icons.forum_outlined,
+            title: kFeedbackSupportRowTitle,
+            subtitle: kFeedbackSupportRowSubtitle,
+            cs: cs,
+            tt: tt,
+            onTap: () => context.push(kUsageRoute),
+          ),
           if (storeReviewSupported)
             _SupportTile(
               icon: Icons.star_outline_rounded,
@@ -242,6 +254,7 @@ class _SectionHeader extends StatelessWidget {
 
 class _SupportTile extends StatelessWidget {
   const _SupportTile({
+    super.key,
     required this.icon,
     required this.title,
     required this.subtitle,

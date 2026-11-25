@@ -12,6 +12,7 @@ import 'package:pos_app/features/review/data/review_state_store.dart';
 import 'package:pos_app/features/review/data/store_review_prompter.dart';
 import 'package:pos_app/features/review/domain/review_policy.dart';
 import 'package:pos_app/features/review/domain/review_prompter.dart';
+import 'package:pos_app/features/usage/usage_providers.dart';
 
 /// True on iOS and Android, where a store listing exists. The "Rate Open POS"
 /// row and the automatic request are hidden/no-ops everywhere else.
@@ -32,4 +33,8 @@ final reviewControllerProvider = Provider<ReviewController>((ref) =>
           .ordersDao
           .completedOrderCount(upTo: kReviewMinCompletedSales),
       appVersion: kAppVersionFull,
+      // The feedback ask is only ever considered after (and depending on)
+      // the review check — see UsageAskController.
+      afterCheck: (result) =>
+          ref.read(usageAskControllerProvider).afterReviewCheck(result),
     ));

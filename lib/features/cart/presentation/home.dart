@@ -13,6 +13,8 @@ import 'package:pos_app/features/cart/presentation/widgets/held_tickets_bar.dart
 import 'package:pos_app/features/cart/presentation/widgets/product_tile.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
 import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
+import 'package:pos_app/features/usage/usage_providers.dart';
+import 'package:pos_app/features/usage/domain/usage_event.dart';
 
 /// Main POS screen: product catalog + persistent cart bar at the bottom.
 class CartScreen extends ConsumerStatefulWidget {
@@ -185,7 +187,16 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                               horizontal: 12, vertical: 10),
                           isDense: true,
                         ),
-                        onChanged: filterN.setSearch,
+                        onChanged: (q) {
+                          // One count per search, not per keystroke.
+                          if (q.isNotEmpty &&
+                              ref.read(posFilterProvider).search.isEmpty) {
+                            ref
+                                .read(usageCounterProvider)
+                                .record(UsageEvent.productSearched);
+                          }
+                          filterN.setSearch(q);
+                        },
                       ),
                     ),
                     PopupMenuButton<PosSortMode>(

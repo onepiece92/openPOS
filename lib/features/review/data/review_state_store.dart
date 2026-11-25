@@ -13,7 +13,8 @@ import 'package:pos_app/features/review/domain/review_policy.dart';
 /// `last_prompt_at`/`last_prompt_version`, which could allow one extra
 /// request per version; the OS rate limits (iOS: 3 per 365 days; Play:
 /// quota-based) still apply. Intended behaviour after a restore is to keep
-/// the EARLIEST first-launch date and the LATEST prompt date/version from
+/// the EARLIEST first-launch date and the LATEST prompt date/version (and
+/// the latest shared any-prompt date) from
 /// the two boxes: `AppRoot.restoreFrom` captures the state with
 /// [reviewStateBeforeRestore] before the files are swapped and calls
 /// [mergeReviewStateAfterRestore] once the box is open again.
@@ -28,6 +29,7 @@ class ReviewStateStore {
           final String v => v,
           _ => null,
         },
+        lastPromptShownAt: _date(kPromptLastShownAt),
       );
 
   DateTime? _date(String key) {
@@ -41,10 +43,17 @@ class ReviewStateStore {
     await _box.put(kReviewFirstLaunchAt, now.toIso8601String());
   }
 
+  /// A store-review request; also stamps the shared [kPromptLastShownAt].
   Future<void> markPrompted(DateTime at, String version) async {
     await _box.put(kReviewLastPromptAt, at.toIso8601String());
     await _box.put(kReviewLastPromptVersion, version);
+    await markAnyPromptShown(at);
   }
+
+  /// Any other prompt (the feedback ask): only the shared timestamp, so the
+  /// review rule's own 60-day / per-version bookkeeping is untouched.
+  Future<void> markAnyPromptShown(DateTime at) =>
+      _box.put(kPromptLastShownAt, at.toIso8601String());
 
   /// Restore-merge helper (see class doc): keeps the earliest first-launch
   /// and the latest prompt date/version of [before]
@@ -62,8 +71,15 @@ class ReviewStateStore {
     final b = before.lastPromptAt;
     final a = after.lastPromptAt;
     if (b != null && (a == null || b.isAfter(a))) {
-      await markPrompted(
-          b, before.lastPromptVersion ?? after.lastPromptVersion ?? '');
+      await _box.put(kReviewLastPromptAt, b.toIso8601String());
+      await _box.put(kReviewLastPromptVersion,
+          before.lastPromptVersion ?? after.lastPromptVersion ?? '');
+    }
+    // The shared spacing date: also the latest of the two.
+    final bs = before.lastPromptShownAt;
+    final as = read().lastPromptShownAt;
+    if (bs != null && (as == null || bs.isAfter(as))) {
+      await markAnyPromptShown(bs);
     }
   }
 }

@@ -15,9 +15,17 @@ import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/features/backup/data/share_files.dart';
 import 'package:pos_app/features/backup/data/snapshot_service.dart';
+import 'package:pos_app/features/usage/data/usage_counter.dart';
+import 'package:pos_app/features/usage/usage_providers.dart';
 
-/// Names of the Hive boxes that travel with a snapshot. Must match main().
-const kSnapshotHiveBoxes = ['settings', 'held_orders'];
+/// Hive boxes opened before the first frame (`openStartupStores`).
+const kStartupHiveBoxes = ['settings', 'held_orders'];
+
+/// Names of the Hive boxes that travel with a snapshot: the startup boxes
+/// plus `usage`, which the usage counter opens lazily after the first frame
+/// (backup and restore make sure it is open before they list the files;
+/// restore recovery and the post-restore reopen use this whole list).
+const kSnapshotHiveBoxes = [...kStartupHiveBoxes, kUsageBoxName];
 
 /// How many automatic snapshots to keep on-device.
 const kAutoBackupKeep = 7;
@@ -111,6 +119,11 @@ class SnapshotCoordinator {
   /// automatic backups carry just the DB and Hive.
   Future<File> create(Directory outDir, {bool includePhotos = true}) async {
     final db = _ref.read(databaseProvider);
+    // The usage box opens lazily: open it and write pending counts so the
+    // snapshot carries them.
+    final usage = _ref.read(usageCounterProvider);
+    await usage.ensureLoaded();
+    await usage.flush();
     for (final name in kSnapshotHiveBoxes) {
       if (Hive.isBoxOpen(name)) await Hive.box<dynamic>(name).flush();
     }

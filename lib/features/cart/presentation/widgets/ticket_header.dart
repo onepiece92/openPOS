@@ -7,6 +7,8 @@ import 'package:pos_app/features/cart/presentation/providers/cart_notifier.dart'
 import 'package:pos_app/features/customers/domain/customers_provider.dart';
 import 'package:pos_app/features/cart/presentation/widgets/customer_picker_sheet.dart';
 import 'package:pos_app/features/cart/presentation/widgets/table_selector.dart';
+import 'package:pos_app/features/usage/usage_providers.dart';
+import 'package:pos_app/features/usage/domain/usage_event.dart';
 
 // ─── Ticket header ─────────────────────────────────────────────────────────────
 
@@ -134,6 +136,7 @@ class TicketHeader extends ConsumerWidget {
         customers: customers,
         selectedId: currentId,
         onSelect: (c) {
+          ref.read(usageCounterProvider).record(UsageEvent.customerAddedToSale);
           ref.read(cartSessionProvider.notifier).setCustomer(c.id);
           if (c.defaultDiscount > 0) {
             ref.read(cartSessionProvider.notifier).setOrderDiscount(

@@ -48,6 +48,11 @@ const kReviewFirstLaunchAt = 'review_first_launch_at'; // ISO-8601
 const kReviewLastPromptAt = 'review_last_prompt_at'; // ISO-8601
 const kReviewLastPromptVersion = 'review_last_prompt_version'; // kAppVersionFull, e.g. '1.1.0+10'
 
+/// When ANY prompt (store review or the feedback ask) was last shown.
+/// Read and written by both, so they never appear within
+/// `kMinDaysBetweenAnyPrompts` of each other. ISO-8601.
+const kPromptLastShownAt = 'prompt_last_shown_at';
+
 // ── Raw box provider ─────────────────────────────────────────────────────────
 
 /// The 'settings' box must be opened in main() before the container exists.

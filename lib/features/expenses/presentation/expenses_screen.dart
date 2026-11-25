@@ -21,6 +21,8 @@ import 'package:pos_app/shared/widgets/app_empty_state.dart';
 import 'package:pos_app/shared/widgets/app_sheet.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
 import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
+import 'package:pos_app/features/usage/usage_providers.dart';
+import 'package:pos_app/features/usage/domain/usage_event.dart';
 
 // ── Providers ─────────────────────────────────────────────────────────────────
 
@@ -577,6 +579,7 @@ class _ExpenseFormState extends ConsumerState<_ExpenseForm> {
     setState(() => _loading = true);
 
     final db = ref.read(databaseProvider);
+    final usage = ref.read(usageCounterProvider);
     final entry = ExpensesCompanion(
       id: _isEdit ? Value(widget.expense!.id) : const Value.absent(),
       amount: Value(double.parse(_amountCtrl.text)),
@@ -594,6 +597,7 @@ class _ExpenseFormState extends ConsumerState<_ExpenseForm> {
           await db.expensesDao.updateExpense(entry);
         } else {
           await db.expensesDao.insert(entry);
+          usage.record(UsageEvent.expenseAdded);
         }
         return true;
       },

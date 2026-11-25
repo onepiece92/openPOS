@@ -6,6 +6,21 @@ import 'package:pos_app/features/review/data/review_state_store.dart';
 import 'package:pos_app/features/review/domain/review_policy.dart';
 import 'package:pos_app/features/review/domain/review_prompter.dart';
 
+/// What one [ReviewController.runCheck] found.
+enum ReviewCheck {
+  /// The rule did not pass: nothing was asked.
+  notEligible,
+
+  /// The OS was asked to show its review sheet (or may be showing it).
+  requested,
+
+  /// The rule passed but the store said review is unavailable.
+  unavailable,
+
+  /// Not evaluated: a check was already running, or something threw.
+  skipped,
+}
+
 /// Wires the pure [shouldRequestReview] rule to persisted state and the
 /// platform [ReviewPrompter].
 ///
@@ -27,7 +42,13 @@ class ReviewController {
     DateTime Function()? clock,
     this.settleDelay = const Duration(seconds: 1),
     this.timeout = const Duration(seconds: 5),
+    this.afterCheck,
   }) : _clock = clock ?? DateTime.now;
+
+  /// Called after every check from [onReceiptDismissed] with its outcome —
+  /// the feedback ask hangs off this so it only ever runs when the review
+  /// request did not (see `UsageAskController`). Must not throw.
+  final void Function(ReviewCheck result)? afterCheck;
 
   final ReviewStateStore store;
   final ReviewPrompter prompter;
@@ -45,25 +66,29 @@ class ReviewController {
   void onReceiptDismissed() {
     unawaited(_guard(() async {
       await Future<void>.delayed(settleDelay);
-      await runCheck();
+      final result = await runCheck();
+      afterCheck?.call(result);
+      return result;
     }));
   }
 
   /// One evaluation of the rule (+ the request when it passes). Completes
   /// within about [timeout]; never throws.
   @visibleForTesting
-  Future<void> runCheck() => _guard(() async {
-        if (_inFlight) return;
+  Future<ReviewCheck> runCheck() => _guard(() async {
+        if (_inFlight) return ReviewCheck.skipped;
         final now = _clock();
         final state = store.read();
         bool passes(int sales) => shouldRequestReview(state,
             completedSales: sales, now: now, currentVersion: appVersion);
         // Dates and version first (no I/O): the database is only asked
         // when the sale count is the one thing left to decide.
-        if (!passes(kReviewMinCompletedSales)) return;
+        if (!passes(kReviewMinCompletedSales)) return ReviewCheck.notEligible;
         _inFlight = true;
         try {
-          if (!passes(await completedSales().timeout(timeout))) return;
+          if (!passes(await completedSales().timeout(timeout))) {
+            return ReviewCheck.notEligible;
+          }
           bool asked;
           try {
             asked = await prompter.maybeRequestReview().timeout(timeout);
@@ -71,17 +96,20 @@ class ReviewController {
             // The sheet may be up; count it so we don't re-ask next sale.
             asked = true;
           }
-          if (asked) await store.markPrompted(now, appVersion);
+          if (!asked) return ReviewCheck.unavailable;
+          await store.markPrompted(now, appVersion);
+          return ReviewCheck.requested;
         } finally {
           _inFlight = false;
         }
       });
 
-  Future<void> _guard(Future<void> Function() body) async {
+  Future<ReviewCheck> _guard(Future<ReviewCheck> Function() body) async {
     try {
-      await body();
+      return await body();
     } catch (e) {
       debugPrint('review: ignored $e');
+      return ReviewCheck.skipped;
     }
   }
 }

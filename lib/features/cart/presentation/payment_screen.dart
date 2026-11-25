@@ -18,6 +18,8 @@ import 'package:pos_app/features/cart/data/place_order.dart';
 import 'package:pos_app/features/customers/domain/customers_provider.dart';
 import 'package:pos_app/features/printing/domain/auto_print.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
+import 'package:pos_app/features/usage/usage_providers.dart';
+import 'package:pos_app/features/usage/domain/usage_event.dart';
 
 // ─── Payment screen (/checkout/payment) ──────────────────────────────────────
 
@@ -101,6 +103,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     final heldOrders = ref.read(heldOrdersProvider.notifier);
     final printer = ref.read(autoPrintServiceProvider);
     final messenger = ScaffoldMessenger.of(context);
+    final usage = ref.read(usageCounterProvider);
 
     final int orderId;
     try {
@@ -123,6 +126,12 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         );
       }
       return;
+    }
+
+    // In-memory counts only; written later, off this path.
+    usage.record(UsageEvent.saleCompleted);
+    if (summary.pointsRedeemed > 0) {
+      usage.record(UsageEvent.loyaltyPointsRedeemed);
     }
 
     // The cart may have been resumed from a held ticket, which now stays on

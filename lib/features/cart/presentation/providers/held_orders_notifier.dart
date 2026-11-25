@@ -8,6 +8,8 @@ import 'package:pos_app/features/cart/domain/cart_item.dart';
 import 'package:pos_app/features/cart/presentation/providers/cart_notifier.dart';
 import 'package:pos_app/features/cart/domain/held_order.dart';
 import 'package:pos_app/features/customers/domain/customers_provider.dart';
+import 'package:pos_app/features/usage/usage_providers.dart';
+import 'package:pos_app/features/usage/domain/usage_event.dart';
 
 export 'package:pos_app/features/cart/data/ticket_sequence.dart'
     show heldOrdersBoxProvider;
@@ -120,6 +122,7 @@ class HeldOrdersNotifier extends Notifier<List<HeldOrder>> {
   /// the ticket the cart was resumed from when there is one, otherwise mints
   /// a new ticket off the persisted counter.
   HeldOrder holdCurrentCart() {
+    ref.read(usageCounterProvider).record(UsageEvent.ticketHeld);
     final cart = ref.read(cartProvider);
     final session = ref.read(cartSessionProvider);
     final customerName = ref.read(cartCustomerNameProvider);

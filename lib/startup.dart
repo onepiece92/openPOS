@@ -40,7 +40,8 @@ Future<StartupResult> startUp({
 /// and starts the review-prompt clock (no-op after the first launch).
 Future<void> openStartupStores() async {
   await Future.wait([
-    for (final name in kSnapshotHiveBoxes) Hive.openBox<dynamic>(name),
+    // Not the lazily-opened `usage` box: it must not delay the first frame.
+    for (final name in kStartupHiveBoxes) Hive.openBox<dynamic>(name),
   ]);
   await startReviewClock();
 }

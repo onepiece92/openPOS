@@ -15,6 +15,9 @@ import 'package:pos_app/features/backup/data/snapshot_providers.dart';
 import 'package:pos_app/features/backup/data/snapshot_service.dart';
 import 'package:pos_app/features/help/support_contact.dart';
 import 'package:pos_app/features/review/data/review_state_store.dart';
+import 'package:pos_app/features/usage/data/usage_counter.dart';
+import 'package:pos_app/features/usage/domain/usage_event.dart';
+import 'package:pos_app/features/usage/usage_providers.dart';
 import 'package:pos_app/startup.dart' show startReviewClock;
 
 /// Owns the Riverpod container so the whole app can be hot-restarted —
@@ -133,6 +136,12 @@ class AppRootState extends State<AppRoot> {
     // A restore pre-empts this launch's pending auto-backup.
     _autoBackupTimer?.cancel();
     _autoBackupTimer = null;
+    // The usage box opens lazily: open it (so it is in the file list below)
+    // and write pending counts, then remember it for the merge-back.
+    final usage = _container.read(usageCounterProvider);
+    await usage.ensureLoaded();
+    await usage.flush();
+    final usageBefore = usageSnapshotBeforeRestore();
     // Resolve paths while Hive is still open (box.path needs an open box).
     final dbPath = (await databaseFile()).path;
     final hiveFiles = snapshotHiveBoxFiles();
@@ -189,6 +198,9 @@ class AppRootState extends State<AppRoot> {
           );
           notice = 'Backup restored';
           await mergeReviewStateAfterRestore(reviewBefore); // never throws
+          await mergeUsageAfterRestore(usageBefore); // never throws
+          _container.read(usageCounterProvider)
+              .record(UsageEvent.backupRestored);
         } on RestoreFatalException catch (e) {
           error = e;
           fatal = '$e';
@@ -197,6 +209,7 @@ class AppRootState extends State<AppRoot> {
           notice = 'Restore failed: $e';
           // Back on the old box: the merge finds nothing to change.
           await mergeReviewStateAfterRestore(reviewBefore);
+          await mergeUsageAfterRestore(usageBefore);
         } catch (e) {
           error = e;
           notice = 'Restore failed: $e. Your data was not changed.';

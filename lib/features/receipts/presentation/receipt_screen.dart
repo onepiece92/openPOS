@@ -16,6 +16,8 @@ import 'package:pos_app/features/receipts/presentation/receipt_body.dart';
 import 'package:pos_app/features/orders/domain/order_number.dart';
 import 'package:pos_app/features/review/application/review_controller.dart';
 import 'package:pos_app/features/review/review_providers.dart';
+import 'package:pos_app/features/usage/usage_providers.dart';
+import 'package:pos_app/features/usage/domain/usage_event.dart';
 
 final _receiptProvider =
     FutureProvider.family<ReceiptBodyData, int>((ref, orderId) async {
@@ -83,7 +85,13 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
         automaticallyImplyLeading: false,
         actions: [
           receiptAsync.maybeWhen(
-            data: (data) => _ShareMenu(data: data, fmt: fmt),
+            data: (data) => _ShareMenu(
+              data: data,
+              fmt: fmt,
+              onShared: () => ref
+                  .read(usageCounterProvider)
+                  .record(UsageEvent.receiptShared),
+            ),
             orElse: () => const SizedBox.shrink(),
           ),
         ],
@@ -103,15 +111,20 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
 enum _ShareAction { sms, email, copy }
 
 class _ShareMenu extends StatelessWidget {
-  const _ShareMenu({required this.data, required this.fmt});
+  const _ShareMenu(
+      {required this.data, required this.fmt, required this.onShared});
   final ReceiptBodyData data;
   final CurrencyFormatter fmt;
+
+  /// Counts the share (usage counter); called once a share is handed off.
+  final VoidCallback onShared;
 
   Future<void> _handle(BuildContext context, _ShareAction action) async {
     final text = buildReceiptText(data, fmt);
     switch (action) {
       case _ShareAction.copy:
         await Clipboard.setData(ClipboardData(text: text));
+        onShared();
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Receipt copied')),
@@ -127,6 +140,7 @@ class _ShareMenu extends StatelessWidget {
         );
         if (phone == null || !context.mounted) return;
         final uri = Uri.parse(smsLink(phone, body: text));
+        onShared();
         await _launch(context, uri, fallbackText: text);
       case _ShareAction.email:
         final addr = await _resolveContact(
@@ -142,6 +156,7 @@ class _ShareMenu extends StatelessWidget {
           subject: '${data.businessName} — Receipt ${data.order.billNo}',
           body: text,
         ));
+        onShared();
         await _launch(context, uri, fallbackText: text);
     }
   }

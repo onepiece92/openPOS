@@ -8,6 +8,8 @@ import 'package:pos_app/shared/widgets/summary_row.dart';
 import 'package:pos_app/features/cart/presentation/providers/cart_notifier.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
 import 'package:pos_app/features/cart/presentation/widgets/discount_sheet.dart';
+import 'package:pos_app/features/usage/usage_providers.dart';
+import 'package:pos_app/features/usage/domain/usage_event.dart';
 
 // ─── Order summary ─────────────────────────────────────────────────────────────
 
@@ -140,9 +142,14 @@ class OrderSummary extends ConsumerWidget {
         currentDiscount: session.orderDiscount,
         isPercent: session.orderDiscountIsPercent,
         subtotal: subtotal,
-        onApply: (amount, isPercent) =>
-            ref.read(cartSessionProvider.notifier)
-                .setOrderDiscount(amount, isPercent: isPercent),
+        onApply: (amount, isPercent) {
+          if (amount > 0) {
+            ref.read(usageCounterProvider).record(UsageEvent.discountApplied);
+          }
+          ref
+              .read(cartSessionProvider.notifier)
+              .setOrderDiscount(amount, isPercent: isPercent);
+        },
       ),
     );
   }

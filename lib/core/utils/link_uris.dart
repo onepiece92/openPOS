@@ -46,3 +46,13 @@ String smsLink(String phone, {String? body, TargetPlatform? platform}) {
   if (body == null || body.isEmpty) return 'sms:$to';
   return 'sms:$to${apple ? '&' : '?'}body=${_encode(body, lineBreak: '\n')}';
 }
+
+/// A `https://wa.me/<number>?text=<text>` link (WhatsApp click-to-chat; the
+/// OS hands it to WhatsApp). [phone] is the international number; anything
+/// but digits is dropped, as wa.me requires. Line breaks are sent as a bare
+/// LF (%0A).
+String whatsAppLink(String phone, {String? text}) {
+  final to = phone.replaceAll(RegExp(r'\D'), '');
+  if (text == null || text.isEmpty) return 'https://wa.me/$to';
+  return 'https://wa.me/$to?text=${_encode(text, lineBreak: '\n')}';
+}

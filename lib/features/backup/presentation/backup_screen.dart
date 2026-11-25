@@ -12,6 +12,8 @@ import 'package:pos_app/core/utils/share_origin.dart';
 import 'package:pos_app/features/backup/data/backup_repository.dart';
 import 'package:pos_app/features/backup/data/snapshot_providers.dart';
 import 'package:pos_app/features/backup/data/snapshot_service.dart';
+import 'package:pos_app/features/usage/usage_providers.dart';
+import 'package:pos_app/features/usage/domain/usage_event.dart';
 
 class BackupScreen extends ConsumerStatefulWidget {
   const BackupScreen({super.key});
@@ -31,10 +33,12 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
   /// sheet to it and will not share without one.
   Future<void> _createFullBackup(Rect shareOrigin) async {
     setState(() => _isSnapshotting = true);
+    final usage = ref.read(usageCounterProvider);
     try {
       await ref
           .read(snapshotCoordinatorProvider)
           .createAndShare(shareOrigin: shareOrigin);
+      usage.record(UsageEvent.backupCreated);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -131,8 +135,10 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
 
   Future<void> _runExport(String type, Future<void> Function() exportFn) async {
     setState(() => _isExporting = true);
+    final usage = ref.read(usageCounterProvider);
     try {
       await exportFn();
+      usage.record(UsageEvent.csvExported);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('$type exported successfully')),
@@ -197,6 +203,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
 
       final CsvImportReport report;
       final repo = ref.read(backupRepositoryProvider);
+      final usage = ref.read(usageCounterProvider);
 
       if (isOrders) {
         report = await repo.importOrdersReport(content);
@@ -207,6 +214,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
       } else {
         report = await repo.importCustomersReport(content);
       }
+      usage.record(UsageEvent.csvImported);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

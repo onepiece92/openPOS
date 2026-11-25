@@ -5,6 +5,8 @@ import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/features/printing/domain/receipt_printer.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
 import 'package:pos_app/features/receipts/presentation/receipt_body.dart';
+import 'package:pos_app/features/usage/usage_providers.dart';
+import 'package:pos_app/features/usage/domain/usage_event.dart';
 
 final autoPrintServiceProvider =
     Provider<AutoPrintService>((ref) => AutoPrintService(ref));
@@ -62,6 +64,7 @@ class AutoPrintService {
             ),
           );
       await db.ordersDao.incrementPrintCount(orderId);
+      _ref.read(usageCounterProvider).record(UsageEvent.receiptPrinted);
       return null;
     } catch (e) {
       return 'Printer: $e';

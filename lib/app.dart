@@ -30,6 +30,9 @@ import 'package:pos_app/features/settings/presentation/settings_screen.dart';
 import 'package:pos_app/features/settings/presentation/store_profile_edit_screen.dart';
 import 'package:pos_app/features/tax/presentation/tax_settings_screen.dart';
 import 'package:pos_app/features/theme/presentation/theme_preview_screen.dart';
+import 'package:pos_app/features/usage/presentation/usage_host.dart';
+import 'package:pos_app/features/usage/presentation/usage_screen.dart';
+import 'package:pos_app/features/usage/usage_providers.dart';
 import 'package:pos_app/shared/widgets/dismiss_keyboard.dart';
 
 /// App-wide scroll behaviour. Dragging any list dismisses the software
@@ -124,7 +127,10 @@ class POSApp extends ConsumerWidget {
                   if (router.canPop()) router.pop();
                 },
               },
-              child: child!,
+              child: UsageHost(
+                openUsage: () => router.push(kUsageRoute),
+                child: child!,
+              ),
             ),
           ),
         );
@@ -141,7 +147,7 @@ final routerProvider = Provider<GoRouter>((ref) {
   ref.listen(onboardingCompleteProvider, (_, __) => refresh.ping());
   ref.onDispose(refresh.dispose);
 
-  return GoRouter(
+  final router = GoRouter(
     initialLocation: '/pos',
     refreshListenable: refresh,
     redirect: (context, state) {
@@ -279,8 +285,19 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/help/shortcuts',
         pageBuilder: (_, state) => _slide(state, const ShortcutsScreen()),
       ),
+      GoRoute(
+        path: kUsageRoute,
+        pageBuilder: (_, state) => _slide(state, const UsageScreen()),
+      ),
     ],
   );
+  // Screen-open counts: a synchronous map update per navigation.
+  final usage = ref.read(usageCounterProvider);
+  void onNavigate() =>
+      usage.recordRoute(router.routerDelegate.currentConfiguration.fullPath);
+  router.routerDelegate.addListener(onNavigate);
+  ref.onDispose(() => router.routerDelegate.removeListener(onNavigate));
+  return router;
 });
 
 class _RouterRefresh extends ChangeNotifier {

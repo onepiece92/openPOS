@@ -17,6 +17,8 @@ import 'package:pos_app/features/returns/domain/process_return.dart';
 import 'package:pos_app/features/returns/domain/void_order.dart' as void_svc;
 import 'package:pos_app/features/orders/domain/order_number.dart';
 import 'package:pos_app/features/printing/domain/auto_print.dart';
+import 'package:pos_app/features/usage/usage_providers.dart';
+import 'package:pos_app/features/usage/domain/usage_event.dart';
 
 // ─── Data bundle ──────────────────────────────────────────────────────────────
 
@@ -289,6 +291,7 @@ class _DetailBody extends StatelessWidget {
 
     final db = ref.read(databaseProvider);
     final audit = ref.read(auditServiceProvider);
+    final usage = ref.read(usageCounterProvider);
     final reason = reasonCtrl.text.trim();
 
     final ok = await withErrorSnackbar(
@@ -305,6 +308,7 @@ class _DetailBody extends StatelessWidget {
       failurePrefix: 'Void failed',
     );
     if (ok != true) return;
+    usage.record(UsageEvent.orderVoided);
 
     if (context.mounted) {
       ref.invalidate(_orderDetailProvider(orderId));
@@ -407,6 +411,7 @@ class _DetailBody extends StatelessWidget {
 
     final db = ref.read(databaseProvider);
     final audit = ref.read(auditServiceProvider);
+    final usage = ref.read(usageCounterProvider);
 
     final ok = await withErrorSnackbar(
       context,
@@ -424,6 +429,7 @@ class _DetailBody extends StatelessWidget {
       failurePrefix: 'Refund failed',
     );
     if (ok != true) return;
+    usage.record(UsageEvent.refundIssued);
 
     if (context.mounted) {
       ref.invalidate(_orderDetailProvider(orderId));
