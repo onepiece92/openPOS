@@ -106,8 +106,7 @@ HOLD -->
 
 ### Orders and receipts
 - Order history and voids
-- PDF receipts
-- Share receipts by SMS or email through your device's own apps, or copy them as text
+- PDF receipts you can save or share, or copy the receipt as text
 <!-- HOLD: pending fix confirmation
 - Refunds, with optional restock
 HOLD -->
@@ -199,7 +198,7 @@ flutter build ios --release      # iOS (needs a Mac with Xcode and your own sign
 
 ## Need cloud sync and multi-device?
 
-Open POS is deliberately single-device and offline, and it will stay that way. It will also stay free. If your business needs sync across several devices, online ordering or a back office in the cloud, the same team makes [RebuzzPOS](https://rebuzzpos.com), an online POS with 40+ additional features. It is a separate product; nothing in Open POS depends on it or connects to it.
+Open POS is deliberately single-device and offline, and it will stay that way. It will also stay free. If your business needs sync across several devices, the same team makes [RebuzzPOS](https://rebuzzpos.com), a separate online POS. The Support screen in Open POS links to it. Open POS exchanges no data with it, and you never need it to use Open POS.
 
 ---
 
