@@ -164,4 +164,86 @@ void main() {
     expect(find.textContaining('receipt'), findsOneWidget);
     expect(c.read(cartProvider), isEmpty);
   });
+
+  group('cash tendered', () {
+    void addToCart({required double price, int qty = 1}) =>
+        c.read(cartProvider.notifier).restoreItem(CartItem(
+            productId: productId,
+            name: 'Tea',
+            unitPrice: price,
+            quantity: qty,
+            isTaxable: false));
+
+    String tenderedText(WidgetTester tester) => tester
+        .widget<TextField>(find.widgetWithText(
+            TextField, 'Amount received from customer'))
+        .controller!
+        .text;
+
+    test('shows two decimals, or none for a whole amount', () {
+      expect(exactAmountText(12.5), '12.50');
+      expect(exactAmountText(1000), '1000');
+      expect(exactAmountText(0.1 + 0.2), '0.30');
+      expect(exactAmountText(987.5), '987.50');
+    });
+
+    testWidgets('starts at the exact amount due, so change starts at zero',
+        (tester) async {
+      addToCart(price: 12.5);
+      await tester.pumpWidget(app(ValueNotifier(true)));
+      await tester.pump();
+
+      expect(tenderedText(tester), '12.50',
+          reason: 'not rounded up to 1000');
+      expect(find.textContaining('987.50'), findsNothing);
+
+      // Confirming without touching the field records tendered = total.
+      await tester.tap(confirm());
+      await settle(tester);
+      final order =
+          (await tester.runAsync(() => db.select(db.orders).getSingle()))!;
+      expect(order.total, 12.5);
+      expect(order.tenderedAmount, 12.5);
+      expect(order.changeAmount ?? 0, 0);
+    });
+
+    testWidgets('typing a larger amount gives change as before',
+        (tester) async {
+      addToCart(price: 12.5);
+      await tester.pumpWidget(app(ValueNotifier(true)));
+      await tester.pump();
+      await tester.enterText(
+          find.widgetWithText(TextField, 'Amount received from customer'),
+          '20');
+      await tester.pump();
+      expect(find.textContaining('7.50'), findsOneWidget);
+
+      await tester.tap(confirm());
+      await settle(tester);
+      final order =
+          (await tester.runAsync(() => db.select(db.orders).getSingle()))!;
+      expect(order.tenderedAmount, 20);
+      expect(order.changeAmount, 7.5);
+    });
+
+    testWidgets('an untouched field follows the amount due; an edited one '
+        'is left alone', (tester) async {
+      addToCart(price: 12.5);
+      await tester.pumpWidget(app(ValueNotifier(true)));
+      await tester.pump();
+
+      addToCart(price: 12.5); // the total changes while the screen is open
+      await tester.pump();
+      expect(tenderedText(tester), '25');
+
+      await tester.enterText(
+          find.widgetWithText(TextField, 'Amount received from customer'),
+          '50');
+      await tester.pump();
+      c.read(cartProvider.notifier).clear();
+      addToCart(price: 30);
+      await tester.pump();
+      expect(tenderedText(tester), '50');
+    });
+  });
 }

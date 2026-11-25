@@ -21,6 +21,14 @@ import 'package:pos_app/features/products/domain/products_provider.dart';
 
 // ─── Payment screen (/checkout/payment) ──────────────────────────────────────
 
+/// [amount] as the cash field shows it: two decimals, or none for a whole
+/// amount ("12.50", "1000").
+@visibleForTesting
+String exactAmountText(double amount) {
+  final text = amount.toStringAsFixed(2);
+  return text.endsWith('.00') ? text.substring(0, text.length - 3) : text;
+}
+
 class PaymentScreen extends ConsumerStatefulWidget {
   const PaymentScreen({super.key});
 
@@ -44,10 +52,15 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     if (summary.pointsRedeemed > 0) {
       _loyaltyCtrl.text = summary.pointsRedeemed.toString();
     }
-    final rounds = (total / 1000).ceil();
-    final defaultAmt = (rounds < 1 ? 1 : rounds) * 1000;
-    _tenderedCtrl.text = defaultAmt.toString();
+    // Start at the exact amount due (change 0): the cashier types only when
+    // handed more. It used to start at the next multiple of 1000, which put
+    // "1000" and a change of 987.50 on a 12.50 sale.
+    _tenderedCtrl.text = exactAmountText(total);
   }
+
+  /// True once the cashier has typed in the cash field; until then it
+  /// follows the amount due (e.g. when points are redeemed on this screen).
+  bool _tenderedEdited = false;
 
   @override
   void dispose() {
@@ -66,7 +79,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     final cart = ref.read(cartProvider);
     if (cart.isEmpty) return;
 
-    if (_paymentMethod == 'cash' && _tendered < summary.total) {
+    // Half a cent of slack: the field holds two decimals.
+    if (_paymentMethod == 'cash' && _tendered < summary.total - 0.005) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
             content: Text('Tendered amount is less than the total')),
@@ -141,6 +155,10 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   @override
   Widget build(BuildContext context) {
     final summary = ref.watch(cartSummaryProvider);
+    // Keep the untouched cash field on the amount due when it changes.
+    ref.listen(cartSummaryProvider.select((s) => s.total), (_, total) {
+      if (!_tenderedEdited) _tenderedCtrl.text = exactAmountText(total);
+    });
     final symbol = ref.watch(currencySymbolProvider);
     final fmt = ref.watch(currencyFormatterProvider);
     final loyaltyEnabled = ref.watch(loyaltyEnabledProvider);
@@ -196,9 +214,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                 prefixText: '$symbol ',
                 border: const OutlineInputBorder(),
               ),
-              onChanged: (_) => setState(() {}),
+              onChanged: (_) => setState(() => _tenderedEdited = true),
             ),
-            if (_tendered >= summary.total && summary.total > 0) ...[
+            if (_tendered >= summary.total - 0.005 && summary.total > 0) ...[
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(14),
