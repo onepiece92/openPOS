@@ -9,6 +9,7 @@ import 'package:pos_app/features/cart/domain/cart_item.dart';
 import 'package:pos_app/features/cart/domain/cart_session.dart';
 import 'package:pos_app/features/cart/domain/cart_summary.dart';
 import 'package:pos_app/features/cart/domain/held_order.dart';
+import 'package:pos_app/features/cart/domain/stock_cap.dart';
 import 'package:pos_app/features/customers/domain/customers_provider.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
 
@@ -96,7 +97,8 @@ class CartNotifier extends Notifier<List<CartItem>> {
   List<CartItem> build() => [];
 
   /// Adds one main-unit of [p] (merging into the main-unit line if present).
-  void addProduct(Product p) => addItem(CartItem(
+  /// Returns false when stock doesn't allow it.
+  bool addProduct(Product p) => addItem(CartItem(
         productId: p.id,
         name: p.name,
         unitPrice: p.price,
@@ -106,10 +108,11 @@ class CartNotifier extends Notifier<List<CartItem>> {
 
   /// Adds one *secondary* unit of [p] (e.g. one dozen) as its own line.
   /// Price is the main-unit price × conversion, rounded to money.
-  void addProductInSecondaryUnit(Product p) {
+  /// Returns false when stock doesn't allow it.
+  bool addProductInSecondaryUnit(Product p) {
     final label = p.secondaryUnit;
-    if (label == null || label.isEmpty) return;
-    addItem(CartItem(
+    if (label == null || label.isEmpty) return false;
+    return addItem(CartItem(
       productId: p.id,
       name: p.name,
       unitPrice: roundMoney(p.price * p.conversionRate),
@@ -120,10 +123,20 @@ class CartNotifier extends Notifier<List<CartItem>> {
     ));
   }
 
-  void setQuantity(int productId, int qty, {String unitLabel = ''}) {
+  /// Sets a line's quantity. Returns false — leaving the cart untouched —
+  /// when raising it would take the product past its stock. Lowering a
+  /// quantity is always allowed.
+  bool setQuantity(int productId, int qty, {String unitLabel = ''}) {
     if (qty <= 0) {
       remove(productId, unitLabel: unitLabel);
-      return;
+      return true;
+    }
+    for (final item in state) {
+      if (item.sameLine(productId, unitLabel) &&
+          qty > item.quantity &&
+          !_fitsStock(item.copyWith(quantity: qty))) {
+        return false;
+      }
     }
     state = [
       for (final item in state)
@@ -132,6 +145,28 @@ class CartNotifier extends Notifier<List<CartItem>> {
         else
           item,
     ];
+    return true;
+  }
+
+  /// True when the cart can hold [line] (at its new quantity) alongside the
+  /// product's other lines. Stock is counted in main units, so 2 dozen and
+  /// 3 pcs of the same product weigh 27 against the cap. Products the POS
+  /// catalog doesn't know (not loaded yet, hidden) are not capped.
+  bool _fitsStock(CartItem line) {
+    final products = ref.read(productsStreamProvider).valueOrNull ?? const [];
+    final product =
+        products.where((p) => p.id == line.productId).firstOrNull;
+    if (product == null) return true;
+    final cap = stockCapFor(product);
+    if (cap == null) return true;
+    var committed = line.mainUnitQty;
+    for (final other in state) {
+      if (other.productId == line.productId &&
+          !other.sameLine(line.productId, line.unitLabel)) {
+        committed += other.mainUnitQty;
+      }
+    }
+    return committed <= cap;
   }
 
   void remove(int productId, {String unitLabel = ''}) {
@@ -149,18 +184,40 @@ class CartNotifier extends Notifier<List<CartItem>> {
     ];
   }
 
-  /// Adds a [CartItem], merging into the matching (product, unit) line —
-  /// also used when resuming a held order.
-  void addItem(CartItem item) {
+  /// Adds a [CartItem], merging into the matching (product, unit) line.
+  /// Returns false — leaving the cart untouched — when the product's stock
+  /// can't cover the resulting quantity.
+  bool addItem(CartItem item) {
     final existing =
         state.indexWhere((i) => i.sameLine(item.productId, item.unitLabel));
-    if (existing >= 0) {
-      final updated = [...state];
-      updated[existing] = updated[existing]
-          .copyWith(quantity: updated[existing].quantity + item.quantity);
-      state = updated;
+    final merged = existing >= 0
+        ? state[existing]
+            .copyWith(quantity: state[existing].quantity + item.quantity)
+        : item;
+    if (!_fitsStock(merged)) return false;
+    _put(existing, merged);
+    return true;
+  }
+
+  /// Puts a saved line back as it was, without the stock check: resuming a
+  /// held ticket must not silently drop lines because stock moved while it
+  /// was parked. The line still can't be raised past stock afterwards.
+  void restoreItem(CartItem item) {
+    final existing =
+        state.indexWhere((i) => i.sameLine(item.productId, item.unitLabel));
+    _put(
+        existing,
+        existing >= 0
+            ? state[existing]
+                .copyWith(quantity: state[existing].quantity + item.quantity)
+            : item);
+  }
+
+  void _put(int index, CartItem line) {
+    if (index >= 0) {
+      state = [...state]..[index] = line;
     } else {
-      state = [...state, item];
+      state = [...state, line];
     }
   }
 

@@ -65,9 +65,18 @@ class CartLineItem extends ConsumerWidget {
               ),
               _QtyButton(
                 icon: Icons.add_rounded,
-                onPressed: () => notifier.setQuantity(
-                    item.productId, item.quantity + 1,
-                    unitLabel: item.unitLabel),
+                onPressed: () {
+                  final added = notifier.setQuantity(
+                      item.productId, item.quantity + 1,
+                      unitLabel: item.unitLabel);
+                  if (added) return;
+                  ScaffoldMessenger.of(context)
+                    ..clearSnackBars()
+                    ..showSnackBar(SnackBar(
+                      content: Text('No more ${item.name} in stock'),
+                      duration: const Duration(seconds: 2),
+                    ));
+                },
               ),
             ],
           ),

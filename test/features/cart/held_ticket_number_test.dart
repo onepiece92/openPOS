@@ -4,10 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
+import 'package:pos_app/core/database/app_database.dart' show Product;
 import 'package:pos_app/features/cart/data/ticket_sequence.dart';
 import 'package:pos_app/features/cart/domain/cart_item.dart';
 import 'package:pos_app/features/cart/presentation/providers/cart_notifier.dart';
 import 'package:pos_app/features/cart/presentation/providers/held_orders_notifier.dart';
+import 'package:pos_app/features/products/domain/products_provider.dart';
 
 /// A held ticket keeps its number for life: resuming it, editing it and saving
 /// it again must rewrite the same row rather than mint a new ticket.
@@ -16,7 +18,12 @@ void main() {
   late Box<dynamic> box;
 
   ProviderContainer makeContainer() => ProviderContainer(
-        overrides: [heldOrdersBoxProvider.overrideWithValue(box)],
+        overrides: [
+          heldOrdersBoxProvider.overrideWithValue(box),
+          // The cart's stock cap reads the catalog; none is needed here.
+          productsStreamProvider
+              .overrideWith((ref) => Stream.value(const <Product>[])),
+        ],
       );
 
   setUp(() async {

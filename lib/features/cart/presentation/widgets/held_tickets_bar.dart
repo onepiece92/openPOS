@@ -386,7 +386,7 @@ class _HeldTicketsSheetState extends ConsumerState<_HeldTicketsSheet>
     // ticket number, which is exactly what resumeTicket is about to undo.
     notifier.clearItems();
     for (final item in ticket.items) {
-      notifier.addItem(item);
+      notifier.restoreItem(item);
     }
     // The ticket stays on disk while it is being edited — saving rewrites it
     // in place, so its number, label and position never change.

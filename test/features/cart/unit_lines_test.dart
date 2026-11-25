@@ -9,6 +9,8 @@ import 'package:pos_app/features/cart/domain/cart_item.dart';
 import 'package:pos_app/features/cart/domain/held_order.dart';
 import 'package:pos_app/features/cart/presentation/providers/cart_notifier.dart';
 
+import 'package:pos_app/features/products/domain/products_provider.dart';
+
 import '../../_support/test_db.dart';
 
 /// Secondary-unit selling: cart line identity, pricing, stock math and the
@@ -42,7 +44,12 @@ void main() {
 
   group('cart lines', () {
     late ProviderContainer c;
-    setUp(() => c = ProviderContainer());
+    // The cart notifier consults the product catalog for the stock cap;
+    // an empty catalog means "no cap" without opening a real database.
+    setUp(() => c = ProviderContainer(overrides: [
+          productsStreamProvider
+              .overrideWith((ref) => Stream.value(const <Product>[])),
+        ]));
     tearDown(() => c.dispose());
     CartNotifier n() => c.read(cartProvider.notifier);
     List<CartItem> cart() => c.read(cartProvider);

@@ -6,6 +6,7 @@ import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/services/demo_data_service.dart';
 import 'package:pos_app/core/utils/currency_formatter.dart';
 import 'package:pos_app/features/cart/domain/cart_item.dart';
+import 'package:pos_app/features/cart/domain/stock_cap.dart';
 import 'package:pos_app/shared/widgets/app_sheet.dart';
 import 'package:pos_app/features/cart/presentation/providers/cart_notifier.dart';
 import 'package:pos_app/features/cart/presentation/widgets/unit_picker_sheet.dart';
@@ -105,13 +106,17 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     // Unlimited (qty=0) and flagged out-of-stock are untouched here —
     // out-of-stock tiles are already blocked upstream.
     // desiredMainUnits counts every line of the product (pcs + boxes).
+    // The cart notifier enforces the same cap on every path; this check
+    // exists to tell the cashier why the tap did nothing.
     bool allowQty(Product p, int desiredMainUnits) {
-      if (p.stockQuantity <= 0) return true;
-      if (desiredMainUnits <= p.stockQuantity) return true;
+      final cap = stockCapFor(p);
+      if (cap == null || desiredMainUnits <= cap) return true;
       ScaffoldMessenger.of(context)
         ..clearSnackBars()
         ..showSnackBar(SnackBar(
-          content: Text('Only ${p.stockQuantity} in stock for ${p.name}'),
+          content: Text(cap == 0
+              ? '${p.name} is out of stock'
+              : 'Only $cap in stock for ${p.name}'),
           duration: const Duration(seconds: 2),
         ));
       return false;
