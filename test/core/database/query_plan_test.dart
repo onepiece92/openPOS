@@ -79,6 +79,7 @@ void main() {
               discountTotal: 0,
               discountIsPercent: false,
               total: 1,
+              tipAmount: 0,
               paymentMethod: 'cash',
               pointsRedeemed: 0,
               loyaltyDiscount: 0,
@@ -172,6 +173,31 @@ void main() {
       expectIndexed(
           await planOf(() => db.expensesDao.totalForPeriod(from, to)),
           ['idx_expenses_date']);
+    });
+  });
+
+  group('drawer close', () {
+    test('sales in a window range over orders by date', () async {
+      final plan =
+          await planOf(() => db.shiftsDao.salesInWindow(from, to));
+      expectIndexed(plan, ['idx_orders_created_at']);
+    });
+
+    test('refunds in a window range over returns by date', () async {
+      final plan =
+          await planOf(() => db.shiftsDao.refundsInWindow(from, to));
+      expectIndexed(plan, ['idx_returns_created_at']);
+      expect(plan.join(' | '), contains('SEARCH o USING INTEGER PRIMARY KEY'));
+    });
+
+    test('the open shift and the closed list use idx_shifts_closed_at',
+        () async {
+      expectIndexed(await planOf(() => db.shiftsDao.currentShift()),
+          ['idx_shifts_closed_at']);
+      final closed = await planOf(() => db.shiftsDao.closedShifts());
+      expectIndexed(closed, ['idx_shifts_closed_at']);
+      expect(closed.join(' | '), isNot(contains('TEMP B-TREE')),
+          reason: 'the index delivers newest-first order: $closed');
     });
   });
 

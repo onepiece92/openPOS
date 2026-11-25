@@ -38,7 +38,14 @@ class Orders extends Table {
   RealColumn get discountValue => real().nullable()();
   BoolColumn get discountIsPercent =>
       boolean().withDefault(const Constant(false))();
+  /// What the customer owes for the goods: subtotal − discounts − loyalty
+  /// (+ exclusive tax). **Never includes [tipAmount]** — revenue, VAT,
+  /// refund limits and every report are computed from this column, and a
+  /// tip is not revenue.
   RealColumn get total => real()();
+  /// Tip collected on top of [total] (0 when none). Kept apart so it never
+  /// enters revenue or tax; the drawer close adds it to the cash expected.
+  RealColumn get tipAmount => real().withDefault(const Constant(0.0))();
   TextColumn get paymentMethod => text()();
   RealColumn get tenderedAmount =>
       real().nullable()(); // cash tendered

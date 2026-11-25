@@ -23,6 +23,7 @@ ReceiptBodyData _sampleData({int items = 1}) {
     invoicePrefix: '',
     printCount: 0,
     total: 113.0,
+    tipAmount: 0.0,
     paymentMethod: 'cash',
     tenderedAmount: 120.0,
     changeAmount: 7.0,

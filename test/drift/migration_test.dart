@@ -8,7 +8,7 @@ import 'package:pos_app/core/database/app_database.dart';
 import 'generated/schema.dart';
 
 /// Upgrades a database created at every schema version that has shipped
-/// (v4 · v6 – v14) through our hand-written `onUpgrade` steps and
+/// (v4 · v6 – v15) through our hand-written `onUpgrade` steps and
 /// asserts the result is byte-for-byte what Drift expects for the current
 /// version — tables, columns, types, defaults, indexes.
 ///
@@ -20,7 +20,7 @@ void main() {
 
   setUpAll(() => verifier = SchemaVerifier(GeneratedHelper()));
 
-  const shipped = [4, 6, 7, 8, 9, 10, 11, 12, 13, 14];
+  const shipped = [4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
   for (final from in shipped) {
     test('upgrade v$from → v${AppDatabase.currentSchemaVersion} yields the expected schema',
@@ -231,6 +231,13 @@ void main() {
     'idx_expenses_date': 'expenses',
   };
 
+  const allIndexes = {
+    ...v15Indexes,
+    'idx_orders_invoice_no': 'orders',
+    'idx_shifts_closed_at': 'shifts',
+    'idx_returns_created_at': 'returns',
+  };
+
   Future<Map<String, String>> indexes(AppDatabase db) async => {
         for (final r in await db
             .customSelect("SELECT name, tbl_name FROM sqlite_master "
@@ -283,15 +290,55 @@ void main() {
 
     for (final t in tables) {
       final rows = await db.customSelect('SELECT * FROM $t ORDER BY id').get();
-      expect(rows.map((r) => r.data.values.join('|')).join('\n'), before[t],
+      // v16 appends tip_amount (default 0) to orders and returns; every
+      // column that existed at v14 must be untouched.
+      expect(
+          rows
+              .map((r) => (Map.of(r.data)..remove('tip_amount'))
+                  .values
+                  .join('|'))
+              .join('\n'),
+          before[t],
           reason: '$t rows must be untouched');
     }
-    expect(await indexes(db), {...v15Indexes, 'idx_orders_invoice_no': 'orders'});
+    expect(await indexes(db), allIndexes);
   });
 
   test('a fresh install has the same indexes as an upgraded one', () async {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
-    expect(await indexes(db), {...v15Indexes, 'idx_orders_invoice_no': 'orders'});
+    expect(await indexes(db), allIndexes);
+  });
+
+  // ── v16: tips, refunded tips, till sessions ──────────────────────────────
+
+  test('v15 → v16 adds tip columns at 0 and the shifts table, keeps rows',
+      () async {
+    final schema = await verifier.schemaAt(15);
+    final raw = schema.rawDatabase;
+    raw.execute(
+      'INSERT INTO orders (id, status, subtotal, tax_total, total, payment_method, invoice_no, created_at, updated_at) VALUES '
+      "(1, 'completed', 100, 13, 113, 'cash', 1, 1000, 1000), "
+      "(2, 'refunded', 50, 0, 50, 'card', 2, 2000, 2000)",
+    );
+    raw.execute(
+        'INSERT INTO returns (order_id, amount, created_at) VALUES (1, 13, 1500), (2, 50, 2500)');
+
+    final db = AppDatabase(schema.newConnection());
+    addTearDown(db.close);
+    await verifier.migrateAndValidate(db, AppDatabase.currentSchemaVersion);
+
+    final orders = await db
+        .customSelect('SELECT id, total, tip_amount FROM orders ORDER BY id')
+        .get();
+    expect(orders.map((r) => (r.read<double>('total'), r.read<double>('tip_amount'))),
+        [(113.0, 0.0), (50.0, 0.0)]);
+    final returns = await db
+        .customSelect('SELECT amount, tip_amount FROM returns ORDER BY id')
+        .get();
+    expect(returns.map((r) => (r.read<double>('amount'), r.read<double>('tip_amount'))),
+        [(13.0, 0.0), (50.0, 0.0)]);
+    expect(await db.shiftsDao.currentShift(), isNull);
+    expect(await indexes(db), allIndexes);
   });
 }

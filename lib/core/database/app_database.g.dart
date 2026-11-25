@@ -3703,6 +3703,14 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
   late final GeneratedColumn<double> total = GeneratedColumn<double>(
       'total', aliasedName, false,
       type: DriftSqlType.double, requiredDuringInsert: true);
+  static const VerificationMeta _tipAmountMeta =
+      const VerificationMeta('tipAmount');
+  @override
+  late final GeneratedColumn<double> tipAmount = GeneratedColumn<double>(
+      'tip_amount', aliasedName, false,
+      type: DriftSqlType.double,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0.0));
   static const VerificationMeta _paymentMethodMeta =
       const VerificationMeta('paymentMethod');
   @override
@@ -3804,6 +3812,7 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
         discountValue,
         discountIsPercent,
         total,
+        tipAmount,
         paymentMethod,
         tenderedAmount,
         changeAmount,
@@ -3877,6 +3886,10 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
           _totalMeta, total.isAcceptableOrUnknown(data['total']!, _totalMeta));
     } else if (isInserting) {
       context.missing(_totalMeta);
+    }
+    if (data.containsKey('tip_amount')) {
+      context.handle(_tipAmountMeta,
+          tipAmount.isAcceptableOrUnknown(data['tip_amount']!, _tipAmountMeta));
     }
     if (data.containsKey('payment_method')) {
       context.handle(
@@ -3973,6 +3986,8 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
           DriftSqlType.bool, data['${effectivePrefix}discount_is_percent'])!,
       total: attachedDatabase.typeMapping
           .read(DriftSqlType.double, data['${effectivePrefix}total'])!,
+      tipAmount: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}tip_amount'])!,
       paymentMethod: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}payment_method'])!,
       tenderedAmount: attachedDatabase.typeMapping
@@ -4019,7 +4034,16 @@ class Order extends DataClass implements Insertable<Order> {
   /// held ticket can be resumed and a receipt can show "10 % off".
   final double? discountValue;
   final bool discountIsPercent;
+
+  /// What the customer owes for the goods: subtotal − discounts − loyalty
+  /// (+ exclusive tax). **Never includes [tipAmount]** — revenue, VAT,
+  /// refund limits and every report are computed from this column, and a
+  /// tip is not revenue.
   final double total;
+
+  /// Tip collected on top of [total] (0 when none). Kept apart so it never
+  /// enters revenue or tax; the drawer close adds it to the cash expected.
+  final double tipAmount;
   final String paymentMethod;
   final double? tenderedAmount;
   final double? changeAmount;
@@ -4043,6 +4067,7 @@ class Order extends DataClass implements Insertable<Order> {
       this.discountValue,
       required this.discountIsPercent,
       required this.total,
+      required this.tipAmount,
       required this.paymentMethod,
       this.tenderedAmount,
       this.changeAmount,
@@ -4072,6 +4097,7 @@ class Order extends DataClass implements Insertable<Order> {
     }
     map['discount_is_percent'] = Variable<bool>(discountIsPercent);
     map['total'] = Variable<double>(total);
+    map['tip_amount'] = Variable<double>(tipAmount);
     map['payment_method'] = Variable<String>(paymentMethod);
     if (!nullToAbsent || tenderedAmount != null) {
       map['tendered_amount'] = Variable<double>(tenderedAmount);
@@ -4113,6 +4139,7 @@ class Order extends DataClass implements Insertable<Order> {
           : Value(discountValue),
       discountIsPercent: Value(discountIsPercent),
       total: Value(total),
+      tipAmount: Value(tipAmount),
       paymentMethod: Value(paymentMethod),
       tenderedAmount: tenderedAmount == null && nullToAbsent
           ? const Value.absent()
@@ -4151,6 +4178,7 @@ class Order extends DataClass implements Insertable<Order> {
       discountValue: serializer.fromJson<double?>(json['discountValue']),
       discountIsPercent: serializer.fromJson<bool>(json['discountIsPercent']),
       total: serializer.fromJson<double>(json['total']),
+      tipAmount: serializer.fromJson<double>(json['tipAmount']),
       paymentMethod: serializer.fromJson<String>(json['paymentMethod']),
       tenderedAmount: serializer.fromJson<double?>(json['tenderedAmount']),
       changeAmount: serializer.fromJson<double?>(json['changeAmount']),
@@ -4179,6 +4207,7 @@ class Order extends DataClass implements Insertable<Order> {
       'discountValue': serializer.toJson<double?>(discountValue),
       'discountIsPercent': serializer.toJson<bool>(discountIsPercent),
       'total': serializer.toJson<double>(total),
+      'tipAmount': serializer.toJson<double>(tipAmount),
       'paymentMethod': serializer.toJson<String>(paymentMethod),
       'tenderedAmount': serializer.toJson<double?>(tenderedAmount),
       'changeAmount': serializer.toJson<double?>(changeAmount),
@@ -4205,6 +4234,7 @@ class Order extends DataClass implements Insertable<Order> {
           Value<double?> discountValue = const Value.absent(),
           bool? discountIsPercent,
           double? total,
+          double? tipAmount,
           String? paymentMethod,
           Value<double?> tenderedAmount = const Value.absent(),
           Value<double?> changeAmount = const Value.absent(),
@@ -4229,6 +4259,7 @@ class Order extends DataClass implements Insertable<Order> {
             discountValue.present ? discountValue.value : this.discountValue,
         discountIsPercent: discountIsPercent ?? this.discountIsPercent,
         total: total ?? this.total,
+        tipAmount: tipAmount ?? this.tipAmount,
         paymentMethod: paymentMethod ?? this.paymentMethod,
         tenderedAmount:
             tenderedAmount.present ? tenderedAmount.value : this.tenderedAmount,
@@ -4264,6 +4295,7 @@ class Order extends DataClass implements Insertable<Order> {
           ? data.discountIsPercent.value
           : this.discountIsPercent,
       total: data.total.present ? data.total.value : this.total,
+      tipAmount: data.tipAmount.present ? data.tipAmount.value : this.tipAmount,
       paymentMethod: data.paymentMethod.present
           ? data.paymentMethod.value
           : this.paymentMethod,
@@ -4306,6 +4338,7 @@ class Order extends DataClass implements Insertable<Order> {
           ..write('discountValue: $discountValue, ')
           ..write('discountIsPercent: $discountIsPercent, ')
           ..write('total: $total, ')
+          ..write('tipAmount: $tipAmount, ')
           ..write('paymentMethod: $paymentMethod, ')
           ..write('tenderedAmount: $tenderedAmount, ')
           ..write('changeAmount: $changeAmount, ')
@@ -4334,6 +4367,7 @@ class Order extends DataClass implements Insertable<Order> {
         discountValue,
         discountIsPercent,
         total,
+        tipAmount,
         paymentMethod,
         tenderedAmount,
         changeAmount,
@@ -4361,6 +4395,7 @@ class Order extends DataClass implements Insertable<Order> {
           other.discountValue == this.discountValue &&
           other.discountIsPercent == this.discountIsPercent &&
           other.total == this.total &&
+          other.tipAmount == this.tipAmount &&
           other.paymentMethod == this.paymentMethod &&
           other.tenderedAmount == this.tenderedAmount &&
           other.changeAmount == this.changeAmount &&
@@ -4386,6 +4421,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
   final Value<double?> discountValue;
   final Value<bool> discountIsPercent;
   final Value<double> total;
+  final Value<double> tipAmount;
   final Value<String> paymentMethod;
   final Value<double?> tenderedAmount;
   final Value<double?> changeAmount;
@@ -4409,6 +4445,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     this.discountValue = const Value.absent(),
     this.discountIsPercent = const Value.absent(),
     this.total = const Value.absent(),
+    this.tipAmount = const Value.absent(),
     this.paymentMethod = const Value.absent(),
     this.tenderedAmount = const Value.absent(),
     this.changeAmount = const Value.absent(),
@@ -4433,6 +4470,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     this.discountValue = const Value.absent(),
     this.discountIsPercent = const Value.absent(),
     required double total,
+    this.tipAmount = const Value.absent(),
     required String paymentMethod,
     this.tenderedAmount = const Value.absent(),
     this.changeAmount = const Value.absent(),
@@ -4459,6 +4497,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     Expression<double>? discountValue,
     Expression<bool>? discountIsPercent,
     Expression<double>? total,
+    Expression<double>? tipAmount,
     Expression<String>? paymentMethod,
     Expression<double>? tenderedAmount,
     Expression<double>? changeAmount,
@@ -4483,6 +4522,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
       if (discountValue != null) 'discount_value': discountValue,
       if (discountIsPercent != null) 'discount_is_percent': discountIsPercent,
       if (total != null) 'total': total,
+      if (tipAmount != null) 'tip_amount': tipAmount,
       if (paymentMethod != null) 'payment_method': paymentMethod,
       if (tenderedAmount != null) 'tendered_amount': tenderedAmount,
       if (changeAmount != null) 'change_amount': changeAmount,
@@ -4509,6 +4549,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
       Value<double?>? discountValue,
       Value<bool>? discountIsPercent,
       Value<double>? total,
+      Value<double>? tipAmount,
       Value<String>? paymentMethod,
       Value<double?>? tenderedAmount,
       Value<double?>? changeAmount,
@@ -4532,6 +4573,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
       discountValue: discountValue ?? this.discountValue,
       discountIsPercent: discountIsPercent ?? this.discountIsPercent,
       total: total ?? this.total,
+      tipAmount: tipAmount ?? this.tipAmount,
       paymentMethod: paymentMethod ?? this.paymentMethod,
       tenderedAmount: tenderedAmount ?? this.tenderedAmount,
       changeAmount: changeAmount ?? this.changeAmount,
@@ -4579,6 +4621,9 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     }
     if (total.present) {
       map['total'] = Variable<double>(total.value);
+    }
+    if (tipAmount.present) {
+      map['tip_amount'] = Variable<double>(tipAmount.value);
     }
     if (paymentMethod.present) {
       map['payment_method'] = Variable<String>(paymentMethod.value);
@@ -4632,6 +4677,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
           ..write('discountValue: $discountValue, ')
           ..write('discountIsPercent: $discountIsPercent, ')
           ..write('total: $total, ')
+          ..write('tipAmount: $tipAmount, ')
           ..write('paymentMethod: $paymentMethod, ')
           ..write('tenderedAmount: $tenderedAmount, ')
           ..write('changeAmount: $changeAmount, ')
@@ -6073,6 +6119,14 @@ class $ReturnsTable extends Returns with TableInfo<$ReturnsTable, Return> {
   late final GeneratedColumn<double> amount = GeneratedColumn<double>(
       'amount', aliasedName, false,
       type: DriftSqlType.double, requiredDuringInsert: true);
+  static const VerificationMeta _tipAmountMeta =
+      const VerificationMeta('tipAmount');
+  @override
+  late final GeneratedColumn<double> tipAmount = GeneratedColumn<double>(
+      'tip_amount', aliasedName, false,
+      type: DriftSqlType.double,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0.0));
   static const VerificationMeta _restockMeta =
       const VerificationMeta('restock');
   @override
@@ -6098,7 +6152,7 @@ class $ReturnsTable extends Returns with TableInfo<$ReturnsTable, Return> {
       defaultValue: currentDateAndTime);
   @override
   List<GeneratedColumn> get $columns =>
-      [id, orderId, amount, restock, reason, createdAt];
+      [id, orderId, amount, tipAmount, restock, reason, createdAt];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -6123,6 +6177,10 @@ class $ReturnsTable extends Returns with TableInfo<$ReturnsTable, Return> {
           amount.isAcceptableOrUnknown(data['amount']!, _amountMeta));
     } else if (isInserting) {
       context.missing(_amountMeta);
+    }
+    if (data.containsKey('tip_amount')) {
+      context.handle(_tipAmountMeta,
+          tipAmount.isAcceptableOrUnknown(data['tip_amount']!, _tipAmountMeta));
     }
     if (data.containsKey('restock')) {
       context.handle(_restockMeta,
@@ -6151,6 +6209,8 @@ class $ReturnsTable extends Returns with TableInfo<$ReturnsTable, Return> {
           .read(DriftSqlType.int, data['${effectivePrefix}order_id'])!,
       amount: attachedDatabase.typeMapping
           .read(DriftSqlType.double, data['${effectivePrefix}amount'])!,
+      tipAmount: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}tip_amount'])!,
       restock: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}restock'])!,
       reason: attachedDatabase.typeMapping
@@ -6169,7 +6229,12 @@ class $ReturnsTable extends Returns with TableInfo<$ReturnsTable, Return> {
 class Return extends DataClass implements Insertable<Return> {
   final int id;
   final int orderId;
+
+  /// Amount refunded against the order's `total`. Excludes [tipAmount].
   final double amount;
+
+  /// Tip handed back by this refund, on top of [amount] (0 when none).
+  final double tipAmount;
   final bool restock;
   final String? reason;
   final DateTime createdAt;
@@ -6177,6 +6242,7 @@ class Return extends DataClass implements Insertable<Return> {
       {required this.id,
       required this.orderId,
       required this.amount,
+      required this.tipAmount,
       required this.restock,
       this.reason,
       required this.createdAt});
@@ -6186,6 +6252,7 @@ class Return extends DataClass implements Insertable<Return> {
     map['id'] = Variable<int>(id);
     map['order_id'] = Variable<int>(orderId);
     map['amount'] = Variable<double>(amount);
+    map['tip_amount'] = Variable<double>(tipAmount);
     map['restock'] = Variable<bool>(restock);
     if (!nullToAbsent || reason != null) {
       map['reason'] = Variable<String>(reason);
@@ -6199,6 +6266,7 @@ class Return extends DataClass implements Insertable<Return> {
       id: Value(id),
       orderId: Value(orderId),
       amount: Value(amount),
+      tipAmount: Value(tipAmount),
       restock: Value(restock),
       reason:
           reason == null && nullToAbsent ? const Value.absent() : Value(reason),
@@ -6213,6 +6281,7 @@ class Return extends DataClass implements Insertable<Return> {
       id: serializer.fromJson<int>(json['id']),
       orderId: serializer.fromJson<int>(json['orderId']),
       amount: serializer.fromJson<double>(json['amount']),
+      tipAmount: serializer.fromJson<double>(json['tipAmount']),
       restock: serializer.fromJson<bool>(json['restock']),
       reason: serializer.fromJson<String?>(json['reason']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
@@ -6225,6 +6294,7 @@ class Return extends DataClass implements Insertable<Return> {
       'id': serializer.toJson<int>(id),
       'orderId': serializer.toJson<int>(orderId),
       'amount': serializer.toJson<double>(amount),
+      'tipAmount': serializer.toJson<double>(tipAmount),
       'restock': serializer.toJson<bool>(restock),
       'reason': serializer.toJson<String?>(reason),
       'createdAt': serializer.toJson<DateTime>(createdAt),
@@ -6235,6 +6305,7 @@ class Return extends DataClass implements Insertable<Return> {
           {int? id,
           int? orderId,
           double? amount,
+          double? tipAmount,
           bool? restock,
           Value<String?> reason = const Value.absent(),
           DateTime? createdAt}) =>
@@ -6242,6 +6313,7 @@ class Return extends DataClass implements Insertable<Return> {
         id: id ?? this.id,
         orderId: orderId ?? this.orderId,
         amount: amount ?? this.amount,
+        tipAmount: tipAmount ?? this.tipAmount,
         restock: restock ?? this.restock,
         reason: reason.present ? reason.value : this.reason,
         createdAt: createdAt ?? this.createdAt,
@@ -6251,6 +6323,7 @@ class Return extends DataClass implements Insertable<Return> {
       id: data.id.present ? data.id.value : this.id,
       orderId: data.orderId.present ? data.orderId.value : this.orderId,
       amount: data.amount.present ? data.amount.value : this.amount,
+      tipAmount: data.tipAmount.present ? data.tipAmount.value : this.tipAmount,
       restock: data.restock.present ? data.restock.value : this.restock,
       reason: data.reason.present ? data.reason.value : this.reason,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
@@ -6263,6 +6336,7 @@ class Return extends DataClass implements Insertable<Return> {
           ..write('id: $id, ')
           ..write('orderId: $orderId, ')
           ..write('amount: $amount, ')
+          ..write('tipAmount: $tipAmount, ')
           ..write('restock: $restock, ')
           ..write('reason: $reason, ')
           ..write('createdAt: $createdAt')
@@ -6272,7 +6346,7 @@ class Return extends DataClass implements Insertable<Return> {
 
   @override
   int get hashCode =>
-      Object.hash(id, orderId, amount, restock, reason, createdAt);
+      Object.hash(id, orderId, amount, tipAmount, restock, reason, createdAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -6280,6 +6354,7 @@ class Return extends DataClass implements Insertable<Return> {
           other.id == this.id &&
           other.orderId == this.orderId &&
           other.amount == this.amount &&
+          other.tipAmount == this.tipAmount &&
           other.restock == this.restock &&
           other.reason == this.reason &&
           other.createdAt == this.createdAt);
@@ -6289,6 +6364,7 @@ class ReturnsCompanion extends UpdateCompanion<Return> {
   final Value<int> id;
   final Value<int> orderId;
   final Value<double> amount;
+  final Value<double> tipAmount;
   final Value<bool> restock;
   final Value<String?> reason;
   final Value<DateTime> createdAt;
@@ -6296,6 +6372,7 @@ class ReturnsCompanion extends UpdateCompanion<Return> {
     this.id = const Value.absent(),
     this.orderId = const Value.absent(),
     this.amount = const Value.absent(),
+    this.tipAmount = const Value.absent(),
     this.restock = const Value.absent(),
     this.reason = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -6304,6 +6381,7 @@ class ReturnsCompanion extends UpdateCompanion<Return> {
     this.id = const Value.absent(),
     required int orderId,
     required double amount,
+    this.tipAmount = const Value.absent(),
     this.restock = const Value.absent(),
     this.reason = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -6313,6 +6391,7 @@ class ReturnsCompanion extends UpdateCompanion<Return> {
     Expression<int>? id,
     Expression<int>? orderId,
     Expression<double>? amount,
+    Expression<double>? tipAmount,
     Expression<bool>? restock,
     Expression<String>? reason,
     Expression<DateTime>? createdAt,
@@ -6321,6 +6400,7 @@ class ReturnsCompanion extends UpdateCompanion<Return> {
       if (id != null) 'id': id,
       if (orderId != null) 'order_id': orderId,
       if (amount != null) 'amount': amount,
+      if (tipAmount != null) 'tip_amount': tipAmount,
       if (restock != null) 'restock': restock,
       if (reason != null) 'reason': reason,
       if (createdAt != null) 'created_at': createdAt,
@@ -6331,6 +6411,7 @@ class ReturnsCompanion extends UpdateCompanion<Return> {
       {Value<int>? id,
       Value<int>? orderId,
       Value<double>? amount,
+      Value<double>? tipAmount,
       Value<bool>? restock,
       Value<String?>? reason,
       Value<DateTime>? createdAt}) {
@@ -6338,6 +6419,7 @@ class ReturnsCompanion extends UpdateCompanion<Return> {
       id: id ?? this.id,
       orderId: orderId ?? this.orderId,
       amount: amount ?? this.amount,
+      tipAmount: tipAmount ?? this.tipAmount,
       restock: restock ?? this.restock,
       reason: reason ?? this.reason,
       createdAt: createdAt ?? this.createdAt,
@@ -6355,6 +6437,9 @@ class ReturnsCompanion extends UpdateCompanion<Return> {
     }
     if (amount.present) {
       map['amount'] = Variable<double>(amount.value);
+    }
+    if (tipAmount.present) {
+      map['tip_amount'] = Variable<double>(tipAmount.value);
     }
     if (restock.present) {
       map['restock'] = Variable<bool>(restock.value);
@@ -6374,6 +6459,7 @@ class ReturnsCompanion extends UpdateCompanion<Return> {
           ..write('id: $id, ')
           ..write('orderId: $orderId, ')
           ..write('amount: $amount, ')
+          ..write('tipAmount: $tipAmount, ')
           ..write('restock: $restock, ')
           ..write('reason: $reason, ')
           ..write('createdAt: $createdAt')
@@ -7968,6 +8054,612 @@ class AuditLogCompanion extends UpdateCompanion<AuditLogData> {
   }
 }
 
+class $ShiftsTable extends Shifts with TableInfo<$ShiftsTable, Shift> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ShiftsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+      'id', aliasedName, false,
+      hasAutoIncrement: true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
+  static const VerificationMeta _openedAtMeta =
+      const VerificationMeta('openedAt');
+  @override
+  late final GeneratedColumn<DateTime> openedAt = GeneratedColumn<DateTime>(
+      'opened_at', aliasedName, false,
+      type: DriftSqlType.dateTime,
+      requiredDuringInsert: false,
+      defaultValue: currentDateAndTime);
+  static const VerificationMeta _closedAtMeta =
+      const VerificationMeta('closedAt');
+  @override
+  late final GeneratedColumn<DateTime> closedAt = GeneratedColumn<DateTime>(
+      'closed_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _openingCashMeta =
+      const VerificationMeta('openingCash');
+  @override
+  late final GeneratedColumn<double> openingCash = GeneratedColumn<double>(
+      'opening_cash', aliasedName, false,
+      type: DriftSqlType.double,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(0.0));
+  static const VerificationMeta _cashSalesMeta =
+      const VerificationMeta('cashSales');
+  @override
+  late final GeneratedColumn<double> cashSales = GeneratedColumn<double>(
+      'cash_sales', aliasedName, true,
+      type: DriftSqlType.double, requiredDuringInsert: false);
+  static const VerificationMeta _cashTipsMeta =
+      const VerificationMeta('cashTips');
+  @override
+  late final GeneratedColumn<double> cashTips = GeneratedColumn<double>(
+      'cash_tips', aliasedName, true,
+      type: DriftSqlType.double, requiredDuringInsert: false);
+  static const VerificationMeta _cashRefundsMeta =
+      const VerificationMeta('cashRefunds');
+  @override
+  late final GeneratedColumn<double> cashRefunds = GeneratedColumn<double>(
+      'cash_refunds', aliasedName, true,
+      type: DriftSqlType.double, requiredDuringInsert: false);
+  static const VerificationMeta _paidOutMeta =
+      const VerificationMeta('paidOut');
+  @override
+  late final GeneratedColumn<double> paidOut = GeneratedColumn<double>(
+      'paid_out', aliasedName, true,
+      type: DriftSqlType.double, requiredDuringInsert: false);
+  static const VerificationMeta _expectedCashMeta =
+      const VerificationMeta('expectedCash');
+  @override
+  late final GeneratedColumn<double> expectedCash = GeneratedColumn<double>(
+      'expected_cash', aliasedName, true,
+      type: DriftSqlType.double, requiredDuringInsert: false);
+  static const VerificationMeta _countedCashMeta =
+      const VerificationMeta('countedCash');
+  @override
+  late final GeneratedColumn<double> countedCash = GeneratedColumn<double>(
+      'counted_cash', aliasedName, true,
+      type: DriftSqlType.double, requiredDuringInsert: false);
+  static const VerificationMeta _summaryTextMeta =
+      const VerificationMeta('summaryText');
+  @override
+  late final GeneratedColumn<String> summaryText = GeneratedColumn<String>(
+      'summary_text', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _notesMeta = const VerificationMeta('notes');
+  @override
+  late final GeneratedColumn<String> notes = GeneratedColumn<String>(
+      'notes', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  @override
+  List<GeneratedColumn> get $columns => [
+        id,
+        openedAt,
+        closedAt,
+        openingCash,
+        cashSales,
+        cashTips,
+        cashRefunds,
+        paidOut,
+        expectedCash,
+        countedCash,
+        summaryText,
+        notes
+      ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'shifts';
+  @override
+  VerificationContext validateIntegrity(Insertable<Shift> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('opened_at')) {
+      context.handle(_openedAtMeta,
+          openedAt.isAcceptableOrUnknown(data['opened_at']!, _openedAtMeta));
+    }
+    if (data.containsKey('closed_at')) {
+      context.handle(_closedAtMeta,
+          closedAt.isAcceptableOrUnknown(data['closed_at']!, _closedAtMeta));
+    }
+    if (data.containsKey('opening_cash')) {
+      context.handle(
+          _openingCashMeta,
+          openingCash.isAcceptableOrUnknown(
+              data['opening_cash']!, _openingCashMeta));
+    }
+    if (data.containsKey('cash_sales')) {
+      context.handle(_cashSalesMeta,
+          cashSales.isAcceptableOrUnknown(data['cash_sales']!, _cashSalesMeta));
+    }
+    if (data.containsKey('cash_tips')) {
+      context.handle(_cashTipsMeta,
+          cashTips.isAcceptableOrUnknown(data['cash_tips']!, _cashTipsMeta));
+    }
+    if (data.containsKey('cash_refunds')) {
+      context.handle(
+          _cashRefundsMeta,
+          cashRefunds.isAcceptableOrUnknown(
+              data['cash_refunds']!, _cashRefundsMeta));
+    }
+    if (data.containsKey('paid_out')) {
+      context.handle(_paidOutMeta,
+          paidOut.isAcceptableOrUnknown(data['paid_out']!, _paidOutMeta));
+    }
+    if (data.containsKey('expected_cash')) {
+      context.handle(
+          _expectedCashMeta,
+          expectedCash.isAcceptableOrUnknown(
+              data['expected_cash']!, _expectedCashMeta));
+    }
+    if (data.containsKey('counted_cash')) {
+      context.handle(
+          _countedCashMeta,
+          countedCash.isAcceptableOrUnknown(
+              data['counted_cash']!, _countedCashMeta));
+    }
+    if (data.containsKey('summary_text')) {
+      context.handle(
+          _summaryTextMeta,
+          summaryText.isAcceptableOrUnknown(
+              data['summary_text']!, _summaryTextMeta));
+    }
+    if (data.containsKey('notes')) {
+      context.handle(
+          _notesMeta, notes.isAcceptableOrUnknown(data['notes']!, _notesMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  Shift map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Shift(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
+      openedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}opened_at'])!,
+      closedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}closed_at']),
+      openingCash: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}opening_cash'])!,
+      cashSales: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}cash_sales']),
+      cashTips: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}cash_tips']),
+      cashRefunds: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}cash_refunds']),
+      paidOut: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}paid_out']),
+      expectedCash: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}expected_cash']),
+      countedCash: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}counted_cash']),
+      summaryText: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}summary_text']),
+      notes: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}notes']),
+    );
+  }
+
+  @override
+  $ShiftsTable createAlias(String alias) {
+    return $ShiftsTable(attachedDatabase, alias);
+  }
+}
+
+class Shift extends DataClass implements Insertable<Shift> {
+  final int id;
+  final DateTime openedAt;
+  final DateTime? closedAt;
+  final double openingCash;
+  final double? cashSales;
+  final double? cashTips;
+  final double? cashRefunds;
+  final double? paidOut;
+  final double? expectedCash;
+  final double? countedCash;
+
+  /// The plain-text close summary as printed/shared at close time.
+  final String? summaryText;
+  final String? notes;
+  const Shift(
+      {required this.id,
+      required this.openedAt,
+      this.closedAt,
+      required this.openingCash,
+      this.cashSales,
+      this.cashTips,
+      this.cashRefunds,
+      this.paidOut,
+      this.expectedCash,
+      this.countedCash,
+      this.summaryText,
+      this.notes});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['opened_at'] = Variable<DateTime>(openedAt);
+    if (!nullToAbsent || closedAt != null) {
+      map['closed_at'] = Variable<DateTime>(closedAt);
+    }
+    map['opening_cash'] = Variable<double>(openingCash);
+    if (!nullToAbsent || cashSales != null) {
+      map['cash_sales'] = Variable<double>(cashSales);
+    }
+    if (!nullToAbsent || cashTips != null) {
+      map['cash_tips'] = Variable<double>(cashTips);
+    }
+    if (!nullToAbsent || cashRefunds != null) {
+      map['cash_refunds'] = Variable<double>(cashRefunds);
+    }
+    if (!nullToAbsent || paidOut != null) {
+      map['paid_out'] = Variable<double>(paidOut);
+    }
+    if (!nullToAbsent || expectedCash != null) {
+      map['expected_cash'] = Variable<double>(expectedCash);
+    }
+    if (!nullToAbsent || countedCash != null) {
+      map['counted_cash'] = Variable<double>(countedCash);
+    }
+    if (!nullToAbsent || summaryText != null) {
+      map['summary_text'] = Variable<String>(summaryText);
+    }
+    if (!nullToAbsent || notes != null) {
+      map['notes'] = Variable<String>(notes);
+    }
+    return map;
+  }
+
+  ShiftsCompanion toCompanion(bool nullToAbsent) {
+    return ShiftsCompanion(
+      id: Value(id),
+      openedAt: Value(openedAt),
+      closedAt: closedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(closedAt),
+      openingCash: Value(openingCash),
+      cashSales: cashSales == null && nullToAbsent
+          ? const Value.absent()
+          : Value(cashSales),
+      cashTips: cashTips == null && nullToAbsent
+          ? const Value.absent()
+          : Value(cashTips),
+      cashRefunds: cashRefunds == null && nullToAbsent
+          ? const Value.absent()
+          : Value(cashRefunds),
+      paidOut: paidOut == null && nullToAbsent
+          ? const Value.absent()
+          : Value(paidOut),
+      expectedCash: expectedCash == null && nullToAbsent
+          ? const Value.absent()
+          : Value(expectedCash),
+      countedCash: countedCash == null && nullToAbsent
+          ? const Value.absent()
+          : Value(countedCash),
+      summaryText: summaryText == null && nullToAbsent
+          ? const Value.absent()
+          : Value(summaryText),
+      notes:
+          notes == null && nullToAbsent ? const Value.absent() : Value(notes),
+    );
+  }
+
+  factory Shift.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Shift(
+      id: serializer.fromJson<int>(json['id']),
+      openedAt: serializer.fromJson<DateTime>(json['openedAt']),
+      closedAt: serializer.fromJson<DateTime?>(json['closedAt']),
+      openingCash: serializer.fromJson<double>(json['openingCash']),
+      cashSales: serializer.fromJson<double?>(json['cashSales']),
+      cashTips: serializer.fromJson<double?>(json['cashTips']),
+      cashRefunds: serializer.fromJson<double?>(json['cashRefunds']),
+      paidOut: serializer.fromJson<double?>(json['paidOut']),
+      expectedCash: serializer.fromJson<double?>(json['expectedCash']),
+      countedCash: serializer.fromJson<double?>(json['countedCash']),
+      summaryText: serializer.fromJson<String?>(json['summaryText']),
+      notes: serializer.fromJson<String?>(json['notes']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'openedAt': serializer.toJson<DateTime>(openedAt),
+      'closedAt': serializer.toJson<DateTime?>(closedAt),
+      'openingCash': serializer.toJson<double>(openingCash),
+      'cashSales': serializer.toJson<double?>(cashSales),
+      'cashTips': serializer.toJson<double?>(cashTips),
+      'cashRefunds': serializer.toJson<double?>(cashRefunds),
+      'paidOut': serializer.toJson<double?>(paidOut),
+      'expectedCash': serializer.toJson<double?>(expectedCash),
+      'countedCash': serializer.toJson<double?>(countedCash),
+      'summaryText': serializer.toJson<String?>(summaryText),
+      'notes': serializer.toJson<String?>(notes),
+    };
+  }
+
+  Shift copyWith(
+          {int? id,
+          DateTime? openedAt,
+          Value<DateTime?> closedAt = const Value.absent(),
+          double? openingCash,
+          Value<double?> cashSales = const Value.absent(),
+          Value<double?> cashTips = const Value.absent(),
+          Value<double?> cashRefunds = const Value.absent(),
+          Value<double?> paidOut = const Value.absent(),
+          Value<double?> expectedCash = const Value.absent(),
+          Value<double?> countedCash = const Value.absent(),
+          Value<String?> summaryText = const Value.absent(),
+          Value<String?> notes = const Value.absent()}) =>
+      Shift(
+        id: id ?? this.id,
+        openedAt: openedAt ?? this.openedAt,
+        closedAt: closedAt.present ? closedAt.value : this.closedAt,
+        openingCash: openingCash ?? this.openingCash,
+        cashSales: cashSales.present ? cashSales.value : this.cashSales,
+        cashTips: cashTips.present ? cashTips.value : this.cashTips,
+        cashRefunds: cashRefunds.present ? cashRefunds.value : this.cashRefunds,
+        paidOut: paidOut.present ? paidOut.value : this.paidOut,
+        expectedCash:
+            expectedCash.present ? expectedCash.value : this.expectedCash,
+        countedCash: countedCash.present ? countedCash.value : this.countedCash,
+        summaryText: summaryText.present ? summaryText.value : this.summaryText,
+        notes: notes.present ? notes.value : this.notes,
+      );
+  Shift copyWithCompanion(ShiftsCompanion data) {
+    return Shift(
+      id: data.id.present ? data.id.value : this.id,
+      openedAt: data.openedAt.present ? data.openedAt.value : this.openedAt,
+      closedAt: data.closedAt.present ? data.closedAt.value : this.closedAt,
+      openingCash:
+          data.openingCash.present ? data.openingCash.value : this.openingCash,
+      cashSales: data.cashSales.present ? data.cashSales.value : this.cashSales,
+      cashTips: data.cashTips.present ? data.cashTips.value : this.cashTips,
+      cashRefunds:
+          data.cashRefunds.present ? data.cashRefunds.value : this.cashRefunds,
+      paidOut: data.paidOut.present ? data.paidOut.value : this.paidOut,
+      expectedCash: data.expectedCash.present
+          ? data.expectedCash.value
+          : this.expectedCash,
+      countedCash:
+          data.countedCash.present ? data.countedCash.value : this.countedCash,
+      summaryText:
+          data.summaryText.present ? data.summaryText.value : this.summaryText,
+      notes: data.notes.present ? data.notes.value : this.notes,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Shift(')
+          ..write('id: $id, ')
+          ..write('openedAt: $openedAt, ')
+          ..write('closedAt: $closedAt, ')
+          ..write('openingCash: $openingCash, ')
+          ..write('cashSales: $cashSales, ')
+          ..write('cashTips: $cashTips, ')
+          ..write('cashRefunds: $cashRefunds, ')
+          ..write('paidOut: $paidOut, ')
+          ..write('expectedCash: $expectedCash, ')
+          ..write('countedCash: $countedCash, ')
+          ..write('summaryText: $summaryText, ')
+          ..write('notes: $notes')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+      id,
+      openedAt,
+      closedAt,
+      openingCash,
+      cashSales,
+      cashTips,
+      cashRefunds,
+      paidOut,
+      expectedCash,
+      countedCash,
+      summaryText,
+      notes);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Shift &&
+          other.id == this.id &&
+          other.openedAt == this.openedAt &&
+          other.closedAt == this.closedAt &&
+          other.openingCash == this.openingCash &&
+          other.cashSales == this.cashSales &&
+          other.cashTips == this.cashTips &&
+          other.cashRefunds == this.cashRefunds &&
+          other.paidOut == this.paidOut &&
+          other.expectedCash == this.expectedCash &&
+          other.countedCash == this.countedCash &&
+          other.summaryText == this.summaryText &&
+          other.notes == this.notes);
+}
+
+class ShiftsCompanion extends UpdateCompanion<Shift> {
+  final Value<int> id;
+  final Value<DateTime> openedAt;
+  final Value<DateTime?> closedAt;
+  final Value<double> openingCash;
+  final Value<double?> cashSales;
+  final Value<double?> cashTips;
+  final Value<double?> cashRefunds;
+  final Value<double?> paidOut;
+  final Value<double?> expectedCash;
+  final Value<double?> countedCash;
+  final Value<String?> summaryText;
+  final Value<String?> notes;
+  const ShiftsCompanion({
+    this.id = const Value.absent(),
+    this.openedAt = const Value.absent(),
+    this.closedAt = const Value.absent(),
+    this.openingCash = const Value.absent(),
+    this.cashSales = const Value.absent(),
+    this.cashTips = const Value.absent(),
+    this.cashRefunds = const Value.absent(),
+    this.paidOut = const Value.absent(),
+    this.expectedCash = const Value.absent(),
+    this.countedCash = const Value.absent(),
+    this.summaryText = const Value.absent(),
+    this.notes = const Value.absent(),
+  });
+  ShiftsCompanion.insert({
+    this.id = const Value.absent(),
+    this.openedAt = const Value.absent(),
+    this.closedAt = const Value.absent(),
+    this.openingCash = const Value.absent(),
+    this.cashSales = const Value.absent(),
+    this.cashTips = const Value.absent(),
+    this.cashRefunds = const Value.absent(),
+    this.paidOut = const Value.absent(),
+    this.expectedCash = const Value.absent(),
+    this.countedCash = const Value.absent(),
+    this.summaryText = const Value.absent(),
+    this.notes = const Value.absent(),
+  });
+  static Insertable<Shift> custom({
+    Expression<int>? id,
+    Expression<DateTime>? openedAt,
+    Expression<DateTime>? closedAt,
+    Expression<double>? openingCash,
+    Expression<double>? cashSales,
+    Expression<double>? cashTips,
+    Expression<double>? cashRefunds,
+    Expression<double>? paidOut,
+    Expression<double>? expectedCash,
+    Expression<double>? countedCash,
+    Expression<String>? summaryText,
+    Expression<String>? notes,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (openedAt != null) 'opened_at': openedAt,
+      if (closedAt != null) 'closed_at': closedAt,
+      if (openingCash != null) 'opening_cash': openingCash,
+      if (cashSales != null) 'cash_sales': cashSales,
+      if (cashTips != null) 'cash_tips': cashTips,
+      if (cashRefunds != null) 'cash_refunds': cashRefunds,
+      if (paidOut != null) 'paid_out': paidOut,
+      if (expectedCash != null) 'expected_cash': expectedCash,
+      if (countedCash != null) 'counted_cash': countedCash,
+      if (summaryText != null) 'summary_text': summaryText,
+      if (notes != null) 'notes': notes,
+    });
+  }
+
+  ShiftsCompanion copyWith(
+      {Value<int>? id,
+      Value<DateTime>? openedAt,
+      Value<DateTime?>? closedAt,
+      Value<double>? openingCash,
+      Value<double?>? cashSales,
+      Value<double?>? cashTips,
+      Value<double?>? cashRefunds,
+      Value<double?>? paidOut,
+      Value<double?>? expectedCash,
+      Value<double?>? countedCash,
+      Value<String?>? summaryText,
+      Value<String?>? notes}) {
+    return ShiftsCompanion(
+      id: id ?? this.id,
+      openedAt: openedAt ?? this.openedAt,
+      closedAt: closedAt ?? this.closedAt,
+      openingCash: openingCash ?? this.openingCash,
+      cashSales: cashSales ?? this.cashSales,
+      cashTips: cashTips ?? this.cashTips,
+      cashRefunds: cashRefunds ?? this.cashRefunds,
+      paidOut: paidOut ?? this.paidOut,
+      expectedCash: expectedCash ?? this.expectedCash,
+      countedCash: countedCash ?? this.countedCash,
+      summaryText: summaryText ?? this.summaryText,
+      notes: notes ?? this.notes,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (openedAt.present) {
+      map['opened_at'] = Variable<DateTime>(openedAt.value);
+    }
+    if (closedAt.present) {
+      map['closed_at'] = Variable<DateTime>(closedAt.value);
+    }
+    if (openingCash.present) {
+      map['opening_cash'] = Variable<double>(openingCash.value);
+    }
+    if (cashSales.present) {
+      map['cash_sales'] = Variable<double>(cashSales.value);
+    }
+    if (cashTips.present) {
+      map['cash_tips'] = Variable<double>(cashTips.value);
+    }
+    if (cashRefunds.present) {
+      map['cash_refunds'] = Variable<double>(cashRefunds.value);
+    }
+    if (paidOut.present) {
+      map['paid_out'] = Variable<double>(paidOut.value);
+    }
+    if (expectedCash.present) {
+      map['expected_cash'] = Variable<double>(expectedCash.value);
+    }
+    if (countedCash.present) {
+      map['counted_cash'] = Variable<double>(countedCash.value);
+    }
+    if (summaryText.present) {
+      map['summary_text'] = Variable<String>(summaryText.value);
+    }
+    if (notes.present) {
+      map['notes'] = Variable<String>(notes.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ShiftsCompanion(')
+          ..write('id: $id, ')
+          ..write('openedAt: $openedAt, ')
+          ..write('closedAt: $closedAt, ')
+          ..write('openingCash: $openingCash, ')
+          ..write('cashSales: $cashSales, ')
+          ..write('cashTips: $cashTips, ')
+          ..write('cashRefunds: $cashRefunds, ')
+          ..write('paidOut: $paidOut, ')
+          ..write('expectedCash: $expectedCash, ')
+          ..write('countedCash: $countedCash, ')
+          ..write('summaryText: $summaryText, ')
+          ..write('notes: $notes')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -7994,6 +8686,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $StockAdjustmentsTable stockAdjustments =
       $StockAdjustmentsTable(this);
   late final $AuditLogTable auditLog = $AuditLogTable(this);
+  late final $ShiftsTable shifts = $ShiftsTable(this);
   late final Index idxOrdersInvoiceNo = Index('idx_orders_invoice_no',
       'CREATE UNIQUE INDEX idx_orders_invoice_no ON orders (invoice_prefix, invoice_no)');
   late final Index idxOrdersCreatedAt = Index('idx_orders_created_at',
@@ -8006,6 +8699,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       'CREATE INDEX idx_order_taxes_order_id ON order_taxes (order_id)');
   late final Index idxReturnsOrderId = Index('idx_returns_order_id',
       'CREATE INDEX idx_returns_order_id ON returns (order_id)');
+  late final Index idxReturnsCreatedAt = Index('idx_returns_created_at',
+      'CREATE INDEX idx_returns_created_at ON returns (created_at)');
   late final Index idxExpensesDate = Index(
       'idx_expenses_date', 'CREATE INDEX idx_expenses_date ON expenses (date)');
   late final Index idxStockAdjustmentsProductCreated = Index(
@@ -8013,6 +8708,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       'CREATE INDEX idx_stock_adjustments_product_created ON stock_adjustments (product_id, created_at)');
   late final Index idxAuditLogCreatedAt = Index('idx_audit_log_created_at',
       'CREATE INDEX idx_audit_log_created_at ON audit_log (created_at)');
+  late final Index idxShiftsClosedAt = Index('idx_shifts_closed_at',
+      'CREATE INDEX idx_shifts_closed_at ON shifts (closed_at)');
   late final ProductsDao productsDao = ProductsDao(this as AppDatabase);
   late final OrdersDao ordersDao = OrdersDao(this as AppDatabase);
   late final CustomersDao customersDao = CustomersDao(this as AppDatabase);
@@ -8021,6 +8718,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final ExpensesDao expensesDao = ExpensesDao(this as AppDatabase);
   late final AuditDao auditDao = AuditDao(this as AppDatabase);
   late final TablesDao tablesDao = TablesDao(this as AppDatabase);
+  late final ShiftsDao shiftsDao = ShiftsDao(this as AppDatabase);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -8044,15 +8742,18 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         expenses,
         stockAdjustments,
         auditLog,
+        shifts,
         idxOrdersInvoiceNo,
         idxOrdersCreatedAt,
         idxOrdersCustomerId,
         idxOrderItemsOrderId,
         idxOrderTaxesOrderId,
         idxReturnsOrderId,
+        idxReturnsCreatedAt,
         idxExpensesDate,
         idxStockAdjustmentsProductCreated,
-        idxAuditLogCreatedAt
+        idxAuditLogCreatedAt,
+        idxShiftsClosedAt
       ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules(
@@ -11651,6 +12352,7 @@ typedef $$OrdersTableCreateCompanionBuilder = OrdersCompanion Function({
   Value<double?> discountValue,
   Value<bool> discountIsPercent,
   required double total,
+  Value<double> tipAmount,
   required String paymentMethod,
   Value<double?> tenderedAmount,
   Value<double?> changeAmount,
@@ -11675,6 +12377,7 @@ typedef $$OrdersTableUpdateCompanionBuilder = OrdersCompanion Function({
   Value<double?> discountValue,
   Value<bool> discountIsPercent,
   Value<double> total,
+  Value<double> tipAmount,
   Value<String> paymentMethod,
   Value<double?> tenderedAmount,
   Value<double?> changeAmount,
@@ -11820,6 +12523,9 @@ class $$OrdersTableFilterComposer
 
   ColumnFilters<double> get total => $composableBuilder(
       column: $table.total, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get tipAmount => $composableBuilder(
+      column: $table.tipAmount, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get paymentMethod => $composableBuilder(
       column: $table.paymentMethod, builder: (column) => ColumnFilters(column));
@@ -12022,6 +12728,9 @@ class $$OrdersTableOrderingComposer
   ColumnOrderings<double> get total => $composableBuilder(
       column: $table.total, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<double> get tipAmount => $composableBuilder(
+      column: $table.tipAmount, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<String> get paymentMethod => $composableBuilder(
       column: $table.paymentMethod,
       builder: (column) => ColumnOrderings(column));
@@ -12137,6 +12846,9 @@ class $$OrdersTableAnnotationComposer
 
   GeneratedColumn<double> get total =>
       $composableBuilder(column: $table.total, builder: (column) => column);
+
+  GeneratedColumn<double> get tipAmount =>
+      $composableBuilder(column: $table.tipAmount, builder: (column) => column);
 
   GeneratedColumn<String> get paymentMethod => $composableBuilder(
       column: $table.paymentMethod, builder: (column) => column);
@@ -12333,6 +13045,7 @@ class $$OrdersTableTableManager extends RootTableManager<
             Value<double?> discountValue = const Value.absent(),
             Value<bool> discountIsPercent = const Value.absent(),
             Value<double> total = const Value.absent(),
+            Value<double> tipAmount = const Value.absent(),
             Value<String> paymentMethod = const Value.absent(),
             Value<double?> tenderedAmount = const Value.absent(),
             Value<double?> changeAmount = const Value.absent(),
@@ -12357,6 +13070,7 @@ class $$OrdersTableTableManager extends RootTableManager<
             discountValue: discountValue,
             discountIsPercent: discountIsPercent,
             total: total,
+            tipAmount: tipAmount,
             paymentMethod: paymentMethod,
             tenderedAmount: tenderedAmount,
             changeAmount: changeAmount,
@@ -12381,6 +13095,7 @@ class $$OrdersTableTableManager extends RootTableManager<
             Value<double?> discountValue = const Value.absent(),
             Value<bool> discountIsPercent = const Value.absent(),
             required double total,
+            Value<double> tipAmount = const Value.absent(),
             required String paymentMethod,
             Value<double?> tenderedAmount = const Value.absent(),
             Value<double?> changeAmount = const Value.absent(),
@@ -12405,6 +13120,7 @@ class $$OrdersTableTableManager extends RootTableManager<
             discountValue: discountValue,
             discountIsPercent: discountIsPercent,
             total: total,
+            tipAmount: tipAmount,
             paymentMethod: paymentMethod,
             tenderedAmount: tenderedAmount,
             changeAmount: changeAmount,
@@ -13674,6 +14390,7 @@ typedef $$ReturnsTableCreateCompanionBuilder = ReturnsCompanion Function({
   Value<int> id,
   required int orderId,
   required double amount,
+  Value<double> tipAmount,
   Value<bool> restock,
   Value<String?> reason,
   Value<DateTime> createdAt,
@@ -13682,6 +14399,7 @@ typedef $$ReturnsTableUpdateCompanionBuilder = ReturnsCompanion Function({
   Value<int> id,
   Value<int> orderId,
   Value<double> amount,
+  Value<double> tipAmount,
   Value<bool> restock,
   Value<String?> reason,
   Value<DateTime> createdAt,
@@ -13720,6 +14438,9 @@ class $$ReturnsTableFilterComposer
 
   ColumnFilters<double> get amount => $composableBuilder(
       column: $table.amount, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get tipAmount => $composableBuilder(
+      column: $table.tipAmount, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<bool> get restock => $composableBuilder(
       column: $table.restock, builder: (column) => ColumnFilters(column));
@@ -13766,6 +14487,9 @@ class $$ReturnsTableOrderingComposer
   ColumnOrderings<double> get amount => $composableBuilder(
       column: $table.amount, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<double> get tipAmount => $composableBuilder(
+      column: $table.tipAmount, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<bool> get restock => $composableBuilder(
       column: $table.restock, builder: (column) => ColumnOrderings(column));
 
@@ -13810,6 +14534,9 @@ class $$ReturnsTableAnnotationComposer
 
   GeneratedColumn<double> get amount =>
       $composableBuilder(column: $table.amount, builder: (column) => column);
+
+  GeneratedColumn<double> get tipAmount =>
+      $composableBuilder(column: $table.tipAmount, builder: (column) => column);
 
   GeneratedColumn<bool> get restock =>
       $composableBuilder(column: $table.restock, builder: (column) => column);
@@ -13867,6 +14594,7 @@ class $$ReturnsTableTableManager extends RootTableManager<
             Value<int> id = const Value.absent(),
             Value<int> orderId = const Value.absent(),
             Value<double> amount = const Value.absent(),
+            Value<double> tipAmount = const Value.absent(),
             Value<bool> restock = const Value.absent(),
             Value<String?> reason = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
@@ -13875,6 +14603,7 @@ class $$ReturnsTableTableManager extends RootTableManager<
             id: id,
             orderId: orderId,
             amount: amount,
+            tipAmount: tipAmount,
             restock: restock,
             reason: reason,
             createdAt: createdAt,
@@ -13883,6 +14612,7 @@ class $$ReturnsTableTableManager extends RootTableManager<
             Value<int> id = const Value.absent(),
             required int orderId,
             required double amount,
+            Value<double> tipAmount = const Value.absent(),
             Value<bool> restock = const Value.absent(),
             Value<String?> reason = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
@@ -13891,6 +14621,7 @@ class $$ReturnsTableTableManager extends RootTableManager<
             id: id,
             orderId: orderId,
             amount: amount,
+            tipAmount: tipAmount,
             restock: restock,
             reason: reason,
             createdAt: createdAt,
@@ -15039,6 +15770,271 @@ typedef $$AuditLogTableProcessedTableManager = ProcessedTableManager<
     (AuditLogData, BaseReferences<_$AppDatabase, $AuditLogTable, AuditLogData>),
     AuditLogData,
     PrefetchHooks Function()>;
+typedef $$ShiftsTableCreateCompanionBuilder = ShiftsCompanion Function({
+  Value<int> id,
+  Value<DateTime> openedAt,
+  Value<DateTime?> closedAt,
+  Value<double> openingCash,
+  Value<double?> cashSales,
+  Value<double?> cashTips,
+  Value<double?> cashRefunds,
+  Value<double?> paidOut,
+  Value<double?> expectedCash,
+  Value<double?> countedCash,
+  Value<String?> summaryText,
+  Value<String?> notes,
+});
+typedef $$ShiftsTableUpdateCompanionBuilder = ShiftsCompanion Function({
+  Value<int> id,
+  Value<DateTime> openedAt,
+  Value<DateTime?> closedAt,
+  Value<double> openingCash,
+  Value<double?> cashSales,
+  Value<double?> cashTips,
+  Value<double?> cashRefunds,
+  Value<double?> paidOut,
+  Value<double?> expectedCash,
+  Value<double?> countedCash,
+  Value<String?> summaryText,
+  Value<String?> notes,
+});
+
+class $$ShiftsTableFilterComposer
+    extends Composer<_$AppDatabase, $ShiftsTable> {
+  $$ShiftsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get openedAt => $composableBuilder(
+      column: $table.openedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get closedAt => $composableBuilder(
+      column: $table.closedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get openingCash => $composableBuilder(
+      column: $table.openingCash, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get cashSales => $composableBuilder(
+      column: $table.cashSales, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get cashTips => $composableBuilder(
+      column: $table.cashTips, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get cashRefunds => $composableBuilder(
+      column: $table.cashRefunds, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get paidOut => $composableBuilder(
+      column: $table.paidOut, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get expectedCash => $composableBuilder(
+      column: $table.expectedCash, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get countedCash => $composableBuilder(
+      column: $table.countedCash, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get summaryText => $composableBuilder(
+      column: $table.summaryText, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get notes => $composableBuilder(
+      column: $table.notes, builder: (column) => ColumnFilters(column));
+}
+
+class $$ShiftsTableOrderingComposer
+    extends Composer<_$AppDatabase, $ShiftsTable> {
+  $$ShiftsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get openedAt => $composableBuilder(
+      column: $table.openedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get closedAt => $composableBuilder(
+      column: $table.closedAt, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get openingCash => $composableBuilder(
+      column: $table.openingCash, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get cashSales => $composableBuilder(
+      column: $table.cashSales, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get cashTips => $composableBuilder(
+      column: $table.cashTips, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get cashRefunds => $composableBuilder(
+      column: $table.cashRefunds, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get paidOut => $composableBuilder(
+      column: $table.paidOut, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get expectedCash => $composableBuilder(
+      column: $table.expectedCash,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get countedCash => $composableBuilder(
+      column: $table.countedCash, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get summaryText => $composableBuilder(
+      column: $table.summaryText, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get notes => $composableBuilder(
+      column: $table.notes, builder: (column) => ColumnOrderings(column));
+}
+
+class $$ShiftsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ShiftsTable> {
+  $$ShiftsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get openedAt =>
+      $composableBuilder(column: $table.openedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get closedAt =>
+      $composableBuilder(column: $table.closedAt, builder: (column) => column);
+
+  GeneratedColumn<double> get openingCash => $composableBuilder(
+      column: $table.openingCash, builder: (column) => column);
+
+  GeneratedColumn<double> get cashSales =>
+      $composableBuilder(column: $table.cashSales, builder: (column) => column);
+
+  GeneratedColumn<double> get cashTips =>
+      $composableBuilder(column: $table.cashTips, builder: (column) => column);
+
+  GeneratedColumn<double> get cashRefunds => $composableBuilder(
+      column: $table.cashRefunds, builder: (column) => column);
+
+  GeneratedColumn<double> get paidOut =>
+      $composableBuilder(column: $table.paidOut, builder: (column) => column);
+
+  GeneratedColumn<double> get expectedCash => $composableBuilder(
+      column: $table.expectedCash, builder: (column) => column);
+
+  GeneratedColumn<double> get countedCash => $composableBuilder(
+      column: $table.countedCash, builder: (column) => column);
+
+  GeneratedColumn<String> get summaryText => $composableBuilder(
+      column: $table.summaryText, builder: (column) => column);
+
+  GeneratedColumn<String> get notes =>
+      $composableBuilder(column: $table.notes, builder: (column) => column);
+}
+
+class $$ShiftsTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $ShiftsTable,
+    Shift,
+    $$ShiftsTableFilterComposer,
+    $$ShiftsTableOrderingComposer,
+    $$ShiftsTableAnnotationComposer,
+    $$ShiftsTableCreateCompanionBuilder,
+    $$ShiftsTableUpdateCompanionBuilder,
+    (Shift, BaseReferences<_$AppDatabase, $ShiftsTable, Shift>),
+    Shift,
+    PrefetchHooks Function()> {
+  $$ShiftsTableTableManager(_$AppDatabase db, $ShiftsTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ShiftsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ShiftsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ShiftsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            Value<DateTime> openedAt = const Value.absent(),
+            Value<DateTime?> closedAt = const Value.absent(),
+            Value<double> openingCash = const Value.absent(),
+            Value<double?> cashSales = const Value.absent(),
+            Value<double?> cashTips = const Value.absent(),
+            Value<double?> cashRefunds = const Value.absent(),
+            Value<double?> paidOut = const Value.absent(),
+            Value<double?> expectedCash = const Value.absent(),
+            Value<double?> countedCash = const Value.absent(),
+            Value<String?> summaryText = const Value.absent(),
+            Value<String?> notes = const Value.absent(),
+          }) =>
+              ShiftsCompanion(
+            id: id,
+            openedAt: openedAt,
+            closedAt: closedAt,
+            openingCash: openingCash,
+            cashSales: cashSales,
+            cashTips: cashTips,
+            cashRefunds: cashRefunds,
+            paidOut: paidOut,
+            expectedCash: expectedCash,
+            countedCash: countedCash,
+            summaryText: summaryText,
+            notes: notes,
+          ),
+          createCompanionCallback: ({
+            Value<int> id = const Value.absent(),
+            Value<DateTime> openedAt = const Value.absent(),
+            Value<DateTime?> closedAt = const Value.absent(),
+            Value<double> openingCash = const Value.absent(),
+            Value<double?> cashSales = const Value.absent(),
+            Value<double?> cashTips = const Value.absent(),
+            Value<double?> cashRefunds = const Value.absent(),
+            Value<double?> paidOut = const Value.absent(),
+            Value<double?> expectedCash = const Value.absent(),
+            Value<double?> countedCash = const Value.absent(),
+            Value<String?> summaryText = const Value.absent(),
+            Value<String?> notes = const Value.absent(),
+          }) =>
+              ShiftsCompanion.insert(
+            id: id,
+            openedAt: openedAt,
+            closedAt: closedAt,
+            openingCash: openingCash,
+            cashSales: cashSales,
+            cashTips: cashTips,
+            cashRefunds: cashRefunds,
+            paidOut: paidOut,
+            expectedCash: expectedCash,
+            countedCash: countedCash,
+            summaryText: summaryText,
+            notes: notes,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$ShiftsTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $ShiftsTable,
+    Shift,
+    $$ShiftsTableFilterComposer,
+    $$ShiftsTableOrderingComposer,
+    $$ShiftsTableAnnotationComposer,
+    $$ShiftsTableCreateCompanionBuilder,
+    $$ShiftsTableUpdateCompanionBuilder,
+    (Shift, BaseReferences<_$AppDatabase, $ShiftsTable, Shift>),
+    Shift,
+    PrefetchHooks Function()>;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -15079,4 +16075,6 @@ class $AppDatabaseManager {
       $$StockAdjustmentsTableTableManager(_db, _db.stockAdjustments);
   $$AuditLogTableTableManager get auditLog =>
       $$AuditLogTableTableManager(_db, _db.auditLog);
+  $$ShiftsTableTableManager get shifts =>
+      $$ShiftsTableTableManager(_db, _db.shifts);
 }

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:isolate';
 
 import 'package:archive/archive.dart';
+import 'package:drift_dev/api/migrations_native.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -11,6 +12,8 @@ import 'package:sqlite3/sqlite3.dart' as sql;
 
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/features/backup/data/snapshot_service.dart';
+
+import '../../drift/generated/schema.dart';
 
 /// End-to-end coverage of the zip snapshot: create → inspect → restore,
 /// against real files in a temp dir (this is exactly what the app does).
@@ -185,6 +188,58 @@ void main() {
       currentSchemaVersion: schema,
     );
     expect(await productName(restored, 'VAC'), 'Uncheckpointed');
+  });
+
+  group('schema v16 (tips, shifts)', () {
+    test('a v16 snapshot passes validation in this build, '
+        'and an app on v15 refuses it', () async {
+      expect(schema, 16);
+      await seedLive();
+      final f = dbFileIn(live);
+      SnapshotService.verifyDatabaseFile(f, currentSchemaVersion: schema);
+      expect(
+        () => SnapshotService.verifyDatabaseFile(f, currentSchemaVersion: 15),
+        throwsA(isA<SnapshotFormatException>().having(
+            (e) => '$e', 'message', contains('newer app version'))),
+      );
+    });
+
+    test('a v15 backup restores into this build and migrates on open',
+        () async {
+      // A real v15 database with a sale and a refund in it.
+      final v15 = await SchemaVerifier(GeneratedHelper()).schemaAt(15);
+      v15.rawDatabase
+        ..execute(
+            'INSERT INTO orders (id, subtotal, total, payment_method, created_at, updated_at) '
+            "VALUES (1, 40, 40, 'cash', 1000, 1000)")
+        ..execute(
+            'INSERT INTO returns (order_id, amount, created_at) VALUES (1, 10, 2000)');
+      final v15File = File(p.join(tmp.path, 'v15.db'));
+      v15.rawDatabase.execute(
+          "VACUUM INTO '${v15File.path.replaceAll("'", "''")}'");
+      v15.rawDatabase.dispose();
+      final zip = craftZip(v15File.readAsBytesSync(), schemaVersion: 15);
+
+      await svc.restore(
+        zip: zip,
+        dbFile: dbFileIn(restored),
+        hiveBoxFiles: const {},
+        currentSchemaVersion: schema,
+      );
+
+      final db = openDb(dbFileIn(restored));
+      try {
+        final order = (await db.ordersDao.getById(1))!;
+        expect((order.total, order.tipAmount), (40.0, 0.0));
+        final ret = (await db.select(db.returns).get()).single;
+        expect((ret.amount, ret.tipAmount), (10.0, 0.0));
+        expect(await db.shiftsDao.currentShift(), isNull);
+        final v = await db.customSelect('PRAGMA user_version').getSingle();
+        expect(v.data.values.single, 16);
+      } finally {
+        await db.close();
+      }
+    });
   });
 
   test('restore reproduces rows and settings in a fresh location', () async {

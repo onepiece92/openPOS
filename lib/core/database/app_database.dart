@@ -8,6 +8,7 @@ import 'package:pos_app/core/database/daos/expenses_dao.dart';
 import 'package:pos_app/core/database/daos/inventory_dao.dart';
 import 'package:pos_app/core/database/daos/orders_dao.dart';
 import 'package:pos_app/core/database/daos/products_dao.dart';
+import 'package:pos_app/core/database/daos/shifts_dao.dart';
 import 'package:pos_app/core/database/daos/tables_dao.dart';
 import 'package:pos_app/core/database/daos/tax_dao.dart';
 import 'package:pos_app/core/database/tables/audit_log_table.dart';
@@ -23,6 +24,7 @@ import 'package:pos_app/core/database/tables/product_components_table.dart';
 import 'package:pos_app/core/database/tables/product_taxes_table.dart';
 import 'package:pos_app/core/database/tables/products_table.dart';
 import 'package:pos_app/core/database/tables/returns_table.dart';
+import 'package:pos_app/core/database/tables/shifts_table.dart';
 import 'package:pos_app/core/database/tables/stock_adjustments_table.dart';
 import 'package:pos_app/core/database/tables/tables_table.dart';
 import 'package:pos_app/core/database/tables/tax_group_members_table.dart';
@@ -59,6 +61,8 @@ part 'app_database.g.dart';
     StockAdjustments,
     // Audit
     AuditLog,
+    // Till sessions (end-of-day drawer close)
+    Shifts,
   ],
   daos: [
     ProductsDao,
@@ -69,6 +73,7 @@ part 'app_database.g.dart';
     ExpensesDao,
     AuditDao,
     TablesDao,
+    ShiftsDao,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -76,7 +81,7 @@ class AppDatabase extends _$AppDatabase {
       : super(executor ?? _openConnection());
 
   /// Bump together with a new `onUpgrade` step below.
-  static const int currentSchemaVersion = 15;
+  static const int currentSchemaVersion = 16;
 
   @override
   int get schemaVersion => currentSchemaVersion;
@@ -195,6 +200,17 @@ class AppDatabase extends _$AppDatabase {
             await m.createIndex(idxAuditLogCreatedAt);
             await m.createIndex(idxStockAdjustmentsProductCreated);
             await m.createIndex(idxExpensesDate);
+          }
+          if (from < 16) {
+            // Tips (kept out of orders.total) and refunded tips, plus till
+            // sessions for the end-of-day drawer close. ADD COLUMN with a
+            // constant default only rewrites the schema, not the rows.
+            await m.addColumn(orders, orders.tipAmount);
+            await m.addColumn(returns, returns.tipAmount);
+            await m.createTable(shifts);
+            await m.createIndex(idxShiftsClosedAt);
+            // The close sums refunds by the date they were handed out.
+            await m.createIndex(idxReturnsCreatedAt);
           }
         },
         beforeOpen: (details) async {
