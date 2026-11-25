@@ -8,6 +8,7 @@ import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/core/theme/app_theme.dart';
+import 'package:pos_app/core/utils/link_uris.dart';
 import 'package:pos_app/core/utils/currency_formatter.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
 import 'package:pos_app/features/receipts/domain/receipt_text.dart';
@@ -100,11 +101,7 @@ class _ShareMenu extends StatelessWidget {
           keyboard: TextInputType.phone,
         );
         if (phone == null || !context.mounted) return;
-        final uri = Uri(
-          scheme: 'sms',
-          path: phone,
-          queryParameters: {'body': text},
-        );
+        final uri = Uri.parse(smsLink(phone, body: text));
         await _launch(context, uri, fallbackText: text);
       case _ShareAction.email:
         final addr = await _resolveContact(
@@ -115,14 +112,11 @@ class _ShareMenu extends StatelessWidget {
           keyboard: TextInputType.emailAddress,
         );
         if (addr == null || !context.mounted) return;
-        final uri = Uri(
-          scheme: 'mailto',
-          path: addr,
-          queryParameters: {
-            'subject': '${data.businessName} — Receipt ${data.order.billNo}',
-            'body': text,
-          },
-        );
+        final uri = Uri.parse(mailtoLink(
+          addr,
+          subject: '${data.businessName} — Receipt ${data.order.billNo}',
+          body: text,
+        ));
         await _launch(context, uri, fallbackText: text);
     }
   }
