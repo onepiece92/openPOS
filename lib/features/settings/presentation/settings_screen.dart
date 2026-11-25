@@ -25,6 +25,7 @@ class SettingsScreen extends ConsumerWidget {
     // Sections of switched-off features are not built.
     final stock = ref.watch(featureOnProvider(Feature.stockTracking));
     final customers = ref.watch(featureOnProvider(Feature.customers));
+    final taxes = ref.watch(featureOnProvider(Feature.taxes));
     return Scaffold(
       drawer: const PosDrawer(),
       appBar: AppBar(title: const Text('Settings')),
@@ -34,8 +35,12 @@ class SettingsScreen extends ConsumerWidget {
           const StoreProfileSection(),
           const SettingsSectionHeader('Currency'),
           const CurrencySection(),
-          const SettingsSectionHeader('Tax'),
-          const TaxSection(),
+          if (taxes) ...const [
+            SettingsSectionHeader('Tax'),
+            TaxSection(),
+          ],
+          const SettingsSectionHeader('Invoices'),
+          const InvoiceSection(),
           if (stock) ...const [
             SettingsSectionHeader('Inventory'),
             InventorySection(),

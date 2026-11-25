@@ -99,7 +99,10 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     final session = ref.read(cartSessionProvider);
     final invoicePrefix = ref.read(invoicePrefixProvider);
     final cartNotifier = ref.read(cartProvider.notifier);
-    final heldOrders = ref.read(heldOrdersProvider.notifier);
+    // Only a sale resumed from a held ticket needs the held tickets.
+    final heldOrders = session.heldTicketId == null
+        ? null
+        : ref.read(heldOrdersProvider.notifier);
     // Auto-print off: the print service is not even read.
     final printer = ref.read(featureOnProvider(Feature.autoPrint))
         ? ref.read(autoPrintServiceProvider)
@@ -142,7 +145,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     // disk while it is edited — the sale is what retires it.
     final heldTicketId = session.heldTicketId;
     if (heldTicketId != null) {
-      heldOrders.delete(heldTicketId);
+      heldOrders?.delete(heldTicketId);
     }
     cartNotifier.clear();
 

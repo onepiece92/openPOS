@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:pos_app/core/database/app_database.dart';
-import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/features/cart/domain/pos_catalog_provider.dart';
 import 'package:pos_app/features/cart/presentation/pos_cart_actions.dart';
 import 'package:pos_app/features/products/domain/favorites_provider.dart';
@@ -12,7 +11,17 @@ import 'package:pos_app/features/products/domain/products_provider.dart';
 /// it is a favourite, and the currency format. A cart change elsewhere does
 /// not rebuild it, and its taps read the cart when they happen.
 class PosProductTile extends ConsumerWidget {
-  const PosProductTile({super.key, required this.product});
+  const PosProductTile({
+    super.key,
+    required this.product,
+    required this.units,
+    required this.stock,
+  });
+
+  /// Units and Stock tracking switches, watched ONCE by the product grid /
+  /// list and passed down, so a tile watches nothing more than before.
+  final bool units;
+  final bool stock;
 
   final Product product;
 
@@ -32,9 +41,7 @@ class PosProductTile extends ConsumerWidget {
     void onToggleFavorite() =>
         ref.read(favoritesProvider.notifier).toggle(product.id);
     // Units off: no second-unit picker. Stock tracking off: no caps or
-    // out-of-stock state (one bool each, watched per tile).
-    final units = ref.watch(featureOnProvider(Feature.units));
-    final stock = ref.watch(featureOnProvider(Feature.stockTracking));
+    // out-of-stock state.
     final onLongPress = !units || product.secondaryUnit == null
         ? null
         : () => PosCartActions.of(context).pickUnit(context, product);

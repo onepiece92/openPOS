@@ -9,22 +9,31 @@ import 'package:pos_app/features/products/domain/products_provider.dart';
 
 // ── Tax ───────────────────────────────────────────────────────────────────────
 
+/// The default tax rate. Settings builds it only while Taxes is on, so the
+/// rates stream never starts otherwise.
 class TaxSection extends ConsumerWidget {
   const TaxSection({super.key});
 
   @override
+  Widget build(BuildContext context, WidgetRef ref) => const Card(
+        margin: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        child: _DefaultTaxTile(),
+      );
+}
+
+// ── Invoices ──────────────────────────────────────────────────────────────────
+
+/// Invoice numbering: always on, under its own neutral header.
+class InvoiceSection extends ConsumerWidget {
+  const InvoiceSection({super.key});
+
+  @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final taxes = ref.watch(featureOnProvider(Feature.taxes));
     final invoicePrefix = ref.watch(invoicePrefixProvider);
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: Column(children: [
-        // Taxes off: no default-rate row, and the rates stream never starts.
-        if (taxes) ...[
-          const _DefaultTaxTile(),
-          const Divider(height: 1, indent: 16),
-        ],
         ListTile(
           leading: const Icon(Icons.receipt_long_rounded),
           title: const Text('Invoice Prefix'),

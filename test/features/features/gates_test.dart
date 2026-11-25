@@ -29,7 +29,7 @@ import 'package:pos_app/features/reports/presentation/widgets/dashboard_body.dar
 import 'package:pos_app/features/reports/presentation/widgets/mini_bar_chart.dart';
 import 'package:pos_app/features/reports/domain/report_data.dart';
 import 'package:pos_app/features/review/review_providers.dart';
-import 'package:pos_app/features/settings/presentation/widgets/tax_section.dart';
+import 'package:pos_app/features/settings/presentation/settings_screen.dart';
 import 'package:pos_app/features/tables/domain/tables_provider.dart';
 
 import '../../_support/sales.dart';
@@ -200,13 +200,21 @@ void main() {
       await pump(tester, c, summary(c));
       expect(reads['taxRates'], 1);
     });
-    testWidgets('Taxes off: Settings has no default-rate row (rates unread)',
-        (tester) async {
+    testWidgets(
+        'Taxes off: Settings has no Tax header or default-rate row (rates '
+        'unread); Invoice Prefix stays under Invoices', (tester) async {
       await pump(tester, container(without(Feature.taxes)),
-          const TaxSection());
+          const SettingsScreen());
       expect(find.text('Default Tax Rate'), findsNothing);
+      expect(find.text('TAX'), findsNothing);
+      expect(find.text('INVOICES'), findsOneWidget);
       expect(find.text('Invoice Prefix'), findsOneWidget);
       expect(reads['taxRates'], isNull);
+    });
+    testWidgets('Taxes on: the Tax section watches the rates', (tester) async {
+      await pump(tester, container(all), const SettingsScreen());
+      expect(find.text('Default Tax Rate'), findsOneWidget);
+      expect(reads['taxRates'], 1);
     });
   });
 
@@ -291,13 +299,15 @@ void main() {
         (tester) async {
       await pump(tester, container(without(Feature.stockTracking)),
           SizedBox(width: 160, height: 160,
-              child: GridProductTile(product: product())));
+              child: GridProductTile(
+                  product: product(), units: true, stock: false)));
       expect(find.text('Out of stock'), findsNothing);
     });
     testWidgets('Stock on: it is', (tester) async {
       await pump(tester, container(all),
           SizedBox(width: 160, height: 160,
-              child: GridProductTile(product: product())));
+              child: GridProductTile(
+                  product: product(), units: true, stock: true)));
       expect(find.text('Out of stock'), findsOneWidget);
     });
     testWidgets('Units off: no second-unit picker on long-press',
@@ -305,7 +315,9 @@ void main() {
       await pump(tester, container(without(Feature.units)),
           SizedBox(width: 160, height: 160,
               child: GridProductTile(
-                  product: product(stock: 0, secondary: 'dozen'))));
+                  product: product(stock: 0, secondary: 'dozen'),
+                  units: false,
+                  stock: true)));
       await tester.longPress(find.text('Eggs'));
       await tester.pumpAndSettle();
       expect(find.textContaining('dozen'), findsNothing);
