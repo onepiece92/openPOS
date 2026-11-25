@@ -180,8 +180,8 @@
     "semantic_hash": "fab453f2c95c86cc6dfc41d21b1622b5"
   },
   "lib/core/database/connection/web.dart": {
-    "mtime": 1772882426.8562047,
-    "seen": 1787548275.616173,
+    "mtime": 1795601121.2246177,
+    "seen": 1795601423.267151,
     "ast_hash": "220a789322f467df43a2f19d4e11f117",
     "semantic_hash": "220a789322f467df43a2f19d4e11f117"
   },
@@ -450,8 +450,8 @@
     "semantic_hash": "266497d7850f7efb38e38efe92bfeb61"
   },
   "lib/features/expenses/presentation/expenses_screen.dart": {
-    "mtime": 1787049373.7125864,
-    "seen": 1787549093.426831,
+    "mtime": 1795601121.2264056,
+    "seen": 1795601423.267204,
     "ast_hash": "f3339cdbf706698f74cb484ba8a487cf",
     "semantic_hash": "f3339cdbf706698f74cb484ba8a487cf"
   },
@@ -468,8 +468,8 @@
     "semantic_hash": ""
   },
   "lib/features/printing/presentation/printer_setup_screen.dart": {
-    "mtime": 1789897334.9853628,
-    "seen": 1789897533.951515,
+    "mtime": 1795601121.2269716,
+    "seen": 1795601423.267224,
     "ast_hash": "c5a653e11045912699463e21c13116db",
     "semantic_hash": ""
   },
@@ -600,14 +600,14 @@
     "semantic_hash": "b27280b5f0b06fbbe42b11b92580a74e"
   },
   "lib/features/backup/data/backup_repository.dart": {
-    "mtime": 1778589919.2916873,
-    "seen": 1787548275.616205,
+    "mtime": 1795601121.2251291,
+    "seen": 1795601423.267183,
     "ast_hash": "62b84eee19981b4b94cdcd0b27e1ebbb",
     "semantic_hash": "62b84eee19981b4b94cdcd0b27e1ebbb"
   },
   "lib/features/backup/presentation/backup_screen.dart": {
-    "mtime": 1787044651.696692,
-    "seen": 1787549093.426813,
+    "mtime": 1795601121.225808,
+    "seen": 1795601423.267185,
     "ast_hash": "2dbe807f56374c21ecaeb7f909e449ff",
     "semantic_hash": "2dbe807f56374c21ecaeb7f909e449ff"
   },
@@ -852,14 +852,14 @@
     "semantic_hash": "d02d6079dc635d1bca8abd8d8e107ef3"
   },
   "lib/app_root.dart": {
-    "mtime": 1787043752.6194263,
-    "seen": 1787549093.4267771,
+    "mtime": 1795601121.2240677,
+    "seen": 1795601423.267148,
     "ast_hash": "0eaef131d8acb2f76bb8b826ff9381aa",
     "semantic_hash": "0eaef131d8acb2f76bb8b826ff9381aa"
   },
   "lib/features/backup/data/snapshot_providers.dart": {
-    "mtime": 1787044158.8744261,
-    "seen": 1787549093.426812,
+    "mtime": 1795601121.2254393,
+    "seen": 1795601423.267184,
     "ast_hash": "439cfa7d2a8ac2ed778647ea6a4e1760",
     "semantic_hash": "439cfa7d2a8ac2ed778647ea6a4e1760"
   },
@@ -1086,8 +1086,8 @@
     "semantic_hash": ""
   },
   "lib/features/printing/domain/receipt_printer.dart": {
-    "mtime": 1789897273.6837425,
-    "seen": 1789897533.951513,
+    "mtime": 1795601121.226596,
+    "seen": 1795601423.267222,
     "ast_hash": "068e64f1ac282748194ced149055350a",
     "semantic_hash": ""
   },
@@ -1317,6 +1317,12 @@
     "mtime": 1789897415.6838722,
     "seen": 1789897533.9515588,
     "ast_hash": "4ec30e5920ad8128e47cfd33f3ee7f01",
+    "semantic_hash": ""
+  },
+  "scripts/install_macos.sh": {
+    "mtime": 1795601375.070086,
+    "seen": 1795601423.267252,
+    "ast_hash": "e886643068404c7d53c0d6296f38a85d",
     "semantic_hash": ""
   }
 }
