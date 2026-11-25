@@ -1,0 +1,607 @@
+# Open POS: full site text
+
+> The plain text of every page on https://onepiece92.github.io/openPOS/, one page after another. Updated November 2026.
+
+
+---
+
+Page: Open POS: Free POS App That Works Without Internet
+URL: https://onepiece92.github.io/openPOS/
+
+Free POS app that works without internet
+
+# A POS app that never sends your data anywhere.
+
+A free POS app and cash register that works without internet, for shops, cafes, food trucks and farmers markets. No account. No subscription. Install it on your Android phone, iPhone or iPad and start selling.
+
+Free, for good.
+No ads, no in-app purchases.
+
+Google Play and the Google Play logo are trademarks of Google LLC. Apple and the Apple logo are trademarks of Apple Inc., registered in the U.S. and other countries. App Store is a service mark of Apple Inc.
+
+The current store versions date from May 2026. The features on this page describe the upcoming release, which also fixes known issues.
+
+- No internet needed to sell, ever
+- No account install and start
+- $0 no subscription, ever
+- MIT licensed open source code
+
+## Why a point of sale without internet?
+
+Most "free" POS apps are a front door to a cloud account. Open POS is a cash register app that lives entirely on your phone.
+
+### Sell when the signal drops
+
+A basement shop, a farmers market, a food truck parked out of range, a power outage that takes the router down. The register keeps ringing up cash sales, because the app never needed a connection. A card reader needs its own.
+
+### No subscription, no monthly bill
+
+No subscription, no per-device fee, no trial that runs out. There is no account to sign up for, and none to lose access to. Why it costs nothing.
+
+### Your numbers stay yours
+
+Sales, customers and expenses are kept on your device, and the app never sends them anywhere. We never see them.
+
+## Everything a small shop's cash register needs
+
+Built for a phone or tablet beside the cash drawer. Set your country and currency once, add products, and ring up the first sale.
+
+### Selling
+
+- Product grid with search, categories and favorites
+- Whole-order discounts (amount or percent)
+- Cash with change, or record a card payment taken on your own card terminal
+- Held tickets: park an order, finish it later
+
+### Products
+
+- SKU field
+- Bundles
+- CSV import to load your list fast
+
+### Receipts and printing
+
+- PDF receipts you can save or share, or copy the receipt as text.
+- Save or share a PDF receipt; you can print the PDF from another app.
+- Bluetooth receipt printers coming
+
+### Tables for restaurants and cafes
+
+- Table management
+- Held tickets per table
+- Customers
+- Order history and voids
+
+### Money
+
+- Tax rates, with tax switched on or off per product
+- Expense tracking
+- Reports for today, this week or this month: sales total, expenses, average order value
+- Audit log
+
+### Your data
+
+- CSV export, any time
+- Guided setup: pick your country and currency
+- Light and dark theme
+
+Free POS for Android, iPhone and iPad.
+
+Google Play and the Google Play logo are trademarks of Google LLC. Apple and the Apple logo are trademarks of Apple Inc., registered in the U.S. and other countries. App Store is a service mark of Apple Inc.
+
+## Privacy you can check, not just trust
+
+Anyone can write "we respect your privacy". Open POS is a private POS app with no tracking, built so you can look for yourself.
+
+Today
+
+### The app makes no network calls
+
+The app's own code makes no network calls. It never included analytics or cloud services, and it has no ads and no crash reporting. The full source code is public on GitHub, so you or a friend who codes can read it for yourself.
+
+The app never sends your data anywhere. Your phone's own backup (Google or iCloud), if you have it turned on, may include app data.
+
+Next release
+
+### Android itself blocks the network
+
+From the next release onwards, the Android build has no internet permission. Without it, the operating system does not let the app open any connection, even by mistake. You can verify it on the release file with one command.
+
+from the next Android release: check the APK yourself
+
+$ aapt dump permissions \ open-pos.apk | grep INTERNET # no output = no internet permission ✓ nothing to send it with
+
+Applies to release APKs from the next release onwards. Read the full privacy policy.
+
+## Made for small shops, cafes, food trucks and market stands
+
+If you sell over a counter or from a stand and want a simple cash register app that just works, Open POS is for you.
+
+- Shops Corner stores, rural stores, gift shops and small retail. Search, categories, SKUs.
+- Cafes Favorites for your best sellers and held tickets for busy mornings.
+- Bakeries Bundles for boxes and assortments, favorites for the daily bakes.
+- Restaurants Table management, held tickets and receipts for each table.
+- Food trucks Favorites and held tickets for a fast line at the window, even out of range.
+- Farmers markets No signal at the market? The app itself needs no connection.
+- Craft and flea markets Cash with change, card sales recorded from your own reader.
+- Pop-ups Set up in minutes, see today's sales at close, export to CSV.
+
+## Guides
+
+- Cash register app with no subscription
+- POS for food trucks and farmers markets
+- Loyverse alternative with no account
+
+## Questions shop owners ask
+
+### Is it really free?
+
+Yes. Open POS itself has no paid tier, no trial, no ads and no in-app purchases. Open POS is open source under the MIT license, and it will stay free.
+
+### How do you make money?
+
+Not from Open POS. The same team makes RebuzzPOS, a separate online POS for businesses that need sync across devices.
+
+The Support screen in Open POS links to it. Open POS exchanges no data with it, and you never need it to use Open POS.
+
+### Does it work without internet?
+
+Yes, always. There is no login and no server, so a dropped connection, airplane mode or a market with no signal never stops the app. Card sales are different: your card reader needs its own connection.
+
+### Do I need to create an account?
+
+No. Install the app, pick your country and currency, add your products and you are ready. No email, no phone number, no password.
+
+### What if my phone breaks or gets lost?
+
+The app never sends your data anywhere, so there is no Open POS cloud copy. Your phone's own backup (Google or iCloud), if you have it turned on, may include app data, but keep your own copy too. Export your products and records to CSV files and save them somewhere safe: a USB drive, your own email or a cloud folder you choose. On a new phone, install Open POS and import the CSV files.
+
+A one-file backup and restore is coming in an update.
+
+### Which printers does it work with?
+
+Save or share a PDF receipt; you can print the PDF from another app. You can also copy the receipt as text. Direct printing to Bluetooth receipt printers is coming soon.
+
+### Does it take card payments?
+
+No. Open POS does not process or take card payments. Take the payment on your own card terminal, then record the sale in Open POS as paid by card.
+
+### Does it work for a restaurant with tables?
+
+Yes. Table management lets you open an order for each table, hold it while guests eat, and close it when they pay.
+
+### Can several phones share the same sales?
+
+No. Each phone or tablet is its own register, with its own data, and there are no staff logins. That is what keeps everything offline. If you need several devices in sync, RebuzzPOS is built for that.
+
+### Is there a cash register app with no subscription?
+
+Yes, this one. Open POS has no subscription, no trial and no in-app purchases, on Android and on iPhone and iPad. See what is included for free.
+
+### Is Open POS open source?
+
+Yes. The full source code is public on GitHub under the MIT license, so anyone can read it, check it and build it.
+
+### Does it work for a food truck or farmers market?
+
+Yes. The app itself never needs a signal. It gives change on cash sales and lets you record card sales you took on your own reader (the reader needs its own connection). See how it works at the market.
+
+### Is there an iPhone version?
+
+Yes. Open POS is on the App Store for iPhone and iPad, and on Google Play for Android phones and tablets.
+
+## Open the register in two minutes.
+
+Free point of sale for Android and iPhone. No account, no subscription, no internet needed.
+
+Questions first? Message us on WhatsApp or email mail@brandbuilder.com.np.
+
+Google Play and the Google Play logo are trademarks of Google LLC. Apple and the Apple logo are trademarks of Apple Inc., registered in the U.S. and other countries. App Store is a service mark of Apple Inc.
+
+
+---
+
+Page: Cash Register App With No Subscription, Ever | Open POS
+URL: https://onepiece92.github.io/openPOS/cash-register-no-subscription/
+
+Open POS / No-subscription cash register
+
+Free cash register app for Android and iPhone
+
+# A cash register app with no subscription
+
+Open POS is a free cash register app for small shops, cafes, food trucks and market stalls. No subscription, no trial that runs out, no in-app purchases and no account. It works without internet.
+
+Free, for good.
+No ads, no in-app purchases.
+
+Google Play and the Google Play logo are trademarks of Google LLC. Apple and the Apple logo are trademarks of Apple Inc., registered in the U.S. and other countries. App Store is a service mark of Apple Inc.
+
+The current store versions date from May 2026. The features on this page describe the upcoming release, which also fixes known issues.
+
+## Where "free" cash register apps usually charge
+
+Many POS apps are free to download and then charge somewhere else. The common patterns are:
+
+- a subscription that starts after a free trial;
+- paid exports, where you can enter sales for free but pay to get your own data out;
+- caps on items or sales per day on the free plan;
+- card-processing lock-in, where the app is free because you have to take cards through the vendor.
+
+None of these apply to Open POS. Open POS itself has no paid tier; a separate product, RebuzzPOS, exists for businesses that need cloud sync. Nothing in Open POS is locked behind a payment.
+
+## What you get for free
+
+Everything in the app, on every device you install it on. Free, for good, under the MIT license.
+
+### Selling
+
+- Product grid with search, categories and favorites
+- Whole-order discounts (amount or percent)
+- Cash with change, or record a card payment taken on your own card terminal
+- Held tickets: park an order, finish it later
+
+### Records
+
+- Customers
+- Order history and voids
+- Audit log
+- PDF receipts you can save or share, or copy the receipt as text.
+
+### Money and data
+
+- Tax rates, with tax switched on or off per product
+- Expense tracking
+- Reports for today, this week or this month: sales total, expenses, average order value
+- CSV import and export, any time
+
+## What it doesn't do
+
+Being free and fully offline comes with trade-offs. It is better to know them before you start.
+
+- One device, one register. Each phone or tablet keeps its own sales. Nothing syncs between devices, and there are no staff logins.
+- No card processing. Open POS does not take card payments. Take the payment on your own card terminal, then record the sale as paid by card.
+- You keep your own copy. The app never sends your data anywhere, and there is no Open POS cloud copy. Export it to CSV now and then and save it somewhere safe.
+
+If you need several registers in sync, the same team makes RebuzzPOS, a separate online POS. The Support screen in Open POS links to it. Open POS exchanges no data with it, and you never need it to use Open POS.
+
+### Privacy you can check
+
+The app's own code makes no network calls: no analytics, no ads, no crash reporting and no cloud services. The source code is public on GitHub. From the next release onwards, the Android build also has no internet permission, so the operating system itself blocks any connection. How to check it.
+
+## More guides
+
+- POS for food trucks and farmers markets
+- Loyverse alternative with no account
+- Open POS home
+
+## Questions about the price
+
+### Is Open POS really free, with no subscription?
+
+Yes. There is no subscription, no trial, no premium tier, no ads and no in-app purchases. Open POS is open source under the MIT license, and it will stay free.
+
+### How do you make money, then?
+
+Not from Open POS. The same team makes RebuzzPOS, an online POS for businesses that need sync across devices. It is a separate product, and Open POS never connects to it.
+
+### Is there a limit on products or sales?
+
+There is no paid plan, so there is no free-plan cap. The practical limit is the storage on your own phone or tablet.
+
+### Can I export my data without paying?
+
+Yes. CSV export is part of the free app, and you can export whenever you like.
+
+### Does it work on iPhone and Android?
+
+Yes. Open POS is on Google Play for Android phones and tablets, and on the App Store for iPhone and iPad. Both are free.
+
+### Do I need internet or an account?
+
+No. There is no login and no server. Install it, pick your country and currency, add products and start selling, with or without a signal.
+
+## Open the register in two minutes.
+
+A free cash register app for Android and iPhone. No subscription, no account, no internet needed.
+
+Questions first? Message us on WhatsApp or email mail@brandbuilder.com.np.
+
+Google Play and the Google Play logo are trademarks of Google LLC. Apple and the Apple logo are trademarks of Apple Inc., registered in the U.S. and other countries. App Store is a service mark of Apple Inc.
+
+
+---
+
+Page: Offline POS for Food Trucks and Farmers Markets | Open POS
+URL: https://onepiece92.github.io/openPOS/food-trucks-farmers-markets/
+
+Open POS / Food trucks and farmers markets
+
+Free POS app for food trucks and market stands
+
+# Offline POS for food trucks, farmers markets and pop-ups
+
+No signal at the market? Open POS keeps ringing up cash sales, because the app itself never needs the internet. A free cash register app for Android and iPhone, with no account and no monthly fee.
+
+Free, for good.
+No ads, no in-app purchases.
+
+Google Play and the Google Play logo are trademarks of Google LLC. Apple and the Apple logo are trademarks of Apple Inc., registered in the U.S. and other countries. App Store is a service mark of Apple Inc.
+
+The current store versions date from May 2026. The features on this page describe the upcoming release, which also fixes known issues.
+
+## No signal? Keep ringing up cash sales.
+
+A field full of stands, a parking lot behind a brewery, a fairground with one bar of signal shared by a thousand phones. Cloud POS apps can stall right when the line is longest. Open POS has no server to reach and no login to time out, so the register works the same out at the market as it does at home.
+
+Your card reader needs its own connection. With no signal, Open POS still records cash sales; it cannot take or approve a card payment.
+
+Your sales are saved on your phone or tablet the moment you ring them up. There is nothing waiting to sync later, because nothing ever syncs.
+
+## Built for a fast line at the window
+
+Set up your menu or price list once at home, then sell all day from one screen.
+
+### Quick-service selling
+
+- Product grid with search and categories
+- Favorites for your best sellers, one tap away
+- Held tickets: park an order while a customer decides, serve the next one
+- Whole-order discounts (amount or percent) for end-of-day deals
+
+### Cash sales, and card sales you record
+
+- Cash with change. Type the amount the customer hands you and the app shows the change, for example $20 given on a $12.50 order shows $7.50.
+- Record card payments taken on your own card reader
+
+### Receipts
+
+- PDF receipts you can save or share, or copy the receipt as text.
+- Save or share a PDF receipt; you can print the PDF from another app.
+- Bluetooth receipt printers coming
+
+### Sales tax
+
+- Set your own sales tax rates
+- Switch tax on or off per product, for items that are not taxed.
+
+### End of day
+
+- Reports for today, this week or this month: sales total, expenses, average order value
+- Order history and voids
+- Expense tracking for ingredients, fuel and stand fees
+
+### For your bookkeeper
+
+- You can export a sales report to CSV from Settings → Backup & Restore.
+- Open the file in any spreadsheet app, or send it on yourself
+
+Open POS does not process card payments. It works alongside the card reader you already use.
+
+Take the payment on your reader as usual, then mark the sale as paid by card in Open POS, so your daily totals include every sale.
+
+Your card reader needs its own connection. With no signal, Open POS still records cash sales; it cannot take or approve a card payment.
+
+## Good to know before market day
+
+- One device, one register. Each phone or tablet keeps its own sales. If you run two stands, each one has its own records.
+- Printing. Save or share a PDF receipt; you can print the PDF from another app. Receipts are full-page PDFs, not receipt-paper size. Direct printing to Bluetooth receipt printers is coming.
+- Keep a copy. The app never sends your data anywhere, and there is no Open POS cloud copy. Export to CSV after a busy weekend and save it somewhere safe.
+
+### Privacy you can check
+
+The app's own code makes no network calls: no analytics, no ads, no crash reporting and no cloud services. The source code is public on GitHub. From the next release onwards, the Android build also has no internet permission, so the operating system itself blocks any connection. How to check it.
+
+## More guides
+
+- Cash register app with no subscription
+- Loyverse alternative with no account
+- Open POS home
+
+## Questions from food trucks and market sellers
+
+### Does Open POS work with no cell signal or Wi-Fi?
+
+Yes. The app itself never needs the internet, for setup or for selling. Airplane mode, a dead zone or a crowded fairground makes no difference to the app. Your card reader needs its own connection. With no signal, Open POS still records cash sales; it cannot take or approve a card payment.
+
+### Can I take card payments with it?
+
+No. Open POS does not process cards. It works alongside your own card reader: take the payment on the reader, then record the sale in Open POS as paid by card. Your card reader needs its own connection. With no signal, Open POS still records cash sales; it cannot take or approve a card payment.
+
+### Does it calculate change for cash sales?
+
+Yes. Type the amount the customer hands you and the app shows the change, for example $20 given on a $12.50 order shows $7.50.
+
+### Can I charge sales tax?
+
+Yes. Set your own sales tax rates, and switch tax on or off per product for items that are not taxed. Check with your tax advisor which rates apply to what you sell.
+
+### How do I see what I sold today?
+
+Open Reports. Reports for today, this week or this month: sales total, expenses, average order value. You can export a sales report to CSV from Settings → Backup & Restore.
+
+### Is it really free? Do I need an account?
+
+It is free, with no subscription, no ads and no in-app purchases. There is no account, no email and no password. Install it on Android or iPhone and start selling.
+
+## Open the register in two minutes.
+
+A free, offline POS for food trucks, farmers markets and pop-ups. No signal, no account and no monthly fee needed.
+
+Questions first? Message us on WhatsApp or email mail@brandbuilder.com.np.
+
+Google Play and the Google Play logo are trademarks of Google LLC. Apple and the Apple logo are trademarks of Apple Inc., registered in the U.S. and other countries. App Store is a service mark of Apple Inc.
+
+
+---
+
+Page: Loyverse Alternative With No Account or Cloud | Open POS
+URL: https://onepiece92.github.io/openPOS/loyverse-alternative/
+
+Open POS / Loyverse alternative
+
+Loyverse alternative for Android and iPhone
+
+# A Loyverse alternative that needs no account
+
+Open POS is a free, offline POS app with no sign-up, no cloud and no paid add-ons. It is open source, and the app never sends your sales anywhere.
+
+Free, for good.
+No ads, no in-app purchases.
+
+Google Play and the Google Play logo are trademarks of Google LLC. Apple and the Apple logo are trademarks of Apple Inc., registered in the U.S. and other countries. App Store is a service mark of Apple Inc.
+
+The current store versions date from May 2026. The features on this page describe the upcoming release, which also fixes known issues.
+
+## Loyverse and Open POS, side by side
+
+Loyverse POS is a popular point of sale with a free core app. It is a cloud system: you sign up for an account, and your sales go to an online Back Office that you open in a web browser. In Loyverse's own words, you can "keep recording sales even when offline", and "offline sales sync to the Back Office when you're back online". It supports more than one store and a customer rewards program, and "optional paid add-ons are available". Employee management is one of them: Loyverse's pricing page lists it at $5 per employee per month.
+
+Open POS takes a different approach. There is no account and no server at all. Sales are stored on the device, and the app never sends them anywhere. The whole app is free and open source under the MIT license.
+
+Loyverse details are from loyverse.com, checked on 25 November 2026. Check their site for current details.
+
+| Open POS | Loyverse POS
+
+Account | None. Install and start. | Sign-up for a Loyverse account
+
+Where sales are stored | On your device. The app never sends them anywhere. | Synced to the cloud Back Office
+
+With no internet | Works the same, always | Records sales; syncs when back online
+
+Several stores or devices | No. One device, one register. | Yes
+
+Staff logins | No | Paid add-on ($5 per employee per month)
+
+Paid options | None | Optional paid add-ons
+
+Source code | Open source (MIT) | No public source code that we could find
+
+## Which one fits your shop
+
+### Open POS fits if
+
+you run one counter or one stall, you don't want an account or a cloud service, and you want an app that never sends your sales anywhere. It works the same with or without a signal.
+
+### Loyverse fits if
+
+you need several stores or devices in sync, staff logins, a rewards program or a web back office you can open from anywhere. Open POS does not do those things.
+
+### Switching over
+
+Install Open POS, pick your country and currency, and import your products from a CSV file. You may need to match the column names to the Open POS import format first.
+
+### Privacy you can check
+
+The app's own code makes no network calls: no analytics, no ads, no crash reporting and no cloud services. The source code is public on GitHub. From the next release onwards, the Android build also has no internet permission, so the operating system itself blocks any connection. How to check it.
+
+## More guides
+
+- Cash register app with no subscription
+- POS for food trucks and farmers markets
+- Open POS home
+
+## Questions about switching
+
+### Is Open POS affiliated with Loyverse?
+
+No. Loyverse is a trademark of its owner. Open POS is an independent, open-source app and is not affiliated with or endorsed by Loyverse. We name it here only to compare the two.
+
+### Do I need an account to use Open POS?
+
+No. There is no sign-up, no email and no password. Install the app and start selling.
+
+### Can I move my products over from Loyverse?
+
+Open POS imports products from a CSV file. There is no direct Loyverse importer, so you may need to rename columns in a spreadsheet to match the Open POS import format.
+
+### Can several phones share the same sales, like a cloud POS?
+
+No. Each phone or tablet is its own register, with its own data. That is what keeps everything offline. If you need several devices in sync, a cloud POS such as Loyverse, or our own separate product RebuzzPOS, is a better fit.
+
+### Is Open POS on iPhone and Android?
+
+Yes. It is on Google Play for Android and on the App Store for iPhone and iPad.
+
+## Open the register in two minutes.
+
+A free, offline POS for Android and iPhone. No account, no cloud, no paid add-ons.
+
+Questions first? Message us on WhatsApp or email mail@brandbuilder.com.np.
+
+Google Play and the Google Play logo are trademarks of Google LLC. Apple and the Apple logo are trademarks of Apple Inc., registered in the U.S. and other countries. App Store is a service mark of Apple Inc.
+
+
+---
+
+Page: Privacy Policy | Open POS
+URL: https://onepiece92.github.io/openPOS/privacy.html
+
+# Open POS Privacy Policy
+
+Last updated: 2026-11-25
+
+Open POS is a point-of-sale app that works entirely offline. This policy explains what that means for your data.
+
+## Who we are
+
+Open POS is developed and published by Brand Builder. In this policy, "we" means the developer.
+
+## The short version
+
+Open POS does not collect, transmit, sell or share any data. The app never sends your data anywhere. Your phone's own backup (Google or iCloud), if you have it turned on, may include app data.
+
+The app's own code makes no network calls. From the next Android release, the Android build also does not have the INTERNET permission, so the operating system blocks it from connecting to any network. This operating-system block is Android-only: iOS has no equivalent setting.
+
+There are no accounts, no analytics, no advertising, no crash reporting and no tracking of any kind.
+
+## What the app stores, and where
+
+Products, sales, customers, expenses, settings and the expense-bill photos you add are kept on your device, in the app's private storage. The app never sends them to us or to anyone else.
+
+You control this data:
+
+- Exports are files you choose to create and save. Where they go after that, for example a USB drive, your email or a cloud folder, is up to you.
+- Receipts. You can save or share a PDF receipt, share a receipt by SMS or email through your device's own apps, or copy it as text. When you share by SMS or email, your device's own Messages or Mail app, not Open POS, sends it.
+- Your phone's backup. If Google backup (Android) or iCloud or computer backup (iPhone and iPad) is turned on, your phone may include Open POS data in that backup. That is a setting of your phone, not of Open POS.
+- Uninstalling the app removes its data from the device. If your phone's own backup is on, that backup may restore the data when you reinstall the app.
+
+## Permissions on Android
+
+The table below lists the permissions in the next Android release.
+
+Next Android release
+
+Permission | Why it is used
+
+Camera | To photograph an expense bill, or choose an existing photo from your library, only when you tap to do so. Photos are kept on your device.
+
+Bluetooth (scan/connect) | To find and connect to Bluetooth receipt printers. In this release, Bluetooth scanning on Android 12 and newer is declared as not used for location.
+
+Location (Android 11 and older only) | Android 11 and older require this permission before an app can search for Bluetooth devices. Open POS uses it only to find receipt printers. It never reads or stores your location, and with no internet permission in this release, it could not send it anywhere. On Android 12 and newer, this permission is not requested.
+
+Storage (Android 12 and older only) | To save and open CSV and PDF files you choose.
+
+USB | Declared by the receipt-printer library the app uses. Open POS does not currently print over USB.
+
+Android store versions from May 2026 differ from this table. They also declare notification, alarm, wake-lock, run-at-startup, vibration and nearby Wi-Fi devices (NEARBY_WIFI_DEVICES) permissions, left over from features the app does not use. Their Bluetooth permissions are declared differently, and they have no location permission. The app never sends notifications, and its own code makes no network calls. These leftover permissions are removed in the next release. The camera is used only for expense bill photos.
+
+## Permissions on iPhone and iPad
+
+On iOS, Open POS asks for access to the camera and the photo library (to add an expense-bill photo, only when you tap to do so) and to Bluetooth (to find and connect to Bluetooth receipt printers).
+
+The May 2026 iOS build also declares local-network access and Bonjour printer services, which the next iOS build removes.
+
+iOS has no internet permission that an app can leave out, so the operating-system network block described above applies to Android only, from the next Android release. On iOS, the protection is that the app's own code makes no network calls, and the source code is public for anyone to check.
+
+## Children
+
+Open POS is a business tool and is not directed at children. It collects no data from anyone.
+
+## Changes to this policy
+
+If this policy changes, the updated version will be published at this address with a new date. Because the app collects no data, changes are expected to be rare.
+
+## Contact
+
+Questions about this policy: message us on WhatsApp at +977 980-2850777 or email mail@brandbuilder.com.np.

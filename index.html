@@ -24,145 +24,192 @@
 <meta name="twitter:image" content="https://onepiece92.github.io/openPOS/og.png">
 <meta name="twitter:image:alt" content="Open POS: A POS app that never sends your data anywhere.">
 
-<link rel="icon" href="assets/logo.jpg" type="image/jpeg">
-<link rel="apple-touch-icon" href="assets/logo.jpg">
-<link rel="preload" href="assets/JetBrainsMono-Bold.ttf" as="font" type="font/ttf" crossorigin>
+<link rel="icon" href="assets/logo-82.png" type="image/png" sizes="82x82">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png" sizes="180x180">
+<link rel="preload" href="assets/JetBrainsMono-Regular.latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/JetBrainsMono-Bold.latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="assets/site.css">
 
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
-  "@type": "SoftwareApplication",
-  "name": "Open POS",
-  "description": "Free, offline POS and cash register app that works without internet, for small shops, cafes, restaurants, food trucks and farmers markets, on Android and iPhone/iPad. No account, no subscription, no ads. The app never sends your data anywhere.",
-  "url": "https://onepiece92.github.io/openPOS/",
-  "downloadUrl": "https://play.google.com/store/apps/details?id=com.brandbuilder.openpos",
-  "installUrl": "https://play.google.com/store/apps/details?id=com.brandbuilder.openpos",
-  "image": "https://onepiece92.github.io/openPOS/og.png",
-  "operatingSystem": "Android, iOS",
-  "applicationCategory": "BusinessApplication",
-  "license": "https://opensource.org/licenses/MIT",
-  "isAccessibleForFree": true,
-  "offers": {
-    "@type": "Offer",
-    "price": "0",
-    "priceCurrency": "USD"
-  },
-  "sameAs": [
-    "https://github.com/onepiece92/openPOS",
-    "https://play.google.com/store/apps/details?id=com.brandbuilder.openpos",
-    "https://apps.apple.com/app/open-pos-offline/id6761003751"
-  ]
-}
-</script>
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "FAQPage",
-  "mainEntity": [
+  "@graph": [
     {
-      "@type": "Question",
-      "name": "Is it really free?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "Yes. Open POS itself has no paid tier, no trial, no ads and no in-app purchases. Open POS is open source under the MIT license, and it will stay free."
-      }
+      "@type": "Organization",
+      "@id": "https://onepiece92.github.io/openPOS/#org",
+      "name": "Brand Builder",
+      "url": "https://brandbuilder.com.np",
+      "sameAs": [
+        "https://brandbuilder.com.np"
+      ]
     },
     {
-      "@type": "Question",
-      "name": "How do you make money?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "Not from Open POS. The same team makes RebuzzPOS, an online POS with 40+ more features for businesses that need sync across devices. It is a separate product. Open POS never connects to it, and you never need it to use Open POS."
-      }
+      "@type": "WebSite",
+      "@id": "https://onepiece92.github.io/openPOS/#website",
+      "url": "https://onepiece92.github.io/openPOS/",
+      "name": "Open POS",
+      "alternateName": [
+        "Open POS : Offline",
+        "openPOS"
+      ],
+      "publisher": {
+        "@id": "https://onepiece92.github.io/openPOS/#org"
+      },
+      "inLanguage": "en"
     },
     {
-      "@type": "Question",
-      "name": "Does it work without internet?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "Yes, always. There is no login and no server, so a dropped connection, airplane mode or a market with no signal never stops the app. Card sales are different: your card reader needs its own connection."
-      }
+      "@type": "MobileApplication",
+      "@id": "https://onepiece92.github.io/openPOS/#app",
+      "name": "Open POS",
+      "alternateName": [
+        "Open POS : Offline",
+        "openPOS"
+      ],
+      "description": "Free, offline POS and cash register app that works without internet, for small shops, cafes, restaurants, food trucks and farmers markets, on Android and iPhone/iPad. No account, no subscription, no ads. The app never sends your data anywhere.",
+      "url": "https://onepiece92.github.io/openPOS/",
+      "downloadUrl": "https://play.google.com/store/apps/details?id=com.brandbuilder.openpos",
+      "installUrl": "https://play.google.com/store/apps/details?id=com.brandbuilder.openpos",
+      "image": "https://onepiece92.github.io/openPOS/og.png",
+      "operatingSystem": "Android, iOS",
+      "applicationCategory": "BusinessApplication",
+      "license": "https://opensource.org/licenses/MIT",
+      "isAccessibleForFree": true,
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "publisher": {
+        "@id": "https://onepiece92.github.io/openPOS/#org"
+      },
+      "sameAs": [
+        "https://play.google.com/store/apps/details?id=com.brandbuilder.openpos",
+        "https://apps.apple.com/app/open-pos-offline/id6761003751",
+        "https://github.com/onepiece92/openPOS"
+      ]
     },
     {
-      "@type": "Question",
-      "name": "Do I need to create an account?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "No. Install the app, pick your country and currency, add your products and you are ready. No email, no phone number, no password."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "What if my phone breaks or gets lost?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "The app never sends your data anywhere, so there is no Open POS cloud copy. Your phone's own backup (Google or iCloud), if you have it turned on, may include app data, but keep your own copy too. Export your products and records to CSV files and save them somewhere safe: a USB drive, your own email or a cloud folder you choose. On a new phone, install Open POS and import the CSV files. A one-file backup and restore is coming in an update."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "Which printers does it work with?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "Save or share a PDF receipt; you can print the PDF from another app. You can also share receipts by SMS or email through your device's own apps, or copy them as text. Direct printing to Bluetooth receipt printers is coming soon."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "Does it take card payments?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "No. Open POS does not process or take card payments. Take the payment on your own card terminal, then record the sale in Open POS as paid by card."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "Does it work for a restaurant with tables?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "Yes. Table management lets you open an order for each table, hold it while guests eat, and close it when they pay."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "Can several phones share the same sales?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "No. Each phone or tablet is its own register, with its own data, and there are no staff logins. That is what keeps everything offline. If you need several devices in sync, RebuzzPOS is built for that."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "Is there a cash register app with no subscription?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "Yes, this one. Open POS has no subscription, no trial and no in-app purchases, on Android and on iPhone and iPad. See what is included for free."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "Is Open POS open source?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "Yes. The full source code is public on GitHub under the MIT license, so anyone can read it, check it and build it."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "Does it work for a food truck or farmers market?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "Yes. The app itself never needs a signal. It gives change on cash sales and lets you record card sales you took on your own reader (the reader needs its own connection). See how it works at the market."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "Is there an iPhone version?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "Yes. Open POS is on the App Store for iPhone and iPad, and on Google Play for Android phones and tablets."
-      }
+      "@type": "FAQPage",
+      "@id": "https://onepiece92.github.io/openPOS/#webpage",
+      "url": "https://onepiece92.github.io/openPOS/",
+      "name": "Open POS: Free POS App That Works Without Internet",
+      "isPartOf": {
+        "@id": "https://onepiece92.github.io/openPOS/#website"
+      },
+      "about": {
+        "@id": "https://onepiece92.github.io/openPOS/#app"
+      },
+      "publisher": {
+        "@id": "https://onepiece92.github.io/openPOS/#org"
+      },
+      "inLanguage": "en",
+      "dateModified": "2026-11-25",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Is it really free?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. Open POS itself has no paid tier, no trial, no ads and no in-app purchases. Open POS is open source under the MIT license, and it will stay free."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How do you make money?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Not from Open POS. The same team makes RebuzzPOS, a separate online POS for businesses that need sync across devices. The Support screen in Open POS links to it. Open POS exchanges no data with it, and you never need it to use Open POS."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does it work without internet?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes, always. There is no login and no server, so a dropped connection, airplane mode or a market with no signal never stops the app. Card sales are different: your card reader needs its own connection."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Do I need to create an account?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. Install the app, pick your country and currency, add your products and you are ready. No email, no phone number, no password."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What if my phone breaks or gets lost?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "The app never sends your data anywhere, so there is no Open POS cloud copy. Your phone's own backup (Google or iCloud), if you have it turned on, may include app data, but keep your own copy too. Export your products and records to CSV files and save them somewhere safe: a USB drive, your own email or a cloud folder you choose. On a new phone, install Open POS and import the CSV files. A one-file backup and restore is coming in an update."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Which printers does it work with?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Save or share a PDF receipt; you can print the PDF from another app. You can also copy the receipt as text. Direct printing to Bluetooth receipt printers is coming soon."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does it take card payments?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. Open POS does not process or take card payments. Take the payment on your own card terminal, then record the sale in Open POS as paid by card."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does it work for a restaurant with tables?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. Table management lets you open an order for each table, hold it while guests eat, and close it when they pay."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can several phones share the same sales?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. Each phone or tablet is its own register, with its own data, and there are no staff logins. That is what keeps everything offline. If you need several devices in sync, RebuzzPOS is built for that."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is there a cash register app with no subscription?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes, this one. Open POS has no subscription, no trial and no in-app purchases, on Android and on iPhone and iPad. See what is included for free."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is Open POS open source?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. The full source code is public on GitHub under the MIT license, so anyone can read it, check it and build it."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does it work for a food truck or farmers market?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. The app itself never needs a signal. It gives change on cash sales and lets you record card sales you took on your own reader (the reader needs its own connection). See how it works at the market."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is there an iPhone version?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. Open POS is on the App Store for iPhone and iPad, and on Google Play for Android phones and tablets."
+          }
+        }
+      ]
     }
   ]
 }
@@ -174,7 +221,7 @@
 <header class="bar">
   <div class="wrap">
     <a class="brand" href="./" aria-label="Open POS home">
-      <span class="brand-mark"><img src="assets/logo.jpg" alt="" width="82" height="82"></span>
+      <span class="brand-mark"><img src="assets/logo-82.webp" srcset="assets/logo-164.webp 2x" alt="" width="82" height="82"></span>
       <span><span class="o">Open</span> <span class="p">POS</span></span>
     </a>
     <nav aria-label="Sections">
@@ -286,7 +333,7 @@
         <div>
           <h3>Receipts and printing</h3>
           <ul>
-            <li>PDF receipts. Share receipts by SMS or email through your device's own apps, or copy them as text.</li>
+            <li>PDF receipts you can save or share, or copy the receipt as text.</li>
             <li>Save or share a PDF receipt; you can print the PDF from another app.</li>
             <li class="soon">Bluetooth receipt printers <em>coming</em></li>
           </ul>
@@ -380,6 +427,17 @@
     </div>
   </section>
 
+  <section class="block guides" id="guides" aria-labelledby="guides-title">
+    <div class="wrap">
+      <h2 id="guides-title">Guides</h2>
+      <ul class="guide-links">
+        <li><a href="cash-register-no-subscription/">Cash register app with no subscription</a></li>
+        <li><a href="food-trucks-farmers-markets/">POS for food trucks and farmers markets</a></li>
+        <li><a href="loyverse-alternative/">Loyverse alternative with no account</a></li>
+      </ul>
+    </div>
+  </section>
+
   <section class="block" id="faq" aria-labelledby="faq-title">
     <div class="wrap">
       <h2 id="faq-title">Questions shop owners ask</h2>
@@ -391,8 +449,8 @@
         <details>
           <summary>How do you make money?</summary>
           <div class="a">
-            <p>Not from Open POS. The same team makes <a href="https://rebuzzpos.com">RebuzzPOS</a>, an online POS with 40+ more features for businesses that need sync across devices.</p>
-            <p>It is a separate product. Open POS never connects to it, and you never need it to use Open POS.</p>
+            <p>Not from Open POS. The same team makes <a href="https://rebuzzpos.com">RebuzzPOS</a>, a separate online POS for businesses that need sync across devices.</p>
+            <p>The Support screen in Open POS links to it. Open POS exchanges no data with it, and you never need it to use Open POS.</p>
           </div>
         </details>
         <details>
@@ -412,7 +470,7 @@
         </details>
         <details>
           <summary>Which printers does it work with?</summary>
-          <div class="a"><p>Save or share a PDF receipt; you can print the PDF from another app. You can also share receipts by SMS or email through your device's own apps, or copy them as text. Direct printing to Bluetooth receipt printers is coming soon.</p></div>
+          <div class="a"><p>Save or share a PDF receipt; you can print the PDF from another app. You can also copy the receipt as text. Direct printing to Bluetooth receipt printers is coming soon.</p></div>
         </details>
         <details>
           <summary>Does it take card payments?</summary>
@@ -457,7 +515,7 @@
           <a class="appstore" href="https://apps.apple.com/app/open-pos-offline/id6761003751?ct=site_footer">
             <img src="assets/app-store-badge.svg" alt="Download Open POS on the App Store" width="168" height="56">
           </a>
-        <p class="play-note">Questions first? <a href="https://wa.me/9779802850777">Message us on WhatsApp</a>.</p>
+        <p class="play-note">Questions first? <a href="https://wa.me/9779802850777">Message us on WhatsApp</a> or email <a href="mailto:mail@brandbuilder.com.np">mail@brandbuilder.com.np</a>.</p>
       </div>
       <p class="tm">Google Play and the Google Play logo are trademarks of Google LLC. Apple and the Apple logo are trademarks of Apple Inc., registered in the U.S. and other countries. App Store is a service mark of Apple Inc.</p>
     </div>
@@ -469,10 +527,11 @@
   <div class="wrap">
     <div>
       <a class="brand" href="./" aria-label="Open POS home">
-        <span class="brand-mark"><img src="assets/logo.jpg" alt="" width="82" height="82" loading="lazy"></span>
+        <span class="brand-mark"><img src="assets/logo-82.webp" srcset="assets/logo-164.webp 2x" alt="" width="82" height="82" loading="lazy"></span>
         <span><span class="o">Open</span> <span class="p">POS</span></span>
       </a>
       <p class="fine">Free, offline point of sale. MIT licensed. This site has no cookies, no analytics and no trackers.</p>
+      <p class="fine updated">Updated <time datetime="2026-11-25">November 2026</time></p>
     </div>
     <div class="foot-links">
     <span class="label" id="guides-label">Guides</span>
@@ -487,6 +546,7 @@
       <li><a href="https://github.com/onepiece92/openPOS/blob/main/LICENSE">MIT license</a></li>
       <li><a href="assets/OFL.txt">Font license</a></li>
       <li><a href="https://wa.me/9779802850777">WhatsApp support</a></li>
+      <li><a href="mailto:mail@brandbuilder.com.np">Email support</a></li>
     </ul>
     </div>
   </div>

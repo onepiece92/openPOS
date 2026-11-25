@@ -1,5 +1,6 @@
-@font-face { font-family: "JetBrainsMono"; src: url("JetBrainsMono-Regular.ttf") format("truetype"); font-weight: 400; font-display: swap; }
-@font-face { font-family: "JetBrainsMono"; src: url("JetBrainsMono-Bold.ttf") format("truetype"); font-weight: 700; font-display: swap; }
+/* JetBrains Mono (SIL OFL 1.1, see OFL.txt): WOFF2 Latin subsets, original TTF as fallback */
+@font-face { font-family: "JetBrainsMono"; src: url("JetBrainsMono-Regular.latin.woff2") format("woff2"), url("JetBrainsMono-Regular.ttf") format("truetype"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "JetBrainsMono"; src: url("JetBrainsMono-Bold.latin.woff2") format("woff2"), url("JetBrainsMono-Bold.ttf") format("truetype"); font-weight: 700; font-style: normal; font-display: swap; }
 
 :root {
   --navy: #0B1220;
@@ -190,7 +191,7 @@ section.block + section.block { border-top: 1px solid var(--line); }
 .closing .play-note { color: #EAE9FF; }
 
 /* footer */
-footer { border-top: 1px solid var(--line); padding: 40px 0 48px; font-size: 15px; color: var(--muted); }
+footer { border-top: 1px solid var(--line); padding: 40px 0 112px; font-size: 15px; color: var(--muted); }
 footer .wrap { display: grid; grid-template-columns: 1.2fr 1fr; gap: 32px; }
 footer ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 12px 24px; justify-content: flex-end; }
 footer .fine { margin-top: 12px; font-size: 14px; max-width: 52ch; }
@@ -272,3 +273,17 @@ footer .fine { margin-top: 12px; font-size: 14px; max-width: 52ch; }
 }
 
 .doc caption { caption-side: top; text-align: left; font: 700 13px var(--mono); color: var(--muted); padding: 0 0 8px; }
+
+/* ---------- guide links, freshness line, 404 ---------- */
+.guide-links { list-style: none; padding: 0; margin: 32px 0 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.guide-links li { margin: 0; }
+.guide-links a { display: block; height: 100%; border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; background: var(--navy-2); font: 700 16px/1.4 var(--mono); text-decoration: none; color: var(--ink); }
+.guide-links a::after { content: " \2192"; color: var(--violet-soft); }
+.guide-links a:hover { border-color: var(--violet-soft); }
+footer .fine.updated { margin-top: 6px; font: 13px var(--mono); }
+.notfound .lede { margin-top: 12px; }
+.notfound .btn { display: inline-block; margin-top: 24px; padding: 12px 18px; border-radius: 10px; background: var(--violet); color: #fff; font: 700 15px var(--mono); text-decoration: none; }
+.notfound .btn:hover { background: #5855E8; color: #fff; }
+.notfound h2 { margin-top: 48px; }
+.notfound .guide-links { padding-left: 0; }
+.notfound .guide-links li + li { margin-top: 0; }

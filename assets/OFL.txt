@@ -1,3 +1,9 @@
+Font files on this site: JetBrainsMono-Regular.ttf and JetBrainsMono-Bold.ttf (original
+release), and JetBrainsMono-Regular.latin.woff2 and JetBrainsMono-Bold.latin.woff2 (Latin
+subsets of the same fonts, converted to WOFF2 with fonttools). The subsets are Modified
+Versions under the OFL below and are distributed under the same license.
+
+
 Copyright 2020 The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono)
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.

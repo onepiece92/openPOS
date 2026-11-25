@@ -1,0 +1,39 @@
+# Open POS
+
+> Open POS is a free, open-source (MIT) point-of-sale and cash register app for Android phones and tablets, iPhone and iPad, made by Brand Builder. It works without internet, needs no account and has no subscription, ads or in-app purchases. The app never sends your data anywhere.
+
+Disambiguation: Open POS (Google Play id com.brandbuilder.openpos, App Store "Open POS : Offline", id6761003751) is not affiliated with OSPOS (Open Source Point of Sale), the WooCommerce "OpenPOS" plugin or other apps and projects named "OpenPOS".
+
+Key facts, as stated on this site:
+
+- Price: free. No subscription, no trial, no ads and no in-app purchases.
+- No internet needed to sell: no login and no server. Your card reader needs its own connection.
+- No account: no email, no phone number, no password.
+- One device, one register. Each phone or tablet keeps its own sales; nothing syncs between devices, and there are no staff logins.
+- Open POS does not process card payments. Take the payment on your own card terminal, then record the sale as paid by card.
+- PDF receipts you can save or share, or copy the receipt as text.
+- Reports for today, this week or this month: sales total, expenses, average order value. CSV import and export.
+- Your phone's own backup (Google or iCloud), if you have it turned on, may include app data.
+- The current store versions date from May 2026. The site describes the upcoming release, which also fixes known issues.
+
+## Pages
+
+- [Home and FAQ](https://onepiece92.github.io/openPOS/): what Open POS does, features, privacy and common questions
+- [Cash register app with no subscription](https://onepiece92.github.io/openPOS/cash-register-no-subscription/): what is free and what the app does not do
+- [Offline POS for food trucks, farmers markets and pop-ups](https://onepiece92.github.io/openPOS/food-trucks-farmers-markets/): selling with no signal, cash with change, sales tax
+- [Loyverse alternative with no account](https://onepiece92.github.io/openPOS/loyverse-alternative/): side-by-side comparison with Loyverse POS
+- [Privacy policy](https://onepiece92.github.io/openPOS/privacy.html): what the app stores, where, and the permissions it uses
+
+## Get the app
+
+- [Google Play](https://play.google.com/store/apps/details?id=com.brandbuilder.openpos): Android phones and tablets
+- [App Store](https://apps.apple.com/app/open-pos-offline/id6761003751): iPhone and iPad
+
+## Source code and license
+
+- [GitHub repository](https://github.com/onepiece92/openPOS): full source code
+- [MIT license](https://github.com/onepiece92/openPOS/blob/main/LICENSE)
+
+## Optional
+
+- [Full site text](https://onepiece92.github.io/openPOS/llms-full.txt): the plain text of every page in one file

@@ -24,83 +24,157 @@
 <meta name="twitter:image" content="https://onepiece92.github.io/openPOS/og.png">
 <meta name="twitter:image:alt" content="Open POS: A POS app that never sends your data anywhere.">
 
-<link rel="icon" href="../assets/logo.jpg" type="image/jpeg">
-<link rel="apple-touch-icon" href="../assets/logo.jpg">
-<link rel="preload" href="../assets/JetBrainsMono-Bold.ttf" as="font" type="font/ttf" crossorigin>
+<link rel="icon" href="../assets/logo-82.png" type="image/png" sizes="82x82">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon.png" sizes="180x180">
+<link rel="preload" href="../assets/JetBrainsMono-Regular.latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/JetBrainsMono-Bold.latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="../assets/site.css">
 
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
-  "@type": "FAQPage",
-  "mainEntity": [
+  "@graph": [
     {
-      "@type": "Question",
-      "name": "Does Open POS work with no cell signal or Wi-Fi?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "Yes. The app itself never needs the internet, for setup or for selling. Airplane mode, a dead zone or a crowded fairground makes no difference to the app. Your card reader needs its own connection. With no signal, Open POS still records cash sales; it cannot take or approve a card payment."
-      }
+      "@type": "Organization",
+      "@id": "https://onepiece92.github.io/openPOS/#org",
+      "name": "Brand Builder",
+      "url": "https://brandbuilder.com.np",
+      "sameAs": [
+        "https://brandbuilder.com.np"
+      ]
     },
     {
-      "@type": "Question",
-      "name": "Can I take card payments with it?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "No. Open POS does not process cards. It works alongside your own card reader: take the payment on the reader, then record the sale in Open POS as paid by card. Your card reader needs its own connection. With no signal, Open POS still records cash sales; it cannot take or approve a card payment."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "Does it calculate change for cash sales?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "Yes. Type the amount the customer hands you and the app shows the change, for example $20 given on a $12.50 order shows $7.50."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "Can I charge sales tax?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "Yes. Set your own sales tax rates, and switch tax on or off per product for items that are not taxed. Check with your tax advisor which rates apply to what you sell."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "How do I see what I sold today?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "Open Reports. Reports for today, this week or this month: sales total, expenses, average order value. You can export a sales report to CSV from Settings → Backup & Restore."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "Is it really free? Do I need an account?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "It is free, with no subscription, no ads and no in-app purchases. There is no account, no email and no password. Install it on Android or iPhone and start selling."
-      }
-    }
-  ]
-}
-</script>
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "BreadcrumbList",
-  "itemListElement": [
-    {
-      "@type": "ListItem",
-      "position": 1,
+      "@type": "WebSite",
+      "@id": "https://onepiece92.github.io/openPOS/#website",
+      "url": "https://onepiece92.github.io/openPOS/",
       "name": "Open POS",
-      "item": "https://onepiece92.github.io/openPOS/"
+      "alternateName": [
+        "Open POS : Offline",
+        "openPOS"
+      ],
+      "publisher": {
+        "@id": "https://onepiece92.github.io/openPOS/#org"
+      },
+      "inLanguage": "en"
     },
     {
-      "@type": "ListItem",
-      "position": 2,
-      "name": "Food trucks and farmers markets",
-      "item": "https://onepiece92.github.io/openPOS/food-trucks-farmers-markets/"
+      "@type": "MobileApplication",
+      "@id": "https://onepiece92.github.io/openPOS/#app",
+      "name": "Open POS",
+      "alternateName": [
+        "Open POS : Offline",
+        "openPOS"
+      ],
+      "description": "Free, offline POS and cash register app that works without internet, for small shops, cafes, restaurants, food trucks and farmers markets, on Android and iPhone/iPad. No account, no subscription, no ads. The app never sends your data anywhere.",
+      "url": "https://onepiece92.github.io/openPOS/",
+      "downloadUrl": "https://play.google.com/store/apps/details?id=com.brandbuilder.openpos",
+      "installUrl": "https://play.google.com/store/apps/details?id=com.brandbuilder.openpos",
+      "image": "https://onepiece92.github.io/openPOS/og.png",
+      "operatingSystem": "Android, iOS",
+      "applicationCategory": "BusinessApplication",
+      "license": "https://opensource.org/licenses/MIT",
+      "isAccessibleForFree": true,
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "publisher": {
+        "@id": "https://onepiece92.github.io/openPOS/#org"
+      },
+      "sameAs": [
+        "https://play.google.com/store/apps/details?id=com.brandbuilder.openpos",
+        "https://apps.apple.com/app/open-pos-offline/id6761003751",
+        "https://github.com/onepiece92/openPOS"
+      ]
+    },
+    {
+      "@type": "FAQPage",
+      "@id": "https://onepiece92.github.io/openPOS/food-trucks-farmers-markets/#webpage",
+      "url": "https://onepiece92.github.io/openPOS/food-trucks-farmers-markets/",
+      "name": "Offline POS for Food Trucks and Farmers Markets | Open POS",
+      "isPartOf": {
+        "@id": "https://onepiece92.github.io/openPOS/#website"
+      },
+      "about": {
+        "@id": "https://onepiece92.github.io/openPOS/#app"
+      },
+      "publisher": {
+        "@id": "https://onepiece92.github.io/openPOS/#org"
+      },
+      "inLanguage": "en",
+      "dateModified": "2026-11-25",
+      "breadcrumb": {
+        "@id": "https://onepiece92.github.io/openPOS/food-trucks-farmers-markets/#breadcrumb"
+      },
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Does Open POS work with no cell signal or Wi-Fi?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. The app itself never needs the internet, for setup or for selling. Airplane mode, a dead zone or a crowded fairground makes no difference to the app. Your card reader needs its own connection. With no signal, Open POS still records cash sales; it cannot take or approve a card payment."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can I take card payments with it?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. Open POS does not process cards. It works alongside your own card reader: take the payment on the reader, then record the sale in Open POS as paid by card. Your card reader needs its own connection. With no signal, Open POS still records cash sales; it cannot take or approve a card payment."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does it calculate change for cash sales?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. Type the amount the customer hands you and the app shows the change, for example $20 given on a $12.50 order shows $7.50."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can I charge sales tax?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. Set your own sales tax rates, and switch tax on or off per product for items that are not taxed. Check with your tax advisor which rates apply to what you sell."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How do I see what I sold today?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Open Reports. Reports for today, this week or this month: sales total, expenses, average order value. You can export a sales report to CSV from Settings → Backup & Restore."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is it really free? Do I need an account?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "It is free, with no subscription, no ads and no in-app purchases. There is no account, no email and no password. Install it on Android or iPhone and start selling."
+          }
+        }
+      ]
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://onepiece92.github.io/openPOS/food-trucks-farmers-markets/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Open POS",
+          "item": "https://onepiece92.github.io/openPOS/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Food trucks and farmers markets",
+          "item": "https://onepiece92.github.io/openPOS/food-trucks-farmers-markets/"
+        }
+      ]
     }
   ]
 }
@@ -112,7 +186,7 @@
 <header class="bar">
   <div class="wrap">
     <a class="brand" href="../" aria-label="Open POS home">
-      <span class="brand-mark"><img src="../assets/logo.jpg" alt="" width="82" height="82"></span>
+      <span class="brand-mark"><img src="../assets/logo-82.webp" srcset="../assets/logo-164.webp 2x" alt="" width="82" height="82"></span>
       <span><span class="o">Open</span> <span class="p">POS</span></span>
     </a>
     <nav aria-label="Sections">
@@ -203,7 +277,7 @@
         <div>
           <h3>Receipts</h3>
           <ul>
-            <li>PDF receipts. Share receipts by SMS or email through your device's own apps, or copy them as text.</li>
+            <li>PDF receipts you can save or share, or copy the receipt as text.</li>
             <li>Save or share a PDF receipt; you can print the PDF from another app.</li>
             <li class="soon">Bluetooth receipt printers <em>coming</em></li>
           </ul>
@@ -254,6 +328,17 @@
     </div>
   </section>
 
+  <section class="block guides" id="guides" aria-labelledby="guides-title">
+    <div class="wrap">
+      <h2 id="guides-title">More guides</h2>
+      <ul class="guide-links">
+        <li><a href="../cash-register-no-subscription/">Cash register app with no subscription</a></li>
+        <li><a href="../loyverse-alternative/">Loyverse alternative with no account</a></li>
+        <li><a href="../">Open POS home</a></li>
+      </ul>
+    </div>
+  </section>
+
   <section class="block" id="faq" aria-labelledby="faq-title">
     <div class="wrap">
       <h2 id="faq-title">Questions from food trucks and market sellers</h2>
@@ -297,7 +382,7 @@
           <a class="appstore" href="https://apps.apple.com/app/open-pos-offline/id6761003751?ct=site_food-trucks-farmers-markets">
             <img src="../assets/app-store-badge.svg" alt="Download Open POS on the App Store" width="168" height="56">
           </a>
-          <p class="play-note">Questions first? <a href="https://wa.me/9779802850777">Message us on WhatsApp</a>.</p>
+          <p class="play-note">Questions first? <a href="https://wa.me/9779802850777">Message us on WhatsApp</a> or email <a href="mailto:mail@brandbuilder.com.np">mail@brandbuilder.com.np</a>.</p>
         </div>
       <p class="tm">Google Play and the Google Play logo are trademarks of Google LLC. Apple and the Apple logo are trademarks of Apple Inc., registered in the U.S. and other countries. App Store is a service mark of Apple Inc.</p>
     </div>
@@ -309,10 +394,11 @@
   <div class="wrap">
     <div>
       <a class="brand" href="../" aria-label="Open POS home">
-        <span class="brand-mark"><img src="../assets/logo.jpg" alt="" width="82" height="82" loading="lazy"></span>
+        <span class="brand-mark"><img src="../assets/logo-82.webp" srcset="../assets/logo-164.webp 2x" alt="" width="82" height="82" loading="lazy"></span>
         <span><span class="o">Open</span> <span class="p">POS</span></span>
       </a>
       <p class="fine">Free, offline point of sale. MIT licensed. This site has no cookies, no analytics and no trackers.</p>
+      <p class="fine updated">Updated <time datetime="2026-11-25">November 2026</time></p>
     </div>
     <div class="foot-links">
     <span class="label" id="guides-label">Guides</span>
@@ -328,6 +414,7 @@
       <li><a href="https://github.com/onepiece92/openPOS/blob/main/LICENSE">MIT license</a></li>
       <li><a href="../assets/OFL.txt">Font license</a></li>
       <li><a href="https://wa.me/9779802850777">WhatsApp support</a></li>
+      <li><a href="mailto:mail@brandbuilder.com.np">Email support</a></li>
     </ul>
     </div>
   </div>
