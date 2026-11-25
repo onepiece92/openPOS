@@ -117,7 +117,7 @@ final _articles = <_Article>[
           'Go to Products from the sidebar menu.',
           'Tap the "+" button in the bottom-right corner.',
           'Enter the product name and selling price.',
-          'Optionally add a SKU (barcode number) — you can also scan it using the camera.',
+          'Optionally add a SKU (barcode number).',
           'Choose a category to organise your catalog (e.g. Beverages, Food, Retail).',
         ],
       ),
@@ -157,7 +157,6 @@ final _articles = <_Article>[
           'From the home screen, browse the product catalog or use the search bar.',
           'Tap a product to add it to the cart. Tap again to increase quantity.',
           'If the product has variants, a selector will appear — pick the right option.',
-          'You can also scan a barcode using the scanner icon to quickly add items.',
         ],
       ),
       ArticleSection(
@@ -265,7 +264,7 @@ final _articles = <_Article>[
           'The adjustment is logged in the audit trail for accountability.',
         ],
         tip:
-            'Set a low-stock threshold per product. You\'ll get a notification when stock falls below that level.',
+            'Set a low-stock threshold per product. Products at or below that level show a low-stock badge in the app.',
       ),
       ArticleSection(
         heading: 'Low-Stock Alerts',
