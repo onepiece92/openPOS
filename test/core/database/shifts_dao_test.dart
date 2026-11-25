@@ -3,6 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/database/daos/shifts_dao.dart';
+import 'package:pos_app/core/services/audit_service.dart';
+import 'package:pos_app/features/returns/domain/void_order.dart' as svc;
 
 import '../../_support/test_db.dart';
 
@@ -17,18 +19,61 @@ void main() {
   });
   tearDown(() => db.close());
 
-  Future<void> close(int id, {double counted = 0, DateTime? at}) =>
-      dao.closeShift(
-        id,
-        cashSales: 0,
-        cashTips: 0,
-        cashRefunds: 0,
-        paidOut: 0,
-        expectedCash: counted,
-        countedCash: counted,
-        summaryText: 'Shift #$id',
-        closedAt: at,
-      );
+  // ── Seeding helpers ──────────────────────────────────────────────────────
+
+  final day = DateTime(2026, 6, 10);
+  DateTime at(int h, [int m = 0, int s = 0]) =>
+      DateTime(day.year, day.month, day.day, h, m, s);
+
+  Future<int> order({
+    required double total,
+    String method = 'cash',
+    String status = 'completed',
+    double tip = 0,
+    double tax = 0,
+    String prefix = '',
+    DateTime? when,
+  }) =>
+      db.ordersDao.insertOrder(OrdersCompanion.insert(
+        subtotal: total - tax,
+        taxTotal: Value(tax),
+        total: total,
+        tipAmount: Value(tip),
+        paymentMethod: method,
+        status: Value(status),
+        invoicePrefix: Value(prefix),
+        createdAt: Value(when ?? at(12)),
+      ));
+
+  Future<void> refund(int orderId, double amount,
+          {double tip = 0, DateTime? when}) =>
+      db.ordersDao.insertReturn(ReturnsCompanion.insert(
+        orderId: orderId,
+        amount: amount,
+        tipAmount: Value(tip),
+        createdAt: Value(when ?? at(13)),
+      ));
+
+  /// A void as the app writes it: status + voided_at, and the audit entry.
+  Future<void> voidAt(int orderId, DateTime when) async {
+    await db.ordersDao.voidOrder(orderId, at: when);
+    await db.into(db.auditLog).insert(AuditLogCompanion.insert(
+          entityType: 'order',
+          entityId: Value(orderId),
+          action: 'void',
+          createdAt: Value(when),
+        ));
+  }
+
+  String summaryOf(ShiftClose c) =>
+      'expected ${c.expectedCash} counted ${c.countedCash}';
+
+  Future<ShiftClose> close(int id,
+          {double counted = 0, double paidOut = 0, DateTime? when}) =>
+      dao.closeShift(id,
+          countedCash: counted, paidOut: paidOut, at: when, summary: summaryOf);
+
+  // ── Lifecycle ────────────────────────────────────────────────────────────
 
   group('lifecycle', () {
     test('only one shift may be open at a time', () async {
@@ -44,38 +89,60 @@ void main() {
       expect(await db.select(db.shifts).get(), hasLength(1));
     });
 
-    test('close freezes the figures; closing twice is refused', () async {
-      final id = await dao.openShift(openingCash: 50);
-      await dao.closeShift(
-        id,
-        cashSales: 200,
-        cashTips: 10,
-        cashRefunds: 20,
-        paidOut: 5,
-        expectedCash: 235,
-        countedCash: 230,
-        summaryText: 'Z report',
-        notes: 'short 5',
-        closedAt: DateTime(2026, 3, 1, 22),
-      );
+    test('SQLite itself refuses a second open shift (idx_shifts_one_open)',
+        () async {
+      await dao.openShift(openingCash: 0);
+      await expectLater(
+          db.into(db.shifts).insert(ShiftsCompanion.insert()),
+          throwsA(anything));
+      // Closed shifts are not limited.
+      await db.into(db.shifts).insert(
+          ShiftsCompanion.insert(closedAt: Value(at(1))));
+      await db.into(db.shifts).insert(
+          ShiftsCompanion.insert(closedAt: Value(at(2))));
+    });
+
+    test('close computes and freezes the figures; closing twice is refused',
+        () async {
+      final id = await dao.openShift(openingCash: 50, openedAt: at(8));
+      await order(total: 200, tip: 10);
+      final o = await order(total: 40);
+      await refund(o, 20);
+
+      final c = await close(id, counted: 274.999, paidOut: 5, when: at(22));
+      expect(c.countedCash, 275.0, reason: 'rounded on input');
+      expect(c.expectedCash, 50 + 240 + 10 - 20 - 5);
+      expect(c.overShort, 0);
+      expect(c.overShortCents, 0);
+
       expect(await dao.currentShift(), isNull);
       final s = (await dao.lastClosedShift())!;
       expect(s.id, id);
-      expect(s.closedAt, DateTime(2026, 3, 1, 22));
-      expect((s.cashSales, s.cashTips, s.cashRefunds, s.paidOut),
-          (200.0, 10.0, 20.0, 5.0));
-      expect((s.expectedCash, s.countedCash), (235.0, 230.0));
-      expect(s.summaryText, 'Z report');
-      expect(s.notes, 'short 5');
+      expect(s.closedAt, at(22));
+      expect((s.cashSales, s.cashTips, s.cashRefunds, s.cashVoids, s.paidOut),
+          (240.0, 10.0, 20.0, 0.0, 5.0));
+      expect((s.expectedCash, s.countedCash), (275.0, 275.0));
+      expect(s.summaryText, 'expected 275.0 counted 275.0');
 
       await expectLater(close(id), throwsA(isA<ShiftStateException>()));
       await expectLater(close(999), throwsA(isA<ShiftStateException>()));
-      expect((await dao.lastClosedShift())!.summaryText, 'Z report');
+      expect((await dao.lastClosedShift())!.summaryText,
+          'expected 275.0 counted 275.0');
     });
 
-    test('a new shift can open once the last one is closed', () async {
-      final a = await dao.openShift(openingCash: 0);
-      await close(a, counted: 80);
+    test('a sale written before the close is in the frozen figures', () async {
+      final id = await dao.openShift(openingCash: 0, openedAt: at(8));
+      await order(total: 10, when: at(20, 59, 59));
+      // Figures are taken inside the close transaction, at the close time.
+      final c = await close(id, when: at(21));
+      expect(c.figures.cashSales, 10);
+      expect((await dao.lastClosedShift())!.cashSales, 10);
+    });
+
+    test('a new shift opens once the last is closed, from its counted cash',
+        () async {
+      final a = await dao.openShift(openingCash: 0, openedAt: at(8));
+      await close(a, counted: 80, when: at(9));
       final last = await dao.lastClosedShift();
       final b = await dao.openShift(openingCash: last!.countedCash!);
       expect((await dao.currentShift())!.id, b);
@@ -90,16 +157,16 @@ void main() {
 
     test('closedShifts lists newest close first and honours limit',
         () async {
-      for (final day in [3, 1, 2]) {
-        final id = await dao.openShift(openingCash: 0);
-        await close(id, counted: day.toDouble(), at: DateTime(2026, 5, day));
+      for (final h in [9, 10, 11]) {
+        final id = await dao.openShift(openingCash: 0, openedAt: at(h - 1));
+        await close(id, counted: h.toDouble(), when: at(h));
       }
       await dao.openShift(openingCash: 0); // open: never listed
-      final all = await dao.closedShifts();
-      expect(all.map((s) => s.countedCash), [3.0, 2.0, 1.0]);
+      expect((await dao.closedShifts()).map((s) => s.countedCash),
+          [11.0, 10.0, 9.0]);
       expect((await dao.closedShifts(limit: 2)).map((s) => s.countedCash),
-          [3.0, 2.0]);
-      expect((await dao.lastClosedShift())!.countedCash, 3.0);
+          [11.0, 10.0]);
+      expect((await dao.lastClosedShift())!.countedCash, 11.0);
     });
 
     test('watchCurrentShift follows open and close', () async {
@@ -115,107 +182,215 @@ void main() {
     });
   });
 
+  // ── Windows ──────────────────────────────────────────────────────────────
+
+  group('windows', () {
+    test('contiguous: the next window starts at the previous close', () async {
+      final a = await dao.openShift(openingCash: 0, openedAt: at(8));
+      await order(total: 1, when: at(11, 59, 59)); // shift a
+      await order(total: 2, when: at(12)); // same second as a's close: b
+      await close(a, when: at(12));
+      await order(total: 4, when: at(12, 10)); // between close and open: b
+      final b = await dao.openShift(openingCash: 0, openedAt: at(12, 30));
+      final shiftB = (await dao.currentShift())!;
+      expect(await dao.windowStart(shiftB), at(12));
+      await order(total: 8, when: at(13));
+      final cb = await close(b, when: at(14));
+
+      expect((await dao.lastClosedShift())!.id, b);
+      final shiftA = (await dao.closedShifts()).last;
+      expect(shiftA.cashSales, 1);
+      expect(cb.figures.cashSales, 2 + 4 + 8);
+      expect((cb.figures.from, cb.figures.to), (at(12), at(14)));
+    });
+
+    test('close time is cut to whole seconds', () async {
+      final a = await dao.openShift(openingCash: 0, openedAt: at(8));
+      await order(total: 1, when: at(12)); // the close's own second: next
+      await close(a, when: at(12).add(const Duration(milliseconds: 700)));
+      final s = (await dao.lastClosedShift())!;
+      expect(s.closedAt, at(12));
+      expect(s.cashSales, 0);
+    });
+
+    test('clock set back: close is clamped to the opening, never overlaps',
+        () async {
+      final a = await dao.openShift(openingCash: 0, openedAt: at(10));
+      await close(a, when: at(9)); // clock went back an hour
+      final s = (await dao.lastClosedShift())!;
+      expect(s.closedAt, at(10));
+
+      // The next shift opens "before" the last close: its window still
+      // starts at that close, and its close is clamped to it.
+      final b = await dao.openShift(openingCash: 0, openedAt: at(9, 30));
+      final shiftB = (await dao.currentShift())!;
+      expect(await dao.windowStart(shiftB), at(10));
+      final cb = await close(b, when: at(9, 45));
+      expect((cb.figures.from, cb.figures.to), (at(10), at(10)));
+      expect((await dao.lastClosedShift())!.closedAt, at(10));
+    });
+
+    test('previewClose writes nothing', () async {
+      final a = await dao.openShift(openingCash: 10, openedAt: at(8));
+      await order(total: 5);
+      final p = await dao.previewClose(a, at: at(20), countedCash: 15);
+      expect(p.expectedCash, 15);
+      expect(p.overShort, 0);
+      expect((await dao.currentShift())!.closedAt, isNull);
+    });
+  });
+
   // ── Aggregates ───────────────────────────────────────────────────────────
 
   group('window aggregates', () {
-    final from = DateTime(2026, 6, 10, 8);
-    final to = DateTime(2026, 6, 10, 20);
-    final inside = DateTime(2026, 6, 10, 12);
-
-    Future<int> order({
-      required double total,
-      String method = 'cash',
-      String status = 'completed',
-      double tip = 0,
-      double tax = 0,
-      DateTime? at,
-    }) =>
-        db.ordersDao.insertOrder(OrdersCompanion.insert(
-          subtotal: total - tax,
-          taxTotal: Value(tax),
-          total: total,
-          tipAmount: Value(tip),
-          paymentMethod: method,
-          status: Value(status),
-          createdAt: Value(at ?? inside),
-        ));
-
-    Future<void> refund(int orderId, double amount,
-            {double tip = 0, DateTime? at}) =>
-        db.ordersDao.insertReturn(ReturnsCompanion.insert(
-          orderId: orderId,
-          amount: amount,
-          tipAmount: Value(tip),
-          createdAt: Value(at ?? inside),
-        ));
+    final from = at(8);
+    final to = at(20);
 
     test('an empty window is all zeros', () async {
       final f = await dao.figuresForWindow(from, to);
-      expect((f.cashSales, f.cashTips, f.cashRefunds, f.netTips),
+      expect((f.cashSales, f.cashTips, f.cashRefunds, f.cashVoids),
           (0.0, 0.0, 0.0, 0.0));
-      expect(f.sales.orderCount, 0);
-      expect(f.sales.taxCollected, 0);
+      expect((f.grossTax, f.refundedTax, f.netTax, f.netTips),
+          (0.0, 0.0, 0.0, 0.0));
       expect(f.sales.byMethod, isEmpty);
     });
 
-    test('a seeded day: cash, card, tips, refunds, a void, edges', () async {
-      // Cash sale 100 + tip 10, tax 13.
-      final a = await order(total: 100, tip: 10, tax: 13);
-      // Cash sale 50 + tip 5, partly refunded 20 without the tip.
+    test('a seeded day: cash, card, tips, refunds, voids, imports, edges',
+        () async {
+      final a = await order(total: 100, tip: 10);
+      // Partly refunded, without and with the tip.
       final b = await order(total: 50, tip: 5);
       await refund(b, 20);
-      // Cash sale 40 + tip 4, partly refunded 10 with 4 of tip back.
       final c = await order(total: 40, tip: 4);
       await refund(c, 10, tip: 4);
-      // Card sale 200 + tip 20, tax 26.
-      await order(total: 200, method: 'card', tip: 20, tax: 26);
-      // Cash sale fully refunded in the window: counts as sale and refund.
+      await order(total: 200, method: 'card', tip: 20);
+      // Fully refunded in the window: a sale and a refund.
       final d = await order(total: 30, status: 'refunded');
       await refund(d, 30);
-      // Voided cash sale with a tip: not a sale, not a tip.
-      await order(total: 70, tip: 7, status: 'voided');
-      // Held ticket: never paid.
+      // Voided in the window: a sale and money out (total + tip).
+      final e = await order(total: 70, tip: 7);
+      await voidAt(e, at(14));
+      // Refunded 20 then voided: money out 20 + 80, nets to 0.
+      final f0 = await order(total: 100);
+      await refund(f0, 20);
+      await voidAt(f0, at(15));
+      // Never paid; and orders outside [from, to).
       await order(total: 999, status: 'held');
-      // Outside the window: before `from`, and exactly at `to` (half-open).
-      await order(total: 500, tip: 50, at: DateTime(2026, 6, 10, 7, 59));
-      await order(total: 600, tip: 60, at: to);
-      // Last week's cash sale refunded today, with its tip: today's refund.
-      final old = await order(
-          total: 80, tip: 8, at: DateTime(2026, 6, 3), status: 'refunded');
+      await order(total: 500, tip: 50, when: at(7, 59, 59));
+      await order(total: 600, tip: 60, when: to);
+      // Last week's sales: refunded / voided today count today.
+      final old = await order(total: 80, tip: 8, when: DateTime(2026, 6, 3));
       await refund(old, 80, tip: 8);
-      // ...and a refund of today's sale dated after the window: not today.
-      await refund(a, 5, at: DateTime(2026, 6, 11));
+      final old2 = await order(total: 60, tip: 6, when: DateTime(2026, 6, 3));
+      await voidAt(old2, at(16));
+      // Today's sale refunded tomorrow: not today.
+      await refund(a, 5, when: DateTime(2026, 6, 11));
+      // Imported orders, their refunds and voids: never drawer activity.
+      final imp = await order(total: 300, prefix: 'IMP');
+      await refund(imp, 10);
+      final imp2 = await order(total: 300, prefix: 'IMP');
+      await voidAt(imp2, at(14));
+      // A pre-v16 void: voided, no voided_at — ignored.
+      final pre = await order(
+          total: 90, status: 'voided', when: DateTime(2026, 6, 3));
+      await db.into(db.auditLog).insert(AuditLogCompanion.insert(
+          entityType: 'order',
+          entityId: Value(pre),
+          action: 'void',
+          createdAt: Value(at(12))));
 
       final f = await dao.figuresForWindow(from, to);
 
-      expect(f.cashSales, 100 + 50 + 40 + 30);
-      expect(f.cashTips, 10 + 5 + 4);
-      expect(f.cashRefunds, 20 + (10 + 4) + 30 + (80 + 8));
+      expect(f.cashSales, 100 + 50 + 40 + 30 + 70 + 100);
+      expect(f.cashTips, 10 + 5 + 4 + 7);
+      expect(f.sales.cash.count, 6);
+      expect(f.sales['card'].amount, 200);
+      expect(f.sales['card'].tips, 20);
       expect(f.sales.byMethod.keys.toSet(), {'cash', 'card'});
-      expect(f.sales.byMethod['card']!.total, 200);
-      expect(f.sales.byMethod['card']!.tips, 20);
-      expect(f.sales.orderCount, 5);
-      expect(f.sales.cash.count, 4);
-      expect(f.sales.totalSales, 420);
-      expect(f.sales.taxCollected, 39);
-      expect(f.sales.tipsCollected, 39);
-      expect((f.sales.voidedCount, f.sales.voidedTotal), (1, 70.0));
-      expect(f.refunds.cash.count, 4);
-      expect(f.refunds.cash.amount, 140);
-      expect(f.refunds.cash.tips, 12);
-      expect(f.refunds.tipsRefunded, 12);
-      expect(f.netTips, 39 - 12);
+
+      expect(f.cashRefunds, 20 + (10 + 4) + 30 + 20 + (80 + 8));
+      expect(f.refunds.cash.count, 5);
+      expect(f.cashVoids, (70 + 7) + 80 + (60 + 6));
+      expect(f.voids.cash.count, 3);
+
       expect(f.expectedCash(openingCash: 100, paidOut: 15),
-          100 + 220 + 19 - 152 - 15);
+          100 + 390 + 26 - 172 - 223 - 15);
+      expect((f.grossSales, f.refundedSales, f.netSales),
+          (590.0, 160.0 + 210.0, 220.0));
+      expect((f.tipsCollected, f.tipsReturned, f.netTips),
+          (46.0, 12.0 + 13.0, 21.0));
     });
 
-    test('card refunds do not touch the cash drawer', () async {
+    test('refunded 20 then voided in one shift nets to zero', () async {
+      final id = await dao.openShift(openingCash: 50, openedAt: at(8));
+      final o = await order(total: 100);
+      await refund(o, 20);
+      await voidAt(o, at(14));
+      final c = await close(id, counted: 50, when: at(20));
+      expect((c.figures.cashSales, c.figures.cashRefunds, c.figures.cashVoids),
+          (100.0, 20.0, 80.0));
+      expect(c.expectedCash, 50);
+      expect(c.figures.netSales, 0);
+    });
+
+    test('a sale voided in a later shift is money out in that shift',
+        () async {
+      final s1 = await dao.openShift(openingCash: 0, openedAt: at(8));
+      final o = await order(total: 100, tip: 10, when: at(9));
+      final c1 = await close(s1, counted: 110, when: at(10));
+      expect(c1.expectedCash, 110);
+
+      final s2 = await dao.openShift(openingCash: 110, openedAt: at(11));
+      await voidAt(o, at(12));
+      final c2 = await close(s2, counted: 0, when: at(13));
+      expect(c2.figures.cashSales, 0);
+      expect(c2.figures.cashVoids, 110);
+      expect(c2.expectedCash, 0);
+    });
+
+    test('the app\'s own void (audit entry + voided_at) is found', () async {
+      final o = await order(total: 25, when: DateTime.now()
+          .subtract(const Duration(minutes: 5)));
+      await svc.voidOrder(db, AuditService(db), orderId: o, reason: 'test');
+      final f = await dao.figuresForWindow(
+          DateTime.now().subtract(const Duration(hours: 1)),
+          DateTime.now().add(const Duration(hours: 1)));
+      expect((f.cashSales, f.cashVoids), (25.0, 25.0));
+    });
+
+    test('tax: gross, the refunded share, net', () async {
+      final o = await order(total: 113, tax: 13);
+      await refund(o, 56.5);
+      final v = await order(total: 226, tax: 26, method: 'card');
+      await voidAt(v, at(14));
+      final f = await dao.figuresForWindow(from, to);
+      expect(f.grossTax, 39);
+      expect(f.refundedTax, 6.5 + 26);
+      expect(f.netTax, 6.5);
+    });
+
+    test('card refunds and voids do not touch the cash drawer', () async {
       final o = await order(total: 60, method: 'card', tip: 6);
       await refund(o, 60, tip: 6);
       final f = await dao.figuresForWindow(from, to);
       expect(f.cashRefunds, 0);
-      expect(f.refunds.byMethod['card']!.total, 66);
+      expect(f.refunds['card'].total, 66);
       expect(f.netTips, 0);
+    });
+
+    test('payment methods are bucketed case- and space-insensitively',
+        () async {
+      await order(total: 1, method: 'Cash');
+      await order(total: 2, method: ' cash ');
+      await order(total: 4, method: '');
+      await order(total: 8, method: 'CARD');
+      final f = await dao.figuresForWindow(from, to);
+      expect(f.sales.byMethod.keys.toSet(), {'cash', 'card'});
+      expect(f.cashSales, 7);
+
+      final pay = await db.ordersDao.paymentBreakdownForPeriod(from, to);
+      expect({for (final m in pay) m['method']: m['count']},
+          {'cash': 3, 'card': 1});
     });
   });
 

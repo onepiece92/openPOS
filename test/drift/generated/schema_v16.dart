@@ -720,6 +720,9 @@ class Orders extends Table with TableInfo {
   late final GeneratedColumn<String> notes = GeneratedColumn<String>(
       'notes', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  late final GeneratedColumn<DateTime> voidedAt = GeneratedColumn<DateTime>(
+      'voided_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
   late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
       'created_at', aliasedName, false,
       type: DriftSqlType.dateTime,
@@ -755,6 +758,7 @@ class Orders extends Table with TableInfo {
         pointsEarned,
         printCount,
         notes,
+        voidedAt,
         createdAt,
         updatedAt
       ];
@@ -1348,6 +1352,9 @@ class Shifts extends Table with TableInfo {
   late final GeneratedColumn<double> cashRefunds = GeneratedColumn<double>(
       'cash_refunds', aliasedName, true,
       type: DriftSqlType.double, requiredDuringInsert: false);
+  late final GeneratedColumn<double> cashVoids = GeneratedColumn<double>(
+      'cash_voids', aliasedName, true,
+      type: DriftSqlType.double, requiredDuringInsert: false);
   late final GeneratedColumn<double> paidOut = GeneratedColumn<double>(
       'paid_out', aliasedName, true,
       type: DriftSqlType.double, requiredDuringInsert: false);
@@ -1372,6 +1379,7 @@ class Shifts extends Table with TableInfo {
         cashSales,
         cashTips,
         cashRefunds,
+        cashVoids,
         paidOut,
         expectedCash,
         countedCash,
@@ -1440,6 +1448,8 @@ class DatabaseAtV16 extends GeneratedDatabase {
       'CREATE INDEX idx_audit_log_created_at ON audit_log (created_at)');
   late final Index idxShiftsClosedAt = Index('idx_shifts_closed_at',
       'CREATE INDEX idx_shifts_closed_at ON shifts (closed_at)');
+  late final Index idxShiftsOneOpen = Index('idx_shifts_one_open',
+      'CREATE UNIQUE INDEX idx_shifts_one_open ON shifts ((closed_at IS NULL)) WHERE closed_at IS NULL');
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -1474,7 +1484,8 @@ class DatabaseAtV16 extends GeneratedDatabase {
         idxExpensesDate,
         idxStockAdjustmentsProductCreated,
         idxAuditLogCreatedAt,
-        idxShiftsClosedAt
+        idxShiftsClosedAt,
+        idxShiftsOneOpen
       ];
   @override
   int get schemaVersion => 16;

@@ -3784,6 +3784,12 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
   late final GeneratedColumn<String> notes = GeneratedColumn<String>(
       'notes', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _voidedAtMeta =
+      const VerificationMeta('voidedAt');
+  @override
+  late final GeneratedColumn<DateTime> voidedAt = GeneratedColumn<DateTime>(
+      'voided_at', aliasedName, true,
+      type: DriftSqlType.dateTime, requiredDuringInsert: false);
   static const VerificationMeta _createdAtMeta =
       const VerificationMeta('createdAt');
   @override
@@ -3823,6 +3829,7 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
         pointsEarned,
         printCount,
         notes,
+        voidedAt,
         createdAt,
         updatedAt
       ];
@@ -3949,6 +3956,10 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
       context.handle(
           _notesMeta, notes.isAcceptableOrUnknown(data['notes']!, _notesMeta));
     }
+    if (data.containsKey('voided_at')) {
+      context.handle(_voidedAtMeta,
+          voidedAt.isAcceptableOrUnknown(data['voided_at']!, _voidedAtMeta));
+    }
     if (data.containsKey('created_at')) {
       context.handle(_createdAtMeta,
           createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
@@ -4008,6 +4019,8 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
           .read(DriftSqlType.int, data['${effectivePrefix}print_count'])!,
       notes: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}notes']),
+      voidedAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}voided_at']),
       createdAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
       updatedAt: attachedDatabase.typeMapping
@@ -4054,6 +4067,11 @@ class Order extends DataClass implements Insertable<Order> {
   final int pointsEarned;
   final int printCount;
   final String? notes;
+
+  /// When the order was voided (set by `OrdersDao.voidOrder`). NULL for
+  /// orders that are not voided, and for voids made before schema v16 —
+  /// those predate any till shift and the drawer close ignores them.
+  final DateTime? voidedAt;
   final DateTime createdAt;
   final DateTime updatedAt;
   const Order(
@@ -4078,6 +4096,7 @@ class Order extends DataClass implements Insertable<Order> {
       required this.pointsEarned,
       required this.printCount,
       this.notes,
+      this.voidedAt,
       required this.createdAt,
       required this.updatedAt});
   @override
@@ -4117,6 +4136,9 @@ class Order extends DataClass implements Insertable<Order> {
     map['print_count'] = Variable<int>(printCount);
     if (!nullToAbsent || notes != null) {
       map['notes'] = Variable<String>(notes);
+    }
+    if (!nullToAbsent || voidedAt != null) {
+      map['voided_at'] = Variable<DateTime>(voidedAt);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
@@ -4159,6 +4181,9 @@ class Order extends DataClass implements Insertable<Order> {
       printCount: Value(printCount),
       notes:
           notes == null && nullToAbsent ? const Value.absent() : Value(notes),
+      voidedAt: voidedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(voidedAt),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -4189,6 +4214,7 @@ class Order extends DataClass implements Insertable<Order> {
       pointsEarned: serializer.fromJson<int>(json['pointsEarned']),
       printCount: serializer.fromJson<int>(json['printCount']),
       notes: serializer.fromJson<String?>(json['notes']),
+      voidedAt: serializer.fromJson<DateTime?>(json['voidedAt']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -4218,6 +4244,7 @@ class Order extends DataClass implements Insertable<Order> {
       'pointsEarned': serializer.toJson<int>(pointsEarned),
       'printCount': serializer.toJson<int>(printCount),
       'notes': serializer.toJson<String?>(notes),
+      'voidedAt': serializer.toJson<DateTime?>(voidedAt),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -4245,6 +4272,7 @@ class Order extends DataClass implements Insertable<Order> {
           int? pointsEarned,
           int? printCount,
           Value<String?> notes = const Value.absent(),
+          Value<DateTime?> voidedAt = const Value.absent(),
           DateTime? createdAt,
           DateTime? updatedAt}) =>
       Order(
@@ -4272,6 +4300,7 @@ class Order extends DataClass implements Insertable<Order> {
         pointsEarned: pointsEarned ?? this.pointsEarned,
         printCount: printCount ?? this.printCount,
         notes: notes.present ? notes.value : this.notes,
+        voidedAt: voidedAt.present ? voidedAt.value : this.voidedAt,
         createdAt: createdAt ?? this.createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
       );
@@ -4320,6 +4349,7 @@ class Order extends DataClass implements Insertable<Order> {
       printCount:
           data.printCount.present ? data.printCount.value : this.printCount,
       notes: data.notes.present ? data.notes.value : this.notes,
+      voidedAt: data.voidedAt.present ? data.voidedAt.value : this.voidedAt,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -4349,6 +4379,7 @@ class Order extends DataClass implements Insertable<Order> {
           ..write('pointsEarned: $pointsEarned, ')
           ..write('printCount: $printCount, ')
           ..write('notes: $notes, ')
+          ..write('voidedAt: $voidedAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -4378,6 +4409,7 @@ class Order extends DataClass implements Insertable<Order> {
         pointsEarned,
         printCount,
         notes,
+        voidedAt,
         createdAt,
         updatedAt
       ]);
@@ -4406,6 +4438,7 @@ class Order extends DataClass implements Insertable<Order> {
           other.pointsEarned == this.pointsEarned &&
           other.printCount == this.printCount &&
           other.notes == this.notes &&
+          other.voidedAt == this.voidedAt &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -4432,6 +4465,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
   final Value<int> pointsEarned;
   final Value<int> printCount;
   final Value<String?> notes;
+  final Value<DateTime?> voidedAt;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   const OrdersCompanion({
@@ -4456,6 +4490,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     this.pointsEarned = const Value.absent(),
     this.printCount = const Value.absent(),
     this.notes = const Value.absent(),
+    this.voidedAt = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
   });
@@ -4481,6 +4516,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     this.pointsEarned = const Value.absent(),
     this.printCount = const Value.absent(),
     this.notes = const Value.absent(),
+    this.voidedAt = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
   })  : subtotal = Value(subtotal),
@@ -4508,6 +4544,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     Expression<int>? pointsEarned,
     Expression<int>? printCount,
     Expression<String>? notes,
+    Expression<DateTime>? voidedAt,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
   }) {
@@ -4533,6 +4570,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
       if (pointsEarned != null) 'points_earned': pointsEarned,
       if (printCount != null) 'print_count': printCount,
       if (notes != null) 'notes': notes,
+      if (voidedAt != null) 'voided_at': voidedAt,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
     });
@@ -4560,6 +4598,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
       Value<int>? pointsEarned,
       Value<int>? printCount,
       Value<String?>? notes,
+      Value<DateTime?>? voidedAt,
       Value<DateTime>? createdAt,
       Value<DateTime>? updatedAt}) {
     return OrdersCompanion(
@@ -4584,6 +4623,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
       pointsEarned: pointsEarned ?? this.pointsEarned,
       printCount: printCount ?? this.printCount,
       notes: notes ?? this.notes,
+      voidedAt: voidedAt ?? this.voidedAt,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -4655,6 +4695,9 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     if (notes.present) {
       map['notes'] = Variable<String>(notes.value);
     }
+    if (voidedAt.present) {
+      map['voided_at'] = Variable<DateTime>(voidedAt.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -4688,6 +4731,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
           ..write('pointsEarned: $pointsEarned, ')
           ..write('printCount: $printCount, ')
           ..write('notes: $notes, ')
+          ..write('voidedAt: $voidedAt, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -8108,6 +8152,12 @@ class $ShiftsTable extends Shifts with TableInfo<$ShiftsTable, Shift> {
   late final GeneratedColumn<double> cashRefunds = GeneratedColumn<double>(
       'cash_refunds', aliasedName, true,
       type: DriftSqlType.double, requiredDuringInsert: false);
+  static const VerificationMeta _cashVoidsMeta =
+      const VerificationMeta('cashVoids');
+  @override
+  late final GeneratedColumn<double> cashVoids = GeneratedColumn<double>(
+      'cash_voids', aliasedName, true,
+      type: DriftSqlType.double, requiredDuringInsert: false);
   static const VerificationMeta _paidOutMeta =
       const VerificationMeta('paidOut');
   @override
@@ -8146,6 +8196,7 @@ class $ShiftsTable extends Shifts with TableInfo<$ShiftsTable, Shift> {
         cashSales,
         cashTips,
         cashRefunds,
+        cashVoids,
         paidOut,
         expectedCash,
         countedCash,
@@ -8192,6 +8243,10 @@ class $ShiftsTable extends Shifts with TableInfo<$ShiftsTable, Shift> {
           _cashRefundsMeta,
           cashRefunds.isAcceptableOrUnknown(
               data['cash_refunds']!, _cashRefundsMeta));
+    }
+    if (data.containsKey('cash_voids')) {
+      context.handle(_cashVoidsMeta,
+          cashVoids.isAcceptableOrUnknown(data['cash_voids']!, _cashVoidsMeta));
     }
     if (data.containsKey('paid_out')) {
       context.handle(_paidOutMeta,
@@ -8242,6 +8297,8 @@ class $ShiftsTable extends Shifts with TableInfo<$ShiftsTable, Shift> {
           .read(DriftSqlType.double, data['${effectivePrefix}cash_tips']),
       cashRefunds: attachedDatabase.typeMapping
           .read(DriftSqlType.double, data['${effectivePrefix}cash_refunds']),
+      cashVoids: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}cash_voids']),
       paidOut: attachedDatabase.typeMapping
           .read(DriftSqlType.double, data['${effectivePrefix}paid_out']),
       expectedCash: attachedDatabase.typeMapping
@@ -8269,6 +8326,9 @@ class Shift extends DataClass implements Insertable<Shift> {
   final double? cashSales;
   final double? cashTips;
   final double? cashRefunds;
+
+  /// Cash handed back by voids in the window (total + tip − earlier refunds).
+  final double? cashVoids;
   final double? paidOut;
   final double? expectedCash;
   final double? countedCash;
@@ -8284,6 +8344,7 @@ class Shift extends DataClass implements Insertable<Shift> {
       this.cashSales,
       this.cashTips,
       this.cashRefunds,
+      this.cashVoids,
       this.paidOut,
       this.expectedCash,
       this.countedCash,
@@ -8306,6 +8367,9 @@ class Shift extends DataClass implements Insertable<Shift> {
     }
     if (!nullToAbsent || cashRefunds != null) {
       map['cash_refunds'] = Variable<double>(cashRefunds);
+    }
+    if (!nullToAbsent || cashVoids != null) {
+      map['cash_voids'] = Variable<double>(cashVoids);
     }
     if (!nullToAbsent || paidOut != null) {
       map['paid_out'] = Variable<double>(paidOut);
@@ -8342,6 +8406,9 @@ class Shift extends DataClass implements Insertable<Shift> {
       cashRefunds: cashRefunds == null && nullToAbsent
           ? const Value.absent()
           : Value(cashRefunds),
+      cashVoids: cashVoids == null && nullToAbsent
+          ? const Value.absent()
+          : Value(cashVoids),
       paidOut: paidOut == null && nullToAbsent
           ? const Value.absent()
           : Value(paidOut),
@@ -8370,6 +8437,7 @@ class Shift extends DataClass implements Insertable<Shift> {
       cashSales: serializer.fromJson<double?>(json['cashSales']),
       cashTips: serializer.fromJson<double?>(json['cashTips']),
       cashRefunds: serializer.fromJson<double?>(json['cashRefunds']),
+      cashVoids: serializer.fromJson<double?>(json['cashVoids']),
       paidOut: serializer.fromJson<double?>(json['paidOut']),
       expectedCash: serializer.fromJson<double?>(json['expectedCash']),
       countedCash: serializer.fromJson<double?>(json['countedCash']),
@@ -8388,6 +8456,7 @@ class Shift extends DataClass implements Insertable<Shift> {
       'cashSales': serializer.toJson<double?>(cashSales),
       'cashTips': serializer.toJson<double?>(cashTips),
       'cashRefunds': serializer.toJson<double?>(cashRefunds),
+      'cashVoids': serializer.toJson<double?>(cashVoids),
       'paidOut': serializer.toJson<double?>(paidOut),
       'expectedCash': serializer.toJson<double?>(expectedCash),
       'countedCash': serializer.toJson<double?>(countedCash),
@@ -8404,6 +8473,7 @@ class Shift extends DataClass implements Insertable<Shift> {
           Value<double?> cashSales = const Value.absent(),
           Value<double?> cashTips = const Value.absent(),
           Value<double?> cashRefunds = const Value.absent(),
+          Value<double?> cashVoids = const Value.absent(),
           Value<double?> paidOut = const Value.absent(),
           Value<double?> expectedCash = const Value.absent(),
           Value<double?> countedCash = const Value.absent(),
@@ -8417,6 +8487,7 @@ class Shift extends DataClass implements Insertable<Shift> {
         cashSales: cashSales.present ? cashSales.value : this.cashSales,
         cashTips: cashTips.present ? cashTips.value : this.cashTips,
         cashRefunds: cashRefunds.present ? cashRefunds.value : this.cashRefunds,
+        cashVoids: cashVoids.present ? cashVoids.value : this.cashVoids,
         paidOut: paidOut.present ? paidOut.value : this.paidOut,
         expectedCash:
             expectedCash.present ? expectedCash.value : this.expectedCash,
@@ -8435,6 +8506,7 @@ class Shift extends DataClass implements Insertable<Shift> {
       cashTips: data.cashTips.present ? data.cashTips.value : this.cashTips,
       cashRefunds:
           data.cashRefunds.present ? data.cashRefunds.value : this.cashRefunds,
+      cashVoids: data.cashVoids.present ? data.cashVoids.value : this.cashVoids,
       paidOut: data.paidOut.present ? data.paidOut.value : this.paidOut,
       expectedCash: data.expectedCash.present
           ? data.expectedCash.value
@@ -8457,6 +8529,7 @@ class Shift extends DataClass implements Insertable<Shift> {
           ..write('cashSales: $cashSales, ')
           ..write('cashTips: $cashTips, ')
           ..write('cashRefunds: $cashRefunds, ')
+          ..write('cashVoids: $cashVoids, ')
           ..write('paidOut: $paidOut, ')
           ..write('expectedCash: $expectedCash, ')
           ..write('countedCash: $countedCash, ')
@@ -8475,6 +8548,7 @@ class Shift extends DataClass implements Insertable<Shift> {
       cashSales,
       cashTips,
       cashRefunds,
+      cashVoids,
       paidOut,
       expectedCash,
       countedCash,
@@ -8491,6 +8565,7 @@ class Shift extends DataClass implements Insertable<Shift> {
           other.cashSales == this.cashSales &&
           other.cashTips == this.cashTips &&
           other.cashRefunds == this.cashRefunds &&
+          other.cashVoids == this.cashVoids &&
           other.paidOut == this.paidOut &&
           other.expectedCash == this.expectedCash &&
           other.countedCash == this.countedCash &&
@@ -8506,6 +8581,7 @@ class ShiftsCompanion extends UpdateCompanion<Shift> {
   final Value<double?> cashSales;
   final Value<double?> cashTips;
   final Value<double?> cashRefunds;
+  final Value<double?> cashVoids;
   final Value<double?> paidOut;
   final Value<double?> expectedCash;
   final Value<double?> countedCash;
@@ -8519,6 +8595,7 @@ class ShiftsCompanion extends UpdateCompanion<Shift> {
     this.cashSales = const Value.absent(),
     this.cashTips = const Value.absent(),
     this.cashRefunds = const Value.absent(),
+    this.cashVoids = const Value.absent(),
     this.paidOut = const Value.absent(),
     this.expectedCash = const Value.absent(),
     this.countedCash = const Value.absent(),
@@ -8533,6 +8610,7 @@ class ShiftsCompanion extends UpdateCompanion<Shift> {
     this.cashSales = const Value.absent(),
     this.cashTips = const Value.absent(),
     this.cashRefunds = const Value.absent(),
+    this.cashVoids = const Value.absent(),
     this.paidOut = const Value.absent(),
     this.expectedCash = const Value.absent(),
     this.countedCash = const Value.absent(),
@@ -8547,6 +8625,7 @@ class ShiftsCompanion extends UpdateCompanion<Shift> {
     Expression<double>? cashSales,
     Expression<double>? cashTips,
     Expression<double>? cashRefunds,
+    Expression<double>? cashVoids,
     Expression<double>? paidOut,
     Expression<double>? expectedCash,
     Expression<double>? countedCash,
@@ -8561,6 +8640,7 @@ class ShiftsCompanion extends UpdateCompanion<Shift> {
       if (cashSales != null) 'cash_sales': cashSales,
       if (cashTips != null) 'cash_tips': cashTips,
       if (cashRefunds != null) 'cash_refunds': cashRefunds,
+      if (cashVoids != null) 'cash_voids': cashVoids,
       if (paidOut != null) 'paid_out': paidOut,
       if (expectedCash != null) 'expected_cash': expectedCash,
       if (countedCash != null) 'counted_cash': countedCash,
@@ -8577,6 +8657,7 @@ class ShiftsCompanion extends UpdateCompanion<Shift> {
       Value<double?>? cashSales,
       Value<double?>? cashTips,
       Value<double?>? cashRefunds,
+      Value<double?>? cashVoids,
       Value<double?>? paidOut,
       Value<double?>? expectedCash,
       Value<double?>? countedCash,
@@ -8590,6 +8671,7 @@ class ShiftsCompanion extends UpdateCompanion<Shift> {
       cashSales: cashSales ?? this.cashSales,
       cashTips: cashTips ?? this.cashTips,
       cashRefunds: cashRefunds ?? this.cashRefunds,
+      cashVoids: cashVoids ?? this.cashVoids,
       paidOut: paidOut ?? this.paidOut,
       expectedCash: expectedCash ?? this.expectedCash,
       countedCash: countedCash ?? this.countedCash,
@@ -8622,6 +8704,9 @@ class ShiftsCompanion extends UpdateCompanion<Shift> {
     if (cashRefunds.present) {
       map['cash_refunds'] = Variable<double>(cashRefunds.value);
     }
+    if (cashVoids.present) {
+      map['cash_voids'] = Variable<double>(cashVoids.value);
+    }
     if (paidOut.present) {
       map['paid_out'] = Variable<double>(paidOut.value);
     }
@@ -8650,6 +8735,7 @@ class ShiftsCompanion extends UpdateCompanion<Shift> {
           ..write('cashSales: $cashSales, ')
           ..write('cashTips: $cashTips, ')
           ..write('cashRefunds: $cashRefunds, ')
+          ..write('cashVoids: $cashVoids, ')
           ..write('paidOut: $paidOut, ')
           ..write('expectedCash: $expectedCash, ')
           ..write('countedCash: $countedCash, ')
@@ -8710,6 +8796,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       'CREATE INDEX idx_audit_log_created_at ON audit_log (created_at)');
   late final Index idxShiftsClosedAt = Index('idx_shifts_closed_at',
       'CREATE INDEX idx_shifts_closed_at ON shifts (closed_at)');
+  late final Index idxShiftsOneOpen = Index('idx_shifts_one_open',
+      'CREATE UNIQUE INDEX idx_shifts_one_open ON shifts ((closed_at IS NULL)) WHERE closed_at IS NULL');
   late final ProductsDao productsDao = ProductsDao(this as AppDatabase);
   late final OrdersDao ordersDao = OrdersDao(this as AppDatabase);
   late final CustomersDao customersDao = CustomersDao(this as AppDatabase);
@@ -8753,7 +8841,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         idxExpensesDate,
         idxStockAdjustmentsProductCreated,
         idxAuditLogCreatedAt,
-        idxShiftsClosedAt
+        idxShiftsClosedAt,
+        idxShiftsOneOpen
       ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules(
@@ -12363,6 +12452,7 @@ typedef $$OrdersTableCreateCompanionBuilder = OrdersCompanion Function({
   Value<int> pointsEarned,
   Value<int> printCount,
   Value<String?> notes,
+  Value<DateTime?> voidedAt,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
 });
@@ -12388,6 +12478,7 @@ typedef $$OrdersTableUpdateCompanionBuilder = OrdersCompanion Function({
   Value<int> pointsEarned,
   Value<int> printCount,
   Value<String?> notes,
+  Value<DateTime?> voidedAt,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
 });
@@ -12553,6 +12644,9 @@ class $$OrdersTableFilterComposer
 
   ColumnFilters<String> get notes => $composableBuilder(
       column: $table.notes, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get voidedAt => $composableBuilder(
+      column: $table.voidedAt, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnFilters(column));
@@ -12761,6 +12855,9 @@ class $$OrdersTableOrderingComposer
   ColumnOrderings<String> get notes => $composableBuilder(
       column: $table.notes, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<DateTime> get voidedAt => $composableBuilder(
+      column: $table.voidedAt, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnOrderings(column));
 
@@ -12873,6 +12970,9 @@ class $$OrdersTableAnnotationComposer
 
   GeneratedColumn<String> get notes =>
       $composableBuilder(column: $table.notes, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get voidedAt =>
+      $composableBuilder(column: $table.voidedAt, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -13056,6 +13156,7 @@ class $$OrdersTableTableManager extends RootTableManager<
             Value<int> pointsEarned = const Value.absent(),
             Value<int> printCount = const Value.absent(),
             Value<String?> notes = const Value.absent(),
+            Value<DateTime?> voidedAt = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<DateTime> updatedAt = const Value.absent(),
           }) =>
@@ -13081,6 +13182,7 @@ class $$OrdersTableTableManager extends RootTableManager<
             pointsEarned: pointsEarned,
             printCount: printCount,
             notes: notes,
+            voidedAt: voidedAt,
             createdAt: createdAt,
             updatedAt: updatedAt,
           ),
@@ -13106,6 +13208,7 @@ class $$OrdersTableTableManager extends RootTableManager<
             Value<int> pointsEarned = const Value.absent(),
             Value<int> printCount = const Value.absent(),
             Value<String?> notes = const Value.absent(),
+            Value<DateTime?> voidedAt = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<DateTime> updatedAt = const Value.absent(),
           }) =>
@@ -13131,6 +13234,7 @@ class $$OrdersTableTableManager extends RootTableManager<
             pointsEarned: pointsEarned,
             printCount: printCount,
             notes: notes,
+            voidedAt: voidedAt,
             createdAt: createdAt,
             updatedAt: updatedAt,
           ),
@@ -15778,6 +15882,7 @@ typedef $$ShiftsTableCreateCompanionBuilder = ShiftsCompanion Function({
   Value<double?> cashSales,
   Value<double?> cashTips,
   Value<double?> cashRefunds,
+  Value<double?> cashVoids,
   Value<double?> paidOut,
   Value<double?> expectedCash,
   Value<double?> countedCash,
@@ -15792,6 +15897,7 @@ typedef $$ShiftsTableUpdateCompanionBuilder = ShiftsCompanion Function({
   Value<double?> cashSales,
   Value<double?> cashTips,
   Value<double?> cashRefunds,
+  Value<double?> cashVoids,
   Value<double?> paidOut,
   Value<double?> expectedCash,
   Value<double?> countedCash,
@@ -15828,6 +15934,9 @@ class $$ShiftsTableFilterComposer
 
   ColumnFilters<double> get cashRefunds => $composableBuilder(
       column: $table.cashRefunds, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get cashVoids => $composableBuilder(
+      column: $table.cashVoids, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<double> get paidOut => $composableBuilder(
       column: $table.paidOut, builder: (column) => ColumnFilters(column));
@@ -15874,6 +15983,9 @@ class $$ShiftsTableOrderingComposer
 
   ColumnOrderings<double> get cashRefunds => $composableBuilder(
       column: $table.cashRefunds, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get cashVoids => $composableBuilder(
+      column: $table.cashVoids, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<double> get paidOut => $composableBuilder(
       column: $table.paidOut, builder: (column) => ColumnOrderings(column));
@@ -15922,6 +16034,9 @@ class $$ShiftsTableAnnotationComposer
   GeneratedColumn<double> get cashRefunds => $composableBuilder(
       column: $table.cashRefunds, builder: (column) => column);
 
+  GeneratedColumn<double> get cashVoids =>
+      $composableBuilder(column: $table.cashVoids, builder: (column) => column);
+
   GeneratedColumn<double> get paidOut =>
       $composableBuilder(column: $table.paidOut, builder: (column) => column);
 
@@ -15968,6 +16083,7 @@ class $$ShiftsTableTableManager extends RootTableManager<
             Value<double?> cashSales = const Value.absent(),
             Value<double?> cashTips = const Value.absent(),
             Value<double?> cashRefunds = const Value.absent(),
+            Value<double?> cashVoids = const Value.absent(),
             Value<double?> paidOut = const Value.absent(),
             Value<double?> expectedCash = const Value.absent(),
             Value<double?> countedCash = const Value.absent(),
@@ -15982,6 +16098,7 @@ class $$ShiftsTableTableManager extends RootTableManager<
             cashSales: cashSales,
             cashTips: cashTips,
             cashRefunds: cashRefunds,
+            cashVoids: cashVoids,
             paidOut: paidOut,
             expectedCash: expectedCash,
             countedCash: countedCash,
@@ -15996,6 +16113,7 @@ class $$ShiftsTableTableManager extends RootTableManager<
             Value<double?> cashSales = const Value.absent(),
             Value<double?> cashTips = const Value.absent(),
             Value<double?> cashRefunds = const Value.absent(),
+            Value<double?> cashVoids = const Value.absent(),
             Value<double?> paidOut = const Value.absent(),
             Value<double?> expectedCash = const Value.absent(),
             Value<double?> countedCash = const Value.absent(),
@@ -16010,6 +16128,7 @@ class $$ShiftsTableTableManager extends RootTableManager<
             cashSales: cashSales,
             cashTips: cashTips,
             cashRefunds: cashRefunds,
+            cashVoids: cashVoids,
             paidOut: paidOut,
             expectedCash: expectedCash,
             countedCash: countedCash,

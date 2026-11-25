@@ -345,6 +345,19 @@ void main() {
       expect((o.total, o.tipAmount), (200.0, 0.0));
     });
 
+    test('the payment method is stored trimmed and lower-case, blank as cash',
+        () async {
+      await seedTea();
+      await repo.importOrders([
+        ordersHeader,
+        orderRow(1, method: ' Cash '),
+        orderRow(2, method: 'CARD', tendered: '0.0', change: '0.0'),
+        orderRow(3, method: ''),
+      ].join('\r\n'));
+      expect((await orders()).map((o) => o.paymentMethod),
+          ['cash', 'card', 'cash']);
+    });
+
     test('a second import of the same file adds nothing', () async {
       await seedTea();
       final csv = [ordersHeader, orderRow(7), orderRow(9, total: 100, qty: 1)]

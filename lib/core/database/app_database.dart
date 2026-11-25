@@ -89,129 +89,159 @@ class AppDatabase extends _$AppDatabase {
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (m) async {
-          await m.createAll();
-          await _seedDefaultData();
+          // One transaction, so a first launch killed half-way leaves an
+          // empty file (user_version 0) that simply runs onCreate again.
+          await transaction(() async {
+            await m.createAll();
+            await _seedDefaultData();
+            await customStatement('PRAGMA user_version = $schemaVersion');
+          });
         },
         onUpgrade: (m, from, to) async {
-          // Every step uses the Migrator so the DDL is exactly what Drift
-          // would generate for a fresh install (NULL / CHECK / DEFAULT text
-          // included) — test/drift/migration_test.dart verifies each shipped
-          // version upgrades to a schema identical to `createAll()`.
-          if (from < 2) {
-            await m.addColumn(customers, customers.defaultDiscount);
-            await m.addColumn(customers, customers.defaultDiscountIsPercent);
-          }
-          if (from < 3) {
-            await m.addColumn(products, products.isComposite);
-            await m.createTable(productComponents);
-          }
-          if (from < 4) {
-            await m.addColumn(products, products.isHiddenInPos);
-          }
-          if (from < 5) {
-            await m.addColumn(products, products.isOutOfStock);
-          }
-          if (from < 6) {
-            // Drop deprecated outbox queue (online sync removed — app is offline-only).
-            await customStatement('DROP TABLE IF EXISTS outbox_queue');
-          }
-          if (from < 7) {
-            // Front-of-house tables + nullable FK from orders.
-            await m.createTable(tables);
-            await m.addColumn(orders, orders.tableId);
-          }
-          if (from < 8) {
-            // Persist loyalty redemption + earn on the order row so receipts
-            // can be re-printed and audited without re-deriving from settings.
-            await m.addColumn(orders, orders.pointsRedeemed);
-            await m.addColumn(orders, orders.loyaltyDiscount);
-            await m.addColumn(orders, orders.pointsEarned);
-          }
-          if (from < 9) {
-            // Purchase (cost) price + main/secondary units with conversion.
-            await m.addColumn(products, products.purchasePrice);
-            await m.addColumn(products, products.unit);
-            await m.addColumn(products, products.secondaryUnit);
-            await m.addColumn(products, products.conversionRate);
-          }
-          if (from < 10) {
-            // Gap-free invoice numbers + the order discount as entered.
-            await m.addColumn(orders, orders.invoiceNo);
-            await m.addColumn(orders, orders.discountValue);
-            await m.addColumn(orders, orders.discountIsPercent);
-            await customStatement(
-              'CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_invoice_no ON orders (invoice_no)',
+          // A database written by a newer app: refuse it instead of letting
+          // Drift stamp it with our (lower) version.
+          if (from > to) {
+            throw StateError(
+              'Database schema v$from is newer than this app (v$to). '
+              'Update the app.',
             );
-            await backfillInvoiceNumbers();
           }
-          if (from < 11) {
-            // Fiscal-year invoice prefix + physical print counter. The
-            // invoice_no unique index becomes composite so each prefix owns
-            // its own gap-free sequence.
-            await m.addColumn(orders, orders.invoicePrefix);
-            await m.addColumn(orders, orders.printCount);
-            await customStatement('DROP INDEX IF EXISTS idx_orders_invoice_no');
-            await m.createIndex(idxOrdersInvoiceNo);
-          }
-          if (from < 12) {
-            // Variants/modifiers never reached the sale flow (no UI, no
-            // writes) — drop them and the always-NULL order_items.variant_id.
-            // alterTable recreates order_items from the *current* definition,
-            // which already includes the v13 unit columns and the v14 cost
-            // column — the transformer fills them since the old table has
-            // nothing to copy from.
-            // ignore: experimental_member_use
-            await m.alterTable(TableMigration(orderItems, columnTransformer: {
-              orderItems.unitLabel: const Constant(''),
-              orderItems.unitsPerQty: const Constant(1.0),
-              orderItems.unitCost: const Constant<double>(null),
-            }));
-            await customStatement('DROP TABLE IF EXISTS product_variants');
-            await customStatement('DROP TABLE IF EXISTS product_modifiers');
-          } else {
-            // Databases already at v12+ add the later order_items columns
-            // one by one — older ones got them in the recreate above.
-            if (from < 13) {
-              // Secondary-unit selling: snapshot which unit a line was sold
-              // in and its main-unit conversion.
-              await m.addColumn(orderItems, orderItems.unitLabel);
-              await m.addColumn(orderItems, orderItems.unitsPerQty);
+          // Drift (2.28) neither wraps onUpgrade in a transaction nor writes
+          // user_version until it returns, so a crash mid-upgrade used to
+          // leave half the DDL applied and the old version on disk — every
+          // later launch re-ran the step and died on "duplicate column".
+          // Now the whole upgrade and the new user_version commit together
+          // or not at all. Nothing below needs to run outside a
+          // transaction: there is no VACUUM or journal_mode here, and
+          // foreign keys are still off at this point (beforeOpen turns them
+          // on after the migration), so alterTable's own
+          // `PRAGMA foreign_keys = OFF` is skipped and its inner transaction
+          // becomes a savepoint.
+          await transaction(() async {
+            // Every step uses the Migrator so the DDL is exactly what Drift
+            // would generate for a fresh install (NULL / CHECK / DEFAULT text
+            // included) — test/drift/migration_test.dart verifies each shipped
+            // version upgrades to a schema identical to `createAll()`.
+            if (from < 2) {
+              await m.addColumn(customers, customers.defaultDiscount);
+              await m.addColumn(customers, customers.defaultDiscountIsPercent);
+            }
+            if (from < 3) {
+              await m.addColumn(products, products.isComposite);
+              await m.createTable(productComponents);
+            }
+            if (from < 4) {
+              await m.addColumn(products, products.isHiddenInPos);
+            }
+            if (from < 5) {
+              await m.addColumn(products, products.isOutOfStock);
+            }
+            if (from < 6) {
+              // Drop deprecated outbox queue (online sync removed — app is offline-only).
+              await customStatement('DROP TABLE IF EXISTS outbox_queue');
+            }
+            if (from < 7) {
+              // Front-of-house tables + nullable FK from orders.
+              await m.createTable(tables);
+              await m.addColumn(orders, orders.tableId);
+            }
+            if (from < 8) {
+              // Persist loyalty redemption + earn on the order row so receipts
+              // can be re-printed and audited without re-deriving from settings.
+              await m.addColumn(orders, orders.pointsRedeemed);
+              await m.addColumn(orders, orders.loyaltyDiscount);
+              await m.addColumn(orders, orders.pointsEarned);
+            }
+            if (from < 9) {
+              // Purchase (cost) price + main/secondary units with conversion.
+              await m.addColumn(products, products.purchasePrice);
+              await m.addColumn(products, products.unit);
+              await m.addColumn(products, products.secondaryUnit);
+              await m.addColumn(products, products.conversionRate);
+            }
+            if (from < 10) {
+              // Gap-free invoice numbers + the order discount as entered.
+              await m.addColumn(orders, orders.invoiceNo);
+              await m.addColumn(orders, orders.discountValue);
+              await m.addColumn(orders, orders.discountIsPercent);
+              await customStatement(
+                'CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_invoice_no ON orders (invoice_no)',
+              );
+              await backfillInvoiceNumbers();
+            }
+            if (from < 11) {
+              // Fiscal-year invoice prefix + physical print counter. The
+              // invoice_no unique index becomes composite so each prefix owns
+              // its own gap-free sequence.
+              await m.addColumn(orders, orders.invoicePrefix);
+              await m.addColumn(orders, orders.printCount);
+              await customStatement('DROP INDEX IF EXISTS idx_orders_invoice_no');
+              await m.createIndex(idxOrdersInvoiceNo);
+            }
+            if (from < 12) {
+              // Variants/modifiers never reached the sale flow (no UI, no
+              // writes) — drop them and the always-NULL order_items.variant_id.
+              // alterTable recreates order_items from the *current* definition,
+              // which already includes the v13 unit columns and the v14 cost
+              // column — the transformer fills them since the old table has
+              // nothing to copy from.
+              // ignore: experimental_member_use
+              await m.alterTable(TableMigration(orderItems, columnTransformer: {
+                orderItems.unitLabel: const Constant(''),
+                orderItems.unitsPerQty: const Constant(1.0),
+                orderItems.unitCost: const Constant<double>(null),
+              }));
+              await customStatement('DROP TABLE IF EXISTS product_variants');
+              await customStatement('DROP TABLE IF EXISTS product_modifiers');
+            } else {
+              // Databases already at v12+ add the later order_items columns
+              // one by one — older ones got them in the recreate above.
+              if (from < 13) {
+                // Secondary-unit selling: snapshot which unit a line was sold
+                // in and its main-unit conversion.
+                await m.addColumn(orderItems, orderItems.unitLabel);
+                await m.addColumn(orderItems, orderItems.unitsPerQty);
+              }
+              if (from < 14) {
+                await m.addColumn(orderItems, orderItems.unitCost);
+              }
             }
             if (from < 14) {
-              await m.addColumn(orderItems, orderItems.unitCost);
+              // Cost of goods snapshot per line + whether each tax line was
+              // inclusive (so receipts and reports stop guessing).
+              await m.addColumn(orderTaxes, orderTaxes.isInclusive);
+              await backfillV14();
             }
-          }
-          if (from < 14) {
-            // Cost of goods snapshot per line + whether each tax line was
-            // inclusive (so receipts and reports stop guessing).
-            await m.addColumn(orderTaxes, orderTaxes.isInclusive);
-            await backfillV14();
-          }
-          if (from < 15) {
-            // Secondary indexes so history, reports and per-order lookups
-            // stop scanning whole tables as the shop's data grows. Each one
-            // is declared with @TableIndex on its table; the query it serves
-            // is pinned by test/core/database/query_plan_test.dart.
-            await m.createIndex(idxOrdersCreatedAt);
-            await m.createIndex(idxOrdersCustomerId);
-            await m.createIndex(idxOrderItemsOrderId);
-            await m.createIndex(idxOrderTaxesOrderId);
-            await m.createIndex(idxReturnsOrderId);
-            await m.createIndex(idxAuditLogCreatedAt);
-            await m.createIndex(idxStockAdjustmentsProductCreated);
-            await m.createIndex(idxExpensesDate);
-          }
-          if (from < 16) {
-            // Tips (kept out of orders.total) and refunded tips, plus till
-            // sessions for the end-of-day drawer close. ADD COLUMN with a
-            // constant default only rewrites the schema, not the rows.
-            await m.addColumn(orders, orders.tipAmount);
-            await m.addColumn(returns, returns.tipAmount);
-            await m.createTable(shifts);
-            await m.createIndex(idxShiftsClosedAt);
-            // The close sums refunds by the date they were handed out.
-            await m.createIndex(idxReturnsCreatedAt);
-          }
+            if (from < 15) {
+              // Secondary indexes so history, reports and per-order lookups
+              // stop scanning whole tables as the shop's data grows. Each one
+              // is declared with @TableIndex on its table; the query it serves
+              // is pinned by test/core/database/query_plan_test.dart.
+              await m.createIndex(idxOrdersCreatedAt);
+              await m.createIndex(idxOrdersCustomerId);
+              await m.createIndex(idxOrderItemsOrderId);
+              await m.createIndex(idxOrderTaxesOrderId);
+              await m.createIndex(idxReturnsOrderId);
+              await m.createIndex(idxAuditLogCreatedAt);
+              await m.createIndex(idxStockAdjustmentsProductCreated);
+              await m.createIndex(idxExpensesDate);
+            }
+            if (from < 16) {
+              // Tips (kept out of orders.total) and refunded tips, the void
+              // time, plus till sessions for the end-of-day drawer close.
+              // ADD COLUMN with a constant default (or NULL) only rewrites
+              // the schema, not the rows.
+              await m.addColumn(orders, orders.tipAmount);
+              await m.addColumn(orders, orders.voidedAt);
+              await m.addColumn(returns, returns.tipAmount);
+              await m.createTable(shifts);
+              await m.createIndex(idxShiftsClosedAt);
+              await m.createIndex(idxShiftsOneOpen);
+              // The close sums refunds by the date they were handed out.
+              await m.createIndex(idxReturnsCreatedAt);
+            }
+            await customStatement('PRAGMA user_version = $to');
+          });
         },
         beforeOpen: (details) async {
           // Enable WAL mode for better concurrent read performance.

@@ -8,10 +8,14 @@ import 'package:drift/drift.dart';
 /// reads the same even if later refunds change the underlying orders.
 ///
 /// expected_cash = opening_cash + cash_sales + cash_tips − cash_refunds
-///                 − paid_out; counted − expected is the over/short.
+///                 − cash_voids − paid_out; counted − expected is the
+///                 over/short. See `ShiftsDao` for the window rules.
 // Finding the open shift (closed_at IS NULL) and listing closed ones
 // newest first.
 @TableIndex(name: 'idx_shifts_closed_at', columns: {#closedAt})
+// At most one open shift, enforced by SQLite as well as by the DAO.
+@TableIndex.sql('CREATE UNIQUE INDEX idx_shifts_one_open '
+    'ON shifts ((closed_at IS NULL)) WHERE closed_at IS NULL')
 class Shifts extends Table {
   IntColumn get id => integer().autoIncrement()();
   DateTimeColumn get openedAt =>
@@ -22,6 +26,8 @@ class Shifts extends Table {
   RealColumn get cashSales => real().nullable()();
   RealColumn get cashTips => real().nullable()();
   RealColumn get cashRefunds => real().nullable()();
+  /// Cash handed back by voids in the window (total + tip − earlier refunds).
+  RealColumn get cashVoids => real().nullable()();
   RealColumn get paidOut => real().nullable()();
   RealColumn get expectedCash => real().nullable()();
   RealColumn get countedCash => real().nullable()();

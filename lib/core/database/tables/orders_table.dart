@@ -3,6 +3,10 @@ import 'package:drift/drift.dart';
 import 'package:pos_app/core/database/tables/customers_table.dart';
 import 'package:pos_app/core/database/tables/tables_table.dart';
 
+/// Invoice prefix of orders that came from a CSV import (`IMP-17`). They
+/// are history, not till activity: the drawer close leaves them out.
+const kImportedInvoicePrefix = 'IMP';
+
 /// Completed (or held/voided) sales transactions.
 ///
 /// status:         'completed' | 'held' | 'voided' | 'refunded'
@@ -64,6 +68,10 @@ class Orders extends Table {
   IntColumn get printCount =>
       integer().withDefault(const Constant(0))();
   TextColumn get notes => text().nullable()();
+  /// When the order was voided (set by `OrdersDao.voidOrder`). NULL for
+  /// orders that are not voided, and for voids made before schema v16 —
+  /// those predate any till shift and the drawer close ignores them.
+  DateTimeColumn get voidedAt => dateTime().nullable()();
   DateTimeColumn get createdAt =>
       dateTime().withDefault(currentDateAndTime)();
   DateTimeColumn get updatedAt =>

@@ -190,6 +190,15 @@ void main() {
       expect(plan.join(' | '), contains('SEARCH o USING INTEGER PRIMARY KEY'));
     });
 
+    test('voids are found through the audit log by date, no orders scan',
+        () async {
+      final plan = await planOf(() => db.shiftsDao.voidsInWindow(from, to));
+      expectIndexed(plan, ['idx_audit_log_created_at', 'idx_returns_order_id']);
+      expect(plan.join(' | '), contains('SEARCH o USING INTEGER PRIMARY KEY'));
+      expect(plan.where((s) => s.startsWith('SCAN')), isEmpty,
+          reason: 'no step reads a whole table: $plan');
+    });
+
     test('the open shift and the closed list use idx_shifts_closed_at',
         () async {
       expectIndexed(await planOf(() => db.shiftsDao.currentShift()),
