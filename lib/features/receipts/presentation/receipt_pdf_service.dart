@@ -142,8 +142,11 @@ Future<pw.Document> buildReceiptPdf(
               'Loyalty Redeemed (${order.pointsRedeemed} pts)',
               '- ${fmt.format(order.loyaltyDiscount)}',
             ),
+          if (order.hasTip) billRow('Tip', fmt.format(order.tipAmount)),
           divider(),
-          billRow('Grand Total', fmt.format(order.total), bold: true),
+          billRow(order.hasTip ? 'Total Paid' : 'Grand Total',
+              fmt.format(order.paidTotal),
+              bold: true),
           divider(),
 
           // ── Payment info ────────────────────────────────────────────────

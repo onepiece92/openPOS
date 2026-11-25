@@ -165,12 +165,19 @@ class ReceiptBody extends StatelessWidget {
                     labelStyle: labelStyle.copyWith(color: cs.onSurface),
                     valueStyle: bodyStyle.copyWith(color: cs.onSurface),
                   ),
+                if (order.hasTip)
+                  _BillRow(
+                    label: 'Tip',
+                    value: fmt.format(order.tipAmount),
+                    labelStyle: labelStyle.copyWith(color: cs.onSurface),
+                    valueStyle: bodyStyle.copyWith(color: cs.onSurface),
+                  ),
                 divider,
 
                 // ── Grand total ───────────────────────────────────────────
                 _BillRow(
-                  label: 'Grand Total',
-                  value: fmt.format(order.total),
+                  label: order.hasTip ? 'Total Paid' : 'Grand Total',
+                  value: fmt.format(order.paidTotal),
                   labelStyle: boldStyle.copyWith(color: cs.onSurface),
                   valueStyle: boldStyle.copyWith(color: cs.onSurface),
                 ),

@@ -112,11 +112,14 @@ Future<List<int>> renderReceiptBytes(
       '- ${fmt.format(data.order.loyaltyDiscount)}',
     ));
   }
+  if (data.order.hasTip) {
+    bytes.addAll(_kv(g, 'Tip', fmt.format(data.order.tipAmount)));
+  }
   bytes.addAll(g.hr(ch: '='));
   bytes.addAll(_kv(
     g,
-    'TOTAL',
-    fmt.format(data.order.total),
+    data.order.hasTip ? 'TOTAL PAID' : 'TOTAL',
+    fmt.format(data.order.paidTotal),
     bold: true,
   ));
   bytes.addAll(g.hr());

@@ -28,7 +28,8 @@ String buildReceiptText(ReceiptBodyData data, CurrencyFormatter fmt) {
       'Tax: ${fmt.format(o.taxTotal)}',
     if (o.loyaltyDiscount > 0)
       'Loyalty (${o.pointsRedeemed} pts): -${fmt.format(o.loyaltyDiscount)}',
-    'Total: ${fmt.format(o.total)}',
+    if (o.hasTip) 'Tip: ${fmt.format(o.tipAmount)}',
+    '${o.hasTip ? 'Total paid' : 'Total'}: ${fmt.format(o.paidTotal)}',
     'Paid: ${o.paymentMethod}',
   ];
   return lines.join('\n');
