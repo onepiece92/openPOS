@@ -1,8 +1,8 @@
 # Open POS
 
-**A free, 100% offline point-of-sale app. Your sales data never leaves your device.**
+**A free, 100% offline point-of-sale app that never sends your data anywhere.**
 
-No subscription. No account. No internet connection needed. Ring up sales, manage tables and track your takings on an Android or iOS phone or tablet, with everything stored on that device.
+No subscription. No account. No internet connection needed. Ring up sales, manage tables and track your takings on an Android or iOS phone or tablet, with your data kept in the app on that device.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Platforms: Android | iOS](https://img.shields.io/badge/platforms-Android%20%7C%20iOS-informational.svg)](#get-open-pos)
@@ -68,7 +68,7 @@ HOLD -->
 
 ## Why Open POS
 
-- **Your data stays with you.** The app's own code makes no network calls: no accounts, no cloud, no analytics. Sales, customers and stock live in a database on your device and nowhere else.
+- **Your data stays with you.** The app's own code makes no network calls: no accounts, no cloud, no analytics. Sales, customers and stock live in a database on your device. Your phone's own backup (Google or iCloud), if you have it turned on, may include app data.
 - **Free, for good.** No subscription, no per-device fee, no premium tier. MIT licensed.
 - **Works with no internet.** A dropped connection never stops a sale, because the app never needed one.
 - **Made for small shops and cafes.** Tables, held tickets and simple reports, without the setup of a big system.
@@ -115,7 +115,7 @@ HOLD -->
 ### Money and reports
 - Tax rates, with tax switched on or off per product
 - Expense tracking
-- Reports dashboard: revenue, expenses, net profit, average order value, with charts
+- Reports dashboard: revenue and expenses, average order value, with charts
 - Audit log of important actions
 
 ### Your data
