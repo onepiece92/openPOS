@@ -67,7 +67,7 @@ final _articles = <_Article>[
     category: 'Getting Started',
     title: 'Setting up your store',
     description:
-        'Configure your store name, currency, and basic settings.',
+        'Set your store name, currency, and tax.',
     readTime: '2 min',
     icon: Icons.store_outlined,
     sections: [
@@ -76,30 +76,30 @@ final _articles = <_Article>[
         steps: [
           'Tap the ☰ menu in the top-left corner to open the sidebar.',
           'Select "Settings" from the navigation drawer.',
-          'Tap "Store Profile" to open your store details.',
+          'Tap the "Store Profile" card to open your store details.',
         ],
       ),
       ArticleSection(
         heading: 'Configure Your Store',
         steps: [
-          'Enter your business name — this appears on receipts and reports.',
-          'Choose your currency (e.g. NPR, USD, INR). All prices and totals will display in this format.',
-          'Set your timezone so that sales timestamps and daily reports are accurate.',
-          'Add your store address and phone number for receipt printing.',
+          'Enter your business name — this appears on receipts.',
+          'Optionally add a tagline, tax registration number, phone and address, then tap "Save Profile".',
+          'Back in Settings, tap "Currency" in the Currency section and pick your currency. All prices and totals show in your currency.',
         ],
         tip:
-            'You can update these details anytime from Settings → Store Profile. Changes take effect immediately.',
+            'You can change these details any time from Settings.',
       ),
       ArticleSection(
-        heading: 'Set Your Default Tax Rate',
+        heading: 'Set Your Tax Rates',
         steps: [
-          'Go to Settings → Tax Rates.',
-          'A default tax rate (e.g. 13% VAT) is pre-configured. Edit it to match your local tax.',
-          'Toggle between "Inclusive" (tax is part of the price) or "Exclusive" (tax added on top).',
-          'You can create multiple tax rates if your products have different tax categories.',
+          'The country you chose during setup gives you a starting tax name and rate. Change it to match your local tax.',
+          'Open "Tax" from the sidebar to see your tax rates. Tap "+" to add one, or a rate\'s ⋮ menu to edit it or set it as the default.',
+          'Choose the "Inclusion type" from the dropdown: Exclusive (added on top) or Inclusive (embedded in price).',
+          'You can keep several rates, but a sale uses one rate for the whole cart. Pick it on the Cart screen with "+ Add Tax" or "Change Tax".',
+          'You can also choose the default rate in Settings → Tax → "Default Tax Rate".',
         ],
         tip:
-            'Products marked as "Taxable" will automatically use the assigned tax rate at checkout.',
+            'Only products with "Apply tax" switched on are taxed at checkout.',
       ),
     ],
   ),
@@ -107,7 +107,7 @@ final _articles = <_Article>[
     category: 'Getting Started',
     title: 'Adding your first product',
     description:
-        'Learn how to create products with variants, bundles, and tax rates.',
+        'Create products with a price, category, tax, stock and units.',
     readTime: '3 min',
     icon: Icons.inventory_2_outlined,
     sections: [
@@ -115,31 +115,30 @@ final _articles = <_Article>[
         heading: 'Create a Product',
         steps: [
           'Go to Products from the sidebar menu.',
-          'Tap the "+" button in the bottom-right corner.',
+          'Tap the "Add Product" button.',
           'Enter the product name and selling price.',
-          'Optionally add a SKU (barcode number).',
-          'Choose a category to organise your catalog (e.g. Beverages, Food, Retail).',
+          'Optionally add a SKU / Barcode. One is generated for you if you leave it blank.',
+          'Choose a category to organise your catalog (e.g. Beverages, Food, Retail). Create categories from Categories in the sidebar.',
+          'Tap "Add Product" at the bottom to save.',
         ],
       ),
       ArticleSection(
-        heading: 'Add Variants & Modifiers',
+        heading: 'Tax, Cost & Stock',
         steps: [
-          'Scroll down to the "Variants" section on the product form.',
-          'Add variants like Size (Small, Medium, Large) with optional price adjustments.',
-          'Add modifiers for optional add-ons (e.g. Extra Cheese +₹20).',
-          'Each variant can have its own stock quantity for precise tracking.',
-        ],
-        tip:
-            'Variants are great for the same product in different sizes or flavours. Modifiers work best for optional extras the customer can choose.',
-      ),
-      ArticleSection(
-        heading: 'Set Tax & Stock',
-        steps: [
-          'Enable the "Taxable" toggle to apply your store\'s default tax rate.',
-          'To assign a specific tax rate, tap "Tax Rate" and pick one.',
-          'Enter the current stock quantity if you want stock tracking enabled.',
+          'Switch on "Apply tax" to include the product in tax calculations.',
+          'Enter a "Purchase price" to see cost of goods and profit in Reports.',
+          'In the "Inventory" section, switch on "Track stock" and enter the stock quantity.',
           'The stock count automatically decreases with each sale.',
         ],
+      ),
+      ArticleSection(
+        heading: 'Units',
+        steps: [
+          'Every product has a main unit (e.g. pcs). Stock and price are per main unit.',
+          'To also sell in bulk, add a secondary unit (e.g. box, dozen) and its conversion.',
+        ],
+        tip:
+            'Switch on "Hide in POS" to keep a product off the POS screen while still using it as a bundle component.',
       ),
     ],
   ),
@@ -147,43 +146,42 @@ final _articles = <_Article>[
     category: 'Sales',
     title: 'Making a sale',
     description:
-        'Walk through a complete sale: add to cart, apply discounts, collect payment.',
-    readTime: '4 min',
+        'Walk through a complete sale: add to cart, apply a discount, collect payment.',
+    readTime: '3 min',
     icon: Icons.point_of_sale_outlined,
     sections: [
       ArticleSection(
         heading: 'Add Items to Cart',
         steps: [
-          'From the home screen, browse the product catalog or use the search bar.',
+          'From the POS screen, browse the product catalog or use the search bar.',
           'Tap a product to add it to the cart. Tap again to increase quantity.',
-          'If the product has variants, a selector will appear — pick the right option.',
+          'For a product with a second unit, long-press it and pick the unit.',
         ],
       ),
       ArticleSection(
-        heading: 'Apply Discounts',
+        heading: 'Apply a Discount',
         steps: [
-          'Tap an item in the cart to open its line options.',
-          'Select "Discount" and enter a percentage or fixed amount.',
-          'The discount is applied per line item and reflected in the subtotal.',
+          'Open the Cart screen and tap "+ Add Discount".',
+          'Choose "Flat amount" or "Percentage (%)", enter the value, and tap "Apply".',
+          'The discount applies to the whole order.',
         ],
-        tip:
-            'For a store-wide discount, apply it at checkout before confirming the payment.',
       ),
       ArticleSection(
         heading: 'Checkout & Payment',
         steps: [
-          'Tap the "Checkout" button at the bottom of the cart.',
-          'Review the order summary: items, subtotal, tax breakdown, and total.',
-          'Select a payment method — Cash is the default for offline POS.',
-          'For cash payments, enter the tendered amount — change due is calculated automatically.',
-          'Tap "Confirm Payment" to complete the sale.',
+          'Tap the cart button (cart icon and item count) in the bottom bar to open the Cart screen.',
+          'Review the order summary: items, subtotal, discount, tax, and total.',
+          'Tap "Checkout • <total>" at the bottom.',
+          'Select a payment method: Cash or Card.',
+          'For cash payments, enter the amount received — the change is calculated automatically.',
+          'Tap "Confirm & Charge <total>" to complete the sale.',
         ],
       ),
       ArticleSection(
         heading: 'After the Sale',
         steps: [
           'A digital receipt is shown on screen after each sale.',
-          'If a thermal printer is connected, the receipt prints automatically.',
+          'If a printer is saved in Settings → Hardware, the receipt prints automatically.',
           'The sale is recorded in your order history and reflected in reports immediately.',
         ],
         tip:
@@ -200,33 +198,31 @@ final _articles = <_Article>[
     icon: Icons.bookmark_border_rounded,
     sections: [
       ArticleSection(
-        heading: 'Hold an Order',
+        heading: 'Save a Ticket',
         steps: [
           'Add items to the cart as usual.',
-          'Tap the "Hold" button (bookmark icon) in the cart area.',
-          'Give the held order a name or note (e.g. "Table 3" or "John\'s order").',
-          'The current cart is saved and a fresh, empty cart is ready for the next customer.',
+          'Tap "Save" (pause icon) in the bottom bar.',
+          'The cart is saved as a ticket, named after the customer or "Ticket N", and a fresh, empty cart is ready for the next customer.',
         ],
         tip:
-            'You can hold multiple orders at the same time — useful for restaurants or busy retail counters.',
+            'You can hold multiple tickets at the same time — useful for restaurants or busy counters.',
       ),
       ArticleSection(
-        heading: 'Resume a Held Order',
+        heading: 'Resume a Ticket',
         steps: [
-          'Tap the held-orders icon in the top bar or home screen.',
-          'A list of all parked orders appears with their names and item counts.',
-          'Tap on any held order to load it back into the active cart.',
-          'Continue editing, add more items, or proceed straight to checkout.',
+          'Tap the banner above the bottom bar ("N held tickets — Tap to resume").',
+          'A list of active tickets appears with their names, item counts and totals.',
+          'Tap a ticket to load it back into the cart. If the cart already has items, you can save them as a ticket first or discard them.',
         ],
       ),
       ArticleSection(
-        heading: 'Delete a Held Order',
+        heading: 'Archive & Delete Tickets',
         steps: [
-          'Swipe left on a held order in the list, or tap the delete icon.',
-          'Confirm deletion — the items are discarded and the order is removed.',
+          'Tap the archive icon on an active ticket, or "Archive all tickets", to move tickets to the Archived tab.',
+          'In the Archived tab, restore a ticket, or delete it (or "Delete all archived") after confirming.',
         ],
         tip:
-            'Held orders persist even if you close and reopen the app. They are stored safely on your device.',
+            'Held tickets stay even if you close and reopen the app. They are stored safely on your device.',
       ),
     ],
   ),
@@ -234,15 +230,15 @@ final _articles = <_Article>[
     category: 'Inventory',
     title: 'Stock tracking',
     description:
-        'Set stock levels, get low-stock alerts, and audit stock adjustments.',
+        'Set stock levels, adjust them, and spot low stock.',
     readTime: '3 min',
     icon: Icons.warehouse_outlined,
     sections: [
       ArticleSection(
         heading: 'Enable Stock Tracking',
         steps: [
-          'Open any product and scroll to the "Stock" section.',
-          'Enter the current stock quantity (e.g. 50 units).',
+          'Open any product and scroll to the "Inventory" section.',
+          'Switch on "Track stock" and enter the stock quantity (e.g. 50 units).',
           'Save the product — stock tracking is now active for this item.',
         ],
       ),
@@ -250,28 +246,24 @@ final _articles = <_Article>[
         heading: 'How Stock Decreases',
         steps: [
           'Every time this product is sold, the stock count is reduced automatically.',
-          'If a sale is refunded with the "Restock" option, the quantity is added back.',
-          'Stock changes are recorded in the audit log with timestamps.',
+          'If a sale is refunded with "Restock items" switched on, the quantity is added back.',
         ],
       ),
       ArticleSection(
         heading: 'Adjust Stock Manually',
         steps: [
           'Go to Inventory from the sidebar.',
-          'Find the product and tap "Adjust Stock".',
-          'Enter the adjustment amount (positive to add, negative to remove).',
-          'Select a reason code (e.g. "Received shipment", "Damaged", "Correction").',
-          'The adjustment is logged in the audit trail for accountability.',
+          'Use the − / + buttons on a product card to change its stock by one.',
+          'Or tap the quantity, type a new stock quantity, and tap "Set".',
+          'The ⋮ menu on a card can mark a product out of stock, back in stock, or stop tracking it.',
         ],
-        tip:
-            'Set a low-stock threshold per product. Products at or below that level show a low-stock badge in the app.',
       ),
       ArticleSection(
         heading: 'Low-Stock Alerts',
         steps: [
-          'In the product settings, set a "Low Stock Alert" threshold (e.g. 5 units).',
-          'When stock reaches the threshold, a warning badge appears on the product.',
-          'You can view all low-stock items from the Inventory screen filter.',
+          'Set one shop-wide "Low Stock Threshold" in Settings → Inventory (e.g. 5 units).',
+          'When a product\'s stock is at or below the threshold, a low-stock badge appears on it.',
+          'Use the "Low" and "Out" filters on the Inventory screen to see those products.',
         ],
       ),
     ],
@@ -281,7 +273,7 @@ final _articles = <_Article>[
     title: 'Composite / bundle products',
     description:
         'Build product bundles that deduct stock from multiple components.',
-    readTime: '3 min',
+    readTime: '2 min',
     icon: Icons.workspaces_outlined,
     sections: [
       ArticleSection(
@@ -295,9 +287,9 @@ final _articles = <_Article>[
       ArticleSection(
         heading: 'Create a Bundle Product',
         steps: [
-          'Go to Products → tap "+" to add a new product.',
-          'Toggle the "Composite / Bundle" option on.',
-          'Search and add component products with their required quantities.',
+          'Go to Products → tap "Add Product".',
+          'Switch on "Composite / Bundle".',
+          'Tap "Add component", pick a product, and enter its quantity per bundle.',
           'Set the bundle selling price — this can be different from the sum of component prices.',
           'Save the product. It now appears in your catalog like any regular item.',
         ],
@@ -307,9 +299,8 @@ final _articles = <_Article>[
       ArticleSection(
         heading: 'How Bundle Stock Works',
         steps: [
-          'The bundle itself doesn\'t hold stock — its availability depends on its components.',
-          'If any component runs out of stock, the bundle becomes unavailable.',
-          'Stock deductions happen per-component when the bundle is sold at checkout.',
+          'The bundle itself doesn\'t track its own stock.',
+          'When the bundle is sold, each component\'s stock is deducted at checkout.',
         ],
       ),
     ],
@@ -318,43 +309,41 @@ final _articles = <_Article>[
     category: 'Reports',
     title: 'Understanding your reports',
     description:
-        'Revenue, expenses, and top-selling products at a glance.',
+        'Revenue, tax, profit, and top-selling products at a glance.',
     readTime: '2 min',
     icon: Icons.bar_chart_rounded,
     sections: [
       ArticleSection(
-        heading: 'Sales Summary Dashboard',
+        heading: 'Choose a Period',
         steps: [
           'Open Reports from the sidebar menu.',
-          'The dashboard shows today\'s total sales, number of transactions, and average order value.',
-          'Toggle between Today, This Week, and This Month for different time ranges.',
-          'Top-selling products are ranked by units sold or revenue generated.',
+          'Choose Today, Week, Month or Year, or tap the calendar icon for a custom date range.',
         ],
       ),
       ArticleSection(
-        heading: 'Expense vs Revenue (P&L)',
+        heading: 'Summary Cards',
         steps: [
-          'Scroll to the Profit & Loss section in Reports.',
-          'See your total revenue, total expenses, and net profit for the selected period.',
-          'Expenses are categorised (Rent, Supplies, Wages, etc.) for easy review.',
+          'The cards show Revenue, Tax Collected (shown with your shop\'s tax name), Cost of Goods, Expenses, Net Profit and Orders.',
+          'Net profit is sales without tax, minus cost of goods and expenses.',
+          'Record expenses on the Expenses screen.',
         ],
         tip:
-            'Add expenses regularly through the Expenses screen so your P&L report stays accurate.',
+            'Set a purchase price on your products so cost of goods and profit stay accurate.',
       ),
       ArticleSection(
-        heading: 'Tax Report',
+        heading: 'Chart, Payment Mix & Top Products',
         steps: [
-          'The Tax Report shows total tax collected, broken down by each tax rate.',
-          'Useful for filing VAT or sales tax returns with your local tax authority.',
-          'Export the report as CSV for your accountant or records.',
+          'The sales chart shows sales over the selected period.',
+          'The Summary shows the average order value, and the orders and amount paid by cash and by card.',
+          'Top products are ranked by units sold.',
         ],
       ),
       ArticleSection(
-        heading: 'Export Reports',
+        heading: 'Export Your Data',
         steps: [
-          'Tap the share/export icon on any report screen.',
-          'Choose CSV for spreadsheet-friendly data, or PDF for a formatted summary.',
-          'Share the file via email, messaging apps, or save it to your device.',
+          'Go to Settings → Backup & Restore.',
+          'Export products, customers, expenses or order history as CSV files.',
+          'Or back up everything into one .zip file.',
         ],
         tip:
             'All reports are generated from your local data — no internet required. Data never leaves your device.',

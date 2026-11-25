@@ -18,10 +18,11 @@ class ShortcutsScreen extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         children: [
           _SectionHeader('Navigation', tt, cs),
-          _ShortcutRow(keys: const ['⌘', 'H'], label: 'Home', tt: tt, cs: cs),
+          _ShortcutRow(
+              keys: const ['⌘', 'H'], label: 'POS (home)', tt: tt, cs: cs),
           _ShortcutRow(
               keys: const ['⌘', 'P'],
-              label: 'Open product page',
+              label: 'Products',
               tt: tt,
               cs: cs),
           _ShortcutRow(keys: const ['⌘', 'O'], label: 'Orders', tt: tt, cs: cs),
@@ -36,13 +37,13 @@ class ShortcutsScreen extends StatelessWidget {
           _ShortcutRow(
               keys: const ['⌘', ','], label: 'Settings', tt: tt, cs: cs),
           const SizedBox(height: 20),
-          _SectionHeader('POS / Cart', tt, cs),
+          _SectionHeader('POS screen', tt, cs),
           _ShortcutRow(
               keys: const ['⌘', 'F'], label: 'Focus search', tt: tt, cs: cs),
           _ShortcutRow(
               keys: const ['Esc'], label: 'Clear search', tt: tt, cs: cs),
           _ShortcutRow(
-              keys: const ['⌘', 'Enter'], label: 'Checkout', tt: tt, cs: cs),
+              keys: const ['⌘', 'Enter'], label: 'Open cart', tt: tt, cs: cs),
           _ShortcutRow(
               keys: const ['⌘', 'K'], label: 'Clear cart', tt: tt, cs: cs),
           _ShortcutRow(
@@ -60,6 +61,11 @@ class ShortcutsScreen extends StatelessWidget {
               keys: const ['⌘', 'W'], label: 'Close / Back', tt: tt, cs: cs),
           _ShortcutRow(
               keys: const ['⌘', 'S'], label: 'Keyboard Shortcuts', tt: tt, cs: cs),
+          _ShortcutRow(
+              keys: const ['⌘', '⇧', '/'],
+              label: 'Keyboard Shortcuts',
+              tt: tt,
+              cs: cs),
           const SizedBox(height: 20),
           Container(
             padding: const EdgeInsets.all(14),
@@ -74,7 +80,7 @@ class ShortcutsScreen extends StatelessWidget {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Keyboard shortcuts are available on desktop and web builds.',
+                    'Keyboard shortcuts work on Mac, and on iPad with a keyboard.',
                     style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                   ),
                 ),
