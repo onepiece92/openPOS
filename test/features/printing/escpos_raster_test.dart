@@ -130,6 +130,25 @@ void main() {
     }
   });
 
+  group('the background-isolate job is byte-identical to the sync one', () {
+    for (final (label, pages, paper) in [
+      ('80mm line page', [_pngPage()], 80),
+      ('58mm line page', [_pngPage(width: 384)], 58),
+      ('80mm multi-page', [_pngPage(), _pngPage(height: 40)], 80),
+      ('575 px on 80mm', [_blockPage(575)], 80),
+      ('383 px on 58mm', [_blockPage(383)], 58),
+      ('transparent 575 px', [_blockPage(575, transparent: true)], 80),
+    ]) {
+      test(label, () async {
+        final viaIsolate = await escPosRasterBytes(pages, paper);
+        final reference =
+            escPosRasterBytesSync(pages, paper, await escPosProfile());
+
+        expect(viaIsolate, reference);
+      });
+    }
+  });
+
   test('a transparent background prints as white paper, not solid black',
       () async {
     final raster = _firstRaster(

@@ -1,3 +1,4 @@
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
@@ -13,11 +14,35 @@ import 'package:pos_app/features/printing/domain/render_receipt_image.dart';
 /// script, with no code-page guessing.
 ///
 /// [paperMm] must be 58 or 80; anything else is treated as 80mm.
+///
+/// Decoding, fitting and rastering the pages of a long bill is pure CPU
+/// work, so it runs on a background isolate to keep the till's UI
+/// smooth. The capability profile reads the asset bundle, which only the
+/// main isolate can do, so it is loaded here and handed over as plain data.
 Future<List<int>> escPosRasterBytes(
   List<Uint8List> pages,
   int paperMm,
 ) async {
   final profile = await escPosProfile();
+  return _rasterOffMainIsolate(pages, paperMm, profile);
+}
+
+// Kept apart from [escPosRasterBytes] so the isolate closure captures only
+// these three sendable values.
+Future<List<int>> _rasterOffMainIsolate(
+  List<Uint8List> pages,
+  int paperMm,
+  CapabilityProfile profile,
+) =>
+    Isolate.run(() => escPosRasterBytesSync(pages, paperMm, profile));
+
+/// The synchronous body of [escPosRasterBytes], run on whichever isolate
+/// calls it. Also the reference the isolate path is tested against.
+List<int> escPosRasterBytesSync(
+  List<Uint8List> pages,
+  int paperMm,
+  CapabilityProfile profile,
+) {
   final generator = Generator(
     paperMm == 58 ? PaperSize.mm58 : PaperSize.mm80,
     profile,
