@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pos_app/features/review/domain/review_prompter.dart';
+import 'package:pos_app/features/review/review_providers.dart';
 import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-class SupportScreen extends StatelessWidget {
+class SupportScreen extends ConsumerWidget {
   const SupportScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
 
@@ -45,6 +48,17 @@ class SupportScreen extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           _SectionHeader('Resources', tt, cs),
+          if (storeReviewSupported)
+            _SupportTile(
+              icon: Icons.star_outline_rounded,
+              title: 'Rate Open POS',
+              subtitle: 'Leave a review on the store',
+              cs: cs,
+              tt: tt,
+              onTap: () => ref
+                  .read(reviewPrompterProvider)
+                  .openStoreListing(appStoreId: kAppStoreId),
+            ),
           _SupportTile(
             icon: Icons.bug_report_outlined,
             title: 'Report a Bug',
