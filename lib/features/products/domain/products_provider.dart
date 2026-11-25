@@ -7,8 +7,15 @@ import 'package:pos_app/core/utils/currency_formatter.dart';
 
 /// All active products, reactively updated.
 /// POS catalog — excludes hidden-in-pos products.
+///
+/// Several screens share this one list, so it is handed out unmodifiable:
+/// sorting or editing it in place throws. Work on a copy (`[...list]`).
 final productsStreamProvider = StreamProvider<List<Product>>((ref) {
-  return ref.watch(databaseProvider).productsDao.watchAllForPos();
+  return ref
+      .watch(databaseProvider)
+      .productsDao
+      .watchAllForPos()
+      .map(List<Product>.unmodifiable);
 });
 
 /// Products filtered by category. Used only by the categories screen's
