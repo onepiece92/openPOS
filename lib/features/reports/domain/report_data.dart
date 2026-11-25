@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart' show TableUpdateQuery;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
@@ -29,11 +30,13 @@ extension ReportPeriodX on ReportPeriod {
     };
   }
 
-  // Truncated to the hour so ReportQuery equality is stable across rebuilds and
-  // the provider cache isn't invalidated every minute.
+  // The end of today, so the period always covers everything sold up to
+  // now. It only changes at midnight, which keeps ReportQuery equality (the
+  // provider key) stable across rebuilds; [reportProvider] refreshes itself
+  // when the underlying tables change.
   DateTime get to {
     final n = DateTime.now();
-    return DateTime(n.year, n.month, n.day, n.hour);
+    return DateTime(n.year, n.month, n.day, 23, 59, 59, 999);
   }
 }
 
@@ -109,6 +112,13 @@ String _hourLabel(int h) {
 final reportProvider =
     FutureProvider.family<ReportData, ReportQuery>((ref, query) async {
   final db = ref.watch(databaseProvider);
+  // The key no longer moves during the day, so recompute when a sale, void,
+  // refund or expense lands instead of serving the first answer until midnight.
+  final changes = db
+      .tableUpdates(TableUpdateQuery.onAllTables(
+          [db.orders, db.orderItems, db.returns, db.expenses]))
+      .listen((_) => ref.invalidateSelf());
+  ref.onDispose(changes.cancel);
   final from = query.from;
   final to = query.to;
 
