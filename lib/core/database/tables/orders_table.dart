@@ -17,6 +17,10 @@ import 'package:pos_app/core/database/tables/tables_table.dart';
     name: 'idx_orders_invoice_no',
     columns: {#invoicePrefix, #invoiceNo},
     unique: true)
+// History list, paging and every period report walk orders by date.
+@TableIndex(name: 'idx_orders_created_at', columns: {#createdAt})
+// Order search by customer name (and a customer's order history).
+@TableIndex(name: 'idx_orders_customer_id', columns: {#customerId})
 class Orders extends Table {
   IntColumn get id => integer().autoIncrement()();
   IntColumn get invoiceNo => integer().nullable()();

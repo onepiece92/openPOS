@@ -6,6 +6,10 @@ import 'package:pos_app/core/database/tables/products_table.dart';
 /// delta > 0 = stock added, delta < 0 = stock removed.
 ///
 /// reason_code: 'damage' | 'shrink' | 'count' | 'receive' | 'return' | 'other'
+// One product's adjustment history, newest first.
+@TableIndex(
+    name: 'idx_stock_adjustments_product_created',
+    columns: {#productId, #createdAt})
 class StockAdjustments extends Table {
   IntColumn get id => integer().autoIncrement()();
   IntColumn get productId => integer().references(Products, #id)();

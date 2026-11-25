@@ -4,6 +4,8 @@ import 'package:pos_app/core/database/tables/orders_table.dart';
 
 /// Partial or full refunds linked to the original order.
 /// restock = true means inventory is incremented back on the returned items.
+// Refunds of one order: refundable amount, net-of-refunds reports.
+@TableIndex(name: 'idx_returns_order_id', columns: {#orderId})
 class Returns extends Table {
   IntColumn get id => integer().autoIncrement()();
   IntColumn get orderId => integer().references(Orders, #id)();

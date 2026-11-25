@@ -6,6 +6,8 @@ import 'package:pos_app/core/database/tables/expense_categories_table.dart';
 ///
 /// status:              'pending' | 'approved' | 'rejected'
 /// recurring_frequency: 'daily' | 'weekly' | 'monthly' (null if not recurring)
+// Expense list (newest first) and the period total on the dashboard.
+@TableIndex(name: 'idx_expenses_date', columns: {#date})
 class Expenses extends Table {
   IntColumn get id => integer().autoIncrement()();
   RealColumn get amount => real()();

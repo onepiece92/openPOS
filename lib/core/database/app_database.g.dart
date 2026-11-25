@@ -7996,6 +7996,23 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $AuditLogTable auditLog = $AuditLogTable(this);
   late final Index idxOrdersInvoiceNo = Index('idx_orders_invoice_no',
       'CREATE UNIQUE INDEX idx_orders_invoice_no ON orders (invoice_prefix, invoice_no)');
+  late final Index idxOrdersCreatedAt = Index('idx_orders_created_at',
+      'CREATE INDEX idx_orders_created_at ON orders (created_at)');
+  late final Index idxOrdersCustomerId = Index('idx_orders_customer_id',
+      'CREATE INDEX idx_orders_customer_id ON orders (customer_id)');
+  late final Index idxOrderItemsOrderId = Index('idx_order_items_order_id',
+      'CREATE INDEX idx_order_items_order_id ON order_items (order_id)');
+  late final Index idxOrderTaxesOrderId = Index('idx_order_taxes_order_id',
+      'CREATE INDEX idx_order_taxes_order_id ON order_taxes (order_id)');
+  late final Index idxReturnsOrderId = Index('idx_returns_order_id',
+      'CREATE INDEX idx_returns_order_id ON returns (order_id)');
+  late final Index idxExpensesDate = Index(
+      'idx_expenses_date', 'CREATE INDEX idx_expenses_date ON expenses (date)');
+  late final Index idxStockAdjustmentsProductCreated = Index(
+      'idx_stock_adjustments_product_created',
+      'CREATE INDEX idx_stock_adjustments_product_created ON stock_adjustments (product_id, created_at)');
+  late final Index idxAuditLogCreatedAt = Index('idx_audit_log_created_at',
+      'CREATE INDEX idx_audit_log_created_at ON audit_log (created_at)');
   late final ProductsDao productsDao = ProductsDao(this as AppDatabase);
   late final OrdersDao ordersDao = OrdersDao(this as AppDatabase);
   late final CustomersDao customersDao = CustomersDao(this as AppDatabase);
@@ -8027,7 +8044,15 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         expenses,
         stockAdjustments,
         auditLog,
-        idxOrdersInvoiceNo
+        idxOrdersInvoiceNo,
+        idxOrdersCreatedAt,
+        idxOrdersCustomerId,
+        idxOrderItemsOrderId,
+        idxOrderTaxesOrderId,
+        idxReturnsOrderId,
+        idxExpensesDate,
+        idxStockAdjustmentsProductCreated,
+        idxAuditLogCreatedAt
       ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules(

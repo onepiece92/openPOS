@@ -6,6 +6,8 @@ import 'package:pos_app/core/database/tables/products_table.dart';
 /// Line items within an order.
 /// product_name is a snapshot of the name at time of sale
 /// (product may be renamed later; the receipt must remain accurate).
+// Lines of one order: receipts, order detail, reports, CSV export.
+@TableIndex(name: 'idx_order_items_order_id', columns: {#orderId})
 class OrderItems extends Table {
   IntColumn get id => integer().autoIncrement()();
   IntColumn get orderId => integer().references(Orders, #id)();

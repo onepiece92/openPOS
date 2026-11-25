@@ -8,6 +8,8 @@ import 'package:drift/drift.dart';
 /// action:      'create' | 'update' | 'delete' | 'void' | 'refund' | 'override'
 /// old_value / new_value: JSON snapshots of the changed record.
 /// metadata: JSON bag for extra context (reason, pin_verified, override_amount).
+// The audit screen lists the latest entries.
+@TableIndex(name: 'idx_audit_log_created_at', columns: {#createdAt})
 class AuditLog extends Table {
   IntColumn get id => integer().autoIncrement()();
   DateTimeColumn get createdAt =>

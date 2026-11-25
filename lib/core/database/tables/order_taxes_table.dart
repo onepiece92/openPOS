@@ -6,6 +6,8 @@ import 'package:pos_app/core/database/tables/tax_rates_table.dart';
 /// Per-tax-rate breakdown for an order.
 /// Snapshots the rate name and percent so receipts remain accurate
 /// even if the tax rate is later edited.
+// Tax lines of one order: receipts, order detail, top-products report.
+@TableIndex(name: 'idx_order_taxes_order_id', columns: {#orderId})
 class OrderTaxes extends Table {
   IntColumn get id => integer().autoIncrement()();
   IntColumn get orderId => integer().references(Orders, #id)();

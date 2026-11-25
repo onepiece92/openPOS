@@ -76,7 +76,7 @@ class AppDatabase extends _$AppDatabase {
       : super(executor ?? _openConnection());
 
   /// Bump together with a new `onUpgrade` step below.
-  static const int currentSchemaVersion = 14;
+  static const int currentSchemaVersion = 15;
 
   @override
   int get schemaVersion => currentSchemaVersion;
@@ -182,12 +182,31 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(orderTaxes, orderTaxes.isInclusive);
             await backfillV14();
           }
+          if (from < 15) {
+            // Secondary indexes so history, reports and per-order lookups
+            // stop scanning whole tables as the shop's data grows. Each one
+            // is declared with @TableIndex on its table; the query it serves
+            // is pinned by test/core/database/query_plan_test.dart.
+            await m.createIndex(idxOrdersCreatedAt);
+            await m.createIndex(idxOrdersCustomerId);
+            await m.createIndex(idxOrderItemsOrderId);
+            await m.createIndex(idxOrderTaxesOrderId);
+            await m.createIndex(idxReturnsOrderId);
+            await m.createIndex(idxAuditLogCreatedAt);
+            await m.createIndex(idxStockAdjustmentsProductCreated);
+            await m.createIndex(idxExpensesDate);
+          }
         },
         beforeOpen: (details) async {
           // Enable WAL mode for better concurrent read performance.
           // Enable FK constraints (off by default in SQLite).
           await customStatement('PRAGMA journal_mode = WAL');
           await customStatement('PRAGMA foreign_keys = ON');
+          // Sorting/grouping scratch space in RAM instead of temp files —
+          // measurably faster for the long-range report queries. `synchronous`
+          // is deliberately left at its default: a committed sale must
+          // survive power loss.
+          await customStatement('PRAGMA temp_store = MEMORY');
         },
       );
 
