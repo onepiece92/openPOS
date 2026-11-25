@@ -1,36 +1,39 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:pos_app/core/database/app_database.dart';
-import 'package:pos_app/core/utils/currency_formatter.dart';
+import 'package:pos_app/features/cart/domain/pos_catalog_provider.dart';
+import 'package:pos_app/features/cart/presentation/pos_cart_actions.dart';
+import 'package:pos_app/features/products/domain/favorites_provider.dart';
+import 'package:pos_app/features/products/domain/products_provider.dart';
 
-class PosProductTile extends StatelessWidget {
-  const PosProductTile({
-    super.key,
-    required this.product,
-    required this.fmt,
-    required this.qtyInCart,
-    required this.onTap,
-    this.onLongPress,
-    required this.onIncrement,
-    required this.onDecrement,
-    required this.isFavorite,
-    required this.onToggleFavorite,
-  });
+/// Watches only what it shows: this product's main-unit quantity, whether
+/// it is a favourite, and the currency format. A cart change elsewhere does
+/// not rebuild it, and its taps read the cart when they happen.
+class PosProductTile extends ConsumerWidget {
+  const PosProductTile({super.key, required this.product});
 
   final Product product;
-  final CurrencyFormatter fmt;
-  final int qtyInCart;
-  final VoidCallback onTap;       // add to cart (not in cart)
-  final VoidCallback? onLongPress; // unit picker (products with a 2nd unit)
-  final VoidCallback onIncrement; // qty++
-  final VoidCallback onDecrement; // qty-- / remove
-  final bool isFavorite;
-  final VoidCallback onToggleFavorite;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
+    final fmt = ref.watch(currencyFormatterProvider);
+    final qtyInCart = ref.watch(
+        cartMainUnitQtyProvider.select((qty) => qty[product.id] ?? 0));
+    final isFavorite = ref
+        .watch(favoritesProvider.select((ids) => ids.contains(product.id)));
+
+    void onTap() => PosCartActions.of(context).add(product);
+    void onIncrement() => PosCartActions.of(context).step(product, 1);
+    void onDecrement() => PosCartActions.of(context).step(product, -1);
+    void onToggleFavorite() =>
+        ref.read(favoritesProvider.notifier).toggle(product.id);
+    final onLongPress = product.secondaryUnit == null
+        ? null
+        : () => PosCartActions.of(context).pickUnit(context, product);
+
     final inCart = qtyInCart > 0;
     // is_out_of_stock flag OR negative qty (over-sold) → blocked.
     // 0 = unlimited — tappable.
@@ -41,7 +44,7 @@ class PosProductTile extends StatelessWidget {
         qtyInCart >= product.stockQuantity;
 
     return GestureDetector(
-      // Root tile stays tappable at cap — home.dart's allowQty surfaces
+      // Root tile stays tappable at cap — PosCartActions surfaces
       // the "Only N in stock" snackbar. The greyed `+` button is the
       // visual cap indicator.
       onTap: outOfStock ? null : (inCart ? onIncrement : onTap),

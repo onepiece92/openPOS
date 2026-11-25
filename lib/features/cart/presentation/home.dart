@@ -4,18 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/services/demo_data_service.dart';
-import 'package:pos_app/core/utils/currency_formatter.dart';
-import 'package:pos_app/features/cart/domain/cart_item.dart';
-import 'package:pos_app/features/cart/domain/stock_cap.dart';
-import 'package:pos_app/shared/widgets/app_sheet.dart';
 import 'package:pos_app/features/cart/presentation/providers/cart_notifier.dart';
-import 'package:pos_app/features/cart/presentation/widgets/unit_picker_sheet.dart';
+import 'package:pos_app/features/cart/domain/pos_catalog_provider.dart';
 import 'package:pos_app/features/cart/domain/pos_filter_provider.dart';
 import 'package:pos_app/features/cart/presentation/widgets/grid_product_tile.dart';
 import 'package:pos_app/features/cart/presentation/widgets/checkout_bar.dart';
 import 'package:pos_app/features/cart/presentation/widgets/held_tickets_bar.dart';
 import 'package:pos_app/features/cart/presentation/widgets/product_tile.dart';
-import 'package:pos_app/features/products/domain/favorites_provider.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
 import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
 
@@ -49,78 +44,14 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     super.dispose();
   }
 
-  List<Product> _applyFilter(
-    List<Product> all,
-    Map<int, int> salesCounts,
-    PosFilterState f,
-    Set<int> favorites,
-  ) {
-    var list = f.selectedCategoryId == null
-        ? all
-        : all.where((p) => p.categoryId == f.selectedCategoryId).toList();
-    if (f.favoritesOnly) {
-      list = list.where((p) => favorites.contains(p.id)).toList();
-    }
-    if (f.search.isNotEmpty) {
-      final q = f.search.toLowerCase();
-      list = list
-          .where((p) =>
-              p.name.toLowerCase().contains(q) ||
-              p.sku.toLowerCase().contains(q))
-          .toList();
-    }
-    switch (f.sortMode) {
-      case PosSortMode.mostSold:
-        list.sort((a, b) {
-          final diff =
-              (salesCounts[b.id] ?? 0).compareTo(salesCounts[a.id] ?? 0);
-          return diff != 0 ? diff : a.name.compareTo(b.name);
-        });
-      case PosSortMode.nameAZ:
-        list.sort((a, b) => a.name.compareTo(b.name));
-      case PosSortMode.nameZA:
-        list.sort((a, b) => b.name.compareTo(a.name));
-      case PosSortMode.priceLH:
-        list.sort((a, b) => a.price.compareTo(b.price));
-      case PosSortMode.priceHL:
-        list.sort((a, b) => b.price.compareTo(a.price));
-    }
-    return list;
-  }
-
   @override
   Widget build(BuildContext context) {
-    final productsAsync = ref.watch(productsStreamProvider);
+    // Nothing here watches the cart or the product list: a tap on a tile
+    // rebuilds that tile and the checkout bar, not this screen.
     final categoriesAsync = ref.watch(categoriesStreamProvider);
-    final salesCountsAsync = ref.watch(productSalesCountProvider);
-    final cart = ref.watch(cartProvider);
-    final fmt = ref.watch(currencyFormatterProvider);
     final cs = Theme.of(context).colorScheme;
-    final salesCounts = salesCountsAsync.valueOrNull ?? {};
     final filter = ref.watch(posFilterProvider);
     final filterN = ref.read(posFilterProvider.notifier);
-    final favorites = ref.watch(favoritesProvider);
-    final favoritesN = ref.read(favoritesProvider.notifier);
-
-    // Cap cart qty at stock for tracked products.
-    // Unlimited (qty=0) and flagged out-of-stock are untouched here —
-    // out-of-stock tiles are already blocked upstream.
-    // desiredMainUnits counts every line of the product (pcs + boxes).
-    // The cart notifier enforces the same cap on every path; this check
-    // exists to tell the cashier why the tap did nothing.
-    bool allowQty(Product p, int desiredMainUnits) {
-      final cap = stockCapFor(p);
-      if (cap == null || desiredMainUnits <= cap) return true;
-      ScaffoldMessenger.of(context)
-        ..clearSnackBars()
-        ..showSnackBar(SnackBar(
-          content: Text(cap == 0
-              ? '${p.name} is out of stock'
-              : 'Only $cap in stock for ${p.name}'),
-          duration: const Duration(seconds: 2),
-        ));
-      return false;
-    }
 
     if (_searchCtrl.text != filter.search) {
       _searchCtrl.text = filter.search;
@@ -133,13 +64,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       appBar: AppBar(
         title: const Text('POS'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.remove_shopping_cart_rounded),
-            tooltip: 'Clear cart',
-            onPressed: cart.isEmpty
-                ? null
-                : () => ref.read(cartProvider.notifier).clear(),
-          ),
+          const _ClearCartButton(),
           PopupMenuButton<String>(
             onSelected: (v) async {
               switch (v) {
@@ -214,7 +139,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
             _searchFocus.unfocus();
           },
           const SingleActivator(LogicalKeyboardKey.enter, meta: true): () {
-            if (cart.isNotEmpty) context.push('/cart');
+            if (ref.read(cartProvider).isNotEmpty) context.push('/cart');
           },
           const SingleActivator(LogicalKeyboardKey.keyK, meta: true): () {
             ref.read(cartProvider.notifier).clear();
@@ -343,106 +268,71 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                 error: (_, __) => const SizedBox.shrink(),
               ),
               // ── Product list ───────────────────────────────────────────────
-              Expanded(
-                child: productsAsync.when(
-                  data: (all) {
-                    final filtered =
-                        _applyFilter(all, salesCounts, filter, favorites);
-                    if (all.isEmpty) {
-                      return _EmptyProductsState(
-                        onAddProduct: () => context.push('/products/add'),
-                      );
-                    }
-                    if (filtered.isEmpty) {
-                      return Center(
-                        child: Text(
-                          filter.favoritesOnly
-                              ? 'No favorites yet — tap the star on any product'
-                              : 'No results',
-                          style: TextStyle(color: cs.onSurfaceVariant),
-                          textAlign: TextAlign.center,
-                        ),
-                      );
-                    }
-                    final productsById = {for (final p in all) p.id: p};
-                    // Tile steppers drive the main-unit line only…
-                    final cartMap = {
-                      for (final i in cart)
-                        if (!i.isSecondaryUnit) i.productId: i.quantity,
-                    };
-                    // …while the stock cap counts every line in main units.
-                    final committed = <int, int>{};
-                    for (final i in cart) {
-                      committed[i.productId] =
-                          (committed[i.productId] ?? 0) + i.mainUnitQty;
-                    }
-                    void tryAdd(Product p) {
-                      final current = committed[p.id] ?? 0;
-                      if (!allowQty(p, current + 1)) return;
-                      ref.read(cartProvider.notifier).addProduct(p);
-                    }
-
-                    void trySetQty(int id, int qty) {
-                      final p = productsById[id];
-                      if (p != null && qty > 0) {
-                        final otherLines =
-                            (committed[id] ?? 0) - (cartMap[id] ?? 0);
-                        if (!allowQty(p, otherLines + qty)) return;
-                      }
-                      ref.read(cartProvider.notifier).setQuantity(id, qty);
-                    }
-
-                    Future<void> pickUnit(Product p) async {
-                      final unit = await showAppSheet<String>(
-                        context: context,
-                        builder: (_) =>
-                            UnitPickerSheet(product: p, fmt: fmt),
-                      );
-                      if (unit == null) return;
-                      if (unit.isEmpty) {
-                        tryAdd(p);
-                        return;
-                      }
-                      final current = committed[p.id] ?? 0;
-                      final add = p.conversionRate.round();
-                      if (!allowQty(p, current + add)) return;
-                      ref
-                          .read(cartProvider.notifier)
-                          .addProductInSecondaryUnit(p);
-                    }
-
-                    if (filter.isGrid) {
-                      return _PosProductGrid(
-                        products: filtered,
-                        cart: cart,
-                        fmt: fmt,
-                        favorites: favorites,
-                        onToggleFavorite: favoritesN.toggle,
-                        onTap: tryAdd,
-                        onPickUnit: pickUnit,
-                        onSetQuantity: trySetQty,
-                      );
-                    }
-                    return _PosProductList(
-                      products: filtered,
-                      cart: cart,
-                      fmt: fmt,
-                      favorites: favorites,
-                      onToggleFavorite: favoritesN.toggle,
-                      onTap: tryAdd,
-                      onPickUnit: pickUnit,
-                      onSetQuantity: trySetQty,
-                    );
-                  },
-                  loading: () =>
-                      const Center(child: CircularProgressIndicator()),
-                  error: (e, _) => Center(child: Text('Error: $e')),
-                ),
-              ),
+              const Expanded(child: _ProductArea()),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+// ─── Clear-cart button ────────────────────────────────────────────────────────
+
+/// The only part of the app bar that cares about the cart, and only about
+/// whether it is empty.
+class _ClearCartButton extends ConsumerWidget {
+  const _ClearCartButton();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cartEmpty = ref.watch(cartProvider.select((c) => c.isEmpty));
+    return IconButton(
+      icon: const Icon(Icons.remove_shopping_cart_rounded),
+      tooltip: 'Clear cart',
+      onPressed:
+          cartEmpty ? null : () => ref.read(cartProvider.notifier).clear(),
+    );
+  }
+}
+
+// ─── Product area ─────────────────────────────────────────────────────────────
+
+/// Grid or list of the filtered, sorted catalogue. Rebuilds when that list
+/// or the grid/list toggle changes — never on a cart change.
+class _ProductArea extends ConsumerWidget {
+  const _ProductArea();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final catalog = ref.watch(posCatalogProvider);
+    final (isGrid, favoritesOnly) = ref.watch(
+        posFilterProvider.select((f) => (f.isGrid, f.favoritesOnly)));
+    return catalog.when(
+      data: (view) {
+        if (view.catalogEmpty) {
+          return _EmptyProductsState(
+            onAddProduct: () => context.push('/products/add'),
+          );
+        }
+        if (view.products.isEmpty) {
+          return Center(
+            child: Text(
+              favoritesOnly
+                  ? 'No favorites yet — tap the star on any product'
+                  : 'No results',
+              style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant),
+              textAlign: TextAlign.center,
+            ),
+          );
+        }
+        return isGrid
+            ? _PosProductGrid(products: view.products)
+            : _PosProductList(products: view.products);
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text('Error: $e')),
     );
   }
 }
@@ -600,31 +490,11 @@ class _Chip extends StatelessWidget {
 // ─── POS product grid ─────────────────────────────────────────────────────────
 
 class _PosProductGrid extends StatelessWidget {
-  const _PosProductGrid({
-    required this.products,
-    required this.cart,
-    required this.fmt,
-    required this.onTap,
-    required this.onPickUnit,
-    required this.onSetQuantity,
-    required this.favorites,
-    required this.onToggleFavorite,
-  });
+  const _PosProductGrid({required this.products});
   final List<Product> products;
-  final List<CartItem> cart;
-  final CurrencyFormatter fmt;
-  final ValueChanged<Product> onTap;
-  final ValueChanged<Product> onPickUnit;
-  final void Function(int productId, int qty) onSetQuantity;
-  final Set<int> favorites;
-  final ValueChanged<int> onToggleFavorite;
 
   @override
   Widget build(BuildContext context) {
-    final cartMap = {
-      for (final i in cart)
-        if (!i.isSecondaryUnit) i.productId: i.quantity,
-    };
     return GridView.builder(
       padding: const EdgeInsets.fromLTRB(10, 6, 10, 10),
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
@@ -634,22 +504,7 @@ class _PosProductGrid extends StatelessWidget {
         childAspectRatio: 0.9,
       ),
       itemCount: products.length,
-      itemBuilder: (_, i) {
-        final p = products[i];
-        final qty = cartMap[p.id] ?? 0;
-        return GridProductTile(
-          product: p,
-          fmt: fmt,
-          qtyInCart: qty,
-          isFavorite: favorites.contains(p.id),
-          onToggleFavorite: () => onToggleFavorite(p.id),
-          onTap: () => onTap(p),
-          onLongPress:
-              p.secondaryUnit == null ? null : () => onPickUnit(p),
-          onIncrement: () => onSetQuantity(p.id, qty + 1),
-          onDecrement: () => onSetQuantity(p.id, qty - 1),
-        );
-      },
+      itemBuilder: (_, i) => GridProductTile(product: products[i]),
     );
   }
 }
@@ -657,64 +512,43 @@ class _PosProductGrid extends StatelessWidget {
 // ─── POS product list ─────────────────────────────────────────────────────────
 
 class _PosProductList extends StatelessWidget {
-  const _PosProductList({
-    required this.products,
-    required this.cart,
-    required this.fmt,
-    required this.onTap,
-    required this.onPickUnit,
-    required this.onSetQuantity,
-    required this.favorites,
-    required this.onToggleFavorite,
-  });
+  const _PosProductList({required this.products});
   final List<Product> products;
-  final List<CartItem> cart;
-  final CurrencyFormatter fmt;
-  final ValueChanged<Product> onTap;
-  final ValueChanged<Product> onPickUnit;
-  final void Function(int productId, int qty) onSetQuantity;
-  final Set<int> favorites;
-  final ValueChanged<int> onToggleFavorite;
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final cartMap = {
-      for (final i in cart)
-        if (!i.isSecondaryUnit) i.productId: i.quantity,
-    };
     return ListView.separated(
       padding: const EdgeInsets.only(top: 4, bottom: 8),
       itemCount: products.length,
-      separatorBuilder: (_, i) {
-        final p = products[i];
-        final next = products[i + 1 < products.length ? i + 1 : i];
-        final inCart = (cartMap[p.id] ?? 0) > 0;
-        final nextInCart = (cartMap[next.id] ?? 0) > 0;
-        if (inCart || nextInCart) return const SizedBox(height: 2);
-        return Divider(
-          height: 1,
-          indent: 16,
-          endIndent: 16,
-          color: cs.outlineVariant.withValues(alpha: 0.5),
-        );
-      },
-      itemBuilder: (_, i) {
-        final p = products[i];
-        final qty = cartMap[p.id] ?? 0;
-        return PosProductTile(
-          product: p,
-          fmt: fmt,
-          qtyInCart: qty,
-          isFavorite: favorites.contains(p.id),
-          onToggleFavorite: () => onToggleFavorite(p.id),
-          onTap: () => onTap(p),
-          onLongPress:
-              p.secondaryUnit == null ? null : () => onPickUnit(p),
-          onIncrement: () => onSetQuantity(p.id, qty + 1),
-          onDecrement: () => onSetQuantity(p.id, qty - 1),
-        );
-      },
+      separatorBuilder: (_, i) => _ListSeparator(
+        productId: products[i].id,
+        nextProductId: products[i + 1 < products.length ? i + 1 : i].id,
+      ),
+      itemBuilder: (_, i) => PosProductTile(product: products[i]),
+    );
+  }
+}
+
+/// A hairline between two rows, replaced by a small gap when either row is
+/// highlighted as in the cart. Watches just that one fact.
+class _ListSeparator extends ConsumerWidget {
+  const _ListSeparator({required this.productId, required this.nextProductId});
+  final int productId;
+  final int nextProductId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final eitherInCart = ref.watch(cartMainUnitQtyProvider.select((qty) =>
+        (qty[productId] ?? 0) > 0 || (qty[nextProductId] ?? 0) > 0));
+    if (eitherInCart) return const SizedBox(height: 2);
+    return Divider(
+      height: 1,
+      indent: 16,
+      endIndent: 16,
+      color: Theme.of(context)
+          .colorScheme
+          .outlineVariant
+          .withValues(alpha: 0.5),
     );
   }
 }
