@@ -24,7 +24,10 @@ Future<int> placeOrder(
   required double tenderedAmount,
   String invoicePrefix = '',
   bool trackStock = true,
+  double tipAmount = 0,
 }) {
+  // Never negative; the tip is kept apart from the sale (`total` is tip-free).
+  final tip = tipAmount > 0 ? roundMoney(tipAmount) : 0.0;
   return db.transaction(() async {
     // Read once: needed for the cost snapshot and again for stock below.
     final products = <int, Product?>{};
@@ -58,13 +61,14 @@ Future<int> placeOrder(
         discountValue: Value(session.orderDiscount),
         discountIsPercent: Value(session.orderDiscountIsPercent),
         total: summary.total,
+        tipAmount: Value(tip),
         paymentMethod: paymentMethod,
         tenderedAmount: paymentMethod == 'cash'
             ? Value(tenderedAmount)
             : const Value.absent(),
         changeAmount: paymentMethod == 'cash'
             ? Value(roundMoney(
-                (tenderedAmount - summary.total).clamp(0, double.infinity)))
+                (tenderedAmount - summary.total - tip).clamp(0, double.infinity)))
             : const Value.absent(),
         customerId: session.customerId != null
             ? Value(session.customerId!)

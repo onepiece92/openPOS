@@ -18,6 +18,9 @@ import 'package:pos_app/features/cart/data/place_order.dart';
 import 'package:pos_app/features/customers/domain/customers_provider.dart';
 import 'package:pos_app/features/printing/domain/auto_print.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
+import 'package:pos_app/core/utils/money.dart';
+import 'package:pos_app/features/tips/tip_math.dart';
+import 'package:pos_app/features/tips/tips_settings.dart';
 import 'package:pos_app/features/usage/usage_providers.dart';
 import 'package:pos_app/features/usage/domain/usage_event.dart';
 
@@ -44,6 +47,12 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   final _loyaltyCtrl = TextEditingController();
   bool _placing = false;
 
+  // The tip lives only here until the order is placed: a chosen preset
+  // percent, or a typed amount ([_customTip]). Neither = no tip.
+  double? _tipPercent;
+  bool _customTip = false;
+  final _customTipCtrl = TextEditingController();
+
   @override
   void initState() {
     super.initState();
@@ -68,7 +77,28 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   void dispose() {
     _tenderedCtrl.dispose();
     _loyaltyCtrl.dispose();
+    _customTipCtrl.dispose();
     super.dispose();
+  }
+
+  /// The tip for [summary] under the current choice; 0 when tips are off.
+  double _tipFor(CartSummary summary, TipsSettings tips) {
+    if (!tips.enabled) return 0;
+    if (_customTip) {
+      final v = double.tryParse(_customTipCtrl.text) ?? 0.0;
+      return roundMoney(v.clamp(0.0, kMaxMoneyAmount));
+    }
+    final pct = _tipPercent;
+    if (pct == null) return 0;
+    return tipForPercent(tipBaseOf(summary, postTax: tips.postTax), pct);
+  }
+
+  /// Keeps the untouched cash field on the amount due (sale plus tip).
+  void _followDue() {
+    if (_tenderedEdited) return;
+    final summary = ref.read(cartSummaryProvider);
+    final tip = _tipFor(summary, ref.read(tipsSettingsProvider));
+    _tenderedCtrl.text = exactAmountText(paidWithTip(summary.total, tip));
   }
 
   double get _tendered => double.tryParse(_tenderedCtrl.text) ?? 0.0;
@@ -81,10 +111,16 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     final cart = ref.read(cartProvider);
     if (cart.isEmpty) return;
 
+    final tip = _tipFor(summary, ref.read(tipsSettingsProvider));
+    final due = paidWithTip(summary.total, tip);
+
     // Half a cent of slack: the field holds two decimals.
-    if (_paymentMethod == 'cash' && _tendered < summary.total - 0.005) {
+    if (_paymentMethod == 'cash' && _tendered < due - 0.005) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Tendered amount is less than the total')),
+        SnackBar(
+            content: Text(tip > 0
+                ? 'Tendered amount is less than the total with tip'
+                : 'Tendered amount is less than the total')),
       );
       return;
     }
@@ -123,6 +159,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         tenderedAmount: _tendered,
         invoicePrefix: invoicePrefix,
         trackStock: trackStock,
+        tipAmount: tip,
       );
     } catch (e) {
       _placing = false;
@@ -174,15 +211,18 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   Widget build(BuildContext context) {
     final summary = ref.watch(cartSummaryProvider);
     // Keep the untouched cash field on the amount due when it changes.
-    ref.listen(cartSummaryProvider.select((s) => s.total), (_, total) {
-      if (!_tenderedEdited) _tenderedCtrl.text = exactAmountText(total);
+    ref.listen(cartSummaryProvider.select((s) => s.total), (prev, next) {
+      _followDue();
     });
+    final tips = ref.watch(tipsSettingsProvider);
+    final tip = _tipFor(summary, tips);
+    final due = paidWithTip(summary.total, tip);
     final symbol = ref.watch(currencySymbolProvider);
     final fmt = ref.watch(currencyFormatterProvider);
     final loyalty = ref.watch(featureOnProvider(Feature.loyalty));
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
-    final change = (_tendered - summary.total).clamp(0.0, double.infinity);
+    final change = (_tendered - due).clamp(0.0, double.infinity);
 
     return Scaffold(
       appBar: AppBar(
@@ -191,10 +231,86 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       bottomNavigationBar: _PaymentActionBar(
         onConfirm: _placeOrder,
         placing: _placing,
+        tip: tip,
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          if (tips.enabled) ...[
+            Text('Tip', style: tt.titleMedium),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 10,
+              runSpacing: 8,
+              children: [
+                ChoiceChip(
+                  label: const Text('No tip'),
+                  selected: _tipPercent == null && !_customTip,
+                  onSelected: (_) {
+                    setState(() {
+                      _tipPercent = null;
+                      _customTip = false;
+                    });
+                    _followDue();
+                  },
+                ),
+                for (final pct in tips.presets)
+                  ChoiceChip(
+                    label: Text(tipPercentLabel(pct)),
+                    selected: !_customTip && _tipPercent == pct,
+                    onSelected: (_) {
+                      setState(() {
+                        _tipPercent = pct;
+                        _customTip = false;
+                      });
+                      _followDue();
+                    },
+                  ),
+                ChoiceChip(
+                  label: const Text('Custom'),
+                  selected: _customTip,
+                  onSelected: (_) {
+                    setState(() {
+                      _tipPercent = null;
+                      _customTip = true;
+                    });
+                    _followDue();
+                  },
+                ),
+              ],
+            ),
+            if (_customTip) ...[
+              const SizedBox(height: 12),
+              TextField(
+                controller: _customTipCtrl,
+                autofocus: true,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(
+                      RegExp(r'^\d*\.?\d{0,2}')),
+                ],
+                decoration: InputDecoration(
+                  labelText: 'Tip amount',
+                  prefixText: '$symbol ',
+                  border: const OutlineInputBorder(),
+                ),
+                onChanged: (_) {
+                  setState(() {});
+                  _followDue();
+                },
+              ),
+            ],
+            if (tip > 0) ...[
+              const SizedBox(height: 12),
+              _TipLine(label: 'Tip', value: fmt.format(tip)),
+              _TipLine(
+                  label: 'Total with tip',
+                  value: fmt.format(due),
+                  strong: true),
+            ],
+            const SizedBox(height: 20),
+          ],
           Text('Payment method', style: tt.titleMedium),
           const SizedBox(height: 12),
           Row(
@@ -232,7 +348,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
               ),
               onChanged: (_) => setState(() => _tenderedEdited = true),
             ),
-            if (_tendered >= summary.total - 0.005 && summary.total > 0) ...[
+            if (_tendered >= due - 0.005 && due > 0) ...[
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(14),
@@ -285,10 +401,12 @@ class _PaymentActionBar extends ConsumerWidget {
   const _PaymentActionBar({
     required this.onConfirm,
     required this.placing,
+    this.tip = 0,
   });
 
   final VoidCallback onConfirm;
   final bool placing;
+  final double tip;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -315,10 +433,37 @@ class _PaymentActionBar extends ConsumerWidget {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : Text(
-                    'Confirm & Charge  ${fmt.format(summary.total)}',
+                    'Confirm & Charge  ${fmt.format(paidWithTip(summary.total, tip))}',
                   ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ─── Tip line ─────────────────────────────────────────────────────────────────
+
+class _TipLine extends StatelessWidget {
+  const _TipLine({required this.label, required this.value, this.strong = false});
+  final String label;
+  final String value;
+  final bool strong;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = Theme.of(context).textTheme.bodyLarge?.copyWith(
+          fontFamily: AppFonts.mono,
+          fontWeight: strong ? FontWeight.bold : null,
+        );
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Text(label, style: style),
+          const Spacer(),
+          Text(value, style: style),
+        ],
       ),
     );
   }
