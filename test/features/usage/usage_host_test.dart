@@ -13,7 +13,10 @@ import 'package:pos_app/core/app_version.dart';
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
+import 'package:pos_app/app_root.dart' show RestartNoticeOverlay;
 import 'package:pos_app/core/restart_notice.dart';
+import 'package:pos_app/features/backup/data/snapshot_providers.dart'
+    show restartNoticeDuration;
 import 'package:pos_app/features/help/presentation/support_screen.dart';
 import 'package:pos_app/features/usage/data/usage_counter.dart';
 import 'package:pos_app/features/usage/presentation/usage_host.dart';
@@ -47,7 +50,9 @@ void main() {
   });
 
   Future<ProviderContainer> pump(WidgetTester tester,
-      {bool onboarded = true, String initial = '/'}) async {
+      {bool onboarded = true,
+      String initial = '/',
+      Widget Function(Widget app)? wrap}) async {
     await settings.put('onboarding_complete', onboarded);
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(900, 1600);
@@ -84,7 +89,7 @@ void main() {
       GoRoute(path: kUsageRoute, builder: (_, __) => const UsageScreen()),
     ]);
     addTearDown(router.dispose);
-    await tester.pumpWidget(UncontrolledProviderScope(
+    final app = UncontrolledProviderScope(
       container: container,
       child: MaterialApp.router(
         routerConfig: router,
@@ -92,7 +97,8 @@ void main() {
         builder: (context, child) =>
             UsageHost(openUsage: () => router.push(kUsageRoute), child: child!),
       ),
-    ));
+    );
+    await tester.pumpWidget(wrap == null ? app : wrap(app));
     await tester.pump(); // post-frame: the box opens
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 800)); // snackbar in
@@ -160,6 +166,43 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 800));
       expect(find.text(kUsageDisclosureText), findsOneWidget);
+    });
+
+    testWidgets(
+        "AppRoot's restart notice going away: no locked-tree error; the "
+        'disclosure shows once and is marked shown', (tester) async {
+      const notice = 'Backup restored';
+      // Exactly how AppRoot builds it: the overlay around the app until its
+      // onDone, then the app alone.
+      var showing = true;
+      await pump(tester,
+          wrap: (app) => StatefulBuilder(
+                builder: (_, setState) => showing
+                    ? RestartNoticeOverlay(
+                        message: notice,
+                        onDone: () => setState(() => showing = false),
+                        child: app)
+                    : app,
+              ));
+      expect(find.text(notice), findsOneWidget);
+      expect(find.text(kUsageDisclosureText), findsNothing);
+
+      await tester.pump(restartNoticeDuration(notice));
+      await tester.pump(); // the frame that removes the wrapper
+      expect(find.text(notice), findsNothing);
+      expect(find.byType(RestartNoticeOverlay), findsNothing);
+      expect(restartNoticeShowing.value, isFalse);
+      expect(tester.takeException(), isNull);
+
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 800));
+      expect(find.text(kUsageDisclosureText), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      await tester.pump(kUsageDisclosureDuration);
+      await tester.pumpAndSettle();
+      expect(find.text(kUsageDisclosureText), findsNothing);
+      expect(usageBox.get(kUsageDisclosureShownKey), isTrue);
     });
 
     testWidgets('torn down by a restart before it was seen: not marked',

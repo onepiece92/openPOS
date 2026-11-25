@@ -349,7 +349,7 @@ class AppRootState extends State<AppRoot> {
       container: _container,
       child: _notice == null
           ? const POSApp()
-          : _NoticeOverlay(
+          : RestartNoticeOverlay(
               message: _notice!,
               onDone: () => setState(() => _notice = null),
               child: const POSApp(),
@@ -429,8 +429,10 @@ class _RestoreFailedScreen extends StatelessWidget {
 
 /// Bottom toast rendered *above* the MaterialApp (which is being recreated,
 /// so a ScaffoldMessenger from before the restart no longer exists).
-class _NoticeOverlay extends StatefulWidget {
-  const _NoticeOverlay({
+/// Public for the usage-host test, which reproduces AppRoot's removal of it.
+class RestartNoticeOverlay extends StatefulWidget {
+  const RestartNoticeOverlay({
+    super.key,
     required this.message,
     required this.onDone,
     required this.child,
@@ -440,10 +442,10 @@ class _NoticeOverlay extends StatefulWidget {
   final Widget child;
 
   @override
-  State<_NoticeOverlay> createState() => _NoticeOverlayState();
+  State<RestartNoticeOverlay> createState() => RestartNoticeOverlayState();
 }
 
-class _NoticeOverlayState extends State<_NoticeOverlay> {
+class RestartNoticeOverlayState extends State<RestartNoticeOverlay> {
   @override
   void initState() {
     super.initState();

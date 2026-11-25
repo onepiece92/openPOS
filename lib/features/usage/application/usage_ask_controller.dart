@@ -7,15 +7,34 @@ import 'package:pos_app/features/review/data/review_state_store.dart';
 import 'package:pos_app/features/usage/data/usage_counter.dart';
 import 'package:pos_app/features/usage/domain/usage_ask_policy.dart';
 
+/// True in the F-Droid `foss` build, which has no store review at all:
+/// build it with `--dart-define=OPENPOS_FOSS=true` (see
+/// packages/in_app_review_stub). The stub cannot say so itself — the real
+/// package has no such constant to import.
+const kFossBuild = bool.fromEnvironment('OPENPOS_FOSS');
+
+/// How long the review must have been unavailable, at every check, before
+/// the ask stops yielding to it.
+const kReviewUnavailableGiveUp = Duration(days: 14);
+
 /// Decides when to show the gentle feedback ask, hanging off the review
 /// check that runs after a receipt is closed ([afterReviewCheck]).
 ///
 /// Store guidelines: the ask must never gate, precede or delay the store
 /// review. It is never shown in a session where a review was requested,
 /// and it yields whenever the review may become due within 14 days
-/// (`shouldAskForFeedback`). When the store reports review unavailable
-/// (F-Droid stub, no Play services) there is nothing to yield to, so the
-/// ask may show. [reviewSupported] says whether a store exists at all.
+/// (`shouldAskForFeedback`). [reviewSupported] says whether a store exists
+/// at all.
+///
+/// "Review unavailable" at one receipt is NOT taken as "there is no store":
+/// on a Play device that is offline at one receipt and online at the next,
+/// the review sheet could follow the ask minutes later. The ask yields to
+/// the review exactly as for "not eligible", unless there really is no
+/// store to yield to: the F-Droid build ([fossBuild], set by
+/// `--dart-define=OPENPOS_FOSS=true`), or a review that has been
+/// unavailable at every check for [kReviewUnavailableGiveUp] (since the
+/// first unavailable check, kept in the usage box; any review request
+/// clears it).
 ///
 /// Showing is done by `UsageHost`, which listens to [pending] and calls
 /// [markShown] the moment the ask appears.
@@ -26,6 +45,7 @@ class UsageAskController {
     required this.completedSales,
     required this.appVersion,
     required this.reviewSupported,
+    this.fossBuild = kFossBuild,
     DateTime Function()? clock,
     this.timeout = const Duration(seconds: 5),
   }) : _clock = clock ?? DateTime.now;
@@ -35,6 +55,7 @@ class UsageAskController {
   final Future<int> Function() completedSales;
   final String appVersion;
   final bool reviewSupported;
+  final bool fossBuild;
   final Duration timeout;
   final DateTime Function() _clock;
 
@@ -52,20 +73,19 @@ class UsageAskController {
   /// One evaluation; completes after the (bounded) order count.
   Future<bool> evaluate(ReviewCheck result) async {
     try {
-      final bool reviewCanShow;
       switch (result) {
         case ReviewCheck.requested:
           // Never in the session of a review request.
           _reviewRequestedThisSession = true;
+          // The store works: an earlier "unavailable" streak is over.
+          await counter.ensureLoaded();
+          await counter.setReviewUnavailableSince(null);
           return false;
         case ReviewCheck.skipped:
           return false;
         case ReviewCheck.unavailable:
-          // The store cannot show a review here (F-Droid stub, no Play):
-          // there is no review to yield to.
-          reviewCanShow = false;
         case ReviewCheck.notEligible:
-          reviewCanShow = reviewSupported;
+          break;
       }
       if (_reviewRequestedThisSession || _inFlight || pending.value) {
         return false;
@@ -76,6 +96,14 @@ class UsageAskController {
         // No box: "asked" could not be remembered, so never ask.
         if (!counter.isLoaded) return false;
         final now = _clock();
+        var since = counter.reviewUnavailableSince;
+        if (result == ReviewCheck.unavailable && since == null) {
+          since = now;
+          await counter.setReviewUnavailableSince(now);
+        }
+        final noStore = fossBuild ||
+            (since != null && now.difference(since) >= kReviewUnavailableGiveUp);
+        final reviewCanShow = reviewSupported && !noStore;
         final s = reviewStore.read();
         bool passes(int sales) => shouldAskForFeedback(
               review: s,

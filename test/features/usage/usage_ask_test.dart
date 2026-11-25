@@ -230,13 +230,16 @@ void main() {
     tearDown(closeAll);
 
     UsageAskController askCtl(
-            {bool reviewSupported = true, String version = v}) =>
+            {bool reviewSupported = true,
+            String version = v,
+            bool fossBuild = false}) =>
         UsageAskController(
           reviewStore: store,
           counter: counter,
           completedSales: () async => sales,
           appVersion: version,
           reviewSupported: reviewSupported,
+          fossBuild: fossBuild,
           clock: () => clock,
         );
 
@@ -263,9 +266,8 @@ void main() {
       expect(a.pending.value, isFalse);
     });
 
-    test('review unavailable (F-Droid stub, no Play): the ask may show',
-        () async {
-      final a = askCtl();
+    test('F-Droid build, review unavailable: the ask may show', () async {
+      final a = askCtl(fossBuild: true);
       final r = reviewCtl(_Prompter(false), a);
       expect(await r.runCheck(), ReviewCheck.unavailable);
       expect(store.read().lastPromptVersion, isNull,
@@ -275,6 +277,37 @@ void main() {
       // …and on later days it does not repeat for this version.
       clock = now.add(const Duration(days: 20));
       expect(await a.evaluate(ReviewCheck.unavailable), isFalse);
+    });
+
+    test('Play offline at one receipt, online at the next: the ask yields',
+        () async {
+      // The review is due now (45 days in, never asked).
+      final a = askCtl();
+      final offline = reviewCtl(_Prompter(false), a);
+      expect(await offline.runCheck(), ReviewCheck.unavailable);
+      expect(await a.evaluate(ReviewCheck.unavailable), isFalse,
+          reason: 'one unavailable check is not "no store"');
+      expect(a.pending.value, isFalse);
+      expect(counter.reviewUnavailableSince, now);
+
+      clock = now.add(const Duration(minutes: 5));
+      final online = reviewCtl(_Prompter(true), a);
+      expect(await online.runCheck(), ReviewCheck.requested);
+      expect(await a.evaluate(ReviewCheck.requested), isFalse);
+      expect(counter.reviewUnavailableSince, isNull,
+          reason: 'a request ends the unavailable streak');
+    });
+
+    test('review unavailable for 14 days or more: the ask may show',
+        () async {
+      final a = askCtl();
+      final r = reviewCtl(_Prompter(false), a);
+      expect(await r.runCheck(), ReviewCheck.unavailable);
+      expect(await a.evaluate(ReviewCheck.unavailable), isFalse);
+      clock = now.add(const Duration(days: 13, hours: 23));
+      expect(await a.evaluate(ReviewCheck.unavailable), isFalse);
+      clock = now.add(kReviewUnavailableGiveUp);
+      expect(await a.evaluate(ReviewCheck.unavailable), isTrue);
     });
 
     test('review not eligible: the ask fires once, then never this version',
