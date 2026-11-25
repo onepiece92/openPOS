@@ -12,6 +12,8 @@ class HeldOrder {
     this.tableId,
     this.orderDiscount = 0.0,
     this.orderDiscountIsPercent = false,
+    this.taxEnabled = true,
+    this.taxRateIds,
     this.archivedAt,
   });
 
@@ -30,6 +32,15 @@ class HeldOrder {
   final int? tableId;
   final double orderDiscount;
   final bool orderDiscountIsPercent;
+
+  /// The cart's tax switch when the ticket was parked.
+  final bool taxEnabled;
+
+  /// Tax rate ids selected when the ticket was parked. Null for tickets
+  /// saved before tax state was stored — those resume with the store's
+  /// default rate, as they always did. An empty list means "none selected".
+  final List<int>? taxRateIds;
+
   final DateTime? archivedAt;
 
   bool get isArchived => archivedAt != null;
@@ -46,6 +57,8 @@ class HeldOrder {
         tableId: tableId,
         orderDiscount: orderDiscount,
         orderDiscountIsPercent: orderDiscountIsPercent,
+        taxEnabled: taxEnabled,
+        taxRateIds: taxRateIds,
         archivedAt: clearArchived ? null : (archivedAt ?? this.archivedAt),
       );
 
@@ -62,6 +75,8 @@ class HeldOrder {
         if (tableId != null) 'tableId': tableId,
         if (orderDiscount != 0.0) 'orderDiscount': orderDiscount,
         if (orderDiscountIsPercent) 'orderDiscountIsPercent': true,
+        if (!taxEnabled) 'taxEnabled': false,
+        if (taxRateIds != null) 'taxRateIds': taxRateIds,
         if (archivedAt != null) 'archivedAt': archivedAt!.toIso8601String(),
         'items': items
             .map((i) => {
@@ -88,6 +103,8 @@ class HeldOrder {
         orderDiscount: (json['orderDiscount'] as num?)?.toDouble() ?? 0.0,
         orderDiscountIsPercent:
             json['orderDiscountIsPercent'] as bool? ?? false,
+        taxEnabled: json['taxEnabled'] as bool? ?? true,
+        taxRateIds: (json['taxRateIds'] as List?)?.cast<int>().toList(),
         archivedAt: json['archivedAt'] != null
             ? DateTime.parse(json['archivedAt'] as String)
             : null,

@@ -48,6 +48,8 @@ class HeldOrdersNotifier extends Notifier<List<HeldOrder>> {
     int? tableId,
     double orderDiscount = 0.0,
     bool orderDiscountIsPercent = false,
+    bool taxEnabled = true,
+    List<int>? taxRateIds,
   }) {
     final now = DateTime.now();
     // Keyed by the ticket number, which the counter guarantees is unique and
@@ -67,6 +69,8 @@ class HeldOrdersNotifier extends Notifier<List<HeldOrder>> {
       tableId: tableId,
       orderDiscount: orderDiscount,
       orderDiscountIsPercent: orderDiscountIsPercent,
+      taxEnabled: taxEnabled,
+      taxRateIds: taxRateIds,
     );
     _box.put(id, jsonEncode(ticket.toJson()));
     state = _loadAll();
@@ -84,6 +88,8 @@ class HeldOrdersNotifier extends Notifier<List<HeldOrder>> {
     int? tableId,
     double orderDiscount = 0.0,
     bool orderDiscountIsPercent = false,
+    bool taxEnabled = true,
+    List<int>? taxRateIds,
   }) {
     final existing = state.firstWhere((t) => t.id == id);
     // Auto-labelled tickets follow their customer; hand-picked labels stick.
@@ -101,6 +107,8 @@ class HeldOrdersNotifier extends Notifier<List<HeldOrder>> {
       tableId: tableId,
       orderDiscount: orderDiscount,
       orderDiscountIsPercent: orderDiscountIsPercent,
+      taxEnabled: taxEnabled,
+      taxRateIds: taxRateIds,
       archivedAt: existing.archivedAt,
     );
     _box.put(existing.id, jsonEncode(updated.toJson()));
@@ -116,6 +124,9 @@ class HeldOrdersNotifier extends Notifier<List<HeldOrder>> {
     final session = ref.read(cartSessionProvider);
     final customerName = ref.read(cartCustomerNameProvider);
     final existingId = session.heldTicketId;
+    // The tax switch and the chosen rates decide the total, so they are
+    // parked with the ticket.
+    final taxRateIds = [...ref.read(selectedTaxRatesProvider)];
 
     if (existingId != null && _box.containsKey(existingId)) {
       return update(
@@ -126,6 +137,8 @@ class HeldOrdersNotifier extends Notifier<List<HeldOrder>> {
         tableId: session.tableId,
         orderDiscount: session.orderDiscount,
         orderDiscountIsPercent: session.orderDiscountIsPercent,
+        taxEnabled: session.taxEnabled,
+        taxRateIds: taxRateIds,
       );
     }
 
@@ -137,6 +150,8 @@ class HeldOrdersNotifier extends Notifier<List<HeldOrder>> {
       tableId: session.tableId,
       orderDiscount: session.orderDiscount,
       orderDiscountIsPercent: session.orderDiscountIsPercent,
+      taxEnabled: session.taxEnabled,
+      taxRateIds: taxRateIds,
     );
   }
 

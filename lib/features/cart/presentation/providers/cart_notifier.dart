@@ -51,15 +51,27 @@ class CartSessionNotifier extends Notifier<CartSession> {
   /// Rebinds the cart to an existing held ticket, adopting its number and
   /// metadata so a later save updates that ticket rather than minting a new
   /// one. No counter value is consumed — the ticket already owns its number.
-  void resumeTicket(HeldOrder ticket) => state = CartSession(
-        ticketNumber: ticket.ticketNumber,
-        openedAt: ticket.createdAt,
-        heldTicketId: ticket.id,
-        customerId: ticket.customerId,
-        tableId: ticket.tableId,
-        orderDiscount: ticket.orderDiscount,
-        orderDiscountIsPercent: ticket.orderDiscountIsPercent,
-      );
+  ///
+  /// The tax switch and selected rates come back with it, so the total is
+  /// what it was when the ticket was parked. Tickets saved before tax state
+  /// was stored carry none: they resume with tax on and whatever rates are
+  /// currently selected (the store default after a clearItems).
+  void resumeTicket(HeldOrder ticket) {
+    state = CartSession(
+      ticketNumber: ticket.ticketNumber,
+      openedAt: ticket.createdAt,
+      heldTicketId: ticket.id,
+      customerId: ticket.customerId,
+      tableId: ticket.tableId,
+      orderDiscount: ticket.orderDiscount,
+      orderDiscountIsPercent: ticket.orderDiscountIsPercent,
+      taxEnabled: ticket.taxEnabled,
+    );
+    final rateIds = ticket.taxRateIds;
+    if (rateIds != null) {
+      ref.read(selectedTaxRatesProvider.notifier).restore(rateIds);
+    }
+  }
 }
 
 final cartSessionProvider =
@@ -79,6 +91,9 @@ class SelectedTaxRatesNotifier extends Notifier<List<int>> {
   }
 
   void remove(int id) => state = state.where((x) => x != id).toList();
+
+  /// Reinstates the rates a held ticket was parked with.
+  void restore(List<int> ids) => state = [...ids];
 
   void reset() {
     final defaultId = ref.read(defaultTaxIdProvider);
