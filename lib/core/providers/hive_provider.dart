@@ -3,6 +3,10 @@ import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
+import 'package:pos_app/core/providers/feature_flags.dart';
+
+export 'package:pos_app/core/providers/feature_flags.dart';
+
 /// App settings live in the Hive `settings` box, but the app never reads the
 /// box directly: [SettingsNotifier] loads it once into an immutable
 /// [AppSettings], every setter updates state *and* persists, and the
@@ -18,6 +22,16 @@ const _kLowStockThreshold = 'low_stock_threshold';
 const kLoyaltyEnabled = 'loyalty_enabled';
 const kLoyaltyEarnRate = 'loyalty_earn_rate'; // pts earned per 1 currency unit spent
 const kLoyaltyPointValue = 'loyalty_point_value'; // currency value of 1 pt
+
+// Feature switches (see feature_flags.dart; `features_v1` is kFeaturesKey).
+/// When Stock tracking was last switched off (ISO-8601). Kept after it is
+/// switched back on, for the recount line, until that line is dismissed.
+const kStockOffSince = 'stock_off_since';
+/// The one-time "New: turn features on or off" drawer line was dismissed
+/// (or setup showed the suggested features).
+const kFeaturesIntroSeen = 'features_intro_seen';
+/// `BusinessType.name` chosen in setup (lib/features/onboarding/domain).
+const kBusinessType = 'business_type';
 
 // Printer keys
 const kPrinterDeviceAddress = 'printer_device_address';
@@ -91,7 +105,11 @@ class AppSettings {
     this.timezone = '',
     this.autoBackupEnabled = true,
     this.autoBackupLastAt,
-  });
+    FeatureFlags? features,
+    this.stockOffSince,
+    this.featuresIntroSeen = false,
+    this.businessType,
+  }) : _features = features;
 
   final bool onboardingComplete;
   final ThemeMode themeMode;
@@ -123,6 +141,21 @@ class AppSettings {
   final bool autoBackupEnabled;
   final DateTime? autoBackupLastAt;
 
+  final FeatureFlags? _features;
+
+  /// The feature switches. Loyalty's own switch is [loyaltyEnabled].
+  FeatureFlags get features =>
+      (_features ?? FeatureFlags.defaults()).withStored(
+          Feature.loyalty, loyaltyEnabled);
+
+  /// Set while Stock tracking is off, and after it is switched back on
+  /// until the recount line is dismissed.
+  final DateTime? stockOffSince;
+  final bool featuresIntroSeen;
+
+  /// Raw `BusinessType.name`; parse it with `parseBusinessType`.
+  final String? businessType;
+
   /// Business name for receipts/print — never blank.
   String get businessNameOrDefault =>
       businessName.isEmpty ? 'My Store' : businessName;
@@ -145,13 +178,16 @@ class AppSettings {
         ? rawWidth
         : (rawWidth is String ? int.tryParse(rawWidth) : null) ?? 80;
     final rawLast = box.get(kAutoBackupLastAt);
+    final rawFeatures = box.get(kFeaturesKey);
+    final rawStockOff = box.get(kStockOffSince);
+    final loyalty = get(kLoyaltyEnabled, false);
 
     return AppSettings(
       onboardingComplete: get(_kOnboardingComplete, false),
       themeMode: _themeModeFrom(get(_kThemeMode, 'system')),
       defaultTaxId: box.get(_kDefaultTaxId) as int?,
       lowStockThreshold: get(_kLowStockThreshold, 5),
-      loyaltyEnabled: get(kLoyaltyEnabled, false),
+      loyaltyEnabled: loyalty,
       loyaltyEarnRate: num_(kLoyaltyEarnRate, 1.0),
       loyaltyPointValue: num_(kLoyaltyPointValue, 1.0),
       printerDeviceAddress: box.get(kPrinterDeviceAddress) as String?,
@@ -171,6 +207,13 @@ class AppSettings {
       autoBackupEnabled: get(kAutoBackupEnabled, true),
       autoBackupLastAt:
           rawLast is String ? DateTime.tryParse(rawLast) : null,
+      features: FeatureFlags.fromStored(
+          rawFeatures is Map ? rawFeatures : const {},
+          loyalty: loyalty),
+      stockOffSince:
+          rawStockOff is String ? DateTime.tryParse(rawStockOff) : null,
+      featuresIntroSeen: get(kFeaturesIntroSeen, false),
+      businessType: box.get(kBusinessType) as String?,
     );
   }
 
@@ -200,6 +243,11 @@ class AppSettings {
     String? timezone,
     bool? autoBackupEnabled,
     DateTime? autoBackupLastAt,
+    FeatureFlags? features,
+    DateTime? stockOffSince,
+    bool clearStockOffSince = false,
+    bool? featuresIntroSeen,
+    String? businessType,
   }) =>
       AppSettings(
         onboardingComplete: onboardingComplete ?? this.onboardingComplete,
@@ -230,6 +278,12 @@ class AppSettings {
         timezone: timezone ?? this.timezone,
         autoBackupEnabled: autoBackupEnabled ?? this.autoBackupEnabled,
         autoBackupLastAt: autoBackupLastAt ?? this.autoBackupLastAt,
+        features: features ?? _features,
+        stockOffSince: clearStockOffSince
+            ? null
+            : (stockOffSince ?? this.stockOffSince),
+        featuresIntroSeen: featuresIntroSeen ?? this.featuresIntroSeen,
+        businessType: businessType ?? this.businessType,
       );
 
   static ThemeMode _themeModeFrom(String raw) => switch (raw) {
@@ -365,6 +419,48 @@ class SettingsNotifier extends Notifier<AppSettings> {
       _write(state.copyWith(autoBackupEnabled: v), {kAutoBackupEnabled: v});
   Future<void> markAutoBackupRun(DateTime t) => _write(
       state.copyWith(autoBackupLastAt: t), {kAutoBackupLastAt: t.toIso8601String()});
+
+  // Features
+  /// Sets [f]'s own switch. Loyalty writes `kLoyaltyEnabled`; every other
+  /// feature rewrites the `features_v1` map. Switching Stock tracking off
+  /// records the date (for the recount line when it comes back on).
+  Future<void> setFeature(Feature f, bool on, {DateTime? now}) =>
+      setFeatures({f: on}, now: now);
+
+  /// Sets several switches in one write (setup, "Start minimal").
+  Future<void> setFeatures(Map<Feature, bool> values, {DateTime? now}) {
+    var flags = state.features;
+    for (final e in values.entries) {
+      flags = flags.withStored(e.key, e.value);
+    }
+    final loyalty = flags.stored(Feature.loyalty);
+    final stockOff = values[Feature.stockTracking] == false &&
+        state.features.stored(Feature.stockTracking) &&
+        state.stockOffSince == null;
+    final since = (now ?? DateTime.now());
+    return _write(
+      state.copyWith(
+        features: flags,
+        loyaltyEnabled: loyalty,
+        stockOffSince: stockOff ? since : null,
+      ),
+      {
+        kFeaturesKey: flags.toStored(),
+        if (values.containsKey(Feature.loyalty)) kLoyaltyEnabled: loyalty,
+        if (stockOff) kStockOffSince: since.toIso8601String(),
+      },
+    );
+  }
+
+  /// "Done" on the recount line.
+  Future<void> dismissStockRecount() => _write(
+      state.copyWith(clearStockOffSince: true), {kStockOffSince: null});
+
+  Future<void> markFeaturesIntroSeen() => _write(
+      state.copyWith(featuresIntroSeen: true), {kFeaturesIntroSeen: true});
+
+  Future<void> setBusinessType(String name) =>
+      _write(state.copyWith(businessType: name), {kBusinessType: name});
 }
 
 final settingsProvider =
@@ -419,3 +515,16 @@ final printerPaperWidthProvider = _field((s) => s.printerPaperWidth);
 
 /// Driver key of the saved printer: 'escpos' or 'star'.
 final printerDriverProvider = _field((s) => s.printerDriver);
+
+/// The EFFECTIVE feature switches (own switch AND parent's), read
+/// synchronously from the already-loaded settings — no I/O.
+final featureFlagsProvider = _field((s) => s.features);
+
+/// One feature's effective switch. Watch this rather than
+/// [featureFlagsProvider] so a widget rebuilds only for its own flag.
+final featureOnProvider = Provider.family<bool, Feature>((ref, f) =>
+    ref.watch(featureFlagsProvider.select((flags) => flags.isOn(f))));
+
+final stockOffSinceProvider = _field((s) => s.stockOffSince);
+final featuresIntroSeenProvider = _field((s) => s.featuresIntroSeen);
+final businessTypeNameProvider = _field((s) => s.businessType);
