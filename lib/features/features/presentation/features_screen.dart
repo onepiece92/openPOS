@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import 'package:pos_app/core/providers/hive_provider.dart';
+import 'package:pos_app/features/cart/presentation/providers/cart_notifier.dart';
+import 'package:pos_app/features/cart/presentation/providers/held_orders_notifier.dart';
 import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
 
 const kFeaturesScreenIntro =
@@ -14,6 +16,30 @@ const kTaxesOffBody =
     "New sales won't add tax, and neither will held tickets when you finish "
     'them. Your tax rates and default rate are kept, so they come back when '
     'you turn Taxes on again.';
+
+String _tickets(int n) => n == 1 ? '1 saved ticket' : '$n saved tickets';
+
+/// What switching [f] off would hide that is in use right now, as the
+/// confirm text — null when nothing is (then it switches off at once).
+/// [heldTickets]: active held tickets; [tableTickets]: tickets (held or
+/// the open cart) with a table; [cartCustomer]: the open cart has one.
+String? hideConfirmBody(Feature f,
+    {int heldTickets = 0, int tableTickets = 0, bool cartCustomer = false}) {
+  return switch (f) {
+    Feature.taxes => kTaxesOffBody,
+    Feature.heldTickets when heldTickets > 0 =>
+      '${_tickets(heldTickets)} will be hidden until you turn this back on. '
+          'Nothing is deleted.',
+    Feature.tables when tableTickets > 0 =>
+      '${tableTickets == 1 ? '1 open ticket has' : '$tableTickets open tickets have'} '
+          'a table. Tables will be hidden until you turn this back on. '
+          'Nothing is deleted.',
+    Feature.customers when cartCustomer =>
+      'The customer on the current sale will be hidden until you turn this '
+          'back on. It is still saved with the sale.',
+    _ => null,
+  };
+}
 
 /// "Needs Customers" under a child whose parent is off.
 String needsLine(Feature parent) => 'Needs ${parent.label}';
@@ -43,19 +69,48 @@ class _FeaturesScreenState extends ConsumerState<FeaturesScreen> {
     });
   }
 
+  /// Asks first when switching [f] off would hide live data (or, for
+  /// Taxes, change the next sales). Reads the held tickets and the open
+  /// cart only at that moment, and never creates a cart session.
+  String? _confirmBody(Feature f) {
+    final flags = ref.read(featureFlagsProvider);
+    final session =
+        ref.exists(cartSessionProvider) ? ref.read(cartSessionProvider) : null;
+    var held = 0, withTable = 0;
+    if (flags.heldTickets &&
+        (f == Feature.heldTickets || (f == Feature.tables && flags.tables))) {
+      final tickets = ref.read(activeHeldOrdersProvider);
+      held = tickets.length;
+      withTable = tickets.where((t) => t.tableId != null).length;
+    }
+    if (session?.tableId != null && !session!.isEditingHeldTicket) {
+      withTable++;
+    }
+    return hideConfirmBody(f,
+        heldTickets: held,
+        tableTickets: f == Feature.tables && flags.tables ? withTable : 0,
+        cartCustomer: f == Feature.customers &&
+            flags.customers &&
+            session?.customerId != null);
+  }
+
   Future<void> _set(Feature f, bool on) async {
-    if (f == Feature.taxes && !on) {
+    final body = on ? null : _confirmBody(f);
+    if (body != null) {
       final ok = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text(kTaxesOffTitle),
-          content: const Text(kTaxesOffBody),
+          title: Text(
+              f == Feature.taxes ? kTaxesOffTitle : 'Turn off ${f.label}?'),
+          content: Text(body),
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
                 child: const Text('Cancel')),
             FilledButton(
-                key: const ValueKey('taxes-off-confirm'),
+                key: f == Feature.taxes
+                    ? const ValueKey('taxes-off-confirm')
+                    : const ValueKey('feature-off-confirm'),
                 onPressed: () => Navigator.pop(ctx, true),
                 child: const Text('Turn off')),
           ],
@@ -107,8 +162,8 @@ class _FeatureRow extends StatelessWidget {
     final blocked = parent != null && !flags.isOn(parent);
     return SwitchListTile(
       key: ValueKey('feature-${feature.name}'),
-      contentPadding: EdgeInsets.only(
-          left: parent == null ? 16 : 32, right: 16),
+      contentPadding:
+          EdgeInsets.only(left: parent == null ? 16 : 32, right: 16),
       title: Text(feature.label),
       subtitle: Text(blocked ? needsLine(parent) : feature.description),
       value: flags.stored(feature),

@@ -9,6 +9,8 @@ import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/core/services/audit_service.dart';
 import 'package:pos_app/features/cart/data/place_order.dart';
+import 'package:pos_app/features/cart/domain/cart_item.dart';
+import 'package:pos_app/features/cart/presentation/providers/held_orders_notifier.dart';
 import 'package:pos_app/features/cart/domain/cart_calculator.dart';
 import 'package:pos_app/features/cart/presentation/providers/cart_notifier.dart';
 import 'package:pos_app/features/features/presentation/features_screen.dart';
@@ -19,11 +21,14 @@ import '../../_support/test_db.dart';
 
 void main() {
   late Box<dynamic> settings;
-  setUp(() async => settings = await openTempSettingsBox());
+  setUp(() async =>
+      settings = await openTempSettingsBox(more: ['held_orders']));
 
   ProviderContainer container() {
-    final c = ProviderContainer(
-        overrides: [settingsBoxProvider.overrideWithValue(settings)]);
+    final c = ProviderContainer(overrides: [
+      settingsBoxProvider.overrideWithValue(settings),
+      heldOrdersBoxProvider.overrideWithValue(Hive.box('held_orders')),
+    ]);
     addTearDown(c.dispose);
     return c;
   }
@@ -90,6 +95,85 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text(kTaxesOffTitle), findsNothing);
     expect(c.read(featureFlagsProvider).taxes, isTrue);
+  });
+
+  group('confirm before hiding live data', () {
+    final item = CartItem(
+        productId: 1, name: 'Tea', unitPrice: 1, quantity: 1, isTaxable: false);
+
+    Future<void> turnOff(WidgetTester tester, Feature f) async {
+      await tester.tap(row(f));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('Held tickets: "2 saved tickets will be hidden…"; Cancel keeps '
+        'it on', (tester) async {
+      final c = await pump(tester);
+      final held = c.read(heldOrdersProvider.notifier);
+      held.hold([item], ticketNumber: '#0001');
+      held.hold([item], ticketNumber: '#0002');
+      await turnOff(tester, Feature.heldTickets);
+      expect(find.text('Turn off Held tickets?'), findsOneWidget);
+      expect(
+          find.text('2 saved tickets will be hidden until you turn this back '
+              'on. Nothing is deleted.'),
+          findsOneWidget);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(c.read(featureFlagsProvider).heldTickets, isTrue);
+
+      await turnOff(tester, Feature.heldTickets);
+      await tester.tap(find.byKey(const ValueKey('feature-off-confirm')));
+      await tester.pumpAndSettle();
+      expect(c.read(featureFlagsProvider).heldTickets, isFalse);
+      expect(c.read(heldOrdersProvider), hasLength(2), reason: 'kept');
+    });
+
+    testWidgets('Held tickets with none parked: off at once', (tester) async {
+      final c = await pump(tester);
+      await turnOff(tester, Feature.heldTickets);
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(c.read(featureFlagsProvider).heldTickets, isFalse);
+    });
+
+    testWidgets('Tables: asks when a ticket (or the open cart) has a table',
+        (tester) async {
+      final c = await pump(tester);
+      c.read(heldOrdersProvider.notifier)
+        ..hold([item], ticketNumber: '#0001', tableId: 4)
+        ..hold([item], ticketNumber: '#0002');
+      c.read(cartSessionProvider.notifier).setTable(2);
+      await turnOff(tester, Feature.tables);
+      expect(
+          find.text('2 open tickets have a table. Tables will be hidden until '
+              'you turn this back on. Nothing is deleted.'),
+          findsOneWidget);
+    });
+
+    testWidgets('Tables with no table in use: off at once', (tester) async {
+      final c = await pump(tester);
+      await turnOff(tester, Feature.tables);
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(c.read(featureFlagsProvider).tables, isFalse);
+    });
+
+    testWidgets('Customers: asks when the current sale has a customer',
+        (tester) async {
+      final c = await pump(tester);
+      c.read(cartSessionProvider.notifier).setCustomer(3);
+      await turnOff(tester, Feature.customers);
+      expect(
+          find.text('The customer on the current sale will be hidden until '
+              'you turn this back on. It is still saved with the sale.'),
+          findsOneWidget);
+    });
+
+    test('no confirm for features that hide nothing in use', () {
+      for (final f in Feature.values) {
+        if (f == Feature.taxes) continue;
+        expect(hideConfirmBody(f), isNull, reason: f.name);
+      }
+    });
   });
 
   testWidgets('Taxes off keeps the default rate', (tester) async {
