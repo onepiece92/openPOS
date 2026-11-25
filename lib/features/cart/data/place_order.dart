@@ -49,7 +49,9 @@ Future<int> placeOrder(
         tableId: session.tableId != null
             ? Value(session.tableId!)
             : const Value.absent(),
-        pointsRedeemed: Value(session.loyaltyPointsToRedeem),
+        // The summary's figure, not the session's: it is what the discount
+        // was actually computed from (capped by balance and order total).
+        pointsRedeemed: Value(summary.pointsRedeemed),
         loyaltyDiscount: Value(summary.loyaltyDiscount),
         pointsEarned: Value(summary.pointsToEarn),
       ),
@@ -122,9 +124,9 @@ Future<int> placeOrder(
     }
 
     if (session.customerId != null) {
-      if (session.loyaltyPointsToRedeem > 0) {
+      if (summary.pointsRedeemed > 0) {
         await db.customersDao.redeemLoyaltyPoints(
-            session.customerId!, session.loyaltyPointsToRedeem);
+            session.customerId!, summary.pointsRedeemed);
       }
       if (summary.pointsToEarn > 0) {
         await db.customersDao

@@ -15,6 +15,8 @@ import 'package:pos_app/features/cart/domain/cart_summary.dart';
 ///   3. each line's net = line subtotal × (1 − discount ratio)   ← prorated
 ///   4. tax per rate    = Σ over taxable lines of tax(net), rounded once/line
 ///   5. total           = discounted subtotal + exclusive tax − loyalty
+///      (loyalty needs a customer, and never takes more points than the
+///      customer has or than the amount due can use)
 ///
 /// Every monetary field on the returned [CartSummary] is passed through
 /// [roundMoney] — this is the rounding boundary for the sale flow.
@@ -28,6 +30,7 @@ class CartCalculator {
     bool loyaltyEnabled = false,
     double loyaltyEarnRate = 0,
     double loyaltyPointValue = 0,
+    int customerLoyaltyPoints = 0,
   }) {
     // 1. Subtotal
     double subtotal = 0;
@@ -99,13 +102,23 @@ class CartCalculator {
         : 0.0;
 
     // 5. Loyalty redemption + total
-    final loyaltyDiscount = loyaltyEnabled
-        ? roundMoney((session.loyaltyPointsToRedeem * loyaltyPointValue)
-            .clamp(0.0, double.infinity))
-        : 0.0;
+    //    Points belong to a customer, so no customer means no redemption.
+    //    The request is capped by the customer's balance and by the whole
+    //    points the amount due can absorb, so none are spent for nothing.
+    final due = roundMoney(discountedSubtotal + exclusiveTax);
+    var maxRedeemablePoints = 0;
+    if (loyaltyEnabled && session.customerId != null && loyaltyPointValue > 0) {
+      // The nudge keeps 10 / 0.1 from flooring to 99.
+      final absorbable = ((due + 1e-9) / loyaltyPointValue).floor();
+      maxRedeemablePoints =
+          absorbable < customerLoyaltyPoints ? absorbable : customerLoyaltyPoints;
+      if (maxRedeemablePoints < 0) maxRedeemablePoints = 0;
+    }
+    final pointsRedeemed =
+        session.loyaltyPointsToRedeem.clamp(0, maxRedeemablePoints);
+    final loyaltyDiscount = roundMoney(pointsRedeemed * loyaltyPointValue);
     final total = roundMoney(
-      (discountedSubtotal + exclusiveTax - loyaltyDiscount)
-          .clamp(0.0, double.infinity),
+      (due - loyaltyDiscount).clamp(0.0, double.infinity),
     );
     final pointsToEarn =
         loyaltyEnabled ? (total * loyaltyEarnRate).floor() : 0;
@@ -119,6 +132,8 @@ class CartCalculator {
       total: total,
       taxEnabled: session.taxEnabled,
       pointsToEarn: pointsToEarn,
+      pointsRedeemed: pointsRedeemed,
+      maxRedeemablePoints: maxRedeemablePoints,
     );
   }
 

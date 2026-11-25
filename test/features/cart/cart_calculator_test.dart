@@ -30,10 +30,12 @@ void main() {
     bool isPercent = false,
     bool taxEnabled = true,
     int redeem = 0,
+    int? customerId,
   }) =>
       CartSession(
         ticketNumber: '#0001',
         openedAt: DateTime(2026, 1, 1),
+        customerId: customerId,
         orderDiscount: discount,
         orderDiscountIsPercent: isPercent,
         taxEnabled: taxEnabled,
@@ -302,26 +304,101 @@ void main() {
     test('redeemed points reduce the total by pointValue each', () {
       final s = CartCalculator.compute(
         items: [item(1, price: 100)],
-        session: session(redeem: 30),
+        session: session(redeem: 30, customerId: 1),
         selectedRates: const [],
         loyaltyEnabled: true,
         loyaltyPointValue: 0.5,
         loyaltyEarnRate: 0.1,
+        customerLoyaltyPoints: 200,
       );
+      expect(s.pointsRedeemed, 30);
       expect(s.loyaltyDiscount, money(15));
       expect(s.total, money(85));
       expect(s.pointsToEarn, 8); // floor(85 × 0.1)
     });
 
-    test('total is clamped at zero when points exceed the bill', () {
+    test('points beyond what the bill can absorb are not spent', () {
       final s = CartCalculator.compute(
         items: [item(1, price: 10)],
-        session: session(redeem: 500),
+        session: session(redeem: 500, customerId: 1),
         selectedRates: const [],
         loyaltyEnabled: true,
         loyaltyPointValue: 1,
+        customerLoyaltyPoints: 500,
       );
       expect(s.total, 0);
+      expect(s.pointsRedeemed, 10);
+      expect(s.maxRedeemablePoints, 10);
+      expect(s.loyaltyDiscount, money(10));
+    });
+
+    test('redemption is capped by the customer balance', () {
+      final s = CartCalculator.compute(
+        items: [item(1, price: 100)],
+        session: session(redeem: 80, customerId: 1),
+        selectedRates: const [],
+        loyaltyEnabled: true,
+        loyaltyPointValue: 1,
+        customerLoyaltyPoints: 25,
+      );
+      expect(s.pointsRedeemed, 25);
+      expect(s.loyaltyDiscount, money(25));
+      expect(s.total, money(75));
+    });
+
+    test('only whole points the bill can use are redeemable', () {
+      // 10.20 due at 0.50 per point → 20 points (10.00); a 21st would
+      // burn 0.30 of value for nothing.
+      final s = CartCalculator.compute(
+        items: [item(1, price: 10.20)],
+        session: session(redeem: 100, customerId: 1),
+        selectedRates: const [],
+        loyaltyEnabled: true,
+        loyaltyPointValue: 0.5,
+        customerLoyaltyPoints: 100,
+      );
+      expect(s.pointsRedeemed, 20);
+      expect(s.total, money(0.20));
+    });
+
+    test('fractional point values do not lose a point to float error', () {
+      final s = CartCalculator.compute(
+        items: [item(1, price: 10)],
+        session: session(redeem: 100, customerId: 1),
+        selectedRates: const [],
+        loyaltyEnabled: true,
+        loyaltyPointValue: 0.1,
+        customerLoyaltyPoints: 100,
+      );
+      expect(s.pointsRedeemed, 100);
+      expect(s.total, 0);
+    });
+
+    test('worthless points are never redeemed', () {
+      final s = CartCalculator.compute(
+        items: [item(1, price: 10)],
+        session: session(redeem: 50, customerId: 1),
+        selectedRates: const [],
+        loyaltyEnabled: true,
+        loyaltyPointValue: 0,
+        customerLoyaltyPoints: 100,
+      );
+      expect(s.pointsRedeemed, 0);
+      expect(s.total, money(10));
+    });
+
+    test('no customer means no redemption', () {
+      final s = CartCalculator.compute(
+        items: [item(1, price: 100)],
+        session: session(redeem: 30),
+        selectedRates: const [],
+        loyaltyEnabled: true,
+        loyaltyPointValue: 1,
+        customerLoyaltyPoints: 100,
+      );
+      expect(s.pointsRedeemed, 0);
+      expect(s.loyaltyDiscount, 0);
+      expect(s.total, money(100));
     });
 
     test('disabled loyalty neither discounts nor earns', () {
@@ -329,9 +406,10 @@ void main() {
       // order still accrued points with loyalty switched off in settings.
       final s = CartCalculator.compute(
         items: [item(1, price: 100)],
-        session: session(redeem: 30),
+        session: session(redeem: 30, customerId: 1),
         selectedRates: const [],
         loyaltyEnabled: false,
+        customerLoyaltyPoints: 100,
         loyaltyPointValue: 1,
         loyaltyEarnRate: 1,
       );

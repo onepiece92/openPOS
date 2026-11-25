@@ -32,6 +32,8 @@ class CartSummary {
     required this.total,
     required this.taxEnabled,
     required this.pointsToEarn,
+    this.pointsRedeemed = 0,
+    this.maxRedeemablePoints = 0,
   });
 
   final double subtotal;
@@ -42,6 +44,15 @@ class CartSummary {
   final double total;
   final bool taxEnabled;
   final int pointsToEarn; // pts customer will earn for this purchase
+
+  /// Points actually spent on this order — the session's request capped by
+  /// [maxRedeemablePoints]. This, not the session value, is what is charged
+  /// to the customer's balance.
+  final int pointsRedeemed;
+
+  /// The most points this order can take: the smaller of the customer's
+  /// balance and what the pre-loyalty total can absorb in whole points.
+  final int maxRedeemablePoints;
 
   static const zero = CartSummary(
     subtotal: 0,

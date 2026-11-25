@@ -37,7 +37,13 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   @override
   void initState() {
     super.initState();
-    final total = ref.read(cartSummaryProvider).total;
+    final summary = ref.read(cartSummaryProvider);
+    final total = summary.total;
+    // Show the redemption already on this ticket (e.g. set before stepping
+    // back to the cart) instead of an empty field over a live discount.
+    if (summary.pointsRedeemed > 0) {
+      _loyaltyCtrl.text = summary.pointsRedeemed.toString();
+    }
     final rounds = (total / 1000).ceil();
     final defaultAmt = (rounds < 1 ? 1 : rounds) * 1000;
     _tenderedCtrl.text = defaultAmt.toString();
@@ -320,6 +326,8 @@ class _LoyaltySection extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
     final available = customer.loyaltyPoints;
+    // Balance and what this order can use, whichever is smaller.
+    final maxPoints = summary.maxRedeemablePoints;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -365,7 +373,7 @@ class _LoyaltySection extends StatelessWidget {
             keyboardType: TextInputType.number,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             decoration: InputDecoration(
-              labelText: 'Points to redeem (max $available)',
+              labelText: 'Points to redeem (max $maxPoints)',
               prefixIcon: const Icon(Icons.redeem_rounded),
               border: const OutlineInputBorder(),
               helperText: summary.loyaltyDiscount > 0
@@ -373,7 +381,16 @@ class _LoyaltySection extends StatelessWidget {
                   : null,
             ),
             onChanged: (v) {
-              final pts = (int.tryParse(v) ?? 0).clamp(0, available);
+              final typed = int.tryParse(v) ?? 0;
+              final pts = typed.clamp(0, maxPoints);
+              if (pts != typed) {
+                // Keep the field honest about what will be redeemed.
+                final text = pts.toString();
+                loyaltyCtrl.value = TextEditingValue(
+                  text: text,
+                  selection: TextSelection.collapsed(offset: text.length),
+                );
+              }
               onChanged(pts);
             },
           ),

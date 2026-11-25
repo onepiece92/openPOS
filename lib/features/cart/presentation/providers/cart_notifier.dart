@@ -9,6 +9,7 @@ import 'package:pos_app/features/cart/domain/cart_item.dart';
 import 'package:pos_app/features/cart/domain/cart_session.dart';
 import 'package:pos_app/features/cart/domain/cart_summary.dart';
 import 'package:pos_app/features/cart/domain/held_order.dart';
+import 'package:pos_app/features/customers/domain/customers_provider.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
 
 // Domain types moved to features/cart/domain; re-exported so existing
@@ -26,9 +27,14 @@ class CartSessionNotifier extends Notifier<CartSession> {
   /// abandoned cart leaves a gap rather than letting a later ticket reuse it.
   String _nextTicketNumber() => ref.read(ticketSequenceProvider).next();
 
-  void setCustomer(int? id) => id == null
-      ? state = state.copyWith(clearCustomer: true)
-      : state = state.copyWith(customerId: id);
+  /// Points are redeemed from one customer's balance, so a redemption never
+  /// survives the customer being changed or removed.
+  void setCustomer(int? id) {
+    if (id == state.customerId) return;
+    state = id == null
+        ? state.copyWith(clearCustomer: true, loyaltyPointsToRedeem: 0)
+        : state.copyWith(customerId: id, loyaltyPointsToRedeem: 0);
+  }
   void setTable(int? id) => id == null
       ? state = state.copyWith(clearTable: true)
       : state = state.copyWith(tableId: id);
@@ -193,5 +199,6 @@ final cartSummaryProvider = Provider<CartSummary>((ref) {
     loyaltyEnabled: ref.watch(loyaltyEnabledProvider),
     loyaltyEarnRate: ref.watch(loyaltyEarnRateProvider),
     loyaltyPointValue: ref.watch(loyaltyPointValueProvider),
+    customerLoyaltyPoints: ref.watch(cartCustomerProvider)?.loyaltyPoints ?? 0,
   );
 });
