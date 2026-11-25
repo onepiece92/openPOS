@@ -17,6 +17,11 @@ final _recentOrdersProvider = StreamProvider<List<Order>>((ref) {
   return ref.watch(databaseProvider).ordersDao.watchRecent(limit: 500);
 });
 
+/// orderId → amount refunded so far, so today's revenue is net of refunds.
+final _refundedTotalsProvider = StreamProvider<Map<int, double>>((ref) {
+  return ref.watch(databaseProvider).ordersDao.watchRefundedTotals();
+});
+
 // ─── Orders screen ────────────────────────────────────────────────────────────
 
 class OrdersScreen extends ConsumerStatefulWidget {
@@ -32,6 +37,8 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
   @override
   Widget build(BuildContext context) {
     final ordersAsync = ref.watch(_recentOrdersProvider);
+    final refunded =
+        ref.watch(_refundedTotalsProvider).valueOrNull ?? const <int, double>{};
     final fmt = ref.watch(currencyFormatterProvider);
     final customers = ref.watch(customersStreamProvider).valueOrNull ?? [];
     final customerNames = {for (final c in customers) c.id: c.name};
@@ -85,8 +92,11 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
 
           // Build summary from today's orders
           final today = _todayOrders(all);
-          final todayRevenue =
-              today.fold(0.0, (s, o) => s + (o.status == 'completed' ? o.total : 0));
+          final todayRevenue = today.fold(
+              0.0,
+              (s, o) => o.status == 'completed'
+                  ? s + (o.total - (refunded[o.id] ?? 0)).clamp(0.0, o.total)
+                  : s);
 
           final grouped = _groupByDate(filtered);
 

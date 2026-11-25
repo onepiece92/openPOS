@@ -91,6 +91,21 @@ Future<int> placeOrder(
       ]);
     }
 
+    // The adjustment log records what actually left the shelf: nothing for
+    // untracked products, and never more than was in stock.
+    Future<void> deduct(int productId, int units, String note) async {
+      final taken = await db.productsDao.deductStock(productId, units);
+      if (taken == 0) return;
+      await db.inventoryDao.logAdjustment(
+        StockAdjustmentsCompanion.insert(
+          productId: productId,
+          delta: -taken,
+          reasonCode: 'sale',
+          notes: Value(note),
+        ),
+      );
+    }
+
     for (final item in cart) {
       final product = await db.productsDao.getById(item.productId);
       // Stock is tracked in main units — a secondary-unit line deducts
@@ -99,27 +114,11 @@ Future<int> placeOrder(
       if (product != null && product.isComposite) {
         final components = await db.productsDao.getComponents(item.productId);
         for (final comp in components) {
-          final deduct = comp.quantity * mainUnits;
-          await db.productsDao.deductStock(comp.componentProductId, deduct);
-          await db.inventoryDao.logAdjustment(
-            StockAdjustmentsCompanion.insert(
-              productId: comp.componentProductId,
-              delta: -deduct,
-              reasonCode: 'sale',
-              notes: Value('Order #$invoiceNo (via ${item.name})'),
-            ),
-          );
+          await deduct(comp.componentProductId, comp.quantity * mainUnits,
+              'Order #$invoiceNo (via ${item.name})');
         }
       } else {
-        await db.productsDao.deductStock(item.productId, mainUnits);
-        await db.inventoryDao.logAdjustment(
-          StockAdjustmentsCompanion.insert(
-            productId: item.productId,
-            delta: -mainUnits,
-            reasonCode: 'sale',
-            notes: Value('Order #$invoiceNo'),
-          ),
-        );
+        await deduct(item.productId, mainUnits, 'Order #$invoiceNo');
       }
     }
 

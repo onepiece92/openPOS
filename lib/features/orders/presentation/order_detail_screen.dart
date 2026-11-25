@@ -23,9 +23,16 @@ class _DetailData {
   const _DetailData({
     required this.receipt,
     required this.order,
+    required this.refundable,
+    required this.restocked,
   });
   final ReceiptBodyData receipt;
   final Order order; // kept for status / action bar
+  final double refundable; // order total less refunds so far
+  final bool restocked; // an earlier refund already put the items back
+
+  bool get isPartlyRefunded =>
+      order.status == 'completed' && refundable < order.total;
 }
 
 final _orderDetailProvider =
@@ -54,6 +61,8 @@ final _orderDetailProvider =
       table: table,
     ),
     order: order,
+    refundable: await refundableAmount(db, order),
+    restocked: await db.ordersDao.hasRestockedReturn(orderId),
   );
 });
 
@@ -152,7 +161,10 @@ class _DetailBody extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
           child: Row(
             children: [
-              _StatusChip(status: order.status),
+              _StatusChip(
+                  status: data.isPartlyRefunded
+                      ? 'partly_refunded'
+                      : order.status),
               const Spacer(),
               Row(
                 children: [
@@ -233,7 +245,7 @@ class _DetailBody extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-                'This marks the order as voided and reverses every stock deduction. Composite components are restocked automatically.'),
+                'This marks the order as voided, reverses every stock deduction and reverses the loyalty points redeemed and earned on it. Composite components are restocked automatically.'),
             const SizedBox(height: 16),
             TextField(
               controller: reasonCtrl,
@@ -291,66 +303,90 @@ class _DetailBody extends StatelessWidget {
   // ── Refund ────────────────────────────────────────────────────────────────
 
   Future<void> _showRefundDialog(BuildContext context) async {
-    final amountCtrl = TextEditingController(
-        text: data.order.total.toStringAsFixed(2));
+    final refundable = data.refundable;
+    final alreadyRefunded = data.order.total - refundable;
+    final amountCtrl =
+        TextEditingController(text: refundable.toStringAsFixed(2));
     final reasonCtrl = TextEditingController();
     bool restock = false;
+
+    // Mirrors processReturn's rules so the cashier sees the problem before
+    // confirming rather than as a failure afterwards.
+    String? amountError(String raw) {
+      final value = double.tryParse(raw.trim());
+      if (value == null) return 'Enter the amount to refund';
+      if (value <= 0) return 'Amount must be greater than zero';
+      if (value > refundable) {
+        return 'At most ${fmt.format(refundable)} can be refunded';
+      }
+      return null;
+    }
 
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setState) => AlertDialog(
-          title: const Text('Refund order?'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: amountCtrl,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(
-                      RegExp(r'^\d*\.?\d{0,2}')),
-                ],
-                decoration: const InputDecoration(
-                  labelText: 'Refund amount',
-                  border: OutlineInputBorder(),
+        builder: (ctx, setState) {
+          final error = amountError(amountCtrl.text);
+          return AlertDialog(
+            title: const Text('Refund order?'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: amountCtrl,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(
+                        RegExp(r'^\d*\.?\d{0,2}')),
+                  ],
+                  onChanged: (_) => setState(() {}),
+                  decoration: InputDecoration(
+                    labelText: 'Refund amount',
+                    border: const OutlineInputBorder(),
+                    errorText: error,
+                    helperText: alreadyRefunded > 0
+                        ? '${fmt.format(alreadyRefunded)} already refunded'
+                        : 'Refund less than the total for a partial refund',
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: reasonCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Reason (optional)',
-                  border: OutlineInputBorder(),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: reasonCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Reason (optional)',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 4),
-              SwitchListTile(
-                title: const Text('Restock items'),
-                subtitle: const Text('Return quantities to inventory'),
-                value: restock,
-                onChanged: (v) => setState(() => restock = v),
-                contentPadding: EdgeInsets.zero,
+                const SizedBox(height: 4),
+                if (!data.restocked)
+                  SwitchListTile(
+                    title: const Text('Restock items'),
+                    subtitle: const Text('Return quantities to inventory'),
+                    value: restock,
+                    onChanged: (v) => setState(() => restock = v),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Cancel')),
+              FilledButton(
+                onPressed:
+                    error == null ? () => Navigator.pop(ctx, true) : null,
+                child: const Text('Refund'),
               ),
             ],
-          ),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Cancel')),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Refund'),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
     if (confirm != true || !context.mounted) return;
 
-    final amount =
-        double.tryParse(amountCtrl.text) ?? data.order.total;
+    final amount = double.tryParse(amountCtrl.text.trim());
+    if (amount == null) return;
     final reason =
         reasonCtrl.text.trim().isEmpty ? null : reasonCtrl.text.trim();
 
@@ -398,6 +434,7 @@ class _StatusChip extends StatelessWidget {
     final (label, color) = switch (status) {
       'voided' => ('Voided', cs.error),
       'refunded' => ('Refunded', cs.tertiary),
+      'partly_refunded' => ('Partly refunded', cs.tertiary),
       'held' => ('Held', cs.secondary),
       _ => ('Completed', cs.primary),
     };

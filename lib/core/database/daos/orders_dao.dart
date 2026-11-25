@@ -89,31 +89,83 @@ class OrdersDao extends DatabaseAccessor<AppDatabase> with _$OrdersDaoMixin {
         return before;
       });
 
+  // ── Refunds ────────────────────────────────────────────────────────────
+
+  /// Everything refunded against [orderId] so far.
+  Future<double> refundedTotal(int orderId) async {
+    final row = await customSelect(
+      'SELECT COALESCE(SUM(amount), 0.0) AS refunded FROM returns '
+      'WHERE order_id = ?',
+      variables: [Variable(orderId)],
+      readsFrom: {returns},
+    ).getSingle();
+    return row.read<double>('refunded');
+  }
+
+  /// True once any refund against [orderId] has put its items back in stock.
+  Future<bool> hasRestockedReturn(int orderId) async {
+    final row = await (select(returns)
+          ..where((r) => r.orderId.equals(orderId) & r.restock.equals(true))
+          ..limit(1))
+        .getSingleOrNull();
+    return row != null;
+  }
+
+  /// orderId → total refunded, for every order that has a refund.
+  Stream<Map<int, double>> watchRefundedTotals() => customSelect(
+        'SELECT order_id, SUM(amount) AS refunded FROM returns '
+        'GROUP BY order_id',
+        readsFrom: {returns},
+      ).watch().map((rows) => {
+            for (final row in rows)
+              row.read<int>('order_id'): row.read<double>('refunded'),
+          });
+
   // ── Aggregates (for reports) ───────────────────────────────────────────
 
+  /// Orders that still carry revenue, each with `net` = total − refunds.
+  ///
+  /// A refund is netted against the original sale (so it lands on the sale's
+  /// date and payment method). Partly refunded orders stay `completed`; a
+  /// `refunded` order is fully refunded and carries nothing. The second
+  /// branch only matters for rows written before partial refunds existed,
+  /// when every refund flipped the status: those count for what was kept.
+  static const _netOrders =
+      '(SELECT o.id, o.created_at, o.payment_method, '
+      '  ROUND(MAX(0.0, o.total - COALESCE(r.refunded, 0.0)), 2) AS net '
+      'FROM orders o '
+      'LEFT JOIN (SELECT order_id, SUM(amount) AS refunded '
+      '  FROM returns GROUP BY order_id) r ON r.order_id = o.id '
+      "WHERE o.status = 'completed' "
+      "  OR (o.status = 'refunded' AND r.refunded IS NOT NULL "
+      '    AND r.refunded < o.total - 0.005))';
+
+  /// Revenue for a period, net of refunds.
   Future<double> totalRevenueForPeriod(DateTime from, DateTime to) async {
     final result = await customSelect(
-      "SELECT COALESCE(SUM(total), 0.0) as revenue FROM orders "
-      "WHERE status = 'completed' AND created_at >= ? AND created_at <= ?",
+      'SELECT COALESCE(SUM(net), 0.0) as revenue FROM $_netOrders '
+      'WHERE created_at >= ? AND created_at <= ?',
       variables: [Variable(from), Variable(to)],
+      readsFrom: {orders, returns},
     ).getSingle();
     return result.read<double>('revenue');
   }
 
-  /// Lightweight projection of completed orders in a period, for chart bucketing.
+  /// Lightweight projection of revenue-carrying orders in a period, for
+  /// chart bucketing. `total` is net of refunds.
   Future<List<({DateTime createdAt, double total})>> completedOrdersInPeriod(
       DateTime from, DateTime to) async {
     final rows = await customSelect(
-      "SELECT created_at, total FROM orders "
-      "WHERE status = 'completed' AND created_at >= ? AND created_at <= ? "
+      'SELECT created_at, net FROM $_netOrders '
+      'WHERE created_at >= ? AND created_at <= ? '
       'ORDER BY created_at ASC',
       variables: [Variable(from), Variable(to)],
-      readsFrom: {orders},
+      readsFrom: {orders, returns},
     ).get();
     return rows
         .map((r) => (
               createdAt: r.read<DateTime>('created_at'),
-              total: r.read<double>('total'),
+              total: r.read<double>('net'),
             ))
         .toList();
   }
@@ -144,16 +196,17 @@ class OrdersDao extends DatabaseAccessor<AppDatabase> with _$OrdersDaoMixin {
         .toList();
   }
 
-  /// Payment method breakdown for a period. Returns [{method, count, total}].
+  /// Payment method breakdown for a period, net of refunds.
+  /// Returns [{method, count, total}].
   Future<List<Map<String, dynamic>>> paymentBreakdownForPeriod(
       DateTime from, DateTime to) async {
     final rows = await customSelect(
-      'SELECT payment_method, COUNT(*) as count, SUM(total) as total '
-      'FROM orders '
-      "WHERE status = 'completed' AND created_at >= ? AND created_at <= ? "
+      'SELECT payment_method, COUNT(*) as count, SUM(net) as total '
+      'FROM $_netOrders '
+      'WHERE created_at >= ? AND created_at <= ? '
       'GROUP BY payment_method',
       variables: [Variable(from), Variable(to)],
-      readsFrom: {orders},
+      readsFrom: {orders, returns},
     ).get();
     return rows
         .map((r) => {

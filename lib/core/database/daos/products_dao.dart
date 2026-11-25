@@ -53,16 +53,53 @@ class ProductsDao extends DatabaseAccessor<AppDatabase>
         .write(const ProductsCompanion(isActive: Value(false)));
   }
 
-  /// Deduct stock on sale. Caller is responsible for audit logging.
-  /// Only deducts when stock tracking is active (stock_quantity > 0).
-  /// A value of 0 means "unlimited" — never touch it.
-  Future<void> deductStock(int productId, int quantity) async {
-    await customUpdate(
-      'UPDATE products SET stock_quantity = stock_quantity - ? '
-      'WHERE id = ? AND stock_quantity > 0',
-      variables: [Variable(quantity), Variable(productId)],
-      updates: {products},
+  /// Deduct stock on sale and return the units actually removed, so the
+  /// caller can log exactly what changed (0 = nothing to log).
+  ///
+  /// Only deducts when stock is being counted (stock_quantity > 0); a value
+  /// of 0 without the out-of-stock flag means "untracked / unlimited" and is
+  /// never touched. Stock never goes below 0, and a tracked product that
+  /// reaches 0 is flagged out of stock — otherwise selling the last unit
+  /// would silently turn it into an unlimited product.
+  Future<int> deductStock(int productId, int quantity) async {
+    final product = await getById(productId);
+    if (product == null || quantity <= 0 || product.stockQuantity <= 0) {
+      return 0;
+    }
+    final taken =
+        quantity < product.stockQuantity ? quantity : product.stockQuantity;
+    final left = product.stockQuantity - taken;
+    await (update(products)..where((p) => p.id.equals(productId))).write(
+      ProductsCompanion(
+        stockQuantity: Value(left),
+        isOutOfStock: left == 0 ? const Value(true) : const Value.absent(),
+      ),
     );
+    return taken;
+  }
+
+  /// Put [quantity] units back after a void or refund and return the units
+  /// actually added (0 = nothing to log).
+  ///
+  /// Untracked products (stock 0, not flagged out of stock) are left alone:
+  /// the sale never deducted from them, and giving them a quantity would
+  /// start capping an unlimited product. A product that had sold out
+  /// (nothing left) becomes sellable again; a product the owner flagged out
+  /// of stock while it still had units keeps the flag.
+  Future<int> restock(int productId, int quantity) async {
+    final product = await getById(productId);
+    if (product == null || quantity <= 0) return 0;
+    final untracked = product.stockQuantity == 0 && !product.isOutOfStock;
+    if (untracked) return 0;
+    final hadNone = product.stockQuantity <= 0;
+    final base = hadNone ? 0 : product.stockQuantity;
+    await (update(products)..where((p) => p.id.equals(productId))).write(
+      ProductsCompanion(
+        stockQuantity: Value(base + quantity),
+        isOutOfStock: hadNone ? const Value(false) : const Value.absent(),
+      ),
+    );
+    return quantity;
   }
 
   /// Set stock to an absolute value.

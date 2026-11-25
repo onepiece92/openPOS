@@ -140,8 +140,8 @@ void main() {
     expect(adjustments, hasLength(1));
     expect(adjustments.first.reasonCode, 'sale');
 
-    // Order still flipped to refunded
-    expect((await db.ordersDao.getById(orderId))!.status, 'refunded');
+    // A partial refund (5 of 15) leaves the order completed
+    expect((await db.ordersDao.getById(orderId))!.status, 'completed');
   });
 
   test('refund of composite order restocks components, not the composite',
