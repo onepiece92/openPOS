@@ -167,6 +167,15 @@ class _UsageHostState extends ConsumerState<UsageHost> {
     ref.listen(onboardingCompleteProvider, (_, done) {
       if (done) _maybeDisclose();
     });
+    // So is Usage counting being switched on later (in Features or Usage
+    // summary): disclosed then, not at the next launch. After the frame,
+    // like the restart notice, in case the switch flips mid-build.
+    ref.listen(featureOnProvider(Feature.usageCounting), (was, on) {
+      if (on && was == false) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => _maybeDisclose());
+        WidgetsBinding.instance.ensureVisualUpdate();
+      }
+    });
     return widget.child;
   }
 }

@@ -35,13 +35,10 @@ final usageCounterProvider = Provider<UsageCounter>((ref) {
   } catch (_) {/* no settings box */}
   final c = UsageCounter(
     countingOn: on,
-    onCarriedCountingChoice: (v) async {
-      try {
-        await ref
-            .read(settingsProvider.notifier)
-            .setFeature(Feature.usageCounting, v);
-      } catch (_) {/* no settings box */}
-    },
+    // Throws without a settings box: the counter then keeps the old key.
+    onCarriedCountingChoice: (v) => ref
+        .read(settingsProvider.notifier)
+        .setFeature(Feature.usageCounting, v),
   );
   try {
     ref.listen(featureOnProvider(Feature.usageCounting),

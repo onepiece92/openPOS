@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/widgets.dart' show AppLifecycleState;
@@ -119,6 +120,33 @@ void main() {
     expect(box.containsKey(kUsageCountingOnKey), isFalse);
     await c.flush();
     expect(stored(), isEmpty);
+  });
+
+  test('the old "off" is deleted only after the switch is written',
+      () async {
+    await box.put(kUsageCountingOnKey, false);
+    final written = Completer<void>();
+    final c = UsageCounter(
+        openBox: () async => box,
+        onCarriedCountingChoice: (_) => written.future);
+    final loading = c.ensureLoaded();
+    await pumpEventQueue();
+    expect(box.get(kUsageCountingOnKey), isFalse,
+        reason: 'still there while the settings write is pending');
+    written.complete();
+    await loading;
+    expect(box.containsKey(kUsageCountingOnKey), isFalse);
+  });
+
+  test('a failed settings write keeps the old "off" for the next load',
+      () async {
+    await box.put(kUsageCountingOnKey, false);
+    final c = UsageCounter(
+        openBox: () async => box,
+        onCarriedCountingChoice: (_) async => throw StateError('no settings'));
+    await c.ensureLoaded();
+    expect(c.countingEnabled, isFalse, reason: 'still honoured now');
+    expect(box.get(kUsageCountingOnKey), isFalse);
   });
 
   test('a carried "on" turns the switch back on', () async {

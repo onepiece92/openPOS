@@ -148,13 +148,20 @@ class UsageCounter {
       if (_disposed) return;
       final carried = box.get(kUsageCountingOnKey);
       if (box.containsKey(kUsageCountingOnKey)) {
+        // A stored "off" is a privacy choice: the old key goes only once
+        // the switch is safely written. If that fails, it stays and is
+        // moved on the next load.
+        var moved = true;
         if (carried is bool) {
           countingEnabled = carried;
-          // The settings write is not part of loading: not awaited.
-          final apply = onCarriedCountingChoice;
-          if (apply != null) unawaited(apply(carried));
+          try {
+            await onCarriedCountingChoice?.call(carried);
+          } catch (e) {
+            moved = false;
+            debugPrint('usage: counting choice not moved yet ($e)');
+          }
         }
-        await box.delete(kUsageCountingOnKey);
+        if (moved) await box.delete(kUsageCountingOnKey);
         if (_disposed) return;
       }
       final buffered = Map.of(_counts);

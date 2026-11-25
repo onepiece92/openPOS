@@ -220,6 +220,39 @@ void main() {
       expect(find.text(kUsageDisclosureText), findsNothing);
     });
 
+    testWidgets(
+        'counting off at launch: no disclosure; switched on later: shown '
+        'then, once, and marked shown', (tester) async {
+      await settings.put(kFeaturesKey, {'usageCounting': false});
+      final c = await pump(tester);
+      expect(find.text(kUsageDisclosureText), findsNothing);
+      expect(usageBox.get(kUsageDisclosureShownKey), isNull);
+
+      await c
+          .read(settingsProvider.notifier)
+          .setFeature(Feature.usageCounting, true);
+      await tester.pump();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 800));
+      expect(find.text(kUsageDisclosureText), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      await tester.pump(kUsageDisclosureDuration);
+      await tester.pumpAndSettle();
+      expect(usageBox.get(kUsageDisclosureShownKey), isTrue);
+
+      // Off and on again: not shown a second time.
+      await c
+          .read(settingsProvider.notifier)
+          .setFeature(Feature.usageCounting, false);
+      await c
+          .read(settingsProvider.notifier)
+          .setFeature(Feature.usageCounting, true);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 800));
+      expect(find.text(kUsageDisclosureText), findsNothing);
+    });
+
     testWidgets('not over onboarding; shown once it is done', (tester) async {
       final c = await pump(tester, onboarded: false);
       expect(find.text(kUsageDisclosureText), findsNothing);
