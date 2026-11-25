@@ -25,6 +25,10 @@ const kImportedInvoicePrefix = 'IMP';
 @TableIndex(name: 'idx_orders_created_at', columns: {#createdAt})
 // Order search by customer name (and a customer's order history).
 @TableIndex(name: 'idx_orders_customer_id', columns: {#customerId})
+// Voids made in a period (the drawer close). Partial: only voided orders
+// are in it, so ringing up a sale (voided_at NULL) never writes to it.
+@TableIndex.sql('CREATE INDEX idx_orders_voided_at '
+    'ON orders (voided_at) WHERE voided_at IS NOT NULL')
 class Orders extends Table {
   IntColumn get id => integer().autoIncrement()();
   IntColumn get invoiceNo => integer().nullable()();

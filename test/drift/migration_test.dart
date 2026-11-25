@@ -236,6 +236,7 @@ void main() {
     'idx_orders_invoice_no': 'orders',
     'idx_shifts_closed_at': 'shifts',
     'idx_shifts_one_open': 'shifts',
+    'idx_orders_voided_at': 'orders',
     'idx_returns_created_at': 'returns',
   };
 
@@ -358,6 +359,7 @@ void main() {
   const v16Statements = [
     'ALTER TABLE "orders" ADD COLUMN "tip_amount"',
     'ALTER TABLE "orders" ADD COLUMN "voided_at"',
+    'idx_orders_voided_at',
     'ALTER TABLE "returns" ADD COLUMN "tip_amount"',
     'CREATE TABLE IF NOT EXISTS "shifts"',
     'idx_shifts_closed_at',

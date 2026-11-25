@@ -160,9 +160,9 @@ class OrdersDao extends DatabaseAccessor<AppDatabase> with _$OrdersDaoMixin {
       batch((b) => b.insertAll(orderTaxes, lines));
 
   /// Marks [id] voided and stamps `voided_at` ([at], default now). The
-  /// drawer close finds voids through the 'void' audit-log entry written in
-  /// the same transaction (see `voidOrder` in features/returns), then
-  /// filters on `voided_at`.
+  /// drawer close finds voids by `voided_at` (idx_orders_voided_at); the
+  /// audit entry written by `voidOrder` in features/returns is a record
+  /// only, never read for money.
   Future<void> voidOrder(int id, {DateTime? at}) {
     final now = at ?? DateTime.now();
     return (update(orders)..where((o) => o.id.equals(id))).write(

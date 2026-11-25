@@ -2,7 +2,6 @@ import 'package:drift/drift.dart';
 
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/database/daos/orders_dao.dart';
-import 'package:pos_app/core/database/tables/audit_log_table.dart';
 import 'package:pos_app/core/database/tables/orders_table.dart';
 import 'package:pos_app/core/database/tables/returns_table.dart';
 import 'package:pos_app/core/database/tables/shifts_table.dart';
@@ -191,7 +190,7 @@ DateTime _latest(Iterable<DateTime> ts) =>
 ///  * Imported orders (invoice prefix `IMP`) are history, not till
 ///    activity, and are left out of everything here — with their refunds and
 ///    voids.
-@DriftAccessor(tables: [Shifts, Orders, Returns, AuditLog])
+@DriftAccessor(tables: [Shifts, Orders, Returns])
 class ShiftsDao extends DatabaseAccessor<AppDatabase> with _$ShiftsDaoMixin {
   ShiftsDao(super.db);
 
@@ -332,11 +331,6 @@ class ShiftsDao extends DatabaseAccessor<AppDatabase> with _$ShiftsDaoMixin {
   static const _method =
       "COALESCE(NULLIF(LOWER(TRIM(o.payment_method)), ''), 'cash')";
 
-  /// Voids are found through their audit entry (indexed by date), searched
-  /// this much wider than the window: the entry and `voided_at` are written
-  /// in one transaction but may straddle a second. `voided_at` decides.
-  static const _auditSlack = Duration(minutes: 1);
-
   static FlowByMethod _flows(List<QueryRow> rows) => FlowByMethod({
         for (final r in rows)
           r.read<String>('method'): MethodFlow(
@@ -381,10 +375,9 @@ class ShiftsDao extends DatabaseAccessor<AppDatabase> with _$ShiftsDaoMixin {
       ).get());
 
   /// Voids made in [from, to): each hands back total + tip less what its
-  /// earlier refunds returned. Candidates come from the 'void' audit
-  /// entries in the window (range seek on idx_audit_log_created_at), then
-  /// each order by primary key and its refunds by idx_returns_order_id;
-  /// `voided_at` is the deciding filter.
+  /// earlier refunds returned. A range seek on the partial index
+  /// idx_orders_voided_at (only voided rows are in it), then each void's
+  /// refunds by idx_returns_order_id.
   Future<FlowByMethod> voidsInWindow(DateTime from, DateTime to) async =>
       _flows(await customSelect(
         'SELECT method, COUNT(*) AS c, '
@@ -398,19 +391,12 @@ class ShiftsDao extends DatabaseAccessor<AppDatabase> with _$ShiftsDaoMixin {
         '    MAX(0.0, o.tip_amount - (SELECT COALESCE(SUM(tip_amount), 0.0) '
         '      FROM returns WHERE order_id = o.id)) AS tips '
         '  FROM orders o '
-        '  WHERE o.id IN (SELECT entity_id FROM audit_log '
-        "      WHERE created_at >= ? AND created_at < ? AND action = 'void' "
-        "        AND entity_type = 'order') "
-        "    AND o.status = 'voided' "
-        '    AND o.voided_at >= ? AND o.voided_at < ? AND $_notImported) '
+        '  WHERE o.voided_at IS NOT NULL '
+        '    AND o.voided_at >= ? AND o.voided_at < ? '
+        "    AND o.status = 'voided' AND $_notImported) "
         'GROUP BY 1',
-        variables: [
-          Variable(from.subtract(_auditSlack)),
-          Variable(to.add(_auditSlack)),
-          Variable(from),
-          Variable(to),
-        ],
-        readsFrom: {orders, returns, auditLog},
+        variables: [Variable(from), Variable(to)],
+        readsFrom: {orders, returns},
       ).get());
 
   /// All three flows for [from, to).

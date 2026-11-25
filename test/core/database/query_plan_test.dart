@@ -190,11 +190,14 @@ void main() {
       expect(plan.join(' | '), contains('SEARCH o USING INTEGER PRIMARY KEY'));
     });
 
-    test('voids are found through the audit log by date, no orders scan',
-        () async {
+    test('voids are a range seek on the partial voided_at index', () async {
       final plan = await planOf(() => db.shiftsDao.voidsInWindow(from, to));
-      expectIndexed(plan, ['idx_audit_log_created_at', 'idx_returns_order_id']);
-      expect(plan.join(' | '), contains('SEARCH o USING INTEGER PRIMARY KEY'));
+      expectIndexed(plan, ['idx_orders_voided_at', 'idx_returns_order_id']);
+      expect(
+          plan.join(' | '),
+          contains('SEARCH o USING INDEX idx_orders_voided_at '
+              '(voided_at>? AND voided_at<?)'));
+      expect(plan.join(' | '), isNot(contains('audit_log')));
       expect(plan.where((s) => s.startsWith('SCAN')), isEmpty,
           reason: 'no step reads a whole table: $plan');
     });

@@ -233,6 +233,9 @@ class AppDatabase extends _$AppDatabase {
               // the schema, not the rows.
               await m.addColumn(orders, orders.tipAmount);
               await m.addColumn(orders, orders.voidedAt);
+              // Partial: holds voided orders only (pre-v16 voids have no
+              // voided_at), so it is empty after the upgrade.
+              await m.createIndex(idxOrdersVoidedAt);
               await m.addColumn(returns, returns.tipAmount);
               await m.createTable(shifts);
               await m.createIndex(idxShiftsClosedAt);

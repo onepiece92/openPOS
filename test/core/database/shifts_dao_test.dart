@@ -6,6 +6,7 @@ import 'package:pos_app/core/database/daos/shifts_dao.dart';
 import 'package:pos_app/core/services/audit_service.dart';
 import 'package:pos_app/features/returns/domain/void_order.dart' as svc;
 
+import '../../_support/sales.dart';
 import '../../_support/test_db.dart';
 
 /// Till sessions and the drawer-close aggregates (schema v16).
@@ -54,7 +55,8 @@ void main() {
         createdAt: Value(when ?? at(13)),
       ));
 
-  /// A void as the app writes it: status + voided_at, and the audit entry.
+  /// A void as the app writes it: status + voided_at, and the audit entry
+  /// (written, never read for money — see 'a void with no audit row').
   Future<void> voidAt(int orderId, DateTime when) async {
     await db.ordersDao.voidOrder(orderId, at: when);
     await db.into(db.auditLog).insert(AuditLogCompanion.insert(
@@ -356,6 +358,29 @@ void main() {
           DateTime.now().subtract(const Duration(hours: 1)),
           DateTime.now().add(const Duration(hours: 1)));
       expect((f.cashSales, f.cashVoids), (25.0, 25.0));
+    });
+
+    test('a void with no audit row still counts: money comes from voided_at',
+        () async {
+      final o = await order(total: 40, tip: 4);
+      await db.ordersDao.voidOrder(o, at: at(14));
+      final f = await dao.figuresForWindow(from, to);
+      expect((f.cashSales, f.cashVoids), (40.0, 44.0));
+    });
+
+    test('a normal sale stores voided_at NULL, so the partial index skips it',
+        () async {
+      final p = await seedProduct(db, sku: 'T', stock: 5);
+      final o = await sell(db, AuditService(db), [line(p)]);
+      expect((await db.ordersDao.getById(o))!.voidedAt, isNull);
+      Future<int> indexed() async => (await db
+              .customSelect('SELECT COUNT(*) AS c FROM orders '
+                  'INDEXED BY idx_orders_voided_at WHERE voided_at IS NOT NULL')
+              .getSingle())
+          .read<int>('c');
+      expect(await indexed(), 0);
+      await svc.voidOrder(db, AuditService(db), orderId: o, reason: 'x');
+      expect(await indexed(), 1);
     });
 
     test('tax: gross, the refunded share, net', () async {

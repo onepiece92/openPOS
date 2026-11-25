@@ -8779,6 +8779,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       'CREATE INDEX idx_orders_created_at ON orders (created_at)');
   late final Index idxOrdersCustomerId = Index('idx_orders_customer_id',
       'CREATE INDEX idx_orders_customer_id ON orders (customer_id)');
+  late final Index idxOrdersVoidedAt = Index('idx_orders_voided_at',
+      'CREATE INDEX idx_orders_voided_at ON orders (voided_at) WHERE voided_at IS NOT NULL');
   late final Index idxOrderItemsOrderId = Index('idx_order_items_order_id',
       'CREATE INDEX idx_order_items_order_id ON order_items (order_id)');
   late final Index idxOrderTaxesOrderId = Index('idx_order_taxes_order_id',
@@ -8834,6 +8836,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         idxOrdersInvoiceNo,
         idxOrdersCreatedAt,
         idxOrdersCustomerId,
+        idxOrdersVoidedAt,
         idxOrderItemsOrderId,
         idxOrderTaxesOrderId,
         idxReturnsOrderId,

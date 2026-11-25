@@ -9,5 +9,4 @@ mixin _$ShiftsDaoMixin on DatabaseAccessor<AppDatabase> {
   $TablesTable get tables => attachedDatabase.tables;
   $OrdersTable get orders => attachedDatabase.orders;
   $ReturnsTable get returns => attachedDatabase.returns;
-  $AuditLogTable get auditLog => attachedDatabase.auditLog;
 }
