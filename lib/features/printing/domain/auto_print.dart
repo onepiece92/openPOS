@@ -6,15 +6,6 @@ import 'package:pos_app/features/printing/domain/receipt_printer.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
 import 'package:pos_app/features/receipts/presentation/receipt_body.dart';
 
-/// Fire-and-forget print of a just-placed order. Resolves with `null` on
-/// success, or a short error string on failure (so the caller can flash a
-/// snackbar without blocking the post-checkout navigation).
-///
-/// Returns `null` if no printer is paired — that is not an error, the user
-/// may genuinely be running paperless.
-Future<String?> autoPrintOrder(WidgetRef ref, int orderId) =>
-    ref.read(autoPrintServiceProvider).printOrder(orderId);
-
 final autoPrintServiceProvider =
     Provider<AutoPrintService>((ref) => AutoPrintService(ref));
 
