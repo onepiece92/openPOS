@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:csv/csv.dart';
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -324,72 +325,107 @@ class BackupRepository {
 
   // ── Orders Export ─────────────────────────────────────────────────────────
 
+  static const _ordersCsvHeader = <dynamic>[
+    'Order ID',
+    'Status',
+    'Subtotal',
+    'Tax Total',
+    'Discount',
+    'Total',
+    'Payment Method',
+    'Tendered',
+    'Change',
+    'Customer Name',
+    'Notes',
+    'Created At',
+    'Item Product ID',
+    'Item Name',
+    'Item SKU',
+    'Item Price',
+    'Item Qty',
+    'Item Discount',
+    'Item Tax',
+    'Item Total'
+  ];
+
   Future<void> exportOrders() async {
-    final data = await _db.ordersDao.getAllOrdersWithItems();
-    final List<List<dynamic>> rows = [
-      [
-        'Order ID',
-        'Status',
-        'Subtotal',
-        'Tax Total',
-        'Discount',
-        'Total',
-        'Payment Method',
-        'Tendered',
-        'Change',
-        'Customer Name',
-        'Notes',
-        'Created At',
-        'Item Product ID',
-        'Item Name',
-        'Item SKU',
-        'Item Price',
-        'Item Qty',
-        'Item Discount',
-        'Item Tax',
-        'Item Total'
-      ],
-    ];
-
-    for (final row in data) {
-      // Get SKU if possible (though we have name as snapshot)
-      // Note: productId might be null if product was deleted but order remains
-      String sku = '';
-      final productId = row.read<int?>('product_id');
-      if (productId != null) {
-        final p = await (_db.select(_db.products)
-              ..where((p) => p.id.equals(productId)))
-            .getSingleOrNull();
-        sku = p?.sku ?? '';
-      }
-
-      rows.add([
-        row.read<int>('o_id'),
-        row.read<String>('status'),
-        row.read<double>('o_subtotal'),
-        row.read<double>('tax_total'),
-        row.read<double>('o_discount'),
-        row.read<double>('o_total'),
-        row.read<String>('payment_method'),
-        row.read<double?>('tendered_amount') ?? 0.0,
-        row.read<double?>('change_amount') ?? 0.0,
-        row.read<String?>('customer_name') ?? '',
-        row.read<String?>('notes') ?? '',
-        row.read<DateTime>('created_at').toIso8601String(),
-        productId ?? '',
-        row.read<String?>('product_name') ?? '',
-        sku,
-        row.read<double?>('unit_price') ?? 0.0,
-        row.read<int?>('quantity') ?? 0,
-        row.read<double?>('item_discount') ?? 0.0,
-        row.read<double?>('item_tax') ?? 0.0,
-        row.read<double?>('line_total') ?? 0.0,
-      ]);
-    }
-
-    final csvString = const ListToCsvConverter().convert(rows);
-    await _shareCsv(csvString, 'order_history_backup.csv');
+    final file = await _tempFile('order_history_backup.csv');
+    await writeOrdersCsv(file);
+    await _shareFile(file);
   }
+
+  /// Writes the whole order history to [file] as CSV, one row per order
+  /// line, newest order first. Reads [pageSize] orders at a time and appends
+  /// each page to the file, so memory stays flat however long the history.
+  @visibleForTesting
+  Future<void> writeOrdersCsv(File file, {int pageSize = 500}) =>
+      _writeOrderLinesCsv(
+        file,
+        header: _ordersCsvHeader,
+        pageSize: pageSize,
+        toCsvRow: (row) {
+          // product_id is NULL only on the placeholder row of an order that
+          // has no lines; the SKU is the product's current one.
+          final productId = row.read<int?>('product_id');
+          return [
+            row.read<int>('o_id'),
+            row.read<String>('status'),
+            row.read<double>('o_subtotal'),
+            row.read<double>('tax_total'),
+            row.read<double>('o_discount'),
+            row.read<double>('o_total'),
+            row.read<String>('payment_method'),
+            row.read<double?>('tendered_amount') ?? 0.0,
+            row.read<double?>('change_amount') ?? 0.0,
+            row.read<String?>('customer_name') ?? '',
+            row.read<String?>('notes') ?? '',
+            row.read<DateTime>('created_at').toIso8601String(),
+            productId ?? '',
+            row.read<String?>('product_name') ?? '',
+            row.read<String?>('product_sku') ?? '',
+            row.read<double?>('unit_price') ?? 0.0,
+            row.read<int?>('quantity') ?? 0,
+            row.read<double?>('item_discount') ?? 0.0,
+            row.read<double?>('item_tax') ?? 0.0,
+            row.read<double?>('line_total') ?? 0.0,
+          ];
+        },
+      );
+
+  /// Streams `OrdersDao.ordersWithItemsPage` into [file]: header first, then
+  /// each page as it is read. The bytes are exactly what
+  /// `ListToCsvConverter().convert([header, ...allRows])` would produce.
+  Future<void> _writeOrderLinesCsv(
+    File file, {
+    required List<dynamic> header,
+    required List<dynamic> Function(QueryRow row) toCsvRow,
+    required int pageSize,
+  }) async {
+    const csv = ListToCsvConverter();
+    final sink = file.openWrite();
+    try {
+      sink.write(csv.convert([header]));
+      ({DateTime createdAt, int id})? cursor;
+      while (true) {
+        final page = await _db.ordersDao
+            .ordersWithItemsPage(before: cursor, limit: pageSize);
+        if (page.isEmpty) break;
+        sink
+          ..write(_csvEol)
+          ..write(csv.convert([for (final row in page) toCsvRow(row)]));
+        await sink.flush();
+        cursor = (
+          createdAt: page.last.read<DateTime>('created_at'),
+          id: page.last.read<int>('o_id'),
+        );
+      }
+    } finally {
+      await sink.close();
+    }
+  }
+
+  /// Row separator of [ListToCsvConverter] (its default).
+  static const _csvEol = '\r\n';
 
   // ── Orders Import ──────────────────────────────────────────────────────────
 
@@ -520,38 +556,40 @@ class BackupRepository {
   // ── Sales Report Export ────────────────────────────────────────────────────
 
   Future<void> exportSalesReport() async {
-    final data = await _db.ordersDao.getAllOrdersWithItems();
-    final List<List<dynamic>> rows = [
-      [
-        'Date',
-        'Order ID',
-        'Item',
-        'Qty',
-        'Unit Price',
-        'Line Total',
-        'Payment',
-        'Customer',
-        'Status'
-      ],
-    ];
-
-    for (final row in data) {
-      rows.add([
-        row.read<DateTime>('created_at').toIso8601String().split('T')[0],
-        row.read<int>('o_id'),
-        row.read<String?>('product_name') ?? 'Unknown',
-        row.read<int?>('quantity') ?? 0,
-        row.read<double?>('unit_price') ?? 0.0,
-        row.read<double?>('line_total') ?? 0.0,
-        row.read<String>('payment_method'),
-        row.read<String?>('customer_name') ?? 'Walk-in',
-        row.read<String>('status'),
-      ]);
-    }
-
-    final csvString = const ListToCsvConverter().convert(rows);
-    await _shareCsv(csvString, 'sales_report.csv');
+    final file = await _tempFile('sales_report.csv');
+    await writeSalesReportCsv(file);
+    await _shareFile(file);
   }
+
+  /// Same paged, flat-memory write as [writeOrdersCsv].
+  @visibleForTesting
+  Future<void> writeSalesReportCsv(File file, {int pageSize = 500}) =>
+      _writeOrderLinesCsv(
+        file,
+        header: const [
+          'Date',
+          'Order ID',
+          'Item',
+          'Qty',
+          'Unit Price',
+          'Line Total',
+          'Payment',
+          'Customer',
+          'Status'
+        ],
+        pageSize: pageSize,
+        toCsvRow: (row) => [
+          row.read<DateTime>('created_at').toIso8601String().split('T')[0],
+          row.read<int>('o_id'),
+          row.read<String?>('product_name') ?? 'Unknown',
+          row.read<int?>('quantity') ?? 0,
+          row.read<double?>('unit_price') ?? 0.0,
+          row.read<double?>('line_total') ?? 0.0,
+          row.read<String>('payment_method'),
+          row.read<String?>('customer_name') ?? 'Walk-in',
+          row.read<String>('status'),
+        ],
+      );
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -563,14 +601,20 @@ class BackupRepository {
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
-  Future<void> _shareCsv(String content, String fileName) async {
+  Future<File> _tempFile(String fileName) async {
     final directory = await getTemporaryDirectory();
     if (!await directory.exists()) {
       await directory.create(recursive: true);
     }
-    final filePath = p.join(directory.path, fileName);
-    final file = File(filePath);
+    return File(p.join(directory.path, fileName));
+  }
+
+  Future<void> _shareFile(File file) =>
+      Share.shareXFiles([XFile(file.path)], text: 'POS Data Backup');
+
+  Future<void> _shareCsv(String content, String fileName) async {
+    final file = await _tempFile(fileName);
     await file.writeAsString(content);
-    await Share.shareXFiles([XFile(file.path)], text: 'POS Data Backup');
+    await _shareFile(file);
   }
 }

@@ -20,11 +20,98 @@ class OrdersDao extends DatabaseAccessor<AppDatabase> with _$OrdersDaoMixin {
 
   // ── Watch ──────────────────────────────────────────────────────────────
 
-  Stream<List<Order>> watchRecent({int limit = 50}) =>
-      (select(orders)
-            ..orderBy([(o) => OrderingTerm.desc(o.createdAt)])
-            ..limit(limit))
-          .watch();
+  /// One page of order history, newest first, optionally narrowed by a
+  /// search. Pages are keyed on (created_at, id) — pass the last order of
+  /// the previous page as [before] — so any order, however old, is reachable
+  /// and a sale landing meanwhile cannot shift or repeat rows.
+  ///
+  /// [search] matches, all through indexes:
+  ///  * a bill number as printed — `17`, `#17`, or `2082/83-17` with its
+  ///    prefix (rows from before invoice numbers existed match on their id);
+  ///  * an invoice prefix on its own (`2082/83`): every bill under it;
+  ///  * part of a customer's name, any case.
+  /// A search with a decimal point (`1250.50`) is read as an amount and
+  /// matches the order total instead; that one reads the whole table.
+  Future<List<Order>> historyPage({
+    String search = '',
+    Order? before,
+    int limit = 50,
+  }) async {
+    final where = <String>[];
+    final vars = <Variable>[];
+    final q = search.trim();
+    if (q.isNotEmpty) {
+      final bare = q.startsWith('#') ? q.substring(1).trim() : q;
+      final amount = bare.contains('.') ? double.tryParse(bare) : null;
+      if (amount != null) {
+        where.add('(o.total >= ? AND o.total < ?)');
+        vars
+          ..add(Variable(amount - 0.005))
+          ..add(Variable(amount + 0.005));
+      } else {
+        final terms = <String>[];
+        final number = int.tryParse(bare);
+        if (number != null) {
+          // The unique index leads with the prefix, so hand it the (few)
+          // prefixes in use instead of letting it walk every bill.
+          terms
+            ..add('(o.invoice_no = ? AND o.invoice_prefix IN '
+                '(SELECT DISTINCT invoice_prefix FROM orders))')
+            ..add('(o.id = ? AND o.invoice_no IS NULL)');
+          vars
+            ..add(Variable(number))
+            ..add(Variable(number));
+        }
+        final dash = bare.lastIndexOf('-');
+        final prefixed =
+            dash > 0 ? int.tryParse(bare.substring(dash + 1).trim()) : null;
+        if (prefixed != null) {
+          terms.add('(o.invoice_prefix = ? AND o.invoice_no = ?)');
+          vars
+            ..add(Variable(bare.substring(0, dash).trim()))
+            ..add(Variable(prefixed));
+        }
+        // '' is every un-prefixed bill, so only a real prefix counts.
+        terms.add("(o.invoice_prefix = ? AND o.invoice_prefix != '')");
+        vars.add(Variable(q));
+        terms.add('o.customer_id IN '
+            "(SELECT id FROM customers WHERE name LIKE ? ESCAPE '\\')");
+        vars.add(Variable('%${_escapeLike(q)}%'));
+        where.add('(${terms.join(' OR ')})');
+      }
+    }
+    if (before != null) {
+      where.add('(o.created_at, o.id) < (?, ?)');
+      vars
+        ..add(Variable(before.createdAt))
+        ..add(Variable(before.id));
+    }
+    final rows = await customSelect(
+      'SELECT o.* FROM orders o '
+      '${where.isEmpty ? '' : 'WHERE ${where.join(' AND ')} '}'
+      'ORDER BY o.created_at DESC, o.id DESC LIMIT ?',
+      variables: [...vars, Variable(limit)],
+      readsFrom: {orders, customers},
+    ).get();
+    return [for (final r in rows) orders.map(r.data)];
+  }
+
+  static String _escapeLike(String s) => s
+      .replaceAll(r'\', r'\\')
+      .replaceAll('%', r'\%')
+      .replaceAll('_', r'\_');
+
+  /// How many orders (of any status) were rung up in the period — the
+  /// history screen's "Today's orders".
+  Future<int> orderCountForPeriod(DateTime from, DateTime to) async {
+    final row = await customSelect(
+      'SELECT COUNT(*) AS c FROM orders '
+      'WHERE created_at >= ? AND created_at <= ?',
+      variables: [Variable(from), Variable(to)],
+      readsFrom: {orders},
+    ).getSingle();
+    return row.read<int>('c');
+  }
 
   Stream<List<Order>> watchByCustomer(int customerId) => (select(orders)
         ..where((o) => o.customerId.equals(customerId))
@@ -111,16 +198,6 @@ class OrdersDao extends DatabaseAccessor<AppDatabase> with _$OrdersDaoMixin {
         .getSingleOrNull();
     return row != null;
   }
-
-  /// orderId → total refunded, for every order that has a refund.
-  Stream<Map<int, double>> watchRefundedTotals() => customSelect(
-        'SELECT order_id, SUM(amount) AS refunded FROM returns '
-        'GROUP BY order_id',
-        readsFrom: {returns},
-      ).watch().map((rows) => {
-            for (final row in rows)
-              row.read<int>('order_id'): row.read<double>('refunded'),
-          });
 
   // ── Aggregates (for reports) ───────────────────────────────────────────
 
@@ -252,15 +329,22 @@ class OrdersDao extends DatabaseAccessor<AppDatabase> with _$OrdersDaoMixin {
       'FROM order_items oi '
       'JOIN $_netOrders n ON n.id = oi.order_id '
       'LEFT JOIN products p ON p.id = oi.product_id '
-      'LEFT JOIN (SELECT order_id, SUM(tax_amount) AS inclusive '
-      '  FROM order_taxes WHERE is_inclusive = 1 GROUP BY order_id) it '
-      '  ON it.order_id = n.id '
-      'LEFT JOIN (SELECT order_id, SUM(tax_amount) AS item_tax '
-      '  FROM order_items GROUP BY order_id) ls ON ls.order_id = n.id '
-      'WHERE n.created_at >= ? AND n.created_at <= ? '
+      // Both per-order sums are limited to the period's orders, so a
+      // one-day report does not total every tax line and order line ever
+      // written before joining to a handful of orders.
+      'LEFT JOIN (SELECT t.order_id, SUM(t.tax_amount) AS inclusive '
+      '  FROM order_taxes t JOIN orders po ON po.id = t.order_id '
+      '  WHERE t.is_inclusive = 1 '
+      '    AND po.created_at >= ?1 AND po.created_at <= ?2 '
+      '  GROUP BY t.order_id) it ON it.order_id = n.id '
+      'LEFT JOIN (SELECT i.order_id, SUM(i.tax_amount) AS item_tax '
+      '  FROM order_items i JOIN orders po ON po.id = i.order_id '
+      '  WHERE po.created_at >= ?1 AND po.created_at <= ?2 '
+      '  GROUP BY i.order_id) ls ON ls.order_id = n.id '
+      'WHERE n.created_at >= ?1 AND n.created_at <= ?2 '
       'GROUP BY oi.product_id '
       'ORDER BY qty DESC, sales DESC, oi.product_id '
-      'LIMIT ?',
+      'LIMIT ?3',
       variables: [Variable(from), Variable(to), Variable(limit)],
       readsFrom: {orderItems, orders, returns, orderTaxes, products},
     ).get();
@@ -298,37 +382,61 @@ class OrdersDao extends DatabaseAccessor<AppDatabase> with _$OrdersDaoMixin {
         .toList();
   }
 
-  /// Streams a map of productId → total units sold across completed orders.
-  /// Voided / refunded / held orders are excluded so popularity rankings
-  /// reflect realised sales only.
-  Stream<Map<int, int>> watchProductSalesCounts() {
-    return customSelect(
-      'SELECT oi.product_id, CAST(SUM(oi.quantity) AS INTEGER) as total_sold '
-      'FROM order_items oi '
-      'JOIN orders o ON o.id = oi.order_id '
-      "WHERE o.status = 'completed' "
+  /// productId → units sold since [since], in the product's main unit
+  /// (2 dozen = 24), over completed orders only — voided, refunded and held
+  /// orders are left out so the "most sold" ranking reflects realised sales.
+  ///
+  /// A one-off read bounded by date: it walks only the recent slice of
+  /// orders, and nothing re-runs it when a sale lands or a receipt prints.
+  Future<Map<int, int>> productSalesCounts({required DateTime since}) async {
+    final rows = await customSelect(
+      'SELECT oi.product_id, '
+      '  CAST(ROUND(SUM(oi.quantity * oi.units_per_qty)) AS INTEGER) '
+      '    AS total_sold '
+      'FROM orders o '
+      'JOIN order_items oi ON oi.order_id = o.id '
+      "WHERE o.created_at >= ? AND o.status = 'completed' "
       'GROUP BY oi.product_id',
+      variables: [Variable(since)],
       readsFrom: {orderItems, orders},
-    ).watch().map((rows) => {
-          for (final row in rows)
-            row.read<int>('product_id'): row.read<int>('total_sold'),
-        });
+    ).get();
+    return {
+      for (final row in rows)
+        row.read<int>('product_id'): row.read<int>('total_sold'),
+    };
   }
 
-  /// Bulk retrieval for backups.
-  Future<List<QueryRow>> getAllOrdersWithItems() async {
+  /// One page of the CSV exports: up to [limit] orders, newest first, one
+  /// row per order line (a single row with NULL item columns for an order
+  /// that has none), each with its customer's name and its product's
+  /// current SKU. Pass the last row's (`created_at`, `o_id`) as [before]
+  /// for the next page; an empty result means the history is exhausted.
+  Future<List<QueryRow>> ordersWithItemsPage({
+    ({DateTime createdAt, int id})? before,
+    int limit = 500,
+  }) {
     return customSelect(
       'SELECT '
       'o.id as o_id, o.status, o.subtotal as o_subtotal, o.tax_total, o.discount_total as o_discount, o.total as o_total, '
       'o.payment_method, o.tendered_amount, o.change_amount, o.customer_id, o.notes, o.created_at, '
       'oi.id as item_id, oi.product_id, oi.product_name, oi.unit_price, oi.quantity, oi.discount as item_discount, '
       'oi.tax_amount as item_tax, oi.line_total, '
-      'c.name as customer_name '
-      'FROM orders o '
+      'c.name as customer_name, p.sku as product_sku '
+      'FROM (SELECT * FROM orders '
+      '${before == null ? '' : 'WHERE (created_at, id) < (?, ?) '}'
+      '  ORDER BY created_at DESC, id DESC LIMIT ?) o '
       'LEFT JOIN order_items oi ON o.id = oi.order_id '
       'LEFT JOIN customers c ON o.customer_id = c.id '
-      'ORDER BY o.created_at DESC',
-      readsFrom: {orders, orderItems, customers},
+      'LEFT JOIN products p ON p.id = oi.product_id '
+      'ORDER BY o.created_at DESC, o.id DESC, oi.id',
+      variables: [
+        if (before != null) ...[
+          Variable(before.createdAt),
+          Variable(before.id),
+        ],
+        Variable(limit),
+      ],
+      readsFrom: {orders, orderItems, customers, products},
     ).get();
   }
 }

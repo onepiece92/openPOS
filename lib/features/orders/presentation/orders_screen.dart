@@ -1,26 +1,19 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import 'package:pos_app/core/database/app_database.dart';
-import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/theme/tokens.dart';
 import 'package:pos_app/core/utils/currency_formatter.dart';
 import 'package:pos_app/shared/widgets/app_empty_state.dart';
 import 'package:pos_app/features/customers/domain/customers_provider.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
 import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
+import 'package:pos_app/features/orders/domain/order_history.dart';
 import 'package:pos_app/features/orders/domain/order_number.dart';
-
-final _recentOrdersProvider = StreamProvider<List<Order>>((ref) {
-  return ref.watch(databaseProvider).ordersDao.watchRecent(limit: 500);
-});
-
-/// orderId → amount refunded so far, so today's revenue is net of refunds.
-final _refundedTotalsProvider = StreamProvider<Map<int, double>>((ref) {
-  return ref.watch(databaseProvider).ordersDao.watchRefundedTotals();
-});
 
 // ─── Orders screen ────────────────────────────────────────────────────────────
 
@@ -32,13 +25,50 @@ class OrdersScreen extends ConsumerStatefulWidget {
 }
 
 class _OrdersScreenState extends ConsumerState<OrdersScreen> {
+  final _searchController = TextEditingController();
+  final _scrollController = ScrollController();
+  Timer? _debounce;
   String _query = '';
 
   @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _searchController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  /// Fetch the next (older) page shortly before the end comes into view.
+  void _onScroll() {
+    if (_scrollController.position.extentAfter < 600) {
+      ref.read(orderHistoryProvider.notifier).loadMore();
+    }
+  }
+
+  void _onQueryChanged(String value) {
+    setState(() => _query = value.trim());
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 250), () {
+      if (mounted) ref.read(orderHistoryProvider.notifier).setSearch(_query);
+    });
+  }
+
+  void _clearQuery() {
+    _debounce?.cancel();
+    _searchController.clear();
+    setState(() => _query = '');
+    ref.read(orderHistoryProvider.notifier).setSearch('');
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final ordersAsync = ref.watch(_recentOrdersProvider);
-    final refunded =
-        ref.watch(_refundedTotalsProvider).valueOrNull ?? const <int, double>{};
+    final history = ref.watch(orderHistoryProvider);
     final fmt = ref.watch(currencyFormatterProvider);
     final customers = ref.watch(customersStreamProvider).valueOrNull ?? [];
     final customerNames = {for (final c in customers) c.id: c.name};
@@ -52,118 +82,104 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
             child: SearchBar(
-              hintText: 'Search by order ID or amount…',
+              controller: _searchController,
+              hintText: 'Search by bill no., customer or amount…',
               leading: const Icon(Icons.search_rounded, size: 20),
               trailing: _query.isNotEmpty
                   ? [
                       IconButton(
                         icon: const Icon(Icons.close_rounded, size: 18),
-                        onPressed: () => setState(() => _query = ''),
+                        onPressed: _clearQuery,
                       )
                     ]
                   : null,
-              onChanged: (v) => setState(() => _query = v.trim()),
+              onChanged: _onQueryChanged,
               elevation: const WidgetStatePropertyAll(0),
             ),
           ),
         ),
       ),
-      body: ordersAsync.when(
-        data: (all) {
-          final filtered = _filter(all, _query);
-          if (all.isEmpty) {
-            return const AppEmptyState(
-              icon: Icons.receipt_long_outlined,
-              title: 'No orders yet',
-              subtitle: 'Completed sales will appear here.',
-            );
-          }
-          if (filtered.isEmpty) {
-            return Center(
-              child: Text(
-                'No orders match "$_query"',
-                style: Theme.of(context)
-                    .textTheme
-                    .bodyMedium
-                    ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
-              ),
-            );
-          }
-
-          // Build summary from today's orders
-          final today = _todayOrders(all);
-          final todayRevenue = today.fold(
-              0.0,
-              (s, o) => o.status == 'completed'
-                  ? s + (o.total - (refunded[o.id] ?? 0)).clamp(0.0, o.total)
-                  : s);
-
-          final grouped = _groupByDate(filtered);
-
-          return CustomScrollView(
-            slivers: [
-              if (_query.isEmpty)
-                SliverToBoxAdapter(
-                  child: _SummaryBar(
-                    orderCount: today.length,
-                    revenue: todayRevenue,
-                    fmt: fmt,
-                  ),
-                ),
-              for (final entry in grouped.entries) ...[
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-                  sliver: SliverToBoxAdapter(
-                    child: Text(
-                      entry.key,
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.8,
-                          ),
-                    ),
-                  ),
-                ),
-                SliverPadding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  sliver: SliverList.separated(
-                    itemCount: entry.value.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
-                    itemBuilder: (_, i) => _OrderCard(
-                      order: entry.value[i],
-                      fmt: fmt,
-                      customerName: entry.value[i].customerId != null
-                          ? customerNames[entry.value[i].customerId]
-                          : null,
-                    ),
-                  ),
-                ),
-              ],
-              const SliverToBoxAdapter(child: SizedBox(height: 32)),
-            ],
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
-      ),
+      body: _body(context, history, fmt, customerNames),
     );
   }
 
-  List<Order> _filter(List<Order> orders, String q) {
-    if (q.isEmpty) return orders;
-    final lower = q.toLowerCase();
-    return orders.where((o) {
-      return o.id.toString().contains(lower) ||
-          o.total.toStringAsFixed(2).contains(lower);
-    }).toList();
-  }
+  Widget _body(BuildContext context, OrderHistoryState history,
+      CurrencyFormatter fmt, Map<int, String> customerNames) {
+    if (history.isLoading && history.orders.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (history.error != null && history.orders.isEmpty) {
+      return Center(child: Text('Error: ${history.error}'));
+    }
+    if (history.orders.isEmpty) {
+      if (history.search.isEmpty) {
+        return const AppEmptyState(
+          icon: Icons.receipt_long_outlined,
+          title: 'No orders yet',
+          subtitle: 'Completed sales will appear here.',
+        );
+      }
+      return Center(
+        child: Text(
+          'No orders match "${history.search}"',
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant),
+        ),
+      );
+    }
 
-  List<Order> _todayOrders(List<Order> orders) {
-    final now = DateTime.now();
-    return orders.where((o) {
-      final d = o.createdAt;
-      return d.year == now.year && d.month == now.month && d.day == now.day;
-    }).toList();
+    final grouped = _groupByDate(history.orders);
+
+    return CustomScrollView(
+      controller: _scrollController,
+      slivers: [
+        if (history.search.isEmpty)
+          SliverToBoxAdapter(
+            child: _SummaryBar(
+              orderCount: history.todayOrders,
+              revenue: history.todayRevenue,
+              fmt: fmt,
+            ),
+          ),
+        for (final entry in grouped.entries) ...[
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+            sliver: SliverToBoxAdapter(
+              child: Text(
+                entry.key,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.8,
+                    ),
+              ),
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            sliver: SliverList.separated(
+              itemCount: entry.value.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (_, i) => _OrderCard(
+                order: entry.value[i],
+                fmt: fmt,
+                customerName: entry.value[i].customerId != null
+                    ? customerNames[entry.value[i].customerId]
+                    : null,
+              ),
+            ),
+          ),
+        ],
+        if (history.hasMore)
+          SliverToBoxAdapter(
+            child: _LoadMore(
+              loading: history.isLoadingMore,
+              onPressed: ref.read(orderHistoryProvider.notifier).loadMore,
+            ),
+          ),
+        const SliverToBoxAdapter(child: SizedBox(height: 32)),
+      ],
+    );
   }
 
   /// Groups orders by a human-readable date label.
@@ -188,6 +204,32 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
     }
     return result;
   }
+}
+
+/// Foot of the list while older orders remain: a spinner during a fetch,
+/// otherwise a button (scrolling near it fetches too — the button is for
+/// lists too short to scroll).
+class _LoadMore extends StatelessWidget {
+  const _LoadMore({required this.loading, required this.onPressed});
+  final bool loading;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(top: 16),
+        child: Center(
+          child: loading
+              ? const SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : TextButton(
+                  onPressed: onPressed,
+                  child: const Text('Show older orders'),
+                ),
+        ),
+      );
 }
 
 // ─── Summary bar ─────────────────────────────────────────────────────────────

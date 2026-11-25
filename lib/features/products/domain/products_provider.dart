@@ -11,9 +11,10 @@ final productsStreamProvider = StreamProvider<List<Product>>((ref) {
   return ref.watch(databaseProvider).productsDao.watchAllForPos();
 });
 
-/// Products filtered by category.
+/// Products filtered by category. Used only by the categories screen's
+/// expandable rows, so it stops querying when the row (or screen) goes away.
 final productsByCategoryProvider =
-    StreamProvider.family<List<Product>, int>((ref, categoryId) {
+    StreamProvider.autoDispose.family<List<Product>, int>((ref, categoryId) {
   return ref
       .watch(databaseProvider)
       .productsDao
@@ -30,9 +31,21 @@ final taxRatesStreamProvider = StreamProvider<List<TaxRate>>((ref) {
   return ref.watch(databaseProvider).taxDao.watchActive();
 });
 
-/// productId → total units sold (reactively updated as orders are placed).
-final productSalesCountProvider = StreamProvider<Map<int, int>>((ref) {
-  return ref.watch(databaseProvider).ordersDao.watchProductSalesCounts();
+/// How far back the sell screen's "most sold" ranking looks.
+const mostSoldWindow = Duration(days: 90);
+
+/// productId → units sold (main units) over the last [mostSoldWindow].
+///
+/// Read once when the sell screen opens, not streamed: the ranking then
+/// holds still for the whole visit — tiles do not reshuffle under the
+/// cashier's finger after each sale — and no query re-runs on every order
+/// write or receipt print. Leaving the sell screen and coming back (or
+/// restarting the app) takes a fresh reading.
+final productSalesCountProvider =
+    FutureProvider.autoDispose<Map<int, int>>((ref) {
+  return ref.watch(databaseProvider).ordersDao.productSalesCounts(
+        since: DateTime.now().subtract(mostSoldWindow),
+      );
 });
 
 /// Shared [CurrencyFormatter] that reads the active currency symbol from
