@@ -533,6 +533,7 @@ class BackupRepository {
     'Tax Total',
     'Discount',
     'Total',
+    'Tip',
     'Payment Method',
     'Tendered',
     'Change',
@@ -575,6 +576,7 @@ class BackupRepository {
             row.read<double>('tax_total'),
             row.read<double>('o_discount'),
             row.read<double>('o_total'),
+            row.read<double>('o_tip'),
             row.read<String>('payment_method'),
             row.read<double?>('tendered_amount') ?? 0.0,
             row.read<double?>('change_amount') ?? 0.0,
@@ -782,6 +784,9 @@ class BackupRepository {
           taxTotal: Value(first.numberOf('tax total') ?? 0.0),
           discountTotal: Value(first.numberOf('discount') ?? 0.0),
           total: total,
+          // Older exports have no Tip column: no tip.
+          tipAmount: Value(
+              (first.numberOf('tip') ?? 0.0).clamp(0.0, double.infinity)),
           paymentMethod: method,
           tenderedAmount: Value(tendered),
           changeAmount: Value(change),

@@ -502,7 +502,7 @@ class OrdersDao extends DatabaseAccessor<AppDatabase> with _$OrdersDaoMixin {
   }) {
     return customSelect(
       'SELECT '
-      'o.id as o_id, o.status, o.subtotal as o_subtotal, o.tax_total, o.discount_total as o_discount, o.total as o_total, '
+      'o.id as o_id, o.status, o.subtotal as o_subtotal, o.tax_total, o.discount_total as o_discount, o.total as o_total, o.tip_amount as o_tip, '
       'o.payment_method, o.tendered_amount, o.change_amount, o.customer_id, o.notes, o.created_at, '
       'oi.id as item_id, oi.product_id, oi.product_name, oi.unit_price, oi.quantity, oi.discount as item_discount, '
       'oi.tax_amount as item_tax, oi.line_total, '
