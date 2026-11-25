@@ -10,6 +10,7 @@ import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/core/utils/async_feedback.dart';
 import 'package:pos_app/core/utils/currency_formatter.dart';
+import 'package:pos_app/core/utils/money.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
 import 'package:pos_app/features/receipts/presentation/receipt_body.dart';
 import 'package:pos_app/features/receipts/presentation/receipt_pdf_service.dart';
@@ -53,11 +54,13 @@ class _DetailData {
     required this.order,
     required this.refundable,
     required this.restockFacts,
+    this.tipLeft = 0,
   });
   final ReceiptBodyData receipt;
   final Order order; // kept for status / action bar
   final double refundable; // order total less refunds so far
   final RestockFacts restockFacts; // as void / refund read them
+  final double tipLeft; // order tip not yet handed back by a refund
 
   /// What a void or refund would restock, by the same rule they apply. Only
   /// a guide: their transaction reads it afresh, and its result is shown.
@@ -96,6 +99,8 @@ final _orderDetailProvider =
     order: order,
     refundable: await refundableAmount(db, order),
     restockFacts: await readRestockFacts(db, order),
+    tipLeft: roundMoney(
+        order.tipAmount - await db.ordersDao.refundedTipTotal(orderId)),
   );
 });
 
@@ -364,6 +369,8 @@ class _DetailBody extends StatelessWidget {
     final trackStock = ref.read(featureOnProvider(Feature.stockTracking));
     // "Restock items" only when the refund would put something back.
     final canRestock = data.restockPlan(trackStock: trackStock).any;
+    bool refundTip = false;
+    final tipLeft = data.tipLeft;
 
     // Mirrors processReturn's rules so the cashier sees the problem before
     // confirming rather than as a failure afterwards.
@@ -414,6 +421,23 @@ class _DetailBody extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
+                if (tipLeft > 0)
+                  if ((double.tryParse(amountCtrl.text.trim()) ?? 0) <
+                      refundable - 0.005)
+                    CheckboxListTile(
+                      title: const Text('Also refund tip'),
+                      subtitle: Text(fmt.format(tipLeft)),
+                      value: refundTip,
+                      onChanged: (v) => setState(() => refundTip = v ?? false),
+                      contentPadding: EdgeInsets.zero,
+                      controlAffinity: ListTileControlAffinity.leading,
+                    )
+                  else
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(
+                          'The tip of ${fmt.format(tipLeft)} is refunded too'),
+                    ),
                 if (canRestock)
                   SwitchListTile(
                     key: const ValueKey('refund-restock'),
@@ -460,6 +484,7 @@ class _DetailBody extends StatelessWidget {
         restock: restock,
         reason: reason,
         trackStock: trackStock,
+        refundTip: refundTip,
       ),
       failurePrefix: 'Refund failed',
     );

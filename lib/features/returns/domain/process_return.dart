@@ -30,6 +30,11 @@ import 'package:pos_app/features/returns/domain/reverse_sale.dart';
 /// the audit entry record whether anything was actually put back, and so
 /// does the [RefundResult].
 ///
+/// The tip stays with the staff on a partial refund unless [refundTip] is
+/// set; the refund that completes the full amount always returns whatever
+/// tip is still left. The tip returned is written to `returns.tip_amount`
+/// and never counts against [amount] or the refundable goods.
+///
 /// Throws if the order doesn't exist, is voided, has nothing left to refund,
 /// or the amount is invalid. Caller handles UI error display.
 Future<RefundResult> processReturn(
@@ -40,6 +45,7 @@ Future<RefundResult> processReturn(
   required bool restock,
   String? reason,
   required bool trackStock,
+  bool refundTip = false,
 }) {
   return db.transaction(() async {
     final order = await db.ordersDao.getById(orderId);
@@ -72,10 +78,19 @@ Future<RefundResult> processReturn(
             reasonCode: 'return', note: 'Refund for Order')
         : RestockResult.nothing;
 
+    // Tip still with the shop: the order's tip less what earlier refunds
+    // returned. Handed back on request, and always by the closing refund.
+    final tipLeft = roundMoney(
+        order.tipAmount - await db.ordersDao.refundedTipTotal(orderId));
+    final tipBack = tipLeft > 0 && (refundTip || refund >= refundable)
+        ? tipLeft
+        : 0.0;
+
     final returnId = await db.ordersDao.insertReturn(
       ReturnsCompanion.insert(
         orderId: orderId,
         amount: refund,
+        tipAmount: Value(tipBack),
         restock: Value(restocked.any),
         reason: Value(reason),
       ),
@@ -93,15 +108,23 @@ Future<RefundResult> processReturn(
       reason: reason,
     );
 
-    return RefundResult(returnId: returnId, restocked: restocked);
+    return RefundResult(
+        returnId: returnId, restocked: restocked, tipReturned: tipBack);
   });
 }
 
 /// The outcome of [processReturn]: the Returns row and the stock it
 /// actually put back.
 class RefundResult {
-  const RefundResult({required this.returnId, required this.restocked});
+  const RefundResult({
+    required this.returnId,
+    required this.restocked,
+    this.tipReturned = 0,
+  });
   final int returnId;
+
+  /// The tip handed back with this refund (0 when none).
+  final double tipReturned;
   final RestockResult restocked;
 }
 

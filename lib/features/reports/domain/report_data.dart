@@ -106,6 +106,7 @@ class ReportData {
     required this.chartTotals,
     required this.chartHighlightIndex,
     this.taxLabel = genericTaxLabel,
+    this.netTips = 0,
   });
 
   /// What the dashboard calls tax when the shop's own name for it is not
@@ -115,6 +116,10 @@ class ReportData {
   /// The shop's own word for its tax ("VAT", "Sales Tax", "GST"), used in
   /// the dashboard's labels — see [resolveTaxLabel].
   final String taxLabel;
+
+  /// Tips kept in the period (tips less tips refunded, voids out). Not part
+  /// of [revenue], [vatCollected] or [profit].
+  final double netTips;
 
   /// Takings including VAT, net of refunds.
   final double revenue;
@@ -265,6 +270,7 @@ Future<ReportData> loadReport(
   final goods = sections.costProfit
       ? await db.ordersDao.costOfGoodsForPeriod(from, to)
       : null;
+  final netTips = await db.ordersDao.netTipsForPeriod(from, to);
 
   final topProducts = !sections.extras
       ? const <TopProduct>[]
@@ -418,5 +424,6 @@ Future<ReportData> loadReport(
     chartTotals: chartTotals,
     chartHighlightIndex: chartHighlightIndex,
     taxLabel: taxLabel,
+    netTips: netTips,
   );
 }

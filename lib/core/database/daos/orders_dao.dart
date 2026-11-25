@@ -222,6 +222,17 @@ class OrdersDao extends DatabaseAccessor<AppDatabase> with _$OrdersDaoMixin {
     return row.read<double>('refunded');
   }
 
+  /// The tip already handed back against [orderId].
+  Future<double> refundedTipTotal(int orderId) async {
+    final row = await customSelect(
+      'SELECT COALESCE(SUM(tip_amount), 0.0) AS t FROM returns '
+      'WHERE order_id = ?',
+      variables: [Variable(orderId)],
+      readsFrom: {returns},
+    ).getSingle();
+    return row.read<double>('t');
+  }
+
   /// True once any refund against [orderId] has put its items back in stock.
   Future<bool> hasRestockedReturn(int orderId) async {
     final row = await (select(returns)
@@ -258,6 +269,24 @@ class OrdersDao extends DatabaseAccessor<AppDatabase> with _$OrdersDaoMixin {
       "  WHERE o.status = 'completed' "
       "    OR (o.status = 'refunded' AND r.refunded IS NOT NULL "
       '      AND r.refunded < o.total - 0.005)) n)';
+
+  /// Tips kept in a period: each order's tip less what refunds handed back,
+  /// for orders placed in the window (the sale's date, as with revenue).
+  /// Voided orders are out, with their refunded tips. Tips are never part
+  /// of [totalRevenueForPeriod].
+  Future<double> netTipsForPeriod(DateTime from, DateTime to) async {
+    final row = await customSelect(
+      'SELECT COALESCE(SUM(o.tip_amount - COALESCE('
+      '  (SELECT SUM(r.tip_amount) FROM returns r WHERE r.order_id = o.id), '
+      '  0.0)), 0.0) AS tips '
+      'FROM orders o '
+      "WHERE o.status IN ('completed', 'refunded') AND o.tip_amount > 0 "
+      '  AND o.created_at >= ? AND o.created_at <= ?',
+      variables: [Variable(from), Variable(to)],
+      readsFrom: {orders, returns},
+    ).getSingle();
+    return _round2(row.read<double>('tips'));
+  }
 
   /// Revenue for a period, net of refunds.
   Future<double> totalRevenueForPeriod(DateTime from, DateTime to) async {
