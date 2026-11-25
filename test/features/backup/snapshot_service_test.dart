@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:archive/archive.dart';
 import 'package:drift/native.dart';
@@ -394,6 +395,87 @@ void main() {
   test('inspect rejects files that are not POS snapshots', () async {
     final notZip = File(p.join(tmp.path, 'x.zip'))..writeAsStringSync('hello');
     expect(() => svc.inspect(notZip), throwsA(isA<SnapshotFormatException>()));
+  });
+
+  group('inspect reads only the manifest', () {
+    File zipOf(Map<String, List<int>> entries) {
+      final archive = Archive();
+      entries.forEach((k, v) => archive.addFile(ArchiveFile.bytes(k, v)));
+      return File(p.join(tmp.path, 'entries.zip'))
+        ..writeAsBytesSync(ZipEncoder().encodeBytes(archive));
+    }
+
+    Matcher formatError(Object message) => throwsA(
+        isA<SnapshotFormatException>().having((e) => e.message, 'message',
+            message));
+
+    test('returns the manifest of a crafted snapshot', () async {
+      final m = await svc.inspect(craftZip(rawSqlite(1), schemaVersion: 3));
+      expect(m.schemaVersion, 3);
+      expect(m.createdAt, DateTime(2026));
+      expect(m.hiveBoxes, isEmpty);
+    });
+
+    test('works inside Isolate.run (as the app calls it)', () async {
+      final path = craftZip(rawSqlite(1), schemaVersion: 5).path;
+      final m = await Isolate.run(() => SnapshotService.inspectSync(path));
+      expect(m.schemaVersion, 5);
+    });
+
+    test('empty / non-zip file → no manifest found', () async {
+      // archive 4.x decodes junk without an end-of-central-directory record
+      // as an empty archive, so this surfaces as a missing manifest — the
+      // same message the old in-memory decode produced.
+      final empty = File(p.join(tmp.path, 'empty.zip'))..writeAsBytesSync([]);
+      await expectLater(svc.inspect(empty),
+          formatError('Not a POS backup (manifest.json missing)'));
+      final junk = File(p.join(tmp.path, 'junk.zip'))
+        ..writeAsBytesSync(List.filled(5000, 7));
+      await expectLater(svc.inspect(junk),
+          formatError('Not a POS backup (manifest.json missing)'));
+    });
+
+    test('zip without manifest → "manifest.json missing"', () async {
+      final zip = zipOf({SnapshotService.dbEntryName: rawSqlite(1)});
+      await expectLater(svc.inspect(zip),
+          formatError('Not a POS backup (manifest.json missing)'));
+    });
+
+    test('unparseable manifest → "Corrupt manifest"', () async {
+      final zip = zipOf({
+        SnapshotService.dbEntryName: rawSqlite(1),
+        SnapshotService.manifestName: utf8.encode('{not json'),
+      });
+      await expectLater(
+          svc.inspect(zip), formatError(startsWith('Corrupt manifest')));
+    });
+
+    test('manifest from another app is rejected', () async {
+      final zip = zipOf({
+        SnapshotService.dbEntryName: rawSqlite(1),
+        SnapshotService.manifestName: utf8.encode('{"app":"other"}'),
+      });
+      await expectLater(
+          svc.inspect(zip), formatError('Manifest is not from this app'));
+    });
+
+    test('manifest without a DB entry → "no database file"', () async {
+      final manifest = craftZip(rawSqlite(1));
+      final bytes = ZipDecoder()
+          .decodeBytes(manifest.readAsBytesSync())
+          .find(SnapshotService.manifestName)!
+          .readBytes()!;
+      final zip = zipOf({SnapshotService.manifestName: bytes});
+      await expectLater(
+          svc.inspect(zip), formatError('Snapshot has no database file'));
+    });
+
+    test('unsupported formatVersion is rejected', () async {
+      final zip = craftZip(rawSqlite(1),
+          formatVersion: SnapshotService.formatVersion + 1);
+      await expectLater(
+          svc.inspect(zip), formatError(startsWith('Unsupported backup format')));
+    });
   });
 
   test('listLocal is newest-first and prune keeps N', () async {

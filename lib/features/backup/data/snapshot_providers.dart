@@ -89,7 +89,12 @@ class SnapshotCoordinator {
     return zip;
   }
 
-  Future<SnapshotManifest> inspect(File zip) => _svc.inspect(zip);
+  /// Reads only the manifest, off the UI isolate — even parsing the zip
+  /// directory of a large backup must not freeze the backup screen.
+  Future<SnapshotManifest> inspect(File zip) {
+    final path = zip.path;
+    return Isolate.run(() => SnapshotService.inspectSync(path));
+  }
 
   Future<List<File>> localSnapshots() async =>
       _svc.listLocal(await autoBackupDir());

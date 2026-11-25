@@ -32,18 +32,41 @@ class AppRootState extends State<AppRoot> {
   String? _notice; // one-shot toast shown after a restart
   String? _fatal; // set when no data could be reopened after a restore
 
+  /// How long after the first frame the daily auto-backup waits, so its
+  /// `VACUUM INTO` + zip don't compete with startup work.
+  static const autoBackupDelay = Duration(seconds: 10);
+  Timer? _autoBackupTimer;
+  Future<void>? _autoBackupRun; // in flight; a restore waits for it
+
   @override
   void initState() {
     super.initState();
-    // Daily local snapshot — off the first frame so launch isn't delayed.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      unawaited(
-          _container.read(snapshotCoordinatorProvider).runAutoBackupIfDue());
+      if (!mounted) return;
+      _autoBackupTimer = Timer(autoBackupDelay, _startAutoBackup);
     });
+  }
+
+  /// Fires once, [autoBackupDelay] after the first frame. Skipped when the
+  /// widget is gone or a restore has begun / left the app without data;
+  /// [restoreFrom] and [dispose] also cancel the pending timer.
+  void _startAutoBackup() {
+    _autoBackupTimer = null;
+    if (!mounted || _restoring || _fatal != null) return;
+    final run = _container
+        .read(snapshotCoordinatorProvider)
+        .runAutoBackupIfDue() // never throws
+        .then<void>((_) {});
+    _autoBackupRun = run;
+    unawaited(run.whenComplete(() {
+      if (identical(_autoBackupRun, run)) _autoBackupRun = null;
+    }));
   }
 
   @override
   void dispose() {
+    _autoBackupTimer?.cancel();
+    _autoBackupTimer = null;
     _container.dispose();
     super.dispose();
   }
@@ -63,6 +86,9 @@ class AppRootState extends State<AppRoot> {
   /// The error is rethrown after the UI has been updated.
   Future<void> restoreFrom(File zip) async {
     if (_restoring) return;
+    // A restore pre-empts this launch's pending auto-backup.
+    _autoBackupTimer?.cancel();
+    _autoBackupTimer = null;
     // Resolve paths while Hive is still open (box.path needs an open box).
     final dbPath = (await databaseFile()).path;
     final hiveFiles = snapshotHiveBoxFiles();
@@ -78,6 +104,10 @@ class AppRootState extends State<AppRoot> {
     String? notice;
     String? fatal;
     try {
+      // An auto-backup already under way reads the DB through the current
+      // container; let it finish before that container is torn down.
+      final inFlight = _autoBackupRun;
+      if (inFlight != null) await inFlight;
       await WidgetsBinding.instance.endOfFrame;
 
       // 2. Release both stores. If that fails, nothing on disk is touched.
