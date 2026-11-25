@@ -8,6 +8,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 
 import 'package:pos_app/app.dart';
 import 'package:pos_app/core/database/app_database.dart';
+import 'package:pos_app/core/database/close_on_exit.dart';
 import 'package:pos_app/core/database/connection/native.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/features/backup/data/snapshot_providers.dart';
@@ -38,9 +39,12 @@ class AppRootState extends State<AppRoot> {
   Timer? _autoBackupTimer;
   Future<void>? _autoBackupRun; // in flight; a restore waits for it
 
+  late final DatabaseExitGuard _exitGuard;
+
   @override
   void initState() {
     super.initState();
+    _exitGuard = DatabaseExitGuard(_closeDatabaseForExit);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _autoBackupTimer = Timer(autoBackupDelay, _startAutoBackup);
@@ -63,8 +67,23 @@ class AppRootState extends State<AppRoot> {
     }));
   }
 
+  /// The app is quitting (desktop): close the database of the current
+  /// container while the Dart VM is still fully up — see
+  /// [DatabaseExitGuard]. During a restore the stores are already released
+  /// (or being swapped by [restoreFrom]), so there is nothing to close here.
+  Future<void> _closeDatabaseForExit() async {
+    _autoBackupTimer?.cancel();
+    _autoBackupTimer = null;
+    if (_restoring) return;
+    final container = _container;
+    // Never opened (e.g. the error screen): do not create it just to close.
+    if (!container.exists(databaseProvider)) return;
+    await container.read(databaseProvider).close();
+  }
+
   @override
   void dispose() {
+    _exitGuard.dispose();
     _autoBackupTimer?.cancel();
     _autoBackupTimer = null;
     _container.dispose();
