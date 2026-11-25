@@ -8,6 +8,8 @@ import 'package:pos_app/features/onboarding/domain/country_default.dart';
 import 'package:pos_app/features/onboarding/domain/onboarding_state.dart';
 import 'package:pos_app/features/onboarding/presentation/onboarding_notifier.dart';
 import 'package:pos_app/features/onboarding/presentation/widgets/business_name_step.dart';
+import 'package:pos_app/features/onboarding/presentation/widgets/business_type_step.dart';
+import 'package:pos_app/features/onboarding/presentation/widgets/features_step.dart';
 import 'package:pos_app/features/onboarding/presentation/widgets/confirm_step.dart';
 import 'package:pos_app/features/onboarding/presentation/widgets/country_step.dart';
 import 'package:pos_app/features/onboarding/presentation/widgets/tax_step.dart';
@@ -93,21 +95,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     _taxRateCtrl.text = formatPercentNumber(c.taxRate);
   }
 
-  bool _canProceed(OnboardingState state) {
-    switch (state.step) {
-      case 0:
-        return state.businessName.isNotEmpty;
-      case 1:
-        return state.country != null;
-      default:
-        return true;
-    }
-  }
-
+  // Nothing is required: a blank name prints as "My Store", and a missing
+  // country falls back to USD.
   void _next() {
     final state = ref.read(onboardingNotifierProvider);
-    if (!_canProceed(state)) return;
-    if (state.step < 3) {
+    if (!state.isLast) {
       ref.read(onboardingNotifierProvider.notifier).next();
       _pageController.nextPage(
         duration: const Duration(milliseconds: 350),
@@ -168,34 +160,62 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            WizardHeader(step: state.step, onSkip: state.saving ? null : _skip),
+            WizardHeader(
+                step: state.step,
+                labels: [for (final s in kOnboardingSteps) s.label],
+                onSkip: state.saving ? null : _skip),
             Expanded(
               child: PageView(
                 controller: _pageController,
                 physics: const NeverScrollableScrollPhysics(),
                 children: [
-                  BusinessNameStep(controller: _businessNameCtrl),
-                  CountryStep(
-                    countries: _filtered,
-                    loading: _loadingCountries,
-                    selected: state.country,
-                    searchController: _searchCtrl,
-                    onSearch: _filterCountries,
-                    onSelect: _selectCountry,
-                  ),
-                  TaxStep(
-                    nameController: _taxNameCtrl,
-                    rateController: _taxRateCtrl,
-                    currencySymbol: state.country?.symbol ?? '\$',
-                  ),
-                  ConfirmStep(state: state),
+                  for (final step in kOnboardingSteps)
+                    switch (step) {
+                      OnboardingStep.businessType => BusinessTypeStep(
+                          selected: state.businessType,
+                          onPick: (t) {
+                            ref
+                                .read(onboardingNotifierProvider.notifier)
+                                .setBusinessType(t);
+                            _next();
+                          },
+                        ),
+                      OnboardingStep.features => FeaturesStep(
+                          switches: ref
+                              .read(onboardingNotifierProvider.notifier)
+                              .shownSwitches,
+                          onChanged: ref
+                              .read(onboardingNotifierProvider.notifier)
+                              .setSwitch,
+                          onStartMinimal: ref
+                              .read(onboardingNotifierProvider.notifier)
+                              .startMinimal,
+                        ),
+                      OnboardingStep.name =>
+                        BusinessNameStep(controller: _businessNameCtrl),
+                      OnboardingStep.country => CountryStep(
+                          countries: _filtered,
+                          loading: _loadingCountries,
+                          selected: state.country,
+                          searchController: _searchCtrl,
+                          onSearch: _filterCountries,
+                          onSelect: _selectCountry,
+                        ),
+                      OnboardingStep.tax => TaxStep(
+                          nameController: _taxNameCtrl,
+                          rateController: _taxRateCtrl,
+                          currencySymbol: state.country?.symbol ?? '\$',
+                        ),
+                      OnboardingStep.confirm => ConfirmStep(state: state),
+                    },
                 ],
               ),
             ),
             OnboardingNavBar(
               step: state.step,
+              isLast: state.isLast,
               saving: state.saving,
-              canNext: _canProceed(state),
+              canNext: true,
               onBack: _back,
               onNext: _next,
             ),

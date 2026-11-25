@@ -155,14 +155,10 @@ final routerProvider = Provider<GoRouter>((ref) {
   final router = GoRouter(
     initialLocation: '/pos',
     refreshListenable: refresh,
-    redirect: (context, state) {
-      final isOnboarded = ref.read(onboardingCompleteProvider);
-      if (!isOnboarded && state.matchedLocation != '/onboarding') {
-        return '/onboarding';
-      }
-      return featureRedirect(
-          ref.read(featureFlagsProvider), state.matchedLocation);
-    },
+    redirect: (context, state) => appRedirect(
+        onboarded: ref.read(onboardingCompleteProvider),
+        flags: ref.read(featureFlagsProvider),
+        location: state.matchedLocation),
     routes: [
       GoRoute(
         path: '/onboarding',
@@ -306,6 +302,18 @@ final routerProvider = Provider<GoRouter>((ref) {
       attachUsageRouteCounter(router, ref.read(usageCounterProvider)));
   return router;
 });
+
+/// The app router's redirect: setup until onboarding is complete (it
+/// never replays after that — an upgrade only gets the drawer's intro
+/// line), then switched-off features' screens go to /pos.
+String? appRedirect({
+  required bool onboarded,
+  required FeatureFlags flags,
+  required String location,
+}) {
+  if (!onboarded && location != '/onboarding') return '/onboarding';
+  return featureRedirect(flags, location);
+}
 
 class _RouterRefresh extends ChangeNotifier {
   void ping() => notifyListeners();

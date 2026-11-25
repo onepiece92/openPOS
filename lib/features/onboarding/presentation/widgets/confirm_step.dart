@@ -48,7 +48,7 @@ class ConfirmStep extends StatelessWidget {
               _SummaryRow(
                 icon: Icons.storefront_rounded,
                 label: 'Business',
-                value: state.businessName,
+                value: state.businessName.isEmpty ? 'My Store' : state.businessName,
               ),
               _SummaryRow(
                 icon: Icons.location_on_rounded,

@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
 
 class WizardHeader extends StatelessWidget {
-  const WizardHeader({super.key, required this.step, this.onSkip});
+  const WizardHeader(
+      {super.key, required this.step, required this.labels, this.onSkip});
   final int step;
-  final VoidCallback? onSkip;
 
-  static const _labels = ['Business', 'Country', 'Tax', 'Confirm'];
+  /// One short label per step; the step count is its length.
+  final List<String> labels;
+  final VoidCallback? onSkip;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
+    final count = labels.length;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
@@ -27,7 +30,7 @@ class WizardHeader extends StatelessWidget {
               Row(
                 children: [
                   Text(
-                    '${step + 1} of 4',
+                    '${step + 1} of $count',
                     style: tt.labelMedium?.copyWith(color: cs.onSurfaceVariant),
                   ),
                   if (onSkip != null) ...[
@@ -50,7 +53,7 @@ class WizardHeader extends StatelessWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
-              value: (step + 1) / 4,
+              value: (step + 1) / count,
               minHeight: 6,
               backgroundColor: cs.surfaceContainerHighest,
               color: cs.primary,
@@ -58,19 +61,20 @@ class WizardHeader extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Row(
-            children: List.generate(4, (i) {
+            children: List.generate(count, (i) {
               final active = i == step;
               final done = i < step;
               return Expanded(
                 child: Center(
                   child: Text(
-                    _labels[i],
+                    labels[i],
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: tt.labelSmall?.copyWith(
                       color: (done || active)
                           ? cs.primary
                           : cs.onSurfaceVariant.withAlpha(100),
-                      fontWeight:
-                          active ? FontWeight.bold : FontWeight.normal,
+                      fontWeight: active ? FontWeight.bold : FontWeight.normal,
                     ),
                   ),
                 ),
