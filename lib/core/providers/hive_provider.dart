@@ -47,7 +47,7 @@ const kTimezone = 'timezone';
 const kReviewFirstLaunchAt = 'review_first_launch_at'; // ISO-8601
 const kReviewCompletedSales = 'review_completed_sales'; // int
 const kReviewLastPromptAt = 'review_last_prompt_at'; // ISO-8601
-const kReviewLastPromptVersion = 'review_last_prompt_version'; // e.g. '1.0.0+9'
+const kReviewLastPromptVersion = 'review_last_prompt_version'; // kAppVersionFull, e.g. '1.1.0+10'
 
 // ── Raw box provider ─────────────────────────────────────────────────────────
 
