@@ -10,9 +10,16 @@ class DemoDataService {
   final AppDatabase _db;
   final SettingsNotifier _settings;
 
+  /// Seeds the demo shop. Every database write happens in one transaction:
+  /// one commit instead of a few hundred, and a failure part-way leaves no
+  /// half-seeded catalogue behind.
   Future<void> seed() async {
     // ── Store profile ─────────────────────────────────────────────────────
     await _settings.setStoreProfile(name: 'Rebuzz POS', phone: '9826189697');
+    await _db.transaction(_seedDatabase);
+  }
+
+  Future<void> _seedDatabase() async {
 
     // ── Categories ────────────────────────────────────────────────────────
     final catIds = <String, int>{};
