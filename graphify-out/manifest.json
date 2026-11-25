@@ -804,9 +804,9 @@
     "semantic_hash": "7989d4a0f7a8fd76f0c50af90f6836b6"
   },
   "pubspec.yaml": {
-    "mtime": 1789897174.6740277,
-    "seen": 1789897533.951573,
-    "ast_hash": "fae18b4abebaae31903427f257ea2750",
+    "mtime": 1795601444.295257,
+    "seen": 1795601514.558841,
+    "ast_hash": "a97e0fcafa625dbbd888d4696ed96d95",
     "semantic_hash": ""
   },
   "test/features/products/product_units_test.dart": {
