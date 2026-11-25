@@ -123,15 +123,6 @@ class ProductsDao extends DatabaseAccessor<AppDatabase>
         ),
       );
 
-  /// Adjust stock by delta (positive = add, negative = remove).
-  Future<void> adjustStock(int productId, int delta) async {
-    await customUpdate(
-      'UPDATE products SET stock_quantity = stock_quantity + ? WHERE id = ?',
-      variables: [Variable(delta), Variable(productId)],
-      updates: {products},
-    );
-  }
-
   // ── Composite components ────────────────────────────────────────────────
 
   Future<List<ProductComponent>> getComponents(int compositeId) =>
