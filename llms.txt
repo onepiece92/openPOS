@@ -22,6 +22,7 @@ Key facts, as stated on this site:
 - [Cash register app with no subscription](https://onepiece92.github.io/openPOS/cash-register-no-subscription/): what is free and what the app does not do
 - [Offline POS for food trucks, farmers markets and pop-ups](https://onepiece92.github.io/openPOS/food-trucks-farmers-markets/): selling with no signal, cash with change, sales tax
 - [Loyverse alternative with no account](https://onepiece92.github.io/openPOS/loyverse-alternative/): side-by-side comparison with Loyverse POS
+- [POS for craft fairs, pop-up shops and market stalls](https://onepiece92.github.io/openPOS/pos-for-craft-fairs-pop-ups/): selling at a booth with weak signal, cash with change, after-show totals
 - [Privacy policy](https://onepiece92.github.io/openPOS/privacy.html): what the app stores, where, and the permissions it uses
 
 ## Get the app

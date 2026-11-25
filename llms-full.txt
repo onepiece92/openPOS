@@ -133,6 +133,7 @@ If you sell over a counter or from a stand and want a simple cash register app t
 - Cash register app with no subscription
 - POS for food trucks and farmers markets
 - Loyverse alternative with no account
+- POS for craft fairs and pop-up shops
 
 ## Questions shop owners ask
 
@@ -533,6 +534,135 @@ Questions first? Message us on WhatsApp or email mail@brandbuilder.com.np. Ideas
 
 Google Play and the Google Play logo are trademarks of Google LLC. Apple and the Apple logo are trademarks of Apple Inc., registered in the U.S. and other countries. App Store is a service mark of Apple Inc.
 
+
+---
+
+Page: Free POS for Craft Fairs, Flea Markets and Pop-Ups | Open POS
+URL: https://onepiece92.github.io/openPOS/pos-for-craft-fairs-pop-ups/
+
+Open POS / Craft fairs and pop-ups
+
+Free POS app for craft fairs, pop-ups and market stalls
+
+# A free POS for craft fairs, flea markets, pop-up shops and market stalls
+
+Weak signal in the hall? Open POS keeps ringing up cash sales, because the app itself never needs the internet. A free cash register app for Android and iPhone, with no account and no monthly fee.
+
+Free, for good.
+No ads, no in-app purchases.
+
+Google Play and the Google Play logo are trademarks of Google LLC. Apple and the Apple logo are trademarks of Apple Inc., registered in the U.S. and other countries. App Store is a service mark of Apple Inc.
+
+The current store versions date from May 2026. The features on this page describe the upcoming release, which also fixes known issues.
+
+## One bar of signal in the exhibit hall? Keep selling.
+
+Craft fairs fill church halls, school gyms and convention centers, and pop-ups land in empty storefronts and parking lots. Signal is weakest exactly when a few hundred shoppers walk in. Open POS has no server to reach and no login to time out, so the register at your booth works the same as it does at home.
+
+Your card reader needs its own connection. With no signal, Open POS still records cash sales; it cannot take or approve a card payment.
+
+Your sales are saved on your phone or tablet the moment you ring them up. There is nothing waiting to sync later, because nothing ever syncs.
+
+## From the kitchen table to the booth
+
+Set up your product list once at home, then sell all weekend from one screen.
+
+### Set up at home
+
+- Import your product list from a CSV file, or add items by hand. You may need to match the column names to the Open POS import format first.
+- Categories and an SKU field for your own item codes
+- Bundles for gift sets
+
+### At the booth
+
+- Product grid with search, and favorites for your best sellers
+- Held tickets: park an order while a shopper keeps browsing, serve the next one
+- Whole-order discounts (amount or percent) for end-of-show deals
+- Customers, for regulars and custom orders
+
+### Cash sales, and card sales you record
+
+- Cash with change. Type the amount the customer hands you and the app shows the change, for example $20 given on a $12.50 order shows $7.50.
+- Record card sales taken on your own reader; the reader needs its own connection.
+
+### Receipts
+
+- PDF receipts you can save or share, or copy the receipt as text.
+- Save or share a PDF receipt; you can print the PDF from another app.
+- Bluetooth receipt printers coming
+
+### Sales tax
+
+- Set your own sales tax rates
+- Switch tax on or off per product, for items that are not taxed.
+
+### After the show
+
+- Reports for today, this week or this month: sales total, expenses, average order value.
+- Expense tracking for booth fees, supplies and travel
+- Order history and voids
+- Export a sales report to CSV from Settings for your bookkeeper
+
+Open POS does not process card payments. It works alongside the card reader you already use.
+
+Take the payment on your reader as usual, then mark the sale as paid by card in Open POS, so your show totals include every sale.
+
+Your card reader needs its own connection. With no signal, Open POS still records cash sales; it cannot take or approve a card payment.
+
+## Good to know before the show
+
+- One device, one register. Each phone or tablet keeps its own sales. Nothing syncs between devices, and there are no staff logins. If you and a helper each ring up sales on your own phones, you have two separate sets of records.
+- Printing. Save or share a PDF receipt; you can print the PDF from another app. Receipts are full-page PDFs, not receipt-paper size. Direct printing to Bluetooth receipt printers is coming.
+- Keep a copy. The app never sends your data anywhere, and there is no Open POS cloud copy. Export to CSV after each show and save it somewhere safe.
+
+### Privacy you can check
+
+The app's own code makes no network calls: no analytics, no ads, no crash reporting and no cloud services. The source code is public on GitHub. From the next release onwards, the Android build also has no internet permission, so the operating system itself blocks any connection. How to check it.
+
+## More guides
+
+- Cash register app with no subscription
+- POS for food trucks and farmers markets
+- Loyverse alternative with no account
+- Open POS home
+
+## Questions from craft fair and pop-up sellers
+
+### Does Open POS work at a craft fair with no signal?
+
+Yes. The app itself never needs the internet, for setup or for selling. Airplane mode, a basement hall or a crowded fairground makes no difference to the app. Your card reader needs its own connection. With no signal, Open POS still records cash sales; it cannot take or approve a card payment.
+
+### Can I take card payments with it?
+
+No. Open POS does not process cards. It works alongside your own card reader: take the payment on the reader, then record the sale in Open POS as paid by card. Your card reader needs its own connection. With no signal, Open POS still records cash sales; it cannot take or approve a card payment.
+
+### Does it calculate change for cash sales?
+
+Yes. Type the amount the customer hands you and the app shows the change, for example $20 given on a $12.50 order shows $7.50.
+
+### Can I add my products before the show?
+
+Yes. Add items by hand, or import your product list from a CSV file. Categories, SKUs and bundles let you organize a catalog of handmade items.
+
+### Can I charge sales tax?
+
+Yes. Set your own sales tax rates, and switch tax on or off per product for items that are not taxed. Check with your tax advisor which rates apply to what you sell.
+
+### Can my helper and I both ring up sales?
+
+Only as separate registers. Each phone or tablet keeps its own sales; nothing syncs between devices and there are no staff logins. Add up the two devices' reports at the end of the day.
+
+### Is it really free? Do I need an account?
+
+It is free, with no subscription, no ads and no in-app purchases. There is no account, no email and no password. Install it on Android or iPhone and start selling.
+
+## Open the register in two minutes.
+
+A free, offline POS for craft fairs, pop-up shops and market stalls. No signal, no account and no monthly fee needed.
+
+Questions first? Message us on WhatsApp or email mail@brandbuilder.com.np. Ideas welcome: Open POS is an offline-first POS, so features that work without internet, and a simple text-based design, always come first.
+
+Google Play and the Google Play logo are trademarks of Google LLC. Apple and the Apple logo are trademarks of Apple Inc., registered in the U.S. and other countries. App Store is a service mark of Apple Inc.
 
 ---
 
