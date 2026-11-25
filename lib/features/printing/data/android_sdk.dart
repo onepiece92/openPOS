@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart'
-    show TargetPlatform, defaultTargetPlatform, kIsWeb;
+    show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/services.dart';
 
 /// Android API level (`Build.VERSION.SDK_INT`), or null off Android.
@@ -17,7 +17,7 @@ class AndroidSdk {
   static Future<int?> sdkInt() => _cached ??= _read();
 
   static Future<int?> _read() async {
-    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return null;
+    if (defaultTargetPlatform != TargetPlatform.android) return null;
     try {
       return await _methods.invokeMethod<int>('sdkInt');
     } on PlatformException {

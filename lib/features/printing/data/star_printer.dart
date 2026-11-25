@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart'
-    show TargetPlatform, defaultTargetPlatform, kIsWeb;
+    show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/services.dart';
 
 import 'package:pos_app/features/printing/domain/printer_errors.dart';
@@ -109,9 +109,8 @@ class StarBluetoothPrinter implements ReceiptPrinter {
   }
 
   bool get _isSupported =>
-      !kIsWeb &&
-      (defaultTargetPlatform == TargetPlatform.android ||
-          defaultTargetPlatform == TargetPlatform.iOS);
+      defaultTargetPlatform == TargetPlatform.android ||
+      defaultTargetPlatform == TargetPlatform.iOS;
 
   void _requireSupportedPlatform() {
     if (!_isSupported) {

@@ -1,7 +1,6 @@
 import 'package:drift/drift.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 
-import 'package:pos_app/core/database/connection/native.dart' if (dart.library.html) 'connection/web.dart';
+import 'package:pos_app/core/database/connection/native.dart';
 
 import 'package:pos_app/core/database/daos/audit_dao.dart';
 import 'package:pos_app/core/database/daos/customers_dao.dart';
@@ -173,9 +172,7 @@ class AppDatabase extends _$AppDatabase {
         beforeOpen: (details) async {
           // Enable WAL mode for better concurrent read performance.
           // Enable FK constraints (off by default in SQLite).
-          if (!kIsWeb) {
-            await customStatement('PRAGMA journal_mode = WAL');
-          }
+          await customStatement('PRAGMA journal_mode = WAL');
           await customStatement('PRAGMA foreign_keys = ON');
         },
       );

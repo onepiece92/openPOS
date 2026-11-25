@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:drift/drift.dart' show Value;
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -422,7 +421,7 @@ class _ExpenseFormState extends ConsumerState<_ExpenseForm> {
     // Camera needs an explicit runtime permission. Gallery uses the Android
     // system Photo Picker (image_picker ^1.x default on Android 13+) and
     // ACTION_GET_CONTENT on older Android — neither requires a permission.
-    if (!kIsWeb && source == ImageSource.camera) {
+    if (source == ImageSource.camera) {
       final status = await Permission.camera.request();
       if (!status.isGranted) {
         if (mounted) {

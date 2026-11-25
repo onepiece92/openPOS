@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart'
-    show TargetPlatform, defaultTargetPlatform, kIsWeb;
+    show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/services.dart';
 
 import 'package:pos_app/features/printing/domain/escpos_raster.dart';
@@ -108,7 +108,7 @@ class SppPrinter implements ReceiptPrinter {
   }
 
   void _requireAndroid() {
-    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
+    if (defaultTargetPlatform != TargetPlatform.android) {
       throw StateError(
           'Classic Bluetooth printers are Android only — iOS allows classic '
           'Bluetooth to MFi accessories only');
