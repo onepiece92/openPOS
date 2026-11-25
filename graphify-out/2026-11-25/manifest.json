@@ -468,9 +468,9 @@
     "semantic_hash": ""
   },
   "lib/features/tax/presentation/tax_settings_screen.dart": {
-    "mtime": 1795605106.3715606,
-    "seen": 1795605285.045871,
-    "ast_hash": "92798d72d6e67a49114bb16813a59efd",
+    "mtime": 1795605342.36554,
+    "seen": 1795605373.214571,
+    "ast_hash": "d7d4a03dff257e1d054fbdb59b8775df",
     "semantic_hash": ""
   },
   "lib/features/audit/presentation/audit_log_screen.dart": {
@@ -630,10 +630,10 @@
     "semantic_hash": "049e1b4b00e28de779143c87aa0fc114"
   },
   "lib/features/onboarding/presentation/onboarding_screen.dart": {
-    "mtime": 1787479673.1222892,
-    "seen": 1787549093.426838,
-    "ast_hash": "b47311c16bd00381166c322dc3a6c82d",
-    "semantic_hash": "b47311c16bd00381166c322dc3a6c82d"
+    "mtime": 1795605342.3667402,
+    "seen": 1795605373.2145321,
+    "ast_hash": "5dadceff610f8c6f98725943ee182912",
+    "semantic_hash": ""
   },
   "lib/features/help/presentation/shortcuts_screen.dart": {
     "mtime": 1777537785.7778394,
@@ -1128,10 +1128,10 @@
     "semantic_hash": "302ba04a1be590444939b59d57bca88d"
   },
   "lib/features/onboarding/presentation/widgets/tax_step.dart": {
-    "mtime": 1787479671.2938163,
-    "seen": 1787549093.426841,
-    "ast_hash": "18616ad307c834711cdc50d05287ce93",
-    "semantic_hash": "18616ad307c834711cdc50d05287ce93"
+    "mtime": 1795605342.3661158,
+    "seen": 1795605373.214535,
+    "ast_hash": "32280f5c323e20f7c84236ba06a02628",
+    "semantic_hash": ""
   },
   "lib/features/onboarding/presentation/widgets/wizard_header.dart": {
     "mtime": 1787479671.2931232,
@@ -1422,9 +1422,9 @@
     "semantic_hash": ""
   },
   "lib/core/utils/percent.dart": {
-    "mtime": 1795605106.3680217,
-    "seen": 1795605285.0457978,
-    "ast_hash": "c53b39ee0adf30a6bdb6e4110e3b28cd",
+    "mtime": 1795605342.3651648,
+    "seen": 1795605373.214497,
+    "ast_hash": "c0b736accb69268d5814b5dbd2a678b2",
     "semantic_hash": ""
   },
   "lib/features/products/domain/stock_level.dart": {
@@ -1452,9 +1452,9 @@
     "semantic_hash": ""
   },
   "test/core/utils/percent_test.dart": {
-    "mtime": 1795604903.6988518,
-    "seen": 1795605285.045883,
-    "ast_hash": "4e117ff0b6e9a687da74632969fd0caf",
+    "mtime": 1795605342.3670678,
+    "seen": 1795605373.2145832,
+    "ast_hash": "b608db52303d123a8f6e75ac9accbcfe",
     "semantic_hash": ""
   },
   "test/drift/generated/schema_v14.dart": {
@@ -1509,6 +1509,12 @@
     "mtime": 1795605235.6141572,
     "seen": 1795605285.0459058,
     "ast_hash": "4559e1a4ce536a4bf03800e9ae74dc4f",
+    "semantic_hash": ""
+  },
+  "test/features/tax/tax_rate_form_test.dart": {
+    "mtime": 1795605315.0196788,
+    "seen": 1795605373.214615,
+    "ast_hash": "648d02486e6410d8009e53883bbcc3bc",
     "semantic_hash": ""
   }
 }
