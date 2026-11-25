@@ -20,6 +20,9 @@ const _eventPrefix = 'e.';
 const kUsageCountingOnKey = 'counting_on'; // bool
 const kUsageDisclosureShownKey = 'disclosure_shown'; // bool
 const kUsageAskedVersionKey = 'ask_version'; // kAppVersionFull
+/// First of an unbroken run of "review unavailable" checks (ISO-8601);
+/// cleared by a review request. See `UsageAskController`.
+const kUsageReviewUnavailableSinceKey = 'review_unavailable_since';
 
 String _keyOf(UsageEvent e) => '$_eventPrefix${e.name}';
 
@@ -216,6 +219,24 @@ class UsageCounter {
         final String v => v,
         _ => null,
       };
+
+  DateTime? get reviewUnavailableSince =>
+      switch (_box?.get(kUsageReviewUnavailableSinceKey)) {
+        final String v => DateTime.tryParse(v),
+        _ => null,
+      };
+
+  Future<void> setReviewUnavailableSince(DateTime? t) async {
+    try {
+      if (t == null) {
+        if (_box?.containsKey(kUsageReviewUnavailableSinceKey) ?? false) {
+          await _box?.delete(kUsageReviewUnavailableSinceKey);
+        }
+      } else {
+        await _box?.put(kUsageReviewUnavailableSinceKey, t.toIso8601String());
+      }
+    } catch (_) {/* best effort */}
+  }
 
   Future<void> markAsked(String version) async {
     try {

@@ -123,6 +123,17 @@ void main() {
     expect(preview(tester), isNot(contains('offline')));
   });
 
+  testWidgets('says screen counts are times shown (UI only, not sent)',
+      (tester) async {
+    await pump(tester);
+    expect(kUsageScreenCountsNote,
+        'Screen counts are times the screen was shown.');
+    await tester.ensureVisible(
+        find.byKey(const ValueKey('screen-counts-note')));
+    expect(find.text(kUsageScreenCountsNote), findsOneWidget);
+    expect(preview(tester), isNot(contains('times the screen')));
+  });
+
   testWidgets('nothing ticked by default; Send needs a message or data',
       (tester) async {
     await pump(tester);

@@ -38,6 +38,10 @@ const kOfflineFirstLine =
 /// Shorter form of [kOfflineFirstLine] used on the timed ask.
 const kOfflineFirstShortLine = 'Open POS works offline first.';
 
+/// Under the counts on the Usage summary screen (UI only, not sent):
+/// popping back to a screen counts it again.
+const kUsageScreenCountsNote = 'Screen counts are times the screen was shown.';
+
 /// Question above the feature-area choices.
 const kFeedbackAreaQuestion = 'Which part of Open POS should we improve?';
 

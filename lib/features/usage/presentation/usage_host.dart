@@ -77,7 +77,7 @@ class _UsageHostState extends ConsumerState<UsageHost> {
     super.initState();
     _lifecycle = AppLifecycleListener(onStateChange: _counter.onLifecycle);
     _ask.pending.addListener(_onAsk);
-    restartNoticeShowing.addListener(_maybeDisclose);
+    restartNoticeShowing.addListener(_onRestartNotice);
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _counter.ensureLoaded();
       if (!mounted) return;
@@ -90,7 +90,7 @@ class _UsageHostState extends ConsumerState<UsageHost> {
   void dispose() {
     _lifecycle?.dispose();
     _ask.pending.removeListener(_onAsk);
-    restartNoticeShowing.removeListener(_maybeDisclose);
+    restartNoticeShowing.removeListener(_onRestartNotice);
     super.dispose();
   }
 
@@ -100,6 +100,14 @@ class _UsageHostState extends ConsumerState<UsageHost> {
       final f = File(p.join(dir.path, kUsageSummaryFileName));
       if (f.existsSync()) f.deleteSync(); // one stat when there is none
     } catch (_) {/* no temp folder (tests, desktop quirks): nothing to do */}
+  }
+
+  /// The notice flips while AppRoot unmounts it — inside the frame, with
+  /// the tree locked, where showSnackBar would throw (and the disclosure
+  /// would never be marked shown). So wait for the frame to finish.
+  void _onRestartNotice() {
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeDisclose());
+    WidgetsBinding.instance.ensureVisualUpdate();
   }
 
   void _maybeDisclose() {

@@ -19,7 +19,10 @@
 /// ```
 ///
 /// then `flutter pub get` and
-/// `flutter build apk --dart-define=ANDROID_LISTING_URL=https://f-droid.org/packages/com.brandbuilder.openpos/`.
+/// `flutter build apk --dart-define=OPENPOS_FOSS=true --dart-define=ANDROID_LISTING_URL=https://f-droid.org/packages/com.brandbuilder.openpos/`.
+/// (`OPENPOS_FOSS` tells the feedback ask there is no store review to wait
+/// for; without it the ask still shows once the review has been
+/// unavailable for 14 days.)
 library;
 
 class InAppReview {

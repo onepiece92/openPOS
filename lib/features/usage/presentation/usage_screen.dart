@@ -261,6 +261,11 @@ class _UsageScreenState extends ConsumerState<UsageScreen> {
             'Counts stay on this device unless you choose to send them.',
             style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
           ),
+          Text(
+            kUsageScreenCountsNote,
+            key: const ValueKey('screen-counts-note'),
+            style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
           SwitchListTile(
             key: const ValueKey('stop-counting'),
             contentPadding: EdgeInsets.zero,
