@@ -443,6 +443,7 @@ void main() {
       var reopens = 0;
       await expectLater(
         svc.restoreWithRollback(
+          journal: SnapshotService.journalFileFor(dbFileIn(live)),
           swap: () => restoreInto(live, zip),
           reopen: () async {
             // On the first reopen the backup's photos are in place.

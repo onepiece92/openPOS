@@ -487,6 +487,7 @@ class SnapshotService {
     try {
       await pause('begun');
       await aside(dbMove);
+      await pause('db-moved'); // DB aside, its sidecars not yet
       for (final m in sidecarMoves) {
         await aside(m);
       }
@@ -547,12 +548,16 @@ class SnapshotService {
   /// stores' usual locations.
   ///
   /// * No journal: removes staged leftovers of a restore killed before its
-  ///   swap began (a handful of `exists` checks) → [RestoreRecovery.none].
+  ///   swap began, and puts back a DB or box that is missing while its
+  ///   `.bak` exists (a kill in a pre-journal build, or a power cut that
+  ///   lost the journal's directory entry) → `recoveredWithoutJournal` if
+  ///   anything was put back, else [RestoreRecovery.none]. A few `exists`
+  ///   checks when there is nothing to do.
   /// * Committed journal: finishes the cleanup → `completed`.
   /// * Otherwise every planned move is undone from the disk's state, so
   ///   the app comes back on the data it had before → `rolledBack`.
-  /// * Unreadable journal: conservative state-based recovery
-  ///   ([_recoverWithoutJournal]), journal moved to `*.corrupt` →
+  /// * Unreadable journal: state-based recovery that prefers each `.bak`
+  ///   ([_recoverFromBaks]), journal moved to `*.corrupt` →
   ///   `recoveredWithoutJournal`.
   ///
   /// Throws if the disk can't be put right; the journal then stays, so a
@@ -570,15 +575,28 @@ class SnapshotService {
       if (receiptsDir != null) '${receiptsDir.path}$_tmpSuffix',
     ];
     if (!journal.existsSync()) {
+      // Only missing files: a live file beside a `.bak` is normal after a
+      // pre-journal build's restore (it never deleted its `.bak`s), and
+      // the live one holds everything since.
+      final changed = await _recoverFromBaks(
+          dbFile: dbFile,
+          hivePaths: hivePaths,
+          receiptsDir: null,
+          overLive: false);
       await _deleteAll(leftovers);
-      return RestoreRecovery.none;
+      return changed
+          ? RestoreRecovery.recoveredWithoutJournal
+          : RestoreRecovery.none;
     }
     final RestoreJournalContents c;
     try {
       c = RestoreJournal.read(journal);
     } on RestoreJournalFormatException {
-      await _recoverWithoutJournal(
-          dbFile: dbFile, hivePaths: hivePaths, receiptsDir: receiptsDir);
+      await _recoverFromBaks(
+          dbFile: dbFile,
+          hivePaths: hivePaths,
+          receiptsDir: receiptsDir,
+          overLive: true);
       await _deleteAll(leftovers);
       await journal.rename('${journal.path}$corruptJournalSuffix');
       return RestoreRecovery.recoveredWithoutJournal;
@@ -640,35 +658,34 @@ class SnapshotService {
     } catch (_) {/* journal stays committed; next launch retries */}
   }
 
-  /// Recovery when the journal can't be read. Acts only where the answer
-  /// is unambiguous and never deletes data:
-  /// * a missing DB or box whose `.bak` exists gets the `.bak` back (for
-  ///   the DB, foreign sidecars are cleared first and the `.bak-*`
-  ///   sidecars come along);
-  /// * photos in `receipts.bak` — which only ever holds originals a
-  ///   restore replaced — are put back, then the folder is removed.
-  /// A live file next to its `.bak` is left as is: either could be right.
-  static Future<void> _recoverWithoutJournal({
+  /// State-based recovery without a usable journal. Returns whether
+  /// anything was put back.
+  ///
+  /// * The DB and each box get their `.bak` back when the live file is
+  ///   missing — and, with [overLive], also when both exist. That is the
+  ///   corrupt-journal case: a swap clears stale `.bak`s before writing its
+  ///   journal and a commit deletes them before the journal, so a `.bak`
+  ///   beside a journal is the pre-restore original of an uncommitted
+  ///   restore, and the app never ran on the restored data (the stores
+  ///   stay closed while a journal is pending). Preferring it undoes the
+  ///   restore whole instead of leaving a mix.
+  /// * Sidecars: a `.bak-wal` etc. comes back with its file. A live
+  ///   sidecar is deleted only when it belongs to the live file being
+  ///   replaced; if the live file is missing, a live sidecar is the
+  ///   original's own one that hadn't been moved yet, and is kept.
+  /// * Photos in `receipts.bak` (only ever replaced originals) are put
+  ///   back when [receiptsDir] is given; photos a restore added beside them
+  ///   can't be told apart from the device's own, and stay.
+  static Future<bool> _recoverFromBaks({
     required File dbFile,
     required List<String> hivePaths,
     required Directory? receiptsDir,
+    required bool overLive,
   }) async {
-    final db = dbFile.path;
-    if (!await dbFile.exists() && await File('$db$_bakSuffix').exists()) {
-      for (final s in _sidecars) {
-        await _deleteIfExists(File('$db$s'));
-      }
-      await File('$db$_bakSuffix').rename(db);
-      for (final s in _sidecars) {
-        final b = File('$db$_bakSuffix$s');
-        if (await b.exists()) await b.rename('$db$s');
-      }
-    }
+    var changed = await _putBack(dbFile.path, _sidecars, overLive: overLive);
     for (final h in hivePaths) {
-      final bak = File('$h$_bakSuffix');
-      if (!await File(h).exists() && await bak.exists()) {
-        await bak.rename(h);
-      }
+      changed = await _putBack(h, const ['.lock'], overLive: overLive) ||
+          changed;
     }
     if (receiptsDir != null) {
       final bakDir = Directory('${receiptsDir.path}$_bakSuffix');
@@ -677,11 +694,36 @@ class SnapshotService {
         await for (final f in bakDir.list()) {
           if (f is File) {
             await f.rename(p.join(receiptsDir.path, p.basename(f.path)));
+            changed = true;
           }
         }
         await bakDir.delete(recursive: true);
       }
     }
+    return changed;
+  }
+
+  /// Puts `<target>.bak` (and its `.bak<suffix>` sidecars) back over
+  /// [target]; see [_recoverFromBaks] for the sidecar rule.
+  static Future<bool> _putBack(String target, List<String> sidecars,
+      {required bool overLive}) async {
+    final bak = File('$target$_bakSuffix');
+    if (!await bak.exists()) return false;
+    final liveExists = await File(target).exists();
+    if (liveExists && !overLive) return false;
+    for (final s in sidecars) {
+      final bakSide = File('$target$_bakSuffix$s');
+      if (await bakSide.exists() || liveExists) {
+        await _deleteIfExists(File('$target$s'));
+      }
+    }
+    await _deleteIfExists(File(target));
+    await bak.rename(target);
+    for (final s in sidecars) {
+      final bakSide = File('$target$_bakSuffix$s');
+      if (await bakSide.exists()) await bakSide.rename('$target$s');
+    }
+    return true;
   }
 
   /// `4.0 GB`-style size for messages.
@@ -712,25 +754,37 @@ class SnapshotService {
   ///   failed reopen.
   /// * If reopening the old data fails too, [RestoreFatalException] is
   ///   thrown — the caller must show it, not spin forever.
+  /// * The old data is only reopened once [journal] (the swap's journal,
+  ///   [journalFileFor]) is gone. If a failed swap or rollback left it
+  ///   behind, the disk may hold the backup's data or a mix, and the next
+  ///   launch would roll back anything recorded meanwhile — so
+  ///   [RestoreFatalException] is thrown instead, and the caller's retry
+  ///   must run [recoverInterruptedRestore] before opening anything.
   Future<SnapshotManifest> restoreWithRollback({
     required Future<RestoreBackup> Function() swap,
     required Future<void> Function() reopen,
     required Future<void> Function() release,
+    required File journal,
   }) async {
+    Future<void> reopenOld(Object cause) async {
+      try {
+        assertNoPendingRestore(journal);
+        await reopen();
+      } catch (e2) {
+        throw RestoreFatalException(cause: cause, reopenError: e2);
+      }
+    }
+
     final RestoreBackup backup;
     try {
       backup = await swap();
     } catch (e) {
-      try {
-        await reopen();
-      } catch (e2) {
-        throw RestoreFatalException(cause: e, reopenError: e2);
-      }
+      await reopenOld(e);
       rethrow;
     }
 
     try {
-      await reopen();
+      await reopen(); // the restored data, journal still uncommitted
       await commit(backup);
       return backup.manifest;
     } catch (e) {
@@ -739,12 +793,24 @@ class SnapshotService {
       } catch (_) {/* best effort — we are already failing */}
       try {
         await rollback(backup);
-        await reopen();
       } catch (e2) {
         throw RestoreFatalException(cause: e, reopenError: e2);
       }
+      await reopenOld(e);
       throw RestoreRolledBackException(e);
     }
+  }
+
+  /// Throws [PendingRestoreException] if [journal] holds a restore that
+  /// was neither committed nor undone (an unreadable journal counts).
+  /// The stores must not open then: the disk may hold the backup's data
+  /// or a mix, and recovery would later discard anything written to it.
+  static void assertNoPendingRestore(File journal) {
+    if (!journal.existsSync()) return;
+    try {
+      if (RestoreJournal.read(journal).committed) return;
+    } on RestoreJournalFormatException {/* unreadable → pending */}
+    throw PendingRestoreException(journal.path);
   }
 
   /// Re-points `expenses.receipt_image_path` values in [dbFile] at this
@@ -1284,4 +1350,14 @@ class RestoreFatalException implements Exception {
   String toString() =>
       'Restore failed ($cause) and the app could not reopen its data '
       '($reopenError). Restart the app; if this persists, contact support.';
+}
+
+/// A restore's journal is still on disk, uncommitted: the stores must stay
+/// closed until [SnapshotService.recoverInterruptedRestore] has run.
+class PendingRestoreException implements Exception {
+  const PendingRestoreException(this.journalPath);
+  final String journalPath;
+  @override
+  String toString() =>
+      'an interrupted restore has not been undone yet ($journalPath)';
 }

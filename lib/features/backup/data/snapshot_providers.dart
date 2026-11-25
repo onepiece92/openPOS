@@ -72,8 +72,8 @@ String? restoreRecoveryNotice(RestoreRecovery? r) => switch (r) {
       RestoreRecovery.rolledBack =>
         'A restore was interrupted. Your previous data was put back.',
       RestoreRecovery.recoveredWithoutJournal =>
-        'A restore was interrupted and its log was unreadable. Previous data '
-            'was put back where possible — please check your recent records.',
+        'A restore was interrupted. The app may be showing backup data or a '
+            'mix — check recent records, or restore again.',
       _ => null,
     };
 

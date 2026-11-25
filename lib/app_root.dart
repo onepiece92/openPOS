@@ -59,6 +59,9 @@ class AppRootState extends State<AppRoot> {
 
   late final DatabaseExitGuard _exitGuard;
 
+  @visibleForTesting
+  bool get autoBackupScheduledForTest => _autoBackupTimer != null;
+
   @override
   void initState() {
     super.initState();
@@ -175,8 +178,12 @@ class AppRootState extends State<AppRoot> {
           await const SnapshotService().restoreWithRollback(
             swap: () =>
                 _swapInIsolate(zipPath, dbPath, hiveFiles, photosPath),
-            reopen: _reopenStores,
+            // The first reopen verifies the restored data while its journal
+            // is still uncommitted; restoreWithRollback itself refuses to
+            // reopen the old data while a journal is pending.
+            reopen: () => _reopenStores(verifyingRestore: true),
             release: _releaseStores,
+            journal: SnapshotService.journalFileFor(File(dbPath)),
           );
           notice = 'Backup restored';
           await mergeReviewStateAfterRestore(reviewBefore); // never throws
@@ -243,7 +250,16 @@ class AppRootState extends State<AppRoot> {
 
   /// Opens Hive + a fresh container and runs a first query, so a broken DB
   /// or failed migration surfaces here rather than after "restored".
-  Future<void> _reopenStores() async {
+  ///
+  /// Refuses ([PendingRestoreException]) while an uncommitted restore
+  /// journal exists — the disk may hold the backup's data or a mix, and
+  /// the next recovery would discard anything recorded on it — unless
+  /// [verifyingRestore] (the reopen that decides whether to commit).
+  Future<void> _reopenStores({bool verifyingRestore = false}) async {
+    if (!verifyingRestore) {
+      SnapshotService.assertNoPendingRestore(
+          SnapshotService.journalFileFor(await databaseFile()));
+    }
     for (final name in kSnapshotHiveBoxes) {
       await Hive.openBox<dynamic>(name);
     }
@@ -255,6 +271,7 @@ class AppRootState extends State<AppRoot> {
   Future<void> _retryOpen() async {
     setState(() => _restoring = true);
     String? fatal;
+    String? notice;
     try {
       try {
         await _releaseStores();
@@ -268,6 +285,7 @@ class AppRootState extends State<AppRoot> {
         throw StateError('the interrupted restore could not be undone');
       }
       await _reopenStores();
+      notice = restoreRecoveryNotice(recovered);
     } catch (e) {
       fatal = 'Still unable to open the app data: $e';
     } finally {
@@ -275,7 +293,12 @@ class AppRootState extends State<AppRoot> {
         setState(() {
           _restoring = false;
           _fatal = fatal;
+          if (fatal == null) _notice = notice;
         });
+        // This launch's auto-backup was skipped while on the error screen.
+        if (fatal == null && _autoBackupTimer == null) {
+          _autoBackupTimer = Timer(autoBackupDelay, _startAutoBackup);
+        }
       }
     }
   }

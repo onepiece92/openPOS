@@ -65,6 +65,7 @@ void main() {
     var reopens = 0;
     try {
       await svc.restoreWithRollback(
+        journal: SnapshotService.journalFileFor(dbFileIn(live)),
         swap: () => svc.restore(
           zip: zip,
           dbFile: dbFileIn(live),

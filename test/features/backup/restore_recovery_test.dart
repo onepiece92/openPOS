@@ -320,6 +320,7 @@ void main() {
       var reopens = 0;
       await expectLater(
         svc.restoreWithRollback(
+          journal: SnapshotService.journalFileFor(dbFileIn(live)),
           swap: () => restoreLive(zip),
           reopen: () async {
             if (reopens++ == 0) throw StateError('migration blew up');
@@ -342,6 +343,7 @@ void main() {
       var reopens = 0;
       await expectLater(
         svc.restoreWithRollback(
+          journal: SnapshotService.journalFileFor(dbFileIn(live)),
           swap: () => restoreLive(noHeld),
           reopen: () async {
             if (reopens++ == 0) throw StateError('boom');
@@ -356,6 +358,7 @@ void main() {
 
     test('a successful restore removes every .bak once reopened', () async {
       final m = await svc.restoreWithRollback(
+        journal: SnapshotService.journalFileFor(dbFileIn(live)),
         swap: () => restoreLive(zip),
         reopen: () async {},
         release: () async {},
@@ -529,19 +532,50 @@ void main() {
       });
     }
 
-    test('never discards data where both copies exist', () async {
+    // Where a live file and its .bak coexist, the .bak (the pre-restore
+    // original of an uncommitted swap) wins — no mixed shop.
+    for (final (point, n) in [
+      ('db-placed', 1), // backup DB in, old boxes
+      ('hive-placed', 1), // backup DB + settings, old held_orders
+      ('hive-placed', 2), // backup DB + boxes, old photos
+    ]) {
+      test('at a mixed point: $point #$n', () async {
+        final zip = await standardSetup();
+        await killAt(zip, point, n: n);
+        journalIn(live).writeAsStringSync('}{');
+        expect(await recoverLive(), RestoreRecovery.recoveredWithoutJournal);
+        corrupt().deleteSync();
+        await expectLiveIsOriginal();
+      });
+    }
+
+    test('mid-photos: originals back; added photos stay', () async {
       final zip = await standardSetup();
-      await killAt(zip, 'photo-aside', n: 2);
+      await killAt(zip, 'photo-placed', n: 2);
       journalIn(live).writeAsStringSync('}{');
       expect(await recoverLive(), RestoreRecovery.recoveredWithoutJournal);
-      // DB and boxes: live (restored) and .bak (original) both kept.
-      expect(await skuIn(live), 'NEW');
-      expect(File('${dbFileIn(live).path}.bak').existsSync(), isTrue);
-      // Photos: receipts.bak only ever holds replaced originals → back.
-      expect(tree(receiptsIn(live))['a.jpg'], 'live A');
+      expect(await skuIn(live), 'SNAP');
+      expect(await tags(live),
+          {'settings': 'settings:live', 'held_orders': 'held_orders:live'});
+      // receipts.bak only ever holds replaced originals → back. x.jpg had
+      // no original and can't be told from the device's own photos.
+      expect(tree(receiptsIn(live)), {'a.jpg': 'live A', 'x.jpg': 'backup X'});
       expect(Directory('${receiptsIn(live).path}.bak').existsSync(), isFalse);
       expect(Directory('${receiptsIn(live).path}.restore.tmp').existsSync(),
           isFalse);
+    });
+
+    test("keeps the original's own WAL that hadn't been moved yet",
+        () async {
+      final zip = await standardSetup();
+      final db = dbFileIn(live).path;
+      File('$db-wal').writeAsStringSync('ORIGINAL WAL');
+      await killAt(zip, 'db-moved'); // DB aside, its -wal not yet
+      expect(File('$db-wal').readAsStringSync(), 'ORIGINAL WAL');
+      journalIn(live).writeAsStringSync('}{');
+      await recoverLive();
+      expect(File(db).existsSync(), isTrue);
+      expect(File('$db-wal').readAsStringSync(), 'ORIGINAL WAL');
     });
   });
 
@@ -564,26 +598,63 @@ void main() {
     await expectLiveIsOriginal();
   });
 
-  test('a .bak whose live DB is missing is never deleted', () async {
-    final zip = await standardSetup();
-    final db = dbFileIn(live);
-    db.renameSync('${db.path}.bak'); // the only copy of the shop's data
-    final rescued = File('${db.path}.bak').readAsBytesSync();
+  group('no journal, live file missing, .bak present', () {
+    // A kill in a pre-journal build, or a power cut that lost the
+    // journal's directory entry: the .bak is the only copy.
+    late File zip;
+    setUp(() async {
+      zip = await standardSetup();
+      final db = dbFileIn(live).path;
+      File(db).renameSync('$db.bak');
+      File('$db.bak-wal').writeAsStringSync('ORIGINAL WAL');
+      final settings = hivePathIn(live, 'settings');
+      File(settings).renameSync('$settings.bak');
+    });
 
-    // A restore that fails…
-    await expectLater(
-      restoreLive(zip, pause: (at) async {
-        if (at == 'db-placed') throw StateError('boom');
-      }),
-      throwsA(isA<StateError>()),
-    );
-    expect(File('${db.path}.bak').readAsBytesSync(), rescued);
-    expect(db.existsSync(), isFalse);
+    test('startUp puts them back before anything opens', () async {
+      final order = <String>[];
+      final r = await startUp(
+        recover: () => recoverInterruptedRestoreAtStartup(docsDir: live),
+        initHive: () async {
+          order.add('initHive');
+          expect(dbFileIn(live).existsSync(), isTrue);
+          expect(File(hivePathIn(live, 'settings')).existsSync(), isTrue);
+          Hive.init(live.path);
+        },
+        openStores: () async => order.add('openStores'),
+      );
+      expect(order, ['initHive', 'openStores']);
+      expect(r.fatal, isNull);
+      expect(r.notice, contains('may be showing'));
+      final db = dbFileIn(live).path;
+      expect(File('$db-wal').readAsStringSync(), 'ORIGINAL WAL');
+      File('$db-wal').deleteSync(); // not a real WAL; let SQLite open
+      await expectLiveIsOriginal();
+    });
 
-    // …and one that succeeds both keep it.
-    await svc.commit(await restoreLive(zip));
-    expect(await skuIn(live), 'NEW');
-    expect(File('${db.path}.bak').readAsBytesSync(), rescued);
+    test('a restore puts them back first, so .bak is never lost', () async {
+      final rescued = File('${dbFileIn(live).path}.bak').readAsBytesSync();
+      await expectLater(
+        restoreLive(zip, pause: (at) async {
+          if (at == 'db-placed') throw StateError('boom');
+        }),
+        throwsA(isA<StateError>()),
+      );
+      expect(dbFileIn(live).readAsBytesSync(), rescued);
+      expect((await tags(live))['settings'], 'settings:live');
+    });
+
+    test('a live file beside a stale .bak is left alone', () async {
+      // Undo setUp's moves: both copies now exist (normal after a
+      // pre-journal build's restore, which kept its .bak files).
+      final db = dbFileIn(live).path;
+      File('$db.bak').copySync(db);
+      final settings = hivePathIn(live, 'settings');
+      File('$settings.bak').copySync(settings);
+      expect(await recoverLive(), RestoreRecovery.none);
+      expect(File('$db.bak').existsSync(), isTrue);
+      expect(File('$settings.bak').existsSync(), isTrue);
+    });
   });
 
   test('startup removes staged leftovers when there is no journal',
@@ -605,6 +676,7 @@ void main() {
     var reopens = 0;
     await expectLater(
       svc.restoreWithRollback(
+        journal: SnapshotService.journalFileFor(dbFileIn(live)),
         swap: () => restoreLive(zip),
         reopen: () async {
           if (reopens++ > 0) return;
@@ -625,6 +697,73 @@ void main() {
         RestoreRecovery.rolledBack);
     await expectLiveIsOriginal();
   }, skip: Platform.isWindows ? 'needs chmod' : false);
+
+  group('never reopens while an uncommitted journal is on disk', () {
+    test('a swap step fails and its rollback fails too', () async {
+      final zip = await standardSetup();
+      final receipts = receiptsIn(live).path;
+      addTearDown(() => Process.run('chmod', ['755', receipts]));
+      var reopens = 0;
+      await expectLater(
+        svc.restoreWithRollback(
+          journal: journalIn(live),
+          swap: () => restoreLive(zip, pause: (at) async {
+            if (at == 'photo-placed') {
+              // a.jpg is in place; make undoing it impossible, then fail.
+              await Process.run('chmod', ['555', receipts]);
+              throw StateError('disk full');
+            }
+          }),
+          reopen: () async => reopens++,
+          release: () async {},
+        ),
+        throwsA(isA<RestoreFatalException>()),
+      );
+      // The live data may be the backup's: the app must not run on it.
+      expect(reopens, 0);
+      expect(journalIn(live).existsSync(), isTrue);
+      expect(() => SnapshotService.assertNoPendingRestore(journalIn(live)),
+          throwsA(isA<PendingRestoreException>()));
+
+      await Process.run('chmod', ['755', receipts]);
+      expect(await recoverLive(), RestoreRecovery.rolledBack);
+      await expectLiveIsOriginal();
+    }, skip: Platform.isWindows ? 'needs chmod' : false);
+
+    test("restore()'s own pre-recovery failing is fatal too", () async {
+      final zip = await standardSetup();
+      await killAt(zip, 'photo-placed', n: 2); // leaves a journal
+      final receipts = receiptsIn(live).path;
+      await Process.run('chmod', ['555', receipts]);
+      addTearDown(() => Process.run('chmod', ['755', receipts]));
+      var reopens = 0;
+      await expectLater(
+        svc.restoreWithRollback(
+          journal: journalIn(live),
+          swap: () => restoreLive(zip),
+          reopen: () async => reopens++,
+          release: () async {},
+        ),
+        throwsA(isA<RestoreFatalException>()),
+      );
+      expect(reopens, 0);
+      expect(journalIn(live).existsSync(), isTrue);
+    }, skip: Platform.isWindows ? 'needs chmod' : false);
+
+    test('assertNoPendingRestore: none, committed, pending, unreadable',
+        () async {
+      final j = journalIn(live);
+      SnapshotService.assertNoPendingRestore(j); // no journal
+      RestoreJournal.begin(j, plan: const [], staged: const []);
+      expect(() => SnapshotService.assertNoPendingRestore(j),
+          throwsA(isA<PendingRestoreException>()));
+      RestoreJournal.markCommitted(j);
+      SnapshotService.assertNoPendingRestore(j); // committed: fine
+      j.writeAsBytesSync([0xff, 0x00]);
+      expect(() => SnapshotService.assertNoPendingRestore(j),
+          throwsA(isA<PendingRestoreException>()));
+    });
+  });
 
   // ── create() refuses what restore would reject ────────────────────────────
 

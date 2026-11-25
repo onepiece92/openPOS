@@ -331,6 +331,7 @@ void main() {
       var releases = 0;
       await expectLater(
         svc.restoreWithRollback(
+          journal: SnapshotService.journalFileFor(dbFileIn(live)),
           swap: swap,
           reopen: () async {
             reopens++;
@@ -351,6 +352,7 @@ void main() {
     test('a successful reopen keeps the restored data', () async {
       var reopens = 0;
       final m = await svc.restoreWithRollback(
+        journal: SnapshotService.journalFileFor(dbFileIn(live)),
         swap: swap,
         reopen: () async => reopens++,
         release: () async {},
@@ -364,6 +366,7 @@ void main() {
       var reopens = 0;
       await expectLater(
         svc.restoreWithRollback(
+          journal: SnapshotService.journalFileFor(dbFileIn(live)),
           swap: () => svc.restore(
             zip: craftZip(utf8.encode('junk')),
             dbFile: dbFileIn(live),
@@ -383,6 +386,7 @@ void main() {
         () async {
       await expectLater(
         svc.restoreWithRollback(
+          journal: SnapshotService.journalFileFor(dbFileIn(live)),
           swap: swap,
           reopen: () async => throw StateError('disk gone'),
           release: () async {},
