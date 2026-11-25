@@ -57,19 +57,22 @@ class ReceiptScreen extends ConsumerStatefulWidget {
 
 class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
   // Captured up front: `ref` must not be used in dispose().
-  late final ReviewController _review;
+  // Null while Review reminder is off: the controller is never created.
+  late final ReviewController? _review;
 
   @override
   void initState() {
     super.initState();
-    _review = ref.read(reviewControllerProvider);
+    _review = ref.read(featureOnProvider(Feature.reviewReminder))
+        ? ref.read(reviewControllerProvider)
+        : null;
   }
 
   @override
   void dispose() {
     // Fire-and-forget, after navigation settles — never during checkout or
     // over the receipt, and never awaited on a UI path.
-    _review.onReceiptDismissed();
+    _review?.onReceiptDismissed();
     super.dispose();
   }
 

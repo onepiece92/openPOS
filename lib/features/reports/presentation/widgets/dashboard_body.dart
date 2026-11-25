@@ -16,7 +16,11 @@ class DashboardBody extends StatelessWidget {
     required this.cs,
     required this.periodLabel,
     required this.isCustomRange,
+    this.sections = ReportSections.all,
   });
+
+  /// Parts switched off in Features are not built.
+  final ReportSections sections;
   final ReportData data;
   final String symbol;
   final ColorScheme cs;
@@ -64,7 +68,7 @@ class DashboardBody extends StatelessWidget {
         const SizedBox(height: 22),
 
         // ── Chart ─────────────────────────────────────────────────────────
-        if (data.chartTotals.any((v) => v > 0)) ...[
+        if (sections.extras && data.chartTotals.any((v) => v > 0)) ...[
           _SectionHeader(data.chartTitle, cs),
           MiniBarChart(
             labels: data.chartDates,
@@ -93,7 +97,7 @@ class DashboardBody extends StatelessWidget {
                         fontFamily: AppFonts.mono),
                   ),
                 ),
-                if (data.payBreakdown.isNotEmpty) ...[
+                if (sections.extras && data.payBreakdown.isNotEmpty) ...[
                   const Divider(height: 1, indent: 16),
                   ...data.payBreakdown.map((p) => ListTile(
                         leading: Icon(
@@ -123,7 +127,7 @@ class DashboardBody extends StatelessWidget {
         ],
 
         // ── Top products ──────────────────────────────────────────────────
-        if (data.topProducts.isNotEmpty) ...[
+        if (sections.extras && data.topProducts.isNotEmpty) ...[
           _SectionHeader('Top Products', cs),
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
@@ -218,94 +222,99 @@ class DashboardBody extends StatelessWidget {
   /// Revenue is what came in (VAT included). Profit is worked out from the
   /// part of it that is the shop's own: sales excluding VAT, less what the
   /// goods cost, less expenses.
-  List<Widget> _buildKpiRows() => [
-        _kpiRow(
-          KpiCard(
-            label: 'Revenue (incl. ${data.taxLabel})',
-            value: '$symbol ${_fmt(data.revenue)}',
-            icon: Icons.trending_up_rounded,
-            color: cs.primary,
-            cs: cs,
-          ),
-          KpiCard(
-            label: '${data.taxLabel} Collected',
-            value: '$symbol ${_fmt(data.vatCollected)}',
-            icon: Icons.receipt_long_rounded,
-            color: cs.tertiary,
-            cs: cs,
-          ),
+  List<Widget> _buildKpiRows() {
+    final cost = sections.costProfit;
+    final cards = <Widget>[
+      KpiCard(
+        label: 'Revenue (incl. ${data.taxLabel})',
+        value: '$symbol ${_fmt(data.revenue)}',
+        icon: Icons.trending_up_rounded,
+        color: cs.primary,
+        cs: cs,
+      ),
+      KpiCard(
+        label: '${data.taxLabel} Collected',
+        value: '$symbol ${_fmt(data.vatCollected)}',
+        icon: Icons.receipt_long_rounded,
+        color: cs.tertiary,
+        cs: cs,
+      ),
+      if (cost)
+        KpiCard(
+          label: 'Cost of Goods',
+          value: '$symbol ${_fmt(data.costOfGoods)}',
+          icon: Icons.inventory_2_rounded,
+          color: cs.error,
+          cs: cs,
         ),
-        const SizedBox(height: 10),
-        _kpiRow(
-          KpiCard(
-            label: 'Cost of Goods',
-            value: '$symbol ${_fmt(data.costOfGoods)}',
-            icon: Icons.inventory_2_rounded,
-            color: cs.error,
-            cs: cs,
-          ),
-          KpiCard(
-            label: 'Expenses',
-            value: '$symbol ${_fmt(data.expenses)}',
-            icon: Icons.trending_down_rounded,
-            color: cs.error,
-            cs: cs,
-          ),
+      if (sections.expenses)
+        KpiCard(
+          label: 'Expenses',
+          value: '$symbol ${_fmt(data.expenses)}',
+          icon: Icons.trending_down_rounded,
+          color: cs.error,
+          cs: cs,
         ),
-        const SizedBox(height: 10),
-        _kpiRow(
-          KpiCard(
-            label: 'Net Profit',
-            value: '$symbol ${_fmt(data.profit)}',
-            icon: Icons.account_balance_rounded,
-            color: data.profit >= 0 ? const Color(0xFF16A34A) : cs.error,
-            cs: cs,
-          ),
-          KpiCard(
-            label: 'Orders',
-            value: '${data.orderCount}',
-            icon: Icons.shopping_bag_rounded,
-            color: cs.secondary,
-            cs: cs,
-          ),
+      if (cost)
+        KpiCard(
+          label: 'Net Profit',
+          value: '$symbol ${_fmt(data.profit)}',
+          icon: Icons.account_balance_rounded,
+          color: data.profit >= 0 ? const Color(0xFF16A34A) : cs.error,
+          cs: cs,
         ),
+      KpiCard(
+        label: 'Orders',
+        value: '${data.orderCount}',
+        icon: Icons.shopping_bag_rounded,
+        color: cs.secondary,
+        cs: cs,
+      ),
+    ];
+    return [
+      for (var i = 0; i < cards.length; i += 2) ...[
+        if (i > 0) const SizedBox(height: 10),
+        _kpiRow(cards[i], i + 1 < cards.length ? cards[i + 1] : null),
+      ],
+      if (cost)
         Padding(
           padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
           child: Text(
             'Net profit = sales excl. ${data.taxLabel} '
             '($symbol ${_fmt(data.salesExVat)}) '
-            '− cost of goods − expenses.',
+            '− cost of goods${sections.expenses ? ' − expenses' : ''}.',
             style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
           ),
         ),
-        if (data.costIsIncomplete)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(4, 6, 4, 0),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.warning_amber_rounded, size: 14, color: cs.error),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    '${data.uncostedLines} of ${data.soldLines} sold '
-                    'item${data.soldLines == 1 ? '' : 's'} '
-                    'ha${data.uncostedLines == 1 ? 's' : 've'} no purchase '
-                    'price recorded and count as zero cost, so profit is '
-                    'overstated. Set purchase prices on your products.',
-                    style: TextStyle(fontSize: 11, color: cs.error),
-                  ),
+      if (cost && data.costIsIncomplete)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 6, 4, 0),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.warning_amber_rounded, size: 14, color: cs.error),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  '${data.uncostedLines} of ${data.soldLines} sold '
+                  'item${data.soldLines == 1 ? '' : 's'} '
+                  'ha${data.uncostedLines == 1 ? 's' : 've'} no purchase '
+                  'price recorded and count as zero cost, so profit is '
+                  'overstated. Set purchase prices on your products.',
+                  style: TextStyle(fontSize: 11, color: cs.error),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-      ];
+        ),
+    ];
+  }
 
-  Widget _kpiRow(Widget left, Widget right) => Row(
+  Widget _kpiRow(Widget left, Widget? right) => Row(
         children: [
           Expanded(child: left),
           const SizedBox(width: 10),
-          Expanded(child: right),
+          Expanded(child: right ?? const SizedBox.shrink()),
         ],
       );
 

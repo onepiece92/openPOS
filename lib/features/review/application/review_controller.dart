@@ -43,7 +43,12 @@ class ReviewController {
     this.settleDelay = const Duration(seconds: 1),
     this.timeout = const Duration(seconds: 5),
     this.afterCheck,
+    this.enabled,
   }) : _clock = clock ?? DateTime.now;
+
+  /// The Review reminder switch. While it says false, [onReceiptDismissed]
+  /// does nothing at all: no store review, no feedback ask, no I/O.
+  final bool Function()? enabled;
 
   /// Called after every check from [onReceiptDismissed] with its outcome —
   /// the feedback ask hangs off this so it only ever runs when the review
@@ -64,6 +69,7 @@ class ReviewController {
   bool _inFlight = false;
 
   void onReceiptDismissed() {
+    if (enabled?.call() == false) return;
     unawaited(_guard(() async {
       await Future<void>.delayed(settleDelay);
       final result = await runCheck();

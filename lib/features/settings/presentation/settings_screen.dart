@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:pos_app/core/providers/hive_provider.dart';
+
 import 'package:pos_app/features/settings/presentation/widgets/appearance_section.dart';
 import 'package:pos_app/features/settings/presentation/widgets/backup_section.dart';
 import 'package:pos_app/features/settings/presentation/widgets/currency_section.dart';
@@ -20,30 +22,38 @@ class SettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Sections of switched-off features are not built.
+    final stock = ref.watch(featureOnProvider(Feature.stockTracking));
+    final customers = ref.watch(featureOnProvider(Feature.customers));
     return Scaffold(
       drawer: const PosDrawer(),
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
-        children: const [
-          SettingsSectionHeader('Store Profile'),
-          StoreProfileSection(),
-          SettingsSectionHeader('Currency'),
-          CurrencySection(),
-          SettingsSectionHeader('Tax'),
-          TaxSection(),
-          SettingsSectionHeader('Inventory'),
-          InventorySection(),
-          SettingsSectionHeader('Loyalty'),
-          LoyaltySection(),
-          SettingsSectionHeader('Appearance'),
-          AppearanceSection(),
-          SettingsSectionHeader('Hardware'),
-          PrinterSection(),
-          SettingsSectionHeader('Data Management'),
-          BackupSection(),
-          SettingsSectionHeader('Danger Zone'),
-          DangerSection(),
-          SizedBox(height: 32),
+        children: [
+          const SettingsSectionHeader('Store Profile'),
+          const StoreProfileSection(),
+          const SettingsSectionHeader('Currency'),
+          const CurrencySection(),
+          const SettingsSectionHeader('Tax'),
+          const TaxSection(),
+          if (stock) ...const [
+            SettingsSectionHeader('Inventory'),
+            InventorySection(),
+          ],
+          // Its switch is the Loyalty points feature, which needs Customers.
+          if (customers) ...const [
+            SettingsSectionHeader('Loyalty'),
+            LoyaltySection(),
+          ],
+          const SettingsSectionHeader('Appearance'),
+          const AppearanceSection(),
+          const SettingsSectionHeader('Hardware'),
+          const PrinterSection(),
+          const SettingsSectionHeader('Data Management'),
+          const BackupSection(),
+          const SettingsSectionHeader('Danger Zone'),
+          const DangerSection(),
+          const SizedBox(height: 32),
         ],
       ),
     );

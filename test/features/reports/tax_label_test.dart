@@ -9,6 +9,7 @@ import 'package:pos_app/features/reports/domain/report_data.dart';
 import 'package:pos_app/features/reports/presentation/widgets/dashboard_body.dart';
 
 import '../../_support/test_db.dart';
+import '../../_support/features.dart';
 
 /// The dashboard names tax the way the shop does ("Sales Tax", "GST",
 /// "VAT") and falls back to the generic "Tax" when that is ambiguous.
@@ -43,7 +44,7 @@ void main() {
     setUp(() {
       db = openInMemoryDatabase();
       c = ProviderContainer(
-          overrides: [databaseProvider.overrideWithValue(db)]);
+          overrides: [allFeaturesOn, databaseProvider.overrideWithValue(db)]);
     });
     tearDown(() async {
       c.dispose();
@@ -123,9 +124,8 @@ void main() {
   });
 
   group('dashboard text', () {
-    ReportData data(String? taxLabel) => taxLabel == null
-        ? _report()
-        : _report(taxLabel: taxLabel);
+    ReportData data(String? taxLabel) =>
+        taxLabel == null ? _report() : _report(taxLabel: taxLabel);
 
     Future<void> pump(WidgetTester tester, ReportData data) async {
       tester.view.physicalSize = const Size(900, 2400);

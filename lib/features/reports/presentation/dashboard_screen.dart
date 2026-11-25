@@ -53,6 +53,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   Widget build(BuildContext context) {
     final query = _activeQuery;
     final reportAsync = ref.watch(reportProvider(query));
+    final sections = ref.watch(reportSectionsProvider);
     final symbol = ref.watch(currencySymbolProvider);
     final cs = Theme.of(context).colorScheme;
 
@@ -129,6 +130,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   cs: cs,
                   periodLabel: query.label,
                   isCustomRange: _customRange != null,
+                  sections: sections,
                 ),
                 loading: () => const Center(child: CircularProgressIndicator()),
                 error: (e, _) => ListView(

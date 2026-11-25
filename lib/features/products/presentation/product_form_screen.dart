@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 
+import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/features/products/domain/unit_conversion.dart';
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
@@ -329,6 +330,9 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
     final categoriesAsync = ref.watch(categoriesStreamProvider);
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
+    // Switched-off features hide their fields only: the values loaded from
+    // the product are kept and saved back unchanged.
+    final flags = ref.watch(featureFlagsProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -420,37 +424,43 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                       validator: (v) => validateMoneyAmount(v,
                           noun: 'Price', allowZero: true),
                     ),
-                    const SizedBox(height: 14),
-                    TextFormField(
-                      controller: _purchasePriceCtrl,
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(
-                            RegExp(r'^\d*\.?\d{0,2}')),
-                      ],
-                      decoration: const InputDecoration(
-                        labelText: 'Purchase price',
-                        hintText: 'Cost per unit (optional)',
-                        prefixIcon: Icon(Icons.shopping_bag_outlined),
-                        border: OutlineInputBorder(),
+                    if (flags.costProfit) ...[
+                      const SizedBox(height: 14),
+                      TextFormField(
+                        key: const ValueKey('product-purchase-price'),
+                        controller: _purchasePriceCtrl,
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(
+                              RegExp(r'^\d*\.?\d{0,2}')),
+                        ],
+                        decoration: const InputDecoration(
+                          labelText: 'Purchase price',
+                          hintText: 'Cost per unit (optional)',
+                          prefixIcon: Icon(Icons.shopping_bag_outlined),
+                          border: OutlineInputBorder(),
+                        ),
+                        validator: (v) => validateMoneyAmount(
+                          v,
+                          noun: 'Purchase price',
+                          isRequired: false,
+                          allowZero: true,
+                        ),
                       ),
-                      validator: (v) => validateMoneyAmount(
-                        v,
-                        noun: 'Purchase price',
-                        isRequired: false,
-                        allowZero: true,
+                    ],
+                    if (flags.taxes) ...[
+                      const SizedBox(height: 4),
+                      SwitchListTile(
+                        key: const ValueKey('product-apply-tax'),
+                        title: const Text('Apply tax'),
+                        subtitle: const Text(
+                            'Include this product in tax calculations'),
+                        value: _isTaxable,
+                        onChanged: (v) => setState(() => _isTaxable = v),
+                        contentPadding: const EdgeInsets.only(left: 4),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    SwitchListTile(
-                      title: const Text('Apply tax'),
-                      subtitle: const Text(
-                          'Include this product in tax calculations'),
-                      value: _isTaxable,
-                      onChanged: (v) => setState(() => _isTaxable = v),
-                      contentPadding: const EdgeInsets.only(left: 4),
-                    ),
+                    ],
                   ],
                 ),
               ),
@@ -480,60 +490,63 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                           : null,
                       onChanged: (_) => setState(() {}),
                     ),
-                    const SizedBox(height: 14),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          flex: 3,
-                          child: TextFormField(
-                            controller: _secondaryUnitCtrl,
-                            textCapitalization: TextCapitalization.none,
-                            decoration: const InputDecoration(
-                              labelText: 'Secondary unit',
-                              hintText: 'box, dozen…',
-                              prefixIcon: Icon(Icons.all_inbox_outlined),
-                              border: OutlineInputBorder(),
+                    if (flags.units) ...[
+                      const SizedBox(height: 14),
+                      Row(
+                        key: const ValueKey('product-secondary-unit'),
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: TextFormField(
+                              controller: _secondaryUnitCtrl,
+                              textCapitalization: TextCapitalization.none,
+                              decoration: const InputDecoration(
+                                labelText: 'Secondary unit',
+                                hintText: 'box, dozen…',
+                                prefixIcon: Icon(Icons.all_inbox_outlined),
+                                border: OutlineInputBorder(),
+                              ),
+                              onChanged: (_) => setState(() {}),
                             ),
-                            onChanged: (_) => setState(() {}),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          flex: 2,
-                          child: TextFormField(
-                            controller: _conversionCtrl,
-                            enabled: _hasSecondaryUnit,
-                            // Whole numbers only: stock is counted in whole
-                            // main units. A product saved earlier with a
-                            // fractional rate still shows it here, and the
-                            // validator asks for a whole one before saving.
-                            keyboardType: TextInputType.number,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                            ],
-                            decoration: const InputDecoration(
-                              labelText: 'Conversion',
-                              hintText: '12',
-                              border: OutlineInputBorder(),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            flex: 2,
+                            child: TextFormField(
+                              controller: _conversionCtrl,
+                              enabled: _hasSecondaryUnit,
+                              // Whole numbers only: stock is counted in whole
+                              // main units. A product saved earlier with a
+                              // fractional rate still shows it here, and the
+                              // validator asks for a whole one before saving.
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                              ],
+                              decoration: const InputDecoration(
+                                labelText: 'Conversion',
+                                hintText: '12',
+                                border: OutlineInputBorder(),
+                              ),
+                              validator: (v) => _hasSecondaryUnit
+                                  ? validateConversionRate(v)
+                                  : null,
+                              onChanged: (_) => setState(() {}),
                             ),
-                            validator: (v) => _hasSecondaryUnit
-                                ? validateConversionRate(v)
-                                : null,
-                            onChanged: (_) => setState(() {}),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Padding(
-                      padding: const EdgeInsets.only(left: 4),
-                      child: Text(
-                        _conversionHint,
-                        style:
-                            tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                        ],
                       ),
-                    ),
+                      const SizedBox(height: 8),
+                      Padding(
+                        padding: const EdgeInsets.only(left: 4),
+                        child: Text(
+                          _conversionHint,
+                          style: tt.bodySmall
+                              ?.copyWith(color: cs.onSurfaceVariant),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -542,57 +555,59 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
             const SizedBox(height: 20),
 
             // ── Inventory ────────────────────────────────────────────────
-            _sectionLabel('Inventory', tt, cs),
-            Card(
-              child: Column(
-                children: [
-                  SwitchListTile(
-                    secondary: const Icon(Icons.inventory_2_outlined),
-                    title: const Text('Track stock'),
-                    subtitle: Text(
-                      _trackStock
-                          ? 'Stock will be deducted on each sale'
-                          : 'Unlimited — stock is not tracked',
+            if (flags.stockTracking) ...[
+              _sectionLabel('Inventory', tt, cs),
+              Card(
+                key: const ValueKey('product-inventory'),
+                child: Column(
+                  children: [
+                    SwitchListTile(
+                      secondary: const Icon(Icons.inventory_2_outlined),
+                      title: const Text('Track stock'),
+                      subtitle: Text(
+                        _trackStock
+                            ? 'Stock will be deducted on each sale'
+                            : 'Unlimited — stock is not tracked',
+                      ),
+                      value: _trackStock,
+                      onChanged: _isComposite
+                          ? null
+                          : (v) => setState(() {
+                                _trackStock = v;
+                                if (!v) _stockCtrl.clear();
+                              }),
                     ),
-                    value: _trackStock,
-                    onChanged: _isComposite
-                        ? null
-                        : (v) => setState(() {
-                              _trackStock = v;
-                              if (!v) _stockCtrl.clear();
-                            }),
-                  ),
-                  AnimatedCrossFade(
-                    duration: const Duration(milliseconds: 220),
-                    firstCurve: Curves.easeOut,
-                    secondCurve: Curves.easeIn,
-                    crossFadeState: (_trackStock && !_isComposite)
-                        ? CrossFadeState.showFirst
-                        : CrossFadeState.showSecond,
-                    firstChild: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      child: TextFormField(
-                        controller: _stockCtrl,
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly
-                        ],
-                        decoration: InputDecoration(
-                          labelText:
-                              '${_isEdit ? 'Stock quantity' : 'Opening stock'} ($_unitLabel)',
-                          hintText: '0',
-                          prefixIcon: const Icon(Icons.numbers_rounded),
-                          border: const OutlineInputBorder(),
+                    AnimatedCrossFade(
+                      duration: const Duration(milliseconds: 220),
+                      firstCurve: Curves.easeOut,
+                      secondCurve: Curves.easeIn,
+                      crossFadeState: (_trackStock && !_isComposite)
+                          ? CrossFadeState.showFirst
+                          : CrossFadeState.showSecond,
+                      firstChild: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        child: TextFormField(
+                          controller: _stockCtrl,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly
+                          ],
+                          decoration: InputDecoration(
+                            labelText:
+                                '${_isEdit ? 'Stock quantity' : 'Opening stock'} ($_unitLabel)',
+                            hintText: '0',
+                            prefixIcon: const Icon(Icons.numbers_rounded),
+                            border: const OutlineInputBorder(),
+                          ),
                         ),
                       ),
+                      secondChild: const SizedBox.shrink(),
                     ),
-                    secondChild: const SizedBox.shrink(),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-
-            const SizedBox(height: 20),
+              const SizedBox(height: 20),
+            ],
 
             // ── Visibility ───────────────────────────────────────────────
             _sectionLabel('Visibility', tt, cs),
@@ -610,83 +625,86 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
             const SizedBox(height: 20),
 
             // ── Composite / Bundle ────────────────────────────────────────
-            _sectionLabel('Bundle', tt, cs),
-            Card(
-              child: Column(
-                children: [
-                  SwitchListTile(
-                    title: const Text('Composite / Bundle'),
-                    subtitle: const Text(
-                        'Made up of other products — stock tracked via components'),
-                    value: _isComposite,
-                    onChanged: (v) => setState(() => _isComposite = v),
-                  ),
-                  if (_isComposite) ...[
-                    const Divider(height: 1, indent: 16),
-                    if (_components.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Text(
-                          'No components added yet.',
-                          style: TextStyle(color: cs.onSurfaceVariant),
-                        ),
-                      ),
-                    ..._components.asMap().entries.map((entry) {
-                      final i = entry.key;
-                      final c = entry.value;
-                      return ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: cs.primaryContainer,
+            if (flags.bundles) ...[
+              _sectionLabel('Bundle', tt, cs),
+              Card(
+                key: const ValueKey('product-bundle'),
+                child: Column(
+                  children: [
+                    SwitchListTile(
+                      title: const Text('Composite / Bundle'),
+                      subtitle: const Text(
+                          'Made up of other products — stock tracked via components'),
+                      value: _isComposite,
+                      onChanged: (v) => setState(() => _isComposite = v),
+                    ),
+                    if (_isComposite) ...[
+                      const Divider(height: 1, indent: 16),
+                      if (_components.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.all(16),
                           child: Text(
-                            c.product.name[0].toUpperCase(),
-                            style: TextStyle(
-                                color: cs.onPrimaryContainer,
-                                fontWeight: FontWeight.bold),
+                            'No components added yet.',
+                            style: TextStyle(color: cs.onSurfaceVariant),
                           ),
                         ),
-                        title: Text(c.product.name),
-                        subtitle: Text('SKU: ${c.product.sku}'),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.remove_rounded, size: 18),
-                              onPressed: c.quantity > 1
-                                  ? () => setState(() => c.quantity--)
-                                  : null,
+                      ..._components.asMap().entries.map((entry) {
+                        final i = entry.key;
+                        final c = entry.value;
+                        return ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: cs.primaryContainer,
+                            child: Text(
+                              c.product.name[0].toUpperCase(),
+                              style: TextStyle(
+                                  color: cs.onPrimaryContainer,
+                                  fontWeight: FontWeight.bold),
                             ),
-                            Text('${c.quantity}', style: tt.titleSmall),
-                            IconButton(
-                              icon: const Icon(Icons.add_rounded, size: 18),
-                              onPressed: () => setState(() => c.quantity++),
-                            ),
-                            IconButton(
-                              icon: Icon(Icons.delete_outline_rounded,
-                                  color: cs.error, size: 20),
-                              onPressed: () =>
-                                  setState(() => _components.removeAt(i)),
-                            ),
-                          ],
-                        ),
-                      );
-                    }),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
-                      child: OutlinedButton.icon(
-                        onPressed: _pickComponent,
-                        icon: const Icon(Icons.add_rounded, size: 18),
-                        label: const Text('Add component'),
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(44),
+                          ),
+                          title: Text(c.product.name),
+                          subtitle: Text('SKU: ${c.product.sku}'),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon:
+                                    const Icon(Icons.remove_rounded, size: 18),
+                                onPressed: c.quantity > 1
+                                    ? () => setState(() => c.quantity--)
+                                    : null,
+                              ),
+                              Text('${c.quantity}', style: tt.titleSmall),
+                              IconButton(
+                                icon: const Icon(Icons.add_rounded, size: 18),
+                                onPressed: () => setState(() => c.quantity++),
+                              ),
+                              IconButton(
+                                icon: Icon(Icons.delete_outline_rounded,
+                                    color: cs.error, size: 20),
+                                onPressed: () =>
+                                    setState(() => _components.removeAt(i)),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+                        child: OutlinedButton.icon(
+                          onPressed: _pickComponent,
+                          icon: const Icon(Icons.add_rounded, size: 18),
+                          label: const Text('Add component'),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size.fromHeight(44),
+                          ),
                         ),
                       ),
-                    ),
+                    ],
                   ],
-                ],
+                ),
               ),
-            ),
-
-            const SizedBox(height: 20),
+              const SizedBox(height: 20),
+            ],
 
             // ── Danger zone ───────────────────────────────────────────────
             if (_isEdit) ...[

@@ -86,7 +86,7 @@ class _FeaturesScreenState extends ConsumerState<FeaturesScreen> {
           for (final f in Feature.values) ...[
             _FeatureRow(feature: f, flags: flags, onChanged: _set),
             if (f == Feature.stockTracking && flags.stockTracking)
-              const StockRecountLine(),
+              const StockRecountLine(indent: 32),
           ],
         ],
       ),
@@ -121,7 +121,8 @@ class _FeatureRow extends StatelessWidget {
 /// Stock tracking was switched off at some point and the line has not been
 /// dismissed. Also shown at the top of Inventory.
 class StockRecountLine extends ConsumerWidget {
-  const StockRecountLine({super.key});
+  const StockRecountLine({super.key, this.indent = 16});
+  final double indent;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -132,7 +133,7 @@ class StockRecountLine extends ConsumerWidget {
     final cs = Theme.of(context).colorScheme;
     return Padding(
       key: const ValueKey('stock-recount'),
-      padding: const EdgeInsets.fromLTRB(32, 0, 8, 8),
+      padding: EdgeInsets.fromLTRB(indent, 0, 8, 8),
       child: Row(
         children: [
           Expanded(

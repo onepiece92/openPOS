@@ -14,45 +14,17 @@ class TaxSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final taxAsync = ref.watch(taxRatesStreamProvider);
-    final defaultTaxId = ref.watch(defaultTaxIdProvider);
-
+    final taxes = ref.watch(featureOnProvider(Feature.taxes));
     final invoicePrefix = ref.watch(invoicePrefixProvider);
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: Column(children: [
-        taxAsync.when(
-        data: (rates) {
-          final defaultRate = rates.where((t) => t.id == defaultTaxId).firstOrNull;
-          final label = defaultRate != null
-              ? '${defaultRate.name} · ${formatRatePercent(defaultRate.rate)}'
-              : 'None';
-          return ListTile(
-            leading: const Icon(Icons.percent_rounded),
-            title: const Text('Default Tax Rate'),
-            subtitle: Text(label),
-            trailing: const Icon(Icons.chevron_right_rounded),
-            onTap: rates.isEmpty
-                ? null
-                : () => _showTaxPicker(context, ref, rates, defaultTaxId),
-          );
-        },
-        loading: () => const ListTile(
-          leading: Icon(Icons.percent_rounded),
-          title: Text('Default Tax Rate'),
-          trailing: SizedBox(
-            width: 16, height: 16,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-        ),
-        error: (_, __) => const ListTile(
-          leading: Icon(Icons.percent_rounded),
-          title: Text('Default Tax Rate'),
-          subtitle: Text('Error loading rates'),
-        ),
-        ),
-        const Divider(height: 1, indent: 16),
+        // Taxes off: no default-rate row, and the rates stream never starts.
+        if (taxes) ...[
+          const _DefaultTaxTile(),
+          const Divider(height: 1, indent: 16),
+        ],
         ListTile(
           leading: const Icon(Icons.receipt_long_rounded),
           title: const Text('Invoice Prefix'),
@@ -113,18 +85,60 @@ class TaxSection extends ConsumerWidget {
       await ref.read(settingsProvider.notifier).setInvoicePrefix(saved);
     }
   }
+}
 
-  void _showTaxPicker(
-    BuildContext context,
-    WidgetRef ref,
-    List<TaxRate> rates,
-    int? currentId,
-  ) {
-    showAppSheet(
-      context: context,
-      builder: (_) => _TaxPickerSheet(rates: rates, currentId: currentId),
+class _DefaultTaxTile extends ConsumerWidget {
+  const _DefaultTaxTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final taxAsync = ref.watch(taxRatesStreamProvider);
+    final defaultTaxId = ref.watch(defaultTaxIdProvider);
+    return taxAsync.when(
+      data: (rates) {
+        final defaultRate =
+            rates.where((t) => t.id == defaultTaxId).firstOrNull;
+        final label = defaultRate != null
+            ? '${defaultRate.name} · ${formatRatePercent(defaultRate.rate)}'
+            : 'None';
+        return ListTile(
+          leading: const Icon(Icons.percent_rounded),
+          title: const Text('Default Tax Rate'),
+          subtitle: Text(label),
+          trailing: const Icon(Icons.chevron_right_rounded),
+          onTap: rates.isEmpty
+              ? null
+              : () => _showTaxPicker(context, ref, rates, defaultTaxId),
+        );
+      },
+      loading: () => const ListTile(
+        leading: Icon(Icons.percent_rounded),
+        title: Text('Default Tax Rate'),
+        trailing: SizedBox(
+          width: 16,
+          height: 16,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      ),
+      error: (_, __) => const ListTile(
+        leading: Icon(Icons.percent_rounded),
+        title: Text('Default Tax Rate'),
+        subtitle: Text('Error loading rates'),
+      ),
     );
   }
+}
+
+void _showTaxPicker(
+  BuildContext context,
+  WidgetRef ref,
+  List<TaxRate> rates,
+  int? currentId,
+) {
+  showAppSheet(
+    context: context,
+    builder: (_) => _TaxPickerSheet(rates: rates, currentId: currentId),
+  );
 }
 
 // ── Tax picker sheet ──────────────────────────────────────────────────────────
@@ -160,15 +174,13 @@ class _TaxPickerSheet extends ConsumerWidget {
         const Divider(height: 1),
         ...rates.map((t) => ListTile(
               title: Text(t.name),
-              subtitle: Text(
-                  '${formatRatePercent(t.rate)} · ${t.inclusionType}'),
+              subtitle:
+                  Text('${formatRatePercent(t.rate)} · ${t.inclusionType}'),
               trailing: t.id == currentId
                   ? Icon(Icons.check_rounded, color: cs.primary)
                   : null,
               onTap: () async {
-                await ref
-                    .read(settingsProvider.notifier)
-                    .setDefaultTaxId(t.id);
+                await ref.read(settingsProvider.notifier).setDefaultTaxId(t.id);
                 if (context.mounted) Navigator.pop(context);
               },
             )),
