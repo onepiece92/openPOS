@@ -14,4 +14,10 @@ class OrderTaxes extends Table {
   RealColumn get taxRatePercent => real()(); // snapshot
   RealColumn get taxableAmount => real()();
   RealColumn get taxAmount => real()();
+  /// True when the tax was already inside the item prices (so it is not
+  /// added to the total). Rows written before schema v14 did not record
+  /// this; the migration infers it where the order's totals prove it and
+  /// otherwise leaves the default, exclusive.
+  BoolColumn get isInclusive =>
+      boolean().withDefault(const Constant(false))();
 }

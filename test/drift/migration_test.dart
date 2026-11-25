@@ -8,7 +8,7 @@ import 'package:pos_app/core/database/app_database.dart';
 import 'generated/schema.dart';
 
 /// Upgrades a database created at every schema version that has shipped
-/// (v4 · v6 · v7 · v8 · v9) through our hand-written `onUpgrade` steps and
+/// (v4 · v6 – v13) through our hand-written `onUpgrade` steps and
 /// asserts the result is byte-for-byte what Drift expects for the current
 /// version — tables, columns, types, defaults, indexes.
 ///
@@ -20,7 +20,7 @@ void main() {
 
   setUpAll(() => verifier = SchemaVerifier(GeneratedHelper()));
 
-  const shipped = [4, 6, 7, 8, 9, 10, 11, 12];
+  const shipped = [4, 6, 7, 8, 9, 10, 11, 12, 13];
 
   for (final from in shipped) {
     test('upgrade v$from → v${AppDatabase.currentSchemaVersion} yields the expected schema',
@@ -85,5 +85,136 @@ void main() {
     ).get();
     expect(rows.map((r) => r.read<int?>('invoice_no')), [1, 2]);
     expect(rows.map((r) => r.read<double>('total')), [5, 7]);
+  });
+
+  // ── v14: cost snapshot on order lines, inclusive flag on tax lines ───────
+
+  /// Seeds a v13 shop: products with and without a purchase price, a
+  /// composite, a fractional secondary unit, and orders of every tax shape.
+  void seedV13(void Function(String sql) execute) {
+    execute(
+      'INSERT INTO products (id, sku, name, price, purchase_price, is_composite, secondary_unit, conversion_rate) VALUES '
+      "(1, 'TEA', 'Tea', 100, 80, 0, NULL, 1), "
+      "(2, 'NOCOST', 'No cost', 50, 0, 0, NULL, 1), "
+      "(3, 'BUNDLE', 'Bundle', 300, 0, 1, NULL, 1), "
+      "(4, 'HALF', 'Cake', 40, 10, 0, 'half', 0.5), "
+      "(5, 'BUNDLE2', 'Bundle with an uncosted part', 300, 0, 1, NULL, 1)",
+    );
+    execute(
+      'INSERT INTO product_components (composite_product_id, component_product_id, quantity) VALUES '
+      '(3, 1, 2), (3, 4, 1), (5, 1, 1), (5, 2, 1)',
+    );
+    execute(
+        "INSERT INTO tax_rates (id, name, rate) VALUES (1, 'VAT', 0.13), (2, 'Levy', 0.05)");
+    execute(
+      'INSERT INTO orders (id, status, subtotal, discount_total, tax_total, loyalty_discount, total, payment_method, invoice_no) VALUES '
+      // 1: exclusive 13 % on 1000 − 100 discount
+      "(1, 'completed', 1000, 100, 117, 0, 1017, 'card', 1), "
+      // 2: inclusive 13 % on 113 — nothing added to the total
+      "(2, 'completed', 113, 0, 13, 0, 113, 'cash', 2), "
+      // 3: inclusive 13 % on 113 with 20 of loyalty redeemed
+      "(3, 'completed', 113, 0, 13, 20, 93, 'cash', 3), "
+      // 4: two exclusive rates on 100
+      "(4, 'completed', 100, 0, 18, 0, 118, 'cash', 4), "
+      // 5: untaxed
+      "(5, 'completed', 50, 0, 0, 0, 50, 'cash', 5), "
+      // 6: exclusive 13 % on 100, paid entirely with points → total 0
+      "(6, 'completed', 100, 0, 13, 113, 0, 'cash', 6)",
+    );
+    execute(
+      'INSERT INTO order_items (order_id, product_id, product_name, unit_price, quantity, line_total, unit_label, units_per_qty) VALUES '
+      "(1, 1, 'Tea', 100, 10, 1000, '', 1), "
+      "(2, 4, 'Cake (half)', 113, 1, 113, 'half', 0.5), "
+      "(3, 3, 'Bundle', 113, 1, 113, '', 1), "
+      "(4, 5, 'Bundle with an uncosted part', 100, 1, 100, '', 1), "
+      "(5, 2, 'No cost', 50, 1, 50, '', 1)",
+    );
+    execute(
+      'INSERT INTO order_taxes (order_id, tax_rate_id, tax_rate_name, tax_rate_percent, taxable_amount, tax_amount) VALUES '
+      "(1, 1, 'VAT', 0.13, 900, 117), "
+      "(2, 1, 'VAT', 0.13, 100, 13), "
+      "(3, 1, 'VAT', 0.13, 100, 13), "
+      "(4, 1, 'VAT', 0.13, 100, 13), "
+      "(4, 2, 'Levy', 0.05, 100, 5), "
+      "(6, 1, 'VAT', 0.13, 100, 13)",
+    );
+  }
+
+  test('v13 → v14 keeps every row and backfills cost and the inclusive flag',
+      () async {
+    final schema = await verifier.schemaAt(13);
+    seedV13(schema.rawDatabase.execute);
+
+    final db = AppDatabase(schema.newConnection());
+    addTearDown(db.close);
+    await verifier.migrateAndValidate(db, AppDatabase.currentSchemaVersion);
+
+    Future<int> count(String table) async => (await db
+            .customSelect('SELECT COUNT(*) AS c FROM $table')
+            .getSingle())
+        .read<int>('c');
+    expect(await count('orders'), 6);
+    expect(await count('order_items'), 5);
+    expect(await count('order_taxes'), 6);
+    expect(await count('products'), 5);
+
+    // Untouched: totals, and the fractional conversion rate is not rewritten.
+    final totals = await db
+        .customSelect('SELECT total FROM orders ORDER BY id')
+        .map((r) => r.read<double>('total'))
+        .get();
+    expect(totals, [1017, 113, 93, 118, 50, 0]);
+    expect((await db.productsDao.getById(4))!.conversionRate, 0.5);
+
+    // Cost: the product's current purchase price, per main unit.
+    final cost = {
+      for (final r in await db
+          .customSelect('SELECT order_id, unit_cost FROM order_items')
+          .get())
+        r.read<int>('order_id'): r.read<double?>('unit_cost'),
+    };
+    expect(cost[1], 80); // Tea
+    expect(cost[2], 10); // Cake, per main unit (the half sells at 0.5 of it)
+    expect(cost[3], 170); // Bundle = 2 × Tea 80 + 1 × Cake 10
+    expect(cost[4], isNull); // a component has no purchase price
+    expect(cost[5], isNull); // no purchase price
+
+    // Inclusive flag: inferred only where the totals prove it.
+    final inclusive = {
+      for (final r in await db
+          .customSelect('SELECT order_id, MIN(is_inclusive) AS lo, '
+              'MAX(is_inclusive) AS hi FROM order_taxes GROUP BY order_id')
+          .get())
+        r.read<int>('order_id'): (r.read<int>('lo'), r.read<int>('hi')),
+    };
+    expect(inclusive[1], (0, 0));
+    expect(inclusive[2], (1, 1));
+    expect(inclusive[3], (1, 1), reason: 'loyalty is netted before comparing');
+    expect(inclusive[4], (0, 0));
+    expect(inclusive[6], (0, 0), reason: 'paid with points, still exclusive');
+  });
+
+  test('v11 → v14 (order_items recreated on the way) gets the same backfill',
+      () async {
+    final schema = await verifier.schemaAt(11);
+    schema.rawDatabase.execute(
+      "INSERT INTO products (id, sku, name, price, purchase_price) VALUES (1, 'TEA', 'Tea', 100, 80)",
+    );
+    schema.rawDatabase.execute(
+      "INSERT INTO orders (subtotal, total, payment_method) VALUES (200, 200, 'cash')",
+    );
+    schema.rawDatabase.execute(
+      'INSERT INTO order_items (order_id, product_id, variant_id, product_name, unit_price, quantity, line_total) '
+      "VALUES (1, 1, NULL, 'Tea', 100, 2, 200)",
+    );
+
+    final db = AppDatabase(schema.newConnection());
+    addTearDown(db.close);
+    await verifier.migrateAndValidate(db, AppDatabase.currentSchemaVersion);
+
+    final item = (await db.ordersDao.getItems(1)).single;
+    expect(item.unitCost, 80);
+    expect(item.unitsPerQty, 1.0);
+    expect(item.quantity, 2);
   });
 }

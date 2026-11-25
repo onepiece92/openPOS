@@ -61,6 +61,7 @@ ReceiptBodyData _sampleData({int items = 1}) {
         taxRatePercent: 0.13,
         taxableAmount: 100.0,
         taxAmount: 13.0,
+        isInclusive: false,
       ),
     ],
     businessName: 'Test Cafe',

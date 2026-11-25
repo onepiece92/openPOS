@@ -4738,6 +4738,12 @@ class $OrderItemsTable extends OrderItems
   late final GeneratedColumn<double> lineTotal = GeneratedColumn<double>(
       'line_total', aliasedName, false,
       type: DriftSqlType.double, requiredDuringInsert: true);
+  static const VerificationMeta _unitCostMeta =
+      const VerificationMeta('unitCost');
+  @override
+  late final GeneratedColumn<double> unitCost = GeneratedColumn<double>(
+      'unit_cost', aliasedName, true,
+      type: DriftSqlType.double, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -4750,7 +4756,8 @@ class $OrderItemsTable extends OrderItems
         unitsPerQty,
         discount,
         taxAmount,
-        lineTotal
+        lineTotal,
+        unitCost
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -4821,6 +4828,10 @@ class $OrderItemsTable extends OrderItems
     } else if (isInserting) {
       context.missing(_lineTotalMeta);
     }
+    if (data.containsKey('unit_cost')) {
+      context.handle(_unitCostMeta,
+          unitCost.isAcceptableOrUnknown(data['unit_cost']!, _unitCostMeta));
+    }
     return context;
   }
 
@@ -4852,6 +4863,8 @@ class $OrderItemsTable extends OrderItems
           .read(DriftSqlType.double, data['${effectivePrefix}tax_amount'])!,
       lineTotal: attachedDatabase.typeMapping
           .read(DriftSqlType.double, data['${effectivePrefix}line_total'])!,
+      unitCost: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}unit_cost']),
     );
   }
 
@@ -4875,8 +4888,18 @@ class OrderItem extends DataClass implements Insertable<OrderItem> {
   /// Main units per quantity step at sale time (1.0 for the main unit).
   final double unitsPerQty;
   final double discount;
+
+  /// This line's share of the order's tax. Tax is worked out once per
+  /// invoice, so this is a prorated share (it sums to orders.tax_total), not
+  /// a per-line calculation. 0 on lines sold before schema v14.
   final double taxAmount;
   final double lineTotal;
+
+  /// What one *main* unit cost the shop when the line was sold (the product's
+  /// purchase price then; for a composite, the sum of its components).
+  /// Line cost = quantity × units_per_qty × unit_cost. NULL = no cost was
+  /// recorded, which reports count as zero and flag.
+  final double? unitCost;
   const OrderItem(
       {required this.id,
       required this.orderId,
@@ -4888,7 +4911,8 @@ class OrderItem extends DataClass implements Insertable<OrderItem> {
       required this.unitsPerQty,
       required this.discount,
       required this.taxAmount,
-      required this.lineTotal});
+      required this.lineTotal,
+      this.unitCost});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -4903,6 +4927,9 @@ class OrderItem extends DataClass implements Insertable<OrderItem> {
     map['discount'] = Variable<double>(discount);
     map['tax_amount'] = Variable<double>(taxAmount);
     map['line_total'] = Variable<double>(lineTotal);
+    if (!nullToAbsent || unitCost != null) {
+      map['unit_cost'] = Variable<double>(unitCost);
+    }
     return map;
   }
 
@@ -4919,6 +4946,9 @@ class OrderItem extends DataClass implements Insertable<OrderItem> {
       discount: Value(discount),
       taxAmount: Value(taxAmount),
       lineTotal: Value(lineTotal),
+      unitCost: unitCost == null && nullToAbsent
+          ? const Value.absent()
+          : Value(unitCost),
     );
   }
 
@@ -4937,6 +4967,7 @@ class OrderItem extends DataClass implements Insertable<OrderItem> {
       discount: serializer.fromJson<double>(json['discount']),
       taxAmount: serializer.fromJson<double>(json['taxAmount']),
       lineTotal: serializer.fromJson<double>(json['lineTotal']),
+      unitCost: serializer.fromJson<double?>(json['unitCost']),
     );
   }
   @override
@@ -4954,6 +4985,7 @@ class OrderItem extends DataClass implements Insertable<OrderItem> {
       'discount': serializer.toJson<double>(discount),
       'taxAmount': serializer.toJson<double>(taxAmount),
       'lineTotal': serializer.toJson<double>(lineTotal),
+      'unitCost': serializer.toJson<double?>(unitCost),
     };
   }
 
@@ -4968,7 +5000,8 @@ class OrderItem extends DataClass implements Insertable<OrderItem> {
           double? unitsPerQty,
           double? discount,
           double? taxAmount,
-          double? lineTotal}) =>
+          double? lineTotal,
+          Value<double?> unitCost = const Value.absent()}) =>
       OrderItem(
         id: id ?? this.id,
         orderId: orderId ?? this.orderId,
@@ -4981,6 +5014,7 @@ class OrderItem extends DataClass implements Insertable<OrderItem> {
         discount: discount ?? this.discount,
         taxAmount: taxAmount ?? this.taxAmount,
         lineTotal: lineTotal ?? this.lineTotal,
+        unitCost: unitCost.present ? unitCost.value : this.unitCost,
       );
   OrderItem copyWithCompanion(OrderItemsCompanion data) {
     return OrderItem(
@@ -4997,6 +5031,7 @@ class OrderItem extends DataClass implements Insertable<OrderItem> {
       discount: data.discount.present ? data.discount.value : this.discount,
       taxAmount: data.taxAmount.present ? data.taxAmount.value : this.taxAmount,
       lineTotal: data.lineTotal.present ? data.lineTotal.value : this.lineTotal,
+      unitCost: data.unitCost.present ? data.unitCost.value : this.unitCost,
     );
   }
 
@@ -5013,7 +5048,8 @@ class OrderItem extends DataClass implements Insertable<OrderItem> {
           ..write('unitsPerQty: $unitsPerQty, ')
           ..write('discount: $discount, ')
           ..write('taxAmount: $taxAmount, ')
-          ..write('lineTotal: $lineTotal')
+          ..write('lineTotal: $lineTotal, ')
+          ..write('unitCost: $unitCost')
           ..write(')'))
         .toString();
   }
@@ -5030,7 +5066,8 @@ class OrderItem extends DataClass implements Insertable<OrderItem> {
       unitsPerQty,
       discount,
       taxAmount,
-      lineTotal);
+      lineTotal,
+      unitCost);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -5045,7 +5082,8 @@ class OrderItem extends DataClass implements Insertable<OrderItem> {
           other.unitsPerQty == this.unitsPerQty &&
           other.discount == this.discount &&
           other.taxAmount == this.taxAmount &&
-          other.lineTotal == this.lineTotal);
+          other.lineTotal == this.lineTotal &&
+          other.unitCost == this.unitCost);
 }
 
 class OrderItemsCompanion extends UpdateCompanion<OrderItem> {
@@ -5060,6 +5098,7 @@ class OrderItemsCompanion extends UpdateCompanion<OrderItem> {
   final Value<double> discount;
   final Value<double> taxAmount;
   final Value<double> lineTotal;
+  final Value<double?> unitCost;
   const OrderItemsCompanion({
     this.id = const Value.absent(),
     this.orderId = const Value.absent(),
@@ -5072,6 +5111,7 @@ class OrderItemsCompanion extends UpdateCompanion<OrderItem> {
     this.discount = const Value.absent(),
     this.taxAmount = const Value.absent(),
     this.lineTotal = const Value.absent(),
+    this.unitCost = const Value.absent(),
   });
   OrderItemsCompanion.insert({
     this.id = const Value.absent(),
@@ -5085,6 +5125,7 @@ class OrderItemsCompanion extends UpdateCompanion<OrderItem> {
     this.discount = const Value.absent(),
     this.taxAmount = const Value.absent(),
     required double lineTotal,
+    this.unitCost = const Value.absent(),
   })  : orderId = Value(orderId),
         productId = Value(productId),
         productName = Value(productName),
@@ -5103,6 +5144,7 @@ class OrderItemsCompanion extends UpdateCompanion<OrderItem> {
     Expression<double>? discount,
     Expression<double>? taxAmount,
     Expression<double>? lineTotal,
+    Expression<double>? unitCost,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -5116,6 +5158,7 @@ class OrderItemsCompanion extends UpdateCompanion<OrderItem> {
       if (discount != null) 'discount': discount,
       if (taxAmount != null) 'tax_amount': taxAmount,
       if (lineTotal != null) 'line_total': lineTotal,
+      if (unitCost != null) 'unit_cost': unitCost,
     });
   }
 
@@ -5130,7 +5173,8 @@ class OrderItemsCompanion extends UpdateCompanion<OrderItem> {
       Value<double>? unitsPerQty,
       Value<double>? discount,
       Value<double>? taxAmount,
-      Value<double>? lineTotal}) {
+      Value<double>? lineTotal,
+      Value<double?>? unitCost}) {
     return OrderItemsCompanion(
       id: id ?? this.id,
       orderId: orderId ?? this.orderId,
@@ -5143,6 +5187,7 @@ class OrderItemsCompanion extends UpdateCompanion<OrderItem> {
       discount: discount ?? this.discount,
       taxAmount: taxAmount ?? this.taxAmount,
       lineTotal: lineTotal ?? this.lineTotal,
+      unitCost: unitCost ?? this.unitCost,
     );
   }
 
@@ -5182,6 +5227,9 @@ class OrderItemsCompanion extends UpdateCompanion<OrderItem> {
     if (lineTotal.present) {
       map['line_total'] = Variable<double>(lineTotal.value);
     }
+    if (unitCost.present) {
+      map['unit_cost'] = Variable<double>(unitCost.value);
+    }
     return map;
   }
 
@@ -5198,7 +5246,8 @@ class OrderItemsCompanion extends UpdateCompanion<OrderItem> {
           ..write('unitsPerQty: $unitsPerQty, ')
           ..write('discount: $discount, ')
           ..write('taxAmount: $taxAmount, ')
-          ..write('lineTotal: $lineTotal')
+          ..write('lineTotal: $lineTotal, ')
+          ..write('unitCost: $unitCost')
           ..write(')'))
         .toString();
   }
@@ -5261,6 +5310,16 @@ class $OrderTaxesTable extends OrderTaxes
   late final GeneratedColumn<double> taxAmount = GeneratedColumn<double>(
       'tax_amount', aliasedName, false,
       type: DriftSqlType.double, requiredDuringInsert: true);
+  static const VerificationMeta _isInclusiveMeta =
+      const VerificationMeta('isInclusive');
+  @override
+  late final GeneratedColumn<bool> isInclusive = GeneratedColumn<bool>(
+      'is_inclusive', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("is_inclusive" IN (0, 1))'),
+      defaultValue: const Constant(false));
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -5269,7 +5328,8 @@ class $OrderTaxesTable extends OrderTaxes
         taxRateName,
         taxRatePercent,
         taxableAmount,
-        taxAmount
+        taxAmount,
+        isInclusive
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -5328,6 +5388,12 @@ class $OrderTaxesTable extends OrderTaxes
     } else if (isInserting) {
       context.missing(_taxAmountMeta);
     }
+    if (data.containsKey('is_inclusive')) {
+      context.handle(
+          _isInclusiveMeta,
+          isInclusive.isAcceptableOrUnknown(
+              data['is_inclusive']!, _isInclusiveMeta));
+    }
     return context;
   }
 
@@ -5351,6 +5417,8 @@ class $OrderTaxesTable extends OrderTaxes
           .read(DriftSqlType.double, data['${effectivePrefix}taxable_amount'])!,
       taxAmount: attachedDatabase.typeMapping
           .read(DriftSqlType.double, data['${effectivePrefix}tax_amount'])!,
+      isInclusive: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}is_inclusive'])!,
     );
   }
 
@@ -5368,6 +5436,12 @@ class OrderTaxe extends DataClass implements Insertable<OrderTaxe> {
   final double taxRatePercent;
   final double taxableAmount;
   final double taxAmount;
+
+  /// True when the tax was already inside the item prices (so it is not
+  /// added to the total). Rows written before schema v14 did not record
+  /// this; the migration infers it where the order's totals prove it and
+  /// otherwise leaves the default, exclusive.
+  final bool isInclusive;
   const OrderTaxe(
       {required this.id,
       required this.orderId,
@@ -5375,7 +5449,8 @@ class OrderTaxe extends DataClass implements Insertable<OrderTaxe> {
       required this.taxRateName,
       required this.taxRatePercent,
       required this.taxableAmount,
-      required this.taxAmount});
+      required this.taxAmount,
+      required this.isInclusive});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -5386,6 +5461,7 @@ class OrderTaxe extends DataClass implements Insertable<OrderTaxe> {
     map['tax_rate_percent'] = Variable<double>(taxRatePercent);
     map['taxable_amount'] = Variable<double>(taxableAmount);
     map['tax_amount'] = Variable<double>(taxAmount);
+    map['is_inclusive'] = Variable<bool>(isInclusive);
     return map;
   }
 
@@ -5398,6 +5474,7 @@ class OrderTaxe extends DataClass implements Insertable<OrderTaxe> {
       taxRatePercent: Value(taxRatePercent),
       taxableAmount: Value(taxableAmount),
       taxAmount: Value(taxAmount),
+      isInclusive: Value(isInclusive),
     );
   }
 
@@ -5412,6 +5489,7 @@ class OrderTaxe extends DataClass implements Insertable<OrderTaxe> {
       taxRatePercent: serializer.fromJson<double>(json['taxRatePercent']),
       taxableAmount: serializer.fromJson<double>(json['taxableAmount']),
       taxAmount: serializer.fromJson<double>(json['taxAmount']),
+      isInclusive: serializer.fromJson<bool>(json['isInclusive']),
     );
   }
   @override
@@ -5425,6 +5503,7 @@ class OrderTaxe extends DataClass implements Insertable<OrderTaxe> {
       'taxRatePercent': serializer.toJson<double>(taxRatePercent),
       'taxableAmount': serializer.toJson<double>(taxableAmount),
       'taxAmount': serializer.toJson<double>(taxAmount),
+      'isInclusive': serializer.toJson<bool>(isInclusive),
     };
   }
 
@@ -5435,7 +5514,8 @@ class OrderTaxe extends DataClass implements Insertable<OrderTaxe> {
           String? taxRateName,
           double? taxRatePercent,
           double? taxableAmount,
-          double? taxAmount}) =>
+          double? taxAmount,
+          bool? isInclusive}) =>
       OrderTaxe(
         id: id ?? this.id,
         orderId: orderId ?? this.orderId,
@@ -5444,6 +5524,7 @@ class OrderTaxe extends DataClass implements Insertable<OrderTaxe> {
         taxRatePercent: taxRatePercent ?? this.taxRatePercent,
         taxableAmount: taxableAmount ?? this.taxableAmount,
         taxAmount: taxAmount ?? this.taxAmount,
+        isInclusive: isInclusive ?? this.isInclusive,
       );
   OrderTaxe copyWithCompanion(OrderTaxesCompanion data) {
     return OrderTaxe(
@@ -5459,6 +5540,8 @@ class OrderTaxe extends DataClass implements Insertable<OrderTaxe> {
           ? data.taxableAmount.value
           : this.taxableAmount,
       taxAmount: data.taxAmount.present ? data.taxAmount.value : this.taxAmount,
+      isInclusive:
+          data.isInclusive.present ? data.isInclusive.value : this.isInclusive,
     );
   }
 
@@ -5471,14 +5554,15 @@ class OrderTaxe extends DataClass implements Insertable<OrderTaxe> {
           ..write('taxRateName: $taxRateName, ')
           ..write('taxRatePercent: $taxRatePercent, ')
           ..write('taxableAmount: $taxableAmount, ')
-          ..write('taxAmount: $taxAmount')
+          ..write('taxAmount: $taxAmount, ')
+          ..write('isInclusive: $isInclusive')
           ..write(')'))
         .toString();
   }
 
   @override
   int get hashCode => Object.hash(id, orderId, taxRateId, taxRateName,
-      taxRatePercent, taxableAmount, taxAmount);
+      taxRatePercent, taxableAmount, taxAmount, isInclusive);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -5489,7 +5573,8 @@ class OrderTaxe extends DataClass implements Insertable<OrderTaxe> {
           other.taxRateName == this.taxRateName &&
           other.taxRatePercent == this.taxRatePercent &&
           other.taxableAmount == this.taxableAmount &&
-          other.taxAmount == this.taxAmount);
+          other.taxAmount == this.taxAmount &&
+          other.isInclusive == this.isInclusive);
 }
 
 class OrderTaxesCompanion extends UpdateCompanion<OrderTaxe> {
@@ -5500,6 +5585,7 @@ class OrderTaxesCompanion extends UpdateCompanion<OrderTaxe> {
   final Value<double> taxRatePercent;
   final Value<double> taxableAmount;
   final Value<double> taxAmount;
+  final Value<bool> isInclusive;
   const OrderTaxesCompanion({
     this.id = const Value.absent(),
     this.orderId = const Value.absent(),
@@ -5508,6 +5594,7 @@ class OrderTaxesCompanion extends UpdateCompanion<OrderTaxe> {
     this.taxRatePercent = const Value.absent(),
     this.taxableAmount = const Value.absent(),
     this.taxAmount = const Value.absent(),
+    this.isInclusive = const Value.absent(),
   });
   OrderTaxesCompanion.insert({
     this.id = const Value.absent(),
@@ -5517,6 +5604,7 @@ class OrderTaxesCompanion extends UpdateCompanion<OrderTaxe> {
     required double taxRatePercent,
     required double taxableAmount,
     required double taxAmount,
+    this.isInclusive = const Value.absent(),
   })  : orderId = Value(orderId),
         taxRateId = Value(taxRateId),
         taxRateName = Value(taxRateName),
@@ -5531,6 +5619,7 @@ class OrderTaxesCompanion extends UpdateCompanion<OrderTaxe> {
     Expression<double>? taxRatePercent,
     Expression<double>? taxableAmount,
     Expression<double>? taxAmount,
+    Expression<bool>? isInclusive,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -5540,6 +5629,7 @@ class OrderTaxesCompanion extends UpdateCompanion<OrderTaxe> {
       if (taxRatePercent != null) 'tax_rate_percent': taxRatePercent,
       if (taxableAmount != null) 'taxable_amount': taxableAmount,
       if (taxAmount != null) 'tax_amount': taxAmount,
+      if (isInclusive != null) 'is_inclusive': isInclusive,
     });
   }
 
@@ -5550,7 +5640,8 @@ class OrderTaxesCompanion extends UpdateCompanion<OrderTaxe> {
       Value<String>? taxRateName,
       Value<double>? taxRatePercent,
       Value<double>? taxableAmount,
-      Value<double>? taxAmount}) {
+      Value<double>? taxAmount,
+      Value<bool>? isInclusive}) {
     return OrderTaxesCompanion(
       id: id ?? this.id,
       orderId: orderId ?? this.orderId,
@@ -5559,6 +5650,7 @@ class OrderTaxesCompanion extends UpdateCompanion<OrderTaxe> {
       taxRatePercent: taxRatePercent ?? this.taxRatePercent,
       taxableAmount: taxableAmount ?? this.taxableAmount,
       taxAmount: taxAmount ?? this.taxAmount,
+      isInclusive: isInclusive ?? this.isInclusive,
     );
   }
 
@@ -5586,6 +5678,9 @@ class OrderTaxesCompanion extends UpdateCompanion<OrderTaxe> {
     if (taxAmount.present) {
       map['tax_amount'] = Variable<double>(taxAmount.value);
     }
+    if (isInclusive.present) {
+      map['is_inclusive'] = Variable<bool>(isInclusive.value);
+    }
     return map;
   }
 
@@ -5598,7 +5693,8 @@ class OrderTaxesCompanion extends UpdateCompanion<OrderTaxe> {
           ..write('taxRateName: $taxRateName, ')
           ..write('taxRatePercent: $taxRatePercent, ')
           ..write('taxableAmount: $taxableAmount, ')
-          ..write('taxAmount: $taxAmount')
+          ..write('taxAmount: $taxAmount, ')
+          ..write('isInclusive: $isInclusive')
           ..write(')'))
         .toString();
   }
@@ -12438,6 +12534,7 @@ typedef $$OrderItemsTableCreateCompanionBuilder = OrderItemsCompanion Function({
   Value<double> discount,
   Value<double> taxAmount,
   required double lineTotal,
+  Value<double?> unitCost,
 });
 typedef $$OrderItemsTableUpdateCompanionBuilder = OrderItemsCompanion Function({
   Value<int> id,
@@ -12451,6 +12548,7 @@ typedef $$OrderItemsTableUpdateCompanionBuilder = OrderItemsCompanion Function({
   Value<double> discount,
   Value<double> taxAmount,
   Value<double> lineTotal,
+  Value<double?> unitCost,
 });
 
 final class $$OrderItemsTableReferences
@@ -12522,6 +12620,9 @@ class $$OrderItemsTableFilterComposer
 
   ColumnFilters<double> get lineTotal => $composableBuilder(
       column: $table.lineTotal, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get unitCost => $composableBuilder(
+      column: $table.unitCost, builder: (column) => ColumnFilters(column));
 
   $$OrdersTableFilterComposer get orderId {
     final $$OrdersTableFilterComposer composer = $composerBuilder(
@@ -12600,6 +12701,9 @@ class $$OrderItemsTableOrderingComposer
   ColumnOrderings<double> get lineTotal => $composableBuilder(
       column: $table.lineTotal, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<double> get unitCost => $composableBuilder(
+      column: $table.unitCost, builder: (column) => ColumnOrderings(column));
+
   $$OrdersTableOrderingComposer get orderId {
     final $$OrdersTableOrderingComposer composer = $composerBuilder(
         composer: this,
@@ -12677,6 +12781,9 @@ class $$OrderItemsTableAnnotationComposer
   GeneratedColumn<double> get lineTotal =>
       $composableBuilder(column: $table.lineTotal, builder: (column) => column);
 
+  GeneratedColumn<double> get unitCost =>
+      $composableBuilder(column: $table.unitCost, builder: (column) => column);
+
   $$OrdersTableAnnotationComposer get orderId {
     final $$OrdersTableAnnotationComposer composer = $composerBuilder(
         composer: this,
@@ -12752,6 +12859,7 @@ class $$OrderItemsTableTableManager extends RootTableManager<
             Value<double> discount = const Value.absent(),
             Value<double> taxAmount = const Value.absent(),
             Value<double> lineTotal = const Value.absent(),
+            Value<double?> unitCost = const Value.absent(),
           }) =>
               OrderItemsCompanion(
             id: id,
@@ -12765,6 +12873,7 @@ class $$OrderItemsTableTableManager extends RootTableManager<
             discount: discount,
             taxAmount: taxAmount,
             lineTotal: lineTotal,
+            unitCost: unitCost,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -12778,6 +12887,7 @@ class $$OrderItemsTableTableManager extends RootTableManager<
             Value<double> discount = const Value.absent(),
             Value<double> taxAmount = const Value.absent(),
             required double lineTotal,
+            Value<double?> unitCost = const Value.absent(),
           }) =>
               OrderItemsCompanion.insert(
             id: id,
@@ -12791,6 +12901,7 @@ class $$OrderItemsTableTableManager extends RootTableManager<
             discount: discount,
             taxAmount: taxAmount,
             lineTotal: lineTotal,
+            unitCost: unitCost,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) => (
@@ -12866,6 +12977,7 @@ typedef $$OrderTaxesTableCreateCompanionBuilder = OrderTaxesCompanion Function({
   required double taxRatePercent,
   required double taxableAmount,
   required double taxAmount,
+  Value<bool> isInclusive,
 });
 typedef $$OrderTaxesTableUpdateCompanionBuilder = OrderTaxesCompanion Function({
   Value<int> id,
@@ -12875,6 +12987,7 @@ typedef $$OrderTaxesTableUpdateCompanionBuilder = OrderTaxesCompanion Function({
   Value<double> taxRatePercent,
   Value<double> taxableAmount,
   Value<double> taxAmount,
+  Value<bool> isInclusive,
 });
 
 final class $$OrderTaxesTableReferences
@@ -12935,6 +13048,9 @@ class $$OrderTaxesTableFilterComposer
 
   ColumnFilters<double> get taxAmount => $composableBuilder(
       column: $table.taxAmount, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get isInclusive => $composableBuilder(
+      column: $table.isInclusive, builder: (column) => ColumnFilters(column));
 
   $$OrdersTableFilterComposer get orderId {
     final $$OrdersTableFilterComposer composer = $composerBuilder(
@@ -13003,6 +13119,9 @@ class $$OrderTaxesTableOrderingComposer
   ColumnOrderings<double> get taxAmount => $composableBuilder(
       column: $table.taxAmount, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<bool> get isInclusive => $composableBuilder(
+      column: $table.isInclusive, builder: (column) => ColumnOrderings(column));
+
   $$OrdersTableOrderingComposer get orderId {
     final $$OrdersTableOrderingComposer composer = $composerBuilder(
         composer: this,
@@ -13067,6 +13186,9 @@ class $$OrderTaxesTableAnnotationComposer
 
   GeneratedColumn<double> get taxAmount =>
       $composableBuilder(column: $table.taxAmount, builder: (column) => column);
+
+  GeneratedColumn<bool> get isInclusive => $composableBuilder(
+      column: $table.isInclusive, builder: (column) => column);
 
   $$OrdersTableAnnotationComposer get orderId {
     final $$OrdersTableAnnotationComposer composer = $composerBuilder(
@@ -13139,6 +13261,7 @@ class $$OrderTaxesTableTableManager extends RootTableManager<
             Value<double> taxRatePercent = const Value.absent(),
             Value<double> taxableAmount = const Value.absent(),
             Value<double> taxAmount = const Value.absent(),
+            Value<bool> isInclusive = const Value.absent(),
           }) =>
               OrderTaxesCompanion(
             id: id,
@@ -13148,6 +13271,7 @@ class $$OrderTaxesTableTableManager extends RootTableManager<
             taxRatePercent: taxRatePercent,
             taxableAmount: taxableAmount,
             taxAmount: taxAmount,
+            isInclusive: isInclusive,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -13157,6 +13281,7 @@ class $$OrderTaxesTableTableManager extends RootTableManager<
             required double taxRatePercent,
             required double taxableAmount,
             required double taxAmount,
+            Value<bool> isInclusive = const Value.absent(),
           }) =>
               OrderTaxesCompanion.insert(
             id: id,
@@ -13166,6 +13291,7 @@ class $$OrderTaxesTableTableManager extends RootTableManager<
             taxRatePercent: taxRatePercent,
             taxableAmount: taxableAmount,
             taxAmount: taxAmount,
+            isInclusive: isInclusive,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) => (

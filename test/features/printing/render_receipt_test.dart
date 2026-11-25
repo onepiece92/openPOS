@@ -48,6 +48,7 @@ ReceiptBodyData _sampleData() {
     taxRatePercent: 0.13,
     taxableAmount: 100.0,
     taxAmount: 13.0,
+    isInclusive: false,
   );
   return ReceiptBodyData(
     order: order,

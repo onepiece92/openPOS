@@ -76,7 +76,7 @@ class AppDatabase extends _$AppDatabase {
       : super(executor ?? _openConnection());
 
   /// Bump together with a new `onUpgrade` step below.
-  static const int currentSchemaVersion = 13;
+  static const int currentSchemaVersion = 14;
 
   @override
   int get schemaVersion => currentSchemaVersion;
@@ -152,21 +152,35 @@ class AppDatabase extends _$AppDatabase {
             // Variants/modifiers never reached the sale flow (no UI, no
             // writes) — drop them and the always-NULL order_items.variant_id.
             // alterTable recreates order_items from the *current* definition,
-            // which already includes the v13 unit columns — the transformer
-            // fills them since the old table has nothing to copy from.
+            // which already includes the v13 unit columns and the v14 cost
+            // column — the transformer fills them since the old table has
+            // nothing to copy from.
             // ignore: experimental_member_use
             await m.alterTable(TableMigration(orderItems, columnTransformer: {
               orderItems.unitLabel: const Constant(''),
               orderItems.unitsPerQty: const Constant(1.0),
+              orderItems.unitCost: const Constant<double>(null),
             }));
             await customStatement('DROP TABLE IF EXISTS product_variants');
             await customStatement('DROP TABLE IF EXISTS product_modifiers');
-          } else if (from < 13) {
-            // Secondary-unit selling: snapshot which unit a line was sold in
-            // and its main-unit conversion. Only databases already at v12
-            // need this — older ones got the columns in the recreate above.
-            await m.addColumn(orderItems, orderItems.unitLabel);
-            await m.addColumn(orderItems, orderItems.unitsPerQty);
+          } else {
+            // Databases already at v12+ add the later order_items columns
+            // one by one — older ones got them in the recreate above.
+            if (from < 13) {
+              // Secondary-unit selling: snapshot which unit a line was sold
+              // in and its main-unit conversion.
+              await m.addColumn(orderItems, orderItems.unitLabel);
+              await m.addColumn(orderItems, orderItems.unitsPerQty);
+            }
+            if (from < 14) {
+              await m.addColumn(orderItems, orderItems.unitCost);
+            }
+          }
+          if (from < 14) {
+            // Cost of goods snapshot per line + whether each tax line was
+            // inclusive (so receipts and reports stop guessing).
+            await m.addColumn(orderTaxes, orderTaxes.isInclusive);
+            await backfillV14();
           }
         },
         beforeOpen: (details) async {
@@ -200,6 +214,46 @@ class AppDatabase extends _$AppDatabase {
             );
           }
         });
+      });
+
+  /// Fills the two v14 columns for rows that predate them. Idempotent; used
+  /// by the v14 migration and by tests.
+  ///
+  /// `order_items.unit_cost`: the cost at the time of sale was never stored,
+  /// so the product's *current* purchase price is the best estimate there is
+  /// (for a composite, the sum of its current components). Products with no
+  /// purchase price — or a composite with a component that has none — stay
+  /// NULL, which reports show as "no cost recorded".
+  ///
+  /// `order_taxes.is_inclusive`: unknown for old rows, but an order's own
+  /// totals settle it when *all* of its tax was inclusive: then the total is
+  /// subtotal − discount − loyalty with no tax added. Everything else keeps
+  /// the default (exclusive), which is right for all-exclusive orders and a
+  /// guess only for an order that mixed both kinds.
+  Future<void> backfillV14() => transaction(() async {
+        await customStatement(
+          'UPDATE order_items SET unit_cost = ('
+          '  SELECT CASE WHEN p.purchase_price > 0 THEN p.purchase_price END '
+          '  FROM products p '
+          '  WHERE p.id = order_items.product_id AND p.is_composite = 0) '
+          'WHERE unit_cost IS NULL',
+        );
+        await customStatement(
+          'UPDATE order_items SET unit_cost = ('
+          '  SELECT CASE WHEN COUNT(*) > 0 AND MIN(cp.purchase_price) > 0 '
+          '    THEN SUM(pc.quantity * cp.purchase_price) END '
+          '  FROM product_components pc '
+          '  JOIN products cp ON cp.id = pc.component_product_id '
+          '  WHERE pc.composite_product_id = order_items.product_id) '
+          'WHERE unit_cost IS NULL AND product_id IN '
+          '  (SELECT id FROM products WHERE is_composite = 1)',
+        );
+        await customStatement(
+          'UPDATE order_taxes SET is_inclusive = 1 '
+          'WHERE is_inclusive = 0 AND order_id IN ('
+          '  SELECT id FROM orders WHERE tax_total > 0.005 AND '
+          '  ABS(total - (subtotal - discount_total - loyalty_discount)) < 0.005)',
+        );
       });
 
   /// Seeds essential data on a fresh install.
