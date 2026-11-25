@@ -31,35 +31,59 @@ Map<String, String> snapshotHiveBoxFiles() => {
           name: Hive.box<dynamic>(name).path!,
     };
 
+/// Box files where `Hive.initFlutter()` keeps them (the documents folder),
+/// resolvable before any box is open.
+List<String> defaultHiveBoxPaths(Directory docs) =>
+    [for (final name in kSnapshotHiveBoxes) p.join(docs.path, '$name.hive')];
+
 /// Undoes (or finishes) a restore the app was killed in the middle of.
 /// Must run before Hive boxes or the DB open; when no restore was
-/// interrupted it is a single file-exists check. Never throws: on failure
-/// the journal stays, so the next launch (or the next restore) retries,
-/// and the moved-aside data is still in the `.bak` files.
-Future<RestoreRecovery?> recoverInterruptedRestoreAtStartup() async {
+/// interrupted it costs a few file-exists checks. [docsDir] overrides the
+/// documents folder (tests).
+///
+/// Never throws. Returns null when the disk could not be put right: the
+/// caller must then NOT open the stores (Drift would create an empty DB
+/// while the real one is still in `.bak`). The journal stays, so a retry
+/// picks up where this left off.
+Future<RestoreRecovery?> recoverInterruptedRestoreAtStartup(
+    {Directory? docsDir}) async {
   try {
-    final journal = SnapshotService.journalFileFor(await databaseFile());
-    return await SnapshotService.recoverInterruptedRestore(journal);
+    final docs = docsDir ?? await getApplicationDocumentsDirectory();
+    return await SnapshotService.recoverInterruptedRestore(
+      dbFile: File(p.join(docs.path, kDatabaseFileName)),
+      hivePaths: defaultHiveBoxPaths(docs),
+      receiptsDir: Directory(p.join(docs.path, kReceiptsDirName)),
+    );
   } catch (e, st) {
     debugPrint('Restore recovery failed: $e\n$st');
     return null;
   }
 }
 
+/// Shown instead of the app when [recoverInterruptedRestoreAtStartup]
+/// returns null.
+const kRecoveryFailedMessage =
+    'A restore was interrupted and could not be undone yet, so the app has '
+    'not opened your data. Tap "Try again"; if this persists, contact '
+    'support — your previous data is kept in the .bak files.';
+
 /// Toast for the first frame after [recoverInterruptedRestoreAtStartup].
 String? restoreRecoveryNotice(RestoreRecovery? r) => switch (r) {
       RestoreRecovery.rolledBack =>
         'A restore was interrupted. Your previous data was put back.',
-      null => 'An interrupted restore could not be undone yet. '
-          'Restart the app; if this persists, contact support.',
+      RestoreRecovery.recoveredWithoutJournal =>
+        'A restore was interrupted and its log was unreadable. Previous data '
+            'was put back where possible — please check your recent records.',
       _ => null,
     };
+
+const kReceiptsDirName = 'receipts';
 
 /// Where expense receipt photos live (the expense form copies them here).
 /// Snapshots carry these photos; restore re-points the DB at this folder.
 Future<Directory> receiptsDir() async {
   final docs = await getApplicationDocumentsDirectory();
-  return Directory(p.join(docs.path, 'receipts'));
+  return Directory(p.join(docs.path, kReceiptsDirName));
 }
 
 Future<Directory> autoBackupDir() async {

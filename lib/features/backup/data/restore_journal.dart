@@ -3,112 +3,102 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
-/// One file move made by a restore's swap, recorded *before* it happens.
+/// One file a restore's swap will replace, decided before any file moves.
 ///
-/// * [RestoreStep.aside]: the live [target] is about to be renamed to [bak].
-/// * [RestoreStep.placed]: a staged file is about to be renamed onto
-///   [target]. [cleanupSuffixes] name files beside it (`-wal`, `.lock`…)
-///   that the restored file may grow and an undo must remove.
+/// * [bak] non-null: [target] existed and will be renamed to [bak] before
+///   the staged file takes its place. Rollback: if [bak] exists, it is put
+///   back over whatever is at [target]; if not, the original never moved
+///   (or is already back) and [target] is left alone.
+/// * [bak] null: [target] did not exist, so anything there was placed by
+///   the restore and rollback removes it.
+/// * [cleanup]: suffixes of files beside [target] the plan does not own
+///   (e.g. a `-wal` the restored DB grew); rollback always deletes them.
 ///
-/// Plain data — safe to send between isolates.
-class RestoreStep {
-  const RestoreStep.aside(this.target, String this.bak)
-      : placed = false,
-        cleanupSuffixes = const [];
-  const RestoreStep.placed(this.target, {this.cleanupSuffixes = const []})
-      : placed = true,
-        bak = null;
-
-  final bool placed;
+/// Rollback therefore needs only the plan and the state of the disk — no
+/// per-step records that a power cut could lose. Plain data — safe to send
+/// between isolates.
+class PlannedMove {
+  const PlannedMove(this.target, {this.bak, this.cleanup = const []});
   final String target;
   final String? bak;
-  final List<String> cleanupSuffixes;
+  final List<String> cleanup;
+}
+
+/// Thrown by [RestoreJournal.read] for a journal it cannot trust.
+class RestoreJournalFormatException implements Exception {
+  const RestoreJournalFormatException(this.message);
+  final String message;
+  @override
+  String toString() => 'Unreadable restore journal: $message';
 }
 
 /// What a journal file says about the restore that wrote it.
 class RestoreJournalContents {
   const RestoreJournalContents({
+    required this.plan,
     required this.staged,
     required this.photoBakDir,
-    required this.steps,
     required this.committed,
   });
+
+  final List<PlannedMove> plan;
 
   /// Staged files / dirs the swap would consume; leftovers are deleted.
   final List<String> staged;
   final String? photoBakDir;
-  final List<RestoreStep> steps;
 
   /// The restored data opened and was accepted; only cleanup remains.
   final bool committed;
 }
 
-/// Append-only restore journal: one JSON object per line.
+/// Restore journal: at most two JSON lines, each flushed to storage.
 ///
 /// ```
-/// {"op":"begin","v":1,"staged":[…],"photoBakDir":"receipts.bak"}
-/// {"op":"aside","target":"pos_database.db","bak":"pos_database.db.bak"}
-/// {"op":"placed","target":"pos_database.db","cleanup":["-wal","-shm","-journal"]}
-/// …
+/// {"op":"begin","v":1,"plan":[{"target":"pos_database.db","bak":"pos_database.db.bak","cleanup":["-shm"]},…],"staged":[…],"photoBakDir":"receipts.bak"}
 /// {"op":"commit"}
 /// ```
 ///
-/// Paths inside the journal's directory are stored relative to it, so a
-/// journal still resolves after iOS moves the app container.
-///
-/// `begin` and `commit` are flushed to storage; step records are plain
-/// writes, which survive the process being killed (the case this guards
-/// against) because they are already in the OS page cache.
+/// `begin` is durable before the first file moves, so whatever the swap
+/// managed to do before a crash or power cut, recovery knows every file it
+/// may have touched. Paths inside the journal's directory are stored
+/// relative to it, so a journal still resolves after iOS moves the app
+/// container.
 class RestoreJournal {
-  RestoreJournal._(this.file, this._raf);
+  const RestoreJournal._();
 
   static const version = 1;
 
-  final File file;
-  final RandomAccessFile _raf;
-
-  String get _dir => file.parent.path;
-
-  /// Creates (truncating) [file] and durably writes the `begin` record.
-  static RestoreJournal begin(
+  /// Writes (truncating) [file] with the `begin` record and flushes it.
+  static void begin(
     File file, {
+    required List<PlannedMove> plan,
     required List<String> staged,
     String? photoBakDir,
   }) {
+    final dir = file.parent.path;
+    String rel(String s) => _rel(dir, s);
+    final record = {
+      'op': 'begin',
+      'v': version,
+      'plan': [
+        for (final m in plan)
+          {
+            'target': rel(m.target),
+            'bak': m.bak == null ? null : rel(m.bak!),
+            'cleanup': m.cleanup,
+          },
+      ],
+      'staged': [for (final s in staged) rel(s)],
+      'photoBakDir': photoBakDir == null ? null : rel(photoBakDir),
+    };
     final raf = file.openSync(mode: FileMode.write);
-    final j = RestoreJournal._(file, raf);
     try {
-      j._write({
-        'op': 'begin',
-        'v': version,
-        'staged': [for (final s in staged) _rel(j._dir, s)],
-        'photoBakDir':
-            photoBakDir == null ? null : _rel(j._dir, photoBakDir),
-      });
+      raf.writeStringSync('${jsonEncode(record)}\n');
       raf.flushSync();
-    } catch (_) {
+    } finally {
       raf.closeSync();
-      rethrow;
     }
-    return j;
   }
-
-  void add(RestoreStep s) => _write(s.placed
-      ? {
-          'op': 'placed',
-          'target': _rel(_dir, s.target),
-          'cleanup': s.cleanupSuffixes,
-        }
-      : {
-          'op': 'aside',
-          'target': _rel(_dir, s.target),
-          'bak': _rel(_dir, s.bak!),
-        });
-
-  void close() => _raf.closeSync();
-
-  void _write(Map<String, Object?> record) =>
-      _raf.writeStringSync('${jsonEncode(record)}\n');
 
   /// Durably appends the `commit` record.
   static void markCommitted(File file) {
@@ -121,48 +111,72 @@ class RestoreJournal {
     }
   }
 
-  /// Parses [file]. A torn last line (killed mid-write) is ignored: that
-  /// step's move never started. A journal whose `begin` is missing or torn
-  /// has no steps — the swap starts only after `begin` is on disk.
+  /// Parses [file]. A torn `commit` line (power cut mid-write) reads as
+  /// not committed. Anything else unexpected — bad UTF-8, a corrupt or
+  /// missing `begin`, an unknown version — throws
+  /// [RestoreJournalFormatException]; the caller then falls back to
+  /// state-based recovery.
   static RestoreJournalContents read(File file) {
-    final dir = file.parent.path;
-    final lines = file
-        .readAsLinesSync()
-        .where((l) => l.trim().isNotEmpty)
-        .toList();
-    var staged = <String>[];
-    String? photoBakDir;
-    final steps = <RestoreStep>[];
-    var committed = false;
-    for (var i = 0; i < lines.length; i++) {
-      final Map<String, dynamic> r;
-      try {
-        r = jsonDecode(lines[i]) as Map<String, dynamic>;
-      } catch (e) {
-        if (i == lines.length - 1) break; // torn tail
-        throw FormatException('Corrupt restore journal line ${i + 1}: $e');
-      }
-      String abs(Object? s) => _abs(dir, s as String);
-      switch (r['op']) {
-        case 'begin':
-          staged = [for (final s in r['staged'] as List) abs(s)];
-          final bak = r['photoBakDir'];
-          photoBakDir = bak == null ? null : abs(bak);
-        case 'aside':
-          steps.add(RestoreStep.aside(abs(r['target']), abs(r['bak'])));
-        case 'placed':
-          steps.add(RestoreStep.placed(abs(r['target']),
-              cleanupSuffixes: (r['cleanup'] as List).cast<String>()));
-        case 'commit':
-          committed = true;
-      }
+    final List<String> lines;
+    try {
+      lines = file
+          .readAsLinesSync() // strict UTF-8
+          .where((l) => l.trim().isNotEmpty)
+          .toList();
+    } on FileSystemException catch (e) {
+      throw RestoreJournalFormatException('${e.message} (${e.osError})');
     }
-    return RestoreJournalContents(
-      staged: staged,
-      photoBakDir: photoBakDir,
-      steps: steps,
-      committed: committed,
-    );
+    if (lines.isEmpty) {
+      throw const RestoreJournalFormatException('empty');
+    }
+    final dir = file.parent.path;
+    String abs(Object? s) => _abs(dir, s! as String);
+    try {
+      final begin = jsonDecode(lines.first) as Map<String, dynamic>;
+      if (begin['op'] != 'begin') {
+        throw const RestoreJournalFormatException('no begin record');
+      }
+      if (begin['v'] != version) {
+        throw RestoreJournalFormatException(
+            'unsupported version ${begin['v']}');
+      }
+      final plan = [
+        for (final m in begin['plan'] as List)
+          PlannedMove(
+            abs((m as Map<String, dynamic>)['target']),
+            bak: m['bak'] == null ? null : abs(m['bak']),
+            cleanup: (m['cleanup'] as List).cast<String>(),
+          ),
+      ];
+      final staged = [for (final s in begin['staged'] as List) abs(s)];
+      final bakDir = begin['photoBakDir'];
+
+      var committed = false;
+      for (var i = 1; i < lines.length; i++) {
+        Object? r;
+        try {
+          r = jsonDecode(lines[i]);
+        } on FormatException {
+          if (i == lines.length - 1) break; // torn tail
+          rethrow;
+        }
+        if (r is Map && r['op'] == 'commit') {
+          committed = true;
+        } else {
+          throw RestoreJournalFormatException('unexpected record ${i + 1}');
+        }
+      }
+      return RestoreJournalContents(
+        plan: plan,
+        staged: staged,
+        photoBakDir: bakDir == null ? null : abs(bakDir),
+        committed: committed,
+      );
+    } on RestoreJournalFormatException {
+      rethrow;
+    } catch (e) {
+      throw RestoreJournalFormatException('$e');
+    }
   }
 
   static String _rel(String dir, String path) =>

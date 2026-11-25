@@ -19,10 +19,24 @@ import 'package:pos_app/features/review/data/review_state_store.dart';
 /// needed to restore a backup: close DB + Hive, swap files on disk, then
 /// bring everything back up on the restored data.
 class AppRoot extends StatefulWidget {
-  const AppRoot({super.key, this.startupNotice});
+  const AppRoot({
+    super.key,
+    this.startupNotice,
+    this.startupFatal,
+    this.recoverForRetry,
+  });
 
   /// Toast for the first frame, e.g. after startup restore recovery.
   final String? startupNotice;
+
+  /// Start on the error screen with nothing opened (startup recovery
+  /// failed); "Try again" reruns recovery before opening the stores.
+  final String? startupFatal;
+
+  /// Recovery used by "Try again"; defaults to
+  /// [recoverInterruptedRestoreAtStartup]. Null result = still failing.
+  @visibleForTesting
+  final Future<RestoreRecovery?> Function()? recoverForRetry;
 
   static AppRootState of(BuildContext context) =>
       context.findAncestorStateOfType<AppRootState>()!;
@@ -49,6 +63,7 @@ class AppRootState extends State<AppRoot> {
   void initState() {
     super.initState();
     _notice = widget.startupNotice;
+    _fatal = widget.startupFatal;
     _exitGuard = DatabaseExitGuard(_closeDatabaseForExit);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -216,7 +231,10 @@ class AppRootState extends State<AppRoot> {
   Future<void> _releaseStores() async {
     final old = _container;
     try {
-      await old.read(databaseProvider).close();
+      // Never opened (startup error screen): don't create it to close it.
+      if (old.exists(databaseProvider)) {
+        await old.read(databaseProvider).close();
+      }
     } finally {
       old.dispose();
       await Hive.close();
@@ -241,9 +259,14 @@ class AppRootState extends State<AppRoot> {
       try {
         await _releaseStores();
       } catch (_) {/* stores may already be half-closed */}
-      // A rollback that failed part-way left its journal: finish it first.
-      await SnapshotService.recoverInterruptedRestore(
-          SnapshotService.journalFileFor(await databaseFile()));
+      // An unfinished restore (startup recovery or a rollback failed) must
+      // be put right before anything opens, or Drift could create an empty
+      // DB over the missing one.
+      final recovered = await (widget.recoverForRetry ??
+          recoverInterruptedRestoreAtStartup)();
+      if (recovered == null) {
+        throw StateError('the interrupted restore could not be undone');
+      }
       await _reopenStores();
     } catch (e) {
       fatal = 'Still unable to open the app data: $e';

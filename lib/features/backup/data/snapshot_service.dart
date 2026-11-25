@@ -13,7 +13,7 @@ import 'package:sqlite3/sqlite3.dart';
 import 'package:pos_app/features/backup/data/restore_journal.dart';
 
 export 'package:pos_app/features/backup/data/restore_journal.dart'
-    show RestoreStep;
+    show PlannedMove;
 
 /// Full-database snapshot: one `.zip` holding the SQLite file, the Hive
 /// preference boxes, the expense receipt photos and a manifest. Pure Dart —
@@ -70,12 +70,38 @@ class SnapshotService {
     required int schemaVersion,
     Directory? receiptsDir,
     DateTime? now,
+    int maxBackupBytes = defaultMaxStagedBytes,
   }) async {
     if (!await dbFile.exists()) {
       throw StateError('Database file not found: ${dbFile.path}');
     }
     final createdAt = now ?? DateTime.now();
     final photos = referencedPhotos(dbFile, receiptsDir: receiptsDir);
+
+    // Refuse what restore would reject, rather than write a dud backup.
+    final seen = <String, String>{};
+    for (final f in photos) {
+      final name = p.basename(f.path);
+      final other = seen[name.toLowerCase()];
+      if (other != null) {
+        throw StateError('Cannot back up receipt photos "$other" and "$name": '
+            'their names differ only by letter case.');
+      }
+      seen[name.toLowerCase()] = name;
+    }
+    var total = dbFile.lengthSync();
+    for (final path in hiveBoxFiles.values) {
+      final f = File(path);
+      if (f.existsSync()) total += f.lengthSync();
+    }
+    for (final f in photos) {
+      total += f.lengthSync();
+    }
+    if (total > maxBackupBytes) {
+      throw StateError('Data is too large to back up '
+          '(${formatBytes(total)}; the limit is '
+          '${formatBytes(maxBackupBytes)}).');
+    }
 
     await outDir.create(recursive: true);
     final out = File(p.join(outDir.path, fileNameFor(createdAt)));
@@ -201,16 +227,19 @@ class SnapshotService {
 
   // ── Restore ───────────────────────────────────────────────────────────────
 
-  /// Default ceiling on the bytes a restore may stage: 4 GiB. That is the
-  /// largest a single (non-zip64) entry can declare, far above any real POS
-  /// database plus photos, and bounds the disk a hostile or broken zip can
-  /// make us fill.
+  /// Ceiling on the bytes a restore may stage (and so a backup may hold):
+  /// 4 GiB. That is the largest a single (non-zip64) entry can declare, far
+  /// above any real POS database plus photos, and bounds the disk a hostile
+  /// or broken zip can make us fill.
   static const defaultMaxStagedBytes = 4 * 1024 * 1024 * 1024;
 
   /// The journal [restore] keeps beside [dbFile] while it swaps files.
   static File journalFileFor(File dbFile) =>
       File('${dbFile.path}$journalSuffix');
   static const journalSuffix = '.restore.journal';
+
+  /// Where an unreadable journal is moved by [recoverInterruptedRestore].
+  static const corruptJournalSuffix = '.corrupt';
 
   /// Replaces [dbFile], the listed Hive box files and (when [receiptsDir]
   /// is given) the backed-up receipt photos with the snapshot's contents.
@@ -226,12 +255,12 @@ class SnapshotService {
   ///
   /// The swap moves the current DB (with its sidecars) and boxes aside as
   /// `*.bak`, and any photo with the same name into `<receiptsDir>.bak/`,
-  /// before renaming the staged files into place. Each move is written to a
-  /// [RestoreJournal] first, so [recoverInterruptedRestore] can undo a swap
-  /// the process was killed in. Photos already on the device that the
-  /// backup doesn't contain are left alone (a format-1 backup carries none,
-  /// and its rows still point at them). If any step of the swap fails, the
-  /// moves made so far are undone before the error is rethrown.
+  /// before renaming the staged files into place. The full plan of moves is
+  /// flushed to a [RestoreJournal] first, so [recoverInterruptedRestore]
+  /// can undo a swap interrupted by a kill or a power cut. Photos already
+  /// on the device that the backup doesn't contain are left alone (a
+  /// format-1 backup carries none, and its rows still point at them). If
+  /// any step of the swap fails, it is undone before the error is rethrown.
   ///
   /// The returned [RestoreBackup] lets the caller [commit] the restore once
   /// it has opened, or [rollback] one that then failed to open.
@@ -250,7 +279,11 @@ class SnapshotService {
   }) async {
     // A journal here means an earlier swap never finished (recovery at
     // startup failed or was skipped); finish undoing it before staging.
-    await recoverInterruptedRestore(journalFileFor(dbFile));
+    await recoverInterruptedRestore(
+      dbFile: dbFile,
+      hivePaths: hiveBoxFiles.values.toList(),
+      receiptsDir: receiptsDir,
+    );
     final input = InputFileStream(zip.path);
     try {
       return await _restore(
@@ -320,8 +353,8 @@ class SnapshotService {
         .fold<int>(0, (sum, e) => sum + e.size);
     if (declared > maxStagedBytes) {
       throw SnapshotFormatException(
-          'Backup is too large to restore ($declared bytes; '
-          'the limit is $maxStagedBytes)');
+          'Backup is too large to restore (${formatBytes(declared)}; '
+          'the limit is ${formatBytes(maxStagedBytes)})');
     }
     final budget = _Budget(maxStagedBytes);
 
@@ -363,110 +396,124 @@ class SnapshotService {
       rethrow;
     }
 
-    // 2. Swap, journalling each move before making it.
-    final photoBakDir = photoEntries.isEmpty
-        ? null
-        : Directory('${receiptsDir!.path}$_bakSuffix');
-    // No journal exists, so nothing an earlier restore moved aside is still
-    // needed; clear it all so a stale `.bak` can never be mistaken for
-    // this run's.
+    // 2. No journal exists, so nothing an earlier restore moved aside is
+    //    still needed: clear it so a stale `.bak` can't pass for this run's.
+    //    Except: a `.bak` whose live file is missing may be the only copy
+    //    of that data (e.g. a pre-journal restore killed mid-swap) — keep.
+    final db = dbFile.path;
     await _deleteAll([
-      for (final t in [dbFile.path, ...hiveBoxFiles.values]) ...[
-        '$t$_bakSuffix',
-        '$t$_absentSuffix',
+      if (File(db).existsSync()) ...[
+        '$db$_bakSuffix',
+        for (final s in _sidecars) '$db$_bakSuffix$s',
       ],
-      for (final s in _sidecars) '${dbFile.path}$_bakSuffix$s',
+      for (final t in [db, ...hiveBoxFiles.values]) '$t$_absentSuffix',
+      for (final t in hiveBoxFiles.values)
+        if (File(t).existsSync()) '$t$_bakSuffix',
     ]);
-    if (receiptsDir != null) {
-      final stale = Directory('${receiptsDir.path}$_bakSuffix');
-      if (stale.existsSync()) stale.deleteSync(recursive: true);
+    final photoBakDir = receiptsDir == null
+        ? null
+        : Directory('${receiptsDir.path}$_bakSuffix');
+    if (photoBakDir != null && photoBakDir.existsSync()) {
+      photoBakDir.deleteSync(recursive: true);
     }
+
+    // 3. Plan every move, from the disk as it is now, and make the plan
+    //    durable before the first rename.
+    PlannedMove planFor(String target, String bak, List<String> cleanup) =>
+        PlannedMove(target,
+            bak: File(target).existsSync() ? bak : null, cleanup: cleanup);
+    final dbMove = planFor(db, '$db$_bakSuffix', [
+      for (final s in _sidecars)
+        if (!File('$db$s').existsSync()) s, // grown later = not ours to keep
+    ]);
+    final sidecarMoves = [
+      for (final s in _sidecars)
+        if (File('$db$s').existsSync())
+          PlannedMove('$db$s', bak: '$db$_bakSuffix$s'),
+    ];
+    final hiveMoves = {
+      for (final t in hiveTmps.keys)
+        t: planFor(t, '$t$_bakSuffix', const ['.lock']),
+    };
+    final photoMoves = {
+      for (final name in photoEntries.keys)
+        name: planFor(p.join(receiptsDir!.path, name),
+            p.join(photoBakDir!.path, name), const []),
+    };
+    final plan = [
+      dbMove,
+      ...sidecarMoves,
+      ...hiveMoves.values,
+      ...photoMoves.values,
+    ];
     final journalFile = journalFileFor(dbFile);
-    final RestoreJournal journal;
-    try {
-      journal = RestoreJournal.begin(journalFile,
-          staged: staged, photoBakDir: photoBakDir?.path);
-    } catch (_) {
-      await _deleteAll(staged);
-      await _deleteIfExists(journalFile);
-      rethrow;
-    }
     final backup = RestoreBackup(
       manifest: manifest,
-      dbPath: dbFile.path,
+      dbPath: db,
       journalPath: journalFile.path,
       staged: List.of(staged),
-      photoBakDir: photoBakDir?.path,
-      steps: <RestoreStep>[],
+      plan: plan,
+      photoBakDir: photoMoves.isEmpty ? null : photoBakDir!.path,
     );
-    void record(RestoreStep s) {
-      journal.add(s);
-      backup.steps.add(s);
+    try {
+      if (photoMoves.isNotEmpty) {
+        await photoBakDir!.create(recursive: true);
+        await receiptsDir!.create(recursive: true);
+      }
+      RestoreJournal.begin(journalFile,
+          plan: plan, staged: staged, photoBakDir: backup.photoBakDir);
+    } catch (_) {
+      await _deleteAll([
+        ...staged,
+        if (backup.photoBakDir != null) backup.photoBakDir!,
+        journalFile.path,
+      ]);
+      rethrow;
     }
-
-    // A stale `.bak` from an earlier restore is never put back: only moves
-    // journalled by this run are.
-    Future<void> moveAside(String target, String bak) async {
-      await _deleteIfExists(File(bak));
-      if (!await File(target).exists()) return;
-      record(RestoreStep.aside(target, bak));
-      await File(target).rename(bak);
-    }
-
-    Future<void> place(File src, String target, List<String> cleanup) async {
-      record(RestoreStep.placed(target, cleanupSuffixes: cleanup));
-      await src.rename(target);
+    // 4. Swap, in plan order.
+    Future<void> aside(PlannedMove m) async {
+      if (m.bak != null) await File(m.target).rename(m.bak!);
     }
 
     try {
-      final db = dbFile.path;
-      await _deleteIfExists(File('$db$_absentSuffix')); // pre-journal marker
-      // Sidecars move with the DB: an old WAL replayed onto the restored
-      // file would corrupt it, and the WAL may hold the old DB's commits.
-      await moveAside(db, '$db$_bakSuffix');
-      for (final s in _sidecars) {
-        await moveAside('$db$s', '$db$_bakSuffix$s');
+      await pause('begun');
+      await aside(dbMove);
+      for (final m in sidecarMoves) {
+        await aside(m);
       }
       await pause('db-aside');
-      await place(dbTmp, db, _sidecars);
+      await dbTmp.rename(db);
       await pause('db-placed');
 
-      for (final e in hiveTmps.entries) {
-        await _deleteIfExists(File('${e.key}$_absentSuffix'));
-        await moveAside(e.key, '${e.key}$_bakSuffix');
+      for (final e in hiveMoves.entries) {
+        await aside(e.value);
         await pause('hive-aside');
+        await hiveTmps[e.key]!.rename(e.key);
         // Hive keeps a `.lock` beside the box; harmless, but drop it.
-        await place(e.value, e.key, const ['.lock']);
         await _deleteIfExists(File('${e.key}.lock'));
         await pause('hive-placed');
       }
 
-      if (photoBakDir != null) {
-        await photoBakDir.create(recursive: true);
-        await receiptsDir!.create(recursive: true);
-        for (final name in photoEntries.keys) {
-          final target = p.join(receiptsDir.path, name);
-          await moveAside(target, p.join(photoBakDir.path, name));
-          await pause('photo-aside');
-          await place(File(p.join(photoStage!.path, name)), target, const []);
-          await pause('photo-placed');
-        }
-        await photoStage!.delete(recursive: true);
+      for (final e in photoMoves.entries) {
+        await aside(e.value);
+        await pause('photo-aside');
+        await File(p.join(photoStage!.path, e.key)).rename(e.value.target);
+        await pause('photo-placed');
       }
+      if (photoMoves.isNotEmpty) await photoStage!.delete(recursive: true);
       await pause('swapped');
     } catch (_) {
-      journal.close();
       await rollback(backup);
       rethrow;
     }
-    journal.close();
     return backup;
   }
 
-  /// Undoes exactly the moves [restore] journalled for [backup], then
-  /// removes its staged files, photo backup and journal. Idempotent.
+  /// Undoes [backup]'s swap from its plan and the state of the disk, then
+  /// removes its staged files, photo backup and journal. Idempotent; if it
+  /// throws, the journal stays for [recoverInterruptedRestore].
   Future<void> rollback(RestoreBackup backup) => _rollback(
-        steps: backup.steps,
+        plan: backup.plan,
         staged: backup.staged,
         photoBakDir: backup.photoBakDir,
         journal: File(backup.journalPath),
@@ -480,31 +527,63 @@ class SnapshotService {
   Future<void> commit(RestoreBackup backup) async {
     RestoreJournal.markCommitted(File(backup.journalPath));
     await _finishCommitted(
-      steps: backup.steps,
+      plan: backup.plan,
       staged: backup.staged,
       photoBakDir: backup.photoBakDir,
       journal: File(backup.journalPath),
     );
   }
 
-  /// Run before the DB or Hive opens. If [journal] exists, a restore was
-  /// interrupted: a committed one only has its cleanup finished; otherwise
-  /// every journalled move is undone, so the app comes back on the data it
-  /// had before the restore. Costs one `exists` check when there is none.
-  static Future<RestoreRecovery> recoverInterruptedRestore(
-      File journal) async {
-    if (!journal.existsSync()) return RestoreRecovery.none;
-    final c = RestoreJournal.read(journal);
+  /// Run before the DB or Hive opens; [hivePaths] and [receiptsDir] are the
+  /// stores' usual locations.
+  ///
+  /// * No journal: removes staged leftovers of a restore killed before its
+  ///   swap began (a handful of `exists` checks) → [RestoreRecovery.none].
+  /// * Committed journal: finishes the cleanup → `completed`.
+  /// * Otherwise every planned move is undone from the disk's state, so
+  ///   the app comes back on the data it had before → `rolledBack`.
+  /// * Unreadable journal: conservative state-based recovery
+  ///   ([_recoverWithoutJournal]), journal moved to `*.corrupt` →
+  ///   `recoveredWithoutJournal`.
+  ///
+  /// Throws if the disk can't be put right; the journal then stays, so a
+  /// retry picks up where this left off.
+  static Future<RestoreRecovery> recoverInterruptedRestore({
+    required File dbFile,
+    List<String> hivePaths = const [],
+    Directory? receiptsDir,
+  }) async {
+    final journal = journalFileFor(dbFile);
+    final leftovers = [
+      '${dbFile.path}$_tmpSuffix',
+      for (final s in _sidecars) '${dbFile.path}$_tmpSuffix$s',
+      for (final h in hivePaths) '$h$_tmpSuffix',
+      if (receiptsDir != null) '${receiptsDir.path}$_tmpSuffix',
+    ];
+    if (!journal.existsSync()) {
+      await _deleteAll(leftovers);
+      return RestoreRecovery.none;
+    }
+    final RestoreJournalContents c;
+    try {
+      c = RestoreJournal.read(journal);
+    } on RestoreJournalFormatException {
+      await _recoverWithoutJournal(
+          dbFile: dbFile, hivePaths: hivePaths, receiptsDir: receiptsDir);
+      await _deleteAll(leftovers);
+      await journal.rename('${journal.path}$corruptJournalSuffix');
+      return RestoreRecovery.recoveredWithoutJournal;
+    }
     if (c.committed) {
       await _finishCommitted(
-          steps: c.steps,
+          plan: c.plan,
           staged: c.staged,
           photoBakDir: c.photoBakDir,
           journal: journal);
       return RestoreRecovery.completed;
     }
     await _rollback(
-        steps: c.steps,
+        plan: c.plan,
         staged: c.staged,
         photoBakDir: c.photoBakDir,
         journal: journal);
@@ -512,40 +591,23 @@ class SnapshotService {
   }
 
   static Future<void> _rollback({
-    required List<RestoreStep> steps,
+    required List<PlannedMove> plan,
     required List<String> staged,
     required String? photoBakDir,
     required File journal,
   }) async {
-    // Per target: a journalled aside whose `.bak` still exists is put back;
-    // one whose `.bak` is gone was never moved or is already back. A target
-    // only ever placed had no original and is removed.
-    final asides = <String, String>{};
-    final placed = <String, List<String>>{};
-    final order = <String>[];
-    for (final s in steps) {
-      if (!asides.containsKey(s.target) && !placed.containsKey(s.target)) {
-        order.add(s.target);
-      }
-      if (s.placed) {
-        placed[s.target] = s.cleanupSuffixes;
-      } else {
-        asides[s.target] = s.bak!;
-      }
-    }
-    for (final target in order.reversed) {
-      final bak = asides[target];
-      if (bak != null) {
-        if (await File(bak).exists()) {
-          await _deleteIfExists(File(target));
-          await File(bak).rename(target);
-        }
-      } else if (placed.containsKey(target)) {
-        await _deleteIfExists(File(target));
-      }
-      for (final suffix in placed[target] ?? const <String>[]) {
-        final extra = '$target$suffix';
-        if (!asides.containsKey(extra)) await _deleteIfExists(File(extra));
+    for (final m in plan.reversed) {
+      final bak = m.bak;
+      if (bak == null) {
+        await _deleteIfExists(File(m.target)); // only we could have put it
+      } else if (await File(bak).exists()) {
+        await _deleteIfExists(File(m.target));
+        await File(bak).rename(m.target);
+      } // else: the original never moved, or is already back
+      // Not ours to keep: e.g. a WAL the restored DB grew must never be
+      // replayed onto the original.
+      for (final suffix in m.cleanup) {
+        await _deleteIfExists(File('${m.target}$suffix'));
       }
     }
     await _deleteAll([...staged, if (photoBakDir != null) photoBakDir]);
@@ -553,20 +615,76 @@ class SnapshotService {
   }
 
   static Future<void> _finishCommitted({
-    required List<RestoreStep> steps,
+    required List<PlannedMove> plan,
     required List<String> staged,
     required String? photoBakDir,
     required File journal,
   }) async {
     try {
       await _deleteAll([
-        for (final s in steps)
-          if (!s.placed) s.bak!,
+        for (final m in plan)
+          if (m.bak != null) m.bak!,
         ...staged,
         if (photoBakDir != null) photoBakDir,
       ]);
       await _deleteIfExists(journal);
     } catch (_) {/* journal stays committed; next launch retries */}
+  }
+
+  /// Recovery when the journal can't be read. Acts only where the answer
+  /// is unambiguous and never deletes data:
+  /// * a missing DB or box whose `.bak` exists gets the `.bak` back (for
+  ///   the DB, foreign sidecars are cleared first and the `.bak-*`
+  ///   sidecars come along);
+  /// * photos in `receipts.bak` — which only ever holds originals a
+  ///   restore replaced — are put back, then the folder is removed.
+  /// A live file next to its `.bak` is left as is: either could be right.
+  static Future<void> _recoverWithoutJournal({
+    required File dbFile,
+    required List<String> hivePaths,
+    required Directory? receiptsDir,
+  }) async {
+    final db = dbFile.path;
+    if (!await dbFile.exists() && await File('$db$_bakSuffix').exists()) {
+      for (final s in _sidecars) {
+        await _deleteIfExists(File('$db$s'));
+      }
+      await File('$db$_bakSuffix').rename(db);
+      for (final s in _sidecars) {
+        final b = File('$db$_bakSuffix$s');
+        if (await b.exists()) await b.rename('$db$s');
+      }
+    }
+    for (final h in hivePaths) {
+      final bak = File('$h$_bakSuffix');
+      if (!await File(h).exists() && await bak.exists()) {
+        await bak.rename(h);
+      }
+    }
+    if (receiptsDir != null) {
+      final bakDir = Directory('${receiptsDir.path}$_bakSuffix');
+      if (await bakDir.exists()) {
+        await receiptsDir.create(recursive: true);
+        await for (final f in bakDir.list()) {
+          if (f is File) {
+            await f.rename(p.join(receiptsDir.path, p.basename(f.path)));
+          }
+        }
+        await bakDir.delete(recursive: true);
+      }
+    }
+  }
+
+  /// `4.0 GB`-style size for messages.
+  static String formatBytes(int bytes) {
+    const units = ['bytes', 'KB', 'MB', 'GB', 'TB'];
+    var v = bytes.toDouble();
+    var i = 0;
+    while (v >= 1024 && i < units.length - 1) {
+      v /= 1024;
+      i++;
+    }
+    return i == 0 ? '$bytes bytes' : '${v.toStringAsFixed(1)} ${units[i]}';
   }
 
   /// Full restore choreography with automatic rollback, independent of
@@ -1011,21 +1129,22 @@ class _Budget {
     remaining -= n;
     if (remaining < 0) {
       throw SnapshotFormatException(
-          'Backup expands past the $limit-byte restore limit');
+          'Backup expands past the '
+          '${SnapshotService.formatBytes(limit)} restore limit');
     }
   }
 }
 
-/// What [SnapshotService.restore] moved, so it can be committed or undone.
-/// Mirrors the on-disk journal. Plain data — safe to return from an
-/// isolate.
+/// What [SnapshotService.restore] planned and did, so it can be committed
+/// or undone. Mirrors the on-disk journal. Plain data — safe to return
+/// from an isolate.
 class RestoreBackup {
   const RestoreBackup({
     required this.manifest,
     required this.dbPath,
     required this.journalPath,
     required this.staged,
-    required this.steps,
+    required this.plan,
     this.photoBakDir,
   });
   final SnapshotManifest manifest;
@@ -1035,8 +1154,8 @@ class RestoreBackup {
   /// Staged files / dirs, deleted on commit or rollback if still there.
   final List<String> staged;
 
-  /// This run's moves, in order (see [RestoreStep]).
-  final List<RestoreStep> steps;
+  /// Every file the swap may replace (see [PlannedMove]).
+  final List<PlannedMove> plan;
 
   /// Holds originals of photos the restore replaced.
   final String? photoBakDir;
@@ -1052,6 +1171,10 @@ enum RestoreRecovery {
 
   /// A restore had been accepted; only its cleanup was left to do.
   completed,
+
+  /// The journal was unreadable; missing files were put back from their
+  /// `.bak` copies where that was unambiguous.
+  recoveredWithoutJournal,
 }
 
 // ─── Manifest ────────────────────────────────────────────────────────────────
