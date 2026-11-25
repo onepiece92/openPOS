@@ -93,6 +93,8 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
           'Backup from $when ($size)'
           '${manifest.photos.isEmpty ? '' : ', with ${manifest.photos.length} '
               'receipt photo${manifest.photos.length == 1 ? '' : 's'}'}.\n\n'
+          '${manifest.photosIncluded ? '' : "This backup doesn't include "
+              'receipt photos; the ones on this device are kept.\n\n'}'
           'This REPLACES all current data — products, orders, customers, '
           'settings — with the backup. The app will restart.\n\n'
           'Tip: create a fresh backup first if you might need today\'s data.',
@@ -512,6 +514,10 @@ class _BackupTile extends StatelessWidget {
 
 // ── Auto-backup tile ─────────────────────────────────────────────────────────
 
+/// Shown on the auto-backup tile: automatic backups skip receipt photos.
+const kAutoBackupNoPhotosNote = "Automatic backups don't include receipt "
+    'photos. Create a backup manually to save them.';
+
 class _AutoBackupTile extends ConsumerWidget {
   const _AutoBackupTile({required this.onOpen});
   final VoidCallback onOpen;
@@ -558,6 +564,10 @@ class _AutoBackupTile extends ConsumerWidget {
                       enabled
                           ? 'Daily on launch · last $last · keeps $kAutoBackupKeep'
                           : 'Auto-backup off · tap to browse',
+                      style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                    ),
+                    Text(
+                      kAutoBackupNoPhotosNote,
                       style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                     ),
                     ValueListenableBuilder<String?>(

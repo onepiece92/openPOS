@@ -102,8 +102,10 @@ class SnapshotCoordinator {
   final Ref _ref;
   static const _svc = SnapshotService();
 
-  /// Creates a snapshot in [outDir] and returns the zip file.
-  Future<File> create(Directory outDir) async {
+  /// Creates a snapshot in [outDir] and returns the zip file. Receipt
+  /// photos are included only when [includePhotos] (manual backups);
+  /// automatic backups carry just the DB and Hive.
+  Future<File> create(Directory outDir, {bool includePhotos = true}) async {
     final db = _ref.read(databaseProvider);
     for (final name in kSnapshotHiveBoxes) {
       if (Hive.isBoxOpen(name)) await Hive.box<dynamic>(name).flush();
@@ -129,6 +131,7 @@ class SnapshotCoordinator {
             hiveBoxFiles: hiveFiles,
             outDir: Directory(outPath),
             receiptsDir: Directory(photosPath),
+            includePhotos: includePhotos,
             schemaVersion: AppDatabase.currentSchemaVersion,
             now: now,
           ));
@@ -181,7 +184,8 @@ class SnapshotCoordinator {
       }
 
       final dir = await autoBackupDir();
-      final zip = await create(dir);
+      // Owner decision: automatic backups never carry receipt photos.
+      final zip = await create(dir, includePhotos: false);
       await _svc.prune(dir, keep: kAutoBackupKeep, protect: zip);
       await _ref.read(settingsProvider.notifier).markAutoBackupRun(t);
       autoBackupLastError.value = null;

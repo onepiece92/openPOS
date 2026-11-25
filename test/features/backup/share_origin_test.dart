@@ -219,6 +219,21 @@ void main() {
         });
       }
 
+      testWidgets('auto-backup tile says photos are not included ($screen)',
+          (tester) async {
+        await pumpScreen(tester, screen);
+        final note = find.text(kAutoBackupNoPhotosNote);
+        await tester.scrollUntilVisible(note, 200);
+        expect(note, findsOneWidget);
+        expect(
+            find.ancestor(
+                of: note,
+                matching: find.ancestor(
+                    of: find.text('Device backups'),
+                    matching: find.byType(Card))),
+            findsOneWidget);
+      });
+
       testWidgets('"Back up everything" tile passes its rectangle ($screen)',
           (tester) async {
         await pumpScreen(tester, screen);

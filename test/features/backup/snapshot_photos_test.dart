@@ -223,6 +223,117 @@ void main() {
     expect(tree(receiptsIn(live)), {'k.jpg': 'kept', 'other.jpg': 'unrelated'});
   });
 
+  group('automatic (photo-less) vs manual backups', () {
+    Future<File> autoBackupOf(Directory dir) => svc.create(
+          dbFile: dbFileIn(dir),
+          hiveBoxFiles: {'settings': hivePathIn(dir)},
+          outDir: Directory(p.join(tmp.path, 'auto')),
+          schemaVersion: schema,
+          receiptsDir: receiptsIn(dir),
+          includePhotos: false,
+        );
+
+    Map<String, dynamic> rawManifest(File zip) => jsonDecode(utf8.decode(
+            entriesOf(zip).find(SnapshotService.manifestName)!.readBytes()!))
+        as Map<String, dynamic>;
+
+    test('auto create has no receipts/ entries and says so', () async {
+      final a = photo(receiptsIn(live), 'a.jpg', 'A');
+      await seed(live, receiptPaths: [a.path]);
+      final zip = await autoBackupOf(live);
+
+      expect(entriesOf(zip).map((e) => e.name).where(
+          (n) => n.startsWith('receipts/')), isEmpty);
+      expect(rawManifest(zip)['photosIncluded'], isFalse);
+      final m = await svc.inspect(zip);
+      expect(m.photosIncluded, isFalse);
+      expect(m.photos, isEmpty);
+    });
+
+    test('manual create still carries the photos', () async {
+      final a = photo(receiptsIn(live), 'a.jpg', 'A');
+      await seed(live, receiptPaths: [a.path]);
+      final zip = await backupOf(live);
+      expect(entriesOf(zip).find('receipts/a.jpg'), isNotNull);
+      expect(rawManifest(zip)['photosIncluded'], isTrue);
+      expect((await svc.inspect(zip)).photos, ['a.jpg']);
+    });
+
+    test('auto restore leaves the receipts folder and valid paths alone',
+        () async {
+      // The device's own photos, plus one stored outside receipts/.
+      final kept = photo(receiptsIn(live), 'a.jpg', 'live A');
+      photo(receiptsIn(live), 'other.jpg', 'unrelated');
+      final elsewhere = photo(Directory(p.join(tmp.path, 'elsewhere')),
+          'z.jpg', 'Z');
+      await seed(live);
+      final before = tree(receiptsIn(live));
+
+      await seed(restored, sku: 'NEW', receiptPaths: [
+        kept.path, // resolves here → kept as is
+        elsewhere.path, // resolves here, outside receipts/ → kept as is
+        '/other/device/Documents/receipts/k.jpg', // → this device's folder
+        '/other/device/Documents/receipts/', // no file name → NULL
+      ]);
+      final zip = await autoBackupOf(restored);
+      final backup = await restoreInto(live, zip);
+      await svc.commit(backup);
+
+      expect(await hasProduct(live, 'NEW'), isTrue);
+      expect(await receiptPaths(live), [
+        kept.path,
+        elsewhere.path,
+        p.join(receiptsIn(live).path, 'k.jpg'),
+        null,
+      ]);
+      expect(tree(receiptsIn(live)), before);
+      expect(Directory('${receiptsIn(live).path}.bak').existsSync(), isFalse);
+      expect(Directory('${receiptsIn(live).path}.restore.tmp').existsSync(),
+          isFalse);
+    });
+
+    test('a photo-less manifest ignores stray receipts/ entries', () async {
+      photo(receiptsIn(live), 'a.jpg', 'live A');
+      await seed(live);
+      await seed(restored, sku: 'NEW');
+      final archive = Archive()
+        ..addFile(ArchiveFile.bytes(SnapshotService.dbEntryName,
+            dbFileIn(restored).readAsBytesSync()))
+        ..addFile(ArchiveFile.string('receipts/a.jpg', 'intruder'))
+        ..addFile(ArchiveFile.string(
+            SnapshotService.manifestName,
+            jsonEncode(SnapshotManifest(
+              formatVersion: 2,
+              schemaVersion: schema,
+              createdAt: DateTime(2026),
+              dbBytes: 1,
+              hiveBoxes: const [],
+              photosIncluded: false,
+            ).toJson())));
+      final zip = File(p.join(tmp.path, 'stray.zip'))
+        ..writeAsBytesSync(ZipEncoder().encodeBytes(archive));
+      await svc.commit(await restoreInto(live, zip));
+      expect(tree(receiptsIn(live)), {'a.jpg': 'live A'});
+    });
+
+    test('photosIncluded defaults by format when absent', () {
+      Map<String, dynamic> j(int v) => {
+            'app': 'pos_app',
+            'formatVersion': v,
+            'schemaVersion': 1,
+            'createdAt': DateTime(2026).toIso8601String(),
+            'dbBytes': 1,
+            'hiveBoxes': <String>[],
+          };
+      expect(SnapshotManifest.fromJson(j(1)).photosIncluded, isFalse);
+      expect(SnapshotManifest.fromJson(j(2)).photosIncluded, isTrue);
+      expect(
+          SnapshotManifest.fromJson({...j(2), 'photosIncluded': false})
+              .photosIncluded,
+          isFalse);
+    });
+  });
+
   group('rejection leaves live data and photos untouched', () {
     late Map<String, String> photosBefore;
 

@@ -59,7 +59,9 @@ class SnapshotService {
   ///
   /// Photos come from `expenses.receipt_image_path` in [dbFile] itself (the
   /// consistent `VACUUM INTO` copy) — see [referencedPhotos]. A photo that
-  /// can't be found is skipped, never fatal.
+  /// can't be found is skipped, never fatal. With [includePhotos] false
+  /// (automatic backups) no photo is read or zipped, and the manifest says
+  /// so ([SnapshotManifest.photosIncluded]).
   ///
   /// The zip is written under a temp name and renamed into place, so a
   /// failed write never leaves a truncated file that looks like a snapshot.
@@ -69,6 +71,7 @@ class SnapshotService {
     required Directory outDir,
     required int schemaVersion,
     Directory? receiptsDir,
+    bool includePhotos = true,
     DateTime? now,
     int maxBackupBytes = defaultMaxStagedBytes,
   }) async {
@@ -76,7 +79,9 @@ class SnapshotService {
       throw StateError('Database file not found: ${dbFile.path}');
     }
     final createdAt = now ?? DateTime.now();
-    final photos = referencedPhotos(dbFile, receiptsDir: receiptsDir);
+    final photos = includePhotos
+        ? referencedPhotos(dbFile, receiptsDir: receiptsDir)
+        : const <File>[];
 
     // Refuse what restore would reject, rather than write a dud backup.
     final seen = <String, String>{};
@@ -136,6 +141,7 @@ class SnapshotService {
         dbBytes: dbFile.lengthSync(),
         hiveBoxes: boxes,
         photos: photoNames,
+        photosIncluded: includePhotos,
       );
       encoder
         ..add(ArchiveFile.string(manifestName, jsonEncode(manifest.toJson())))
@@ -330,7 +336,9 @@ class SnapshotService {
       if (f != null) hiveEntries[e.value] = f; // absent → leave box as-is
     }
     final photoEntries = <String, ArchiveFile>{}; // file name → entry
-    if (receiptsDir != null) {
+    // A backup without photos (format 1, or an automatic one) never
+    // touches the receipts folder: the device's own photos stay as they are.
+    if (receiptsDir != null && manifest.photosIncluded) {
       const prefix = '$photosDirName/';
       final seen = <String>{};
       for (final e in archive) {
@@ -389,7 +397,8 @@ class SnapshotService {
             _extractTo(e.value, File(p.join(photoStage.path, e.key)), budget);
           }
         }
-        repointReceiptPaths(dbTmp, receiptsDir);
+        repointReceiptPaths(dbTmp, receiptsDir,
+            restoredNames: photoEntries.keys.toSet());
       }
     } catch (_) {
       await _deleteAll(staged);
@@ -738,12 +747,19 @@ class SnapshotService {
     }
   }
 
-  /// Rewrites every `expenses.receipt_image_path` in [dbFile] to
-  /// `receiptsDir/<file name>`. Stored paths are absolute, so they break
-  /// on another device — and on iOS even on the same one, whose container
-  /// path changes between installs. Unusable names are cleared. Returns the
-  /// number of rows changed. Leaves no `-wal` / `-shm` beside [dbFile].
-  static int repointReceiptPaths(File dbFile, Directory receiptsDir) {
+  /// Re-points `expenses.receipt_image_path` values in [dbFile] at this
+  /// device. Stored paths are absolute, so they break on another device —
+  /// and on iOS even on the same one, whose container path changes between
+  /// installs. Per row:
+  /// * no usable file name → cleared (NULL);
+  /// * a name in [restoredNames] (photos this restore is placing) →
+  ///   `receiptsDir/<name>`;
+  /// * a path that still names an existing file here → kept as is;
+  /// * otherwise → `receiptsDir/<name>`.
+  /// Returns the number of rows changed. Leaves no `-wal` / `-shm` beside
+  /// [dbFile].
+  static int repointReceiptPaths(File dbFile, Directory receiptsDir,
+      {Set<String> restoredNames = const {}}) {
     final db = sqlite3.open(dbFile.path);
     var changed = 0;
     try {
@@ -757,8 +773,16 @@ class SnapshotService {
         for (final r in rows) {
           final old = r.columnAt(1) as String;
           final name = _baseName(old);
-          final next =
-              _isSafeName(name) ? p.join(receiptsDir.path, name) : null;
+          final String? next;
+          if (!_isSafeName(name)) {
+            next = null; // can never name a photo
+          } else if (restoredNames.contains(name)) {
+            next = p.join(receiptsDir.path, name); // the copy just restored
+          } else if (File(old).existsSync()) {
+            next = old; // still resolves on this device: leave it be
+          } else {
+            next = p.join(receiptsDir.path, name);
+          }
           if (next == old) continue;
           update.execute([next, r.columnAt(0)]);
           changed++;
@@ -1187,7 +1211,8 @@ class SnapshotManifest {
     required this.dbBytes,
     required this.hiveBoxes,
     this.photos = const [],
-  });
+    bool? photosIncluded,
+  }) : photosIncluded = photosIncluded ?? formatVersion >= 2;
 
   final int formatVersion;
   final int schemaVersion;
@@ -1198,6 +1223,12 @@ class SnapshotManifest {
   /// Receipt photo file names under `receipts/` (format 2+; empty before).
   final List<String> photos;
 
+  /// Whether the backup set out to carry receipt photos: false for an
+  /// automatic backup (and format 1), so an empty [photos] there means
+  /// "not saved", not "there were none". Absent in format-2 manifests
+  /// written before this field existed, which always included photos.
+  final bool photosIncluded;
+
   Map<String, dynamic> toJson() => {
         'app': 'pos_app',
         'formatVersion': formatVersion,
@@ -1206,6 +1237,7 @@ class SnapshotManifest {
         'dbBytes': dbBytes,
         'hiveBoxes': hiveBoxes,
         'photos': photos,
+        'photosIncluded': photosIncluded,
       };
 
   factory SnapshotManifest.fromJson(Map<String, dynamic> j) {
@@ -1219,6 +1251,7 @@ class SnapshotManifest {
       dbBytes: j['dbBytes'] as int,
       hiveBoxes: (j['hiveBoxes'] as List).cast<String>(),
       photos: (j['photos'] as List?)?.cast<String>() ?? const [],
+      photosIncluded: j['photosIncluded'] as bool?,
     );
   }
 }
