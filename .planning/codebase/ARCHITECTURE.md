@@ -2,7 +2,7 @@
 
 ## Overview
 
-Offline-first POS application built with Flutter, following a **Feature-First Layered Architecture**. The app is designed for desktop/tablet use cases with deep hardware integration for thermal printing. The development is organized into 8 sequential phases as detailed in [ROADMAP.md](file:///Users/aashishbijukchhe/Documents/anti/offlinePOS/ROADMAP.md).
+Offline-first POS application built with Flutter, following a **Feature-First Layered Architecture**. The app is designed for desktop/tablet use cases with deep hardware integration for thermal printing. The development is organized into 8 sequential phases as detailed in [ROADMAP.md](../../ROADMAP.md).
 
 ## Core Pillars
 

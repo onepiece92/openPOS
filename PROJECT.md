@@ -27,4 +27,4 @@ To provide a seamless POS experience that functions 100% offline, synchronizing 
 ## Standard Practices
 - **Linting:** Strict adherence to `flutter_lints` and project-specific conventions.
 - **Testing:** Unit tests for domain logic; Widget tests for shared components.
-- **PRD:** Tracked in [ROADMAP.md](file:///Users/aashishbijukchhe/Documents/anti/offlinePOS/ROADMAP.md).
+- **PRD:** Tracked in [ROADMAP.md](ROADMAP.md).
