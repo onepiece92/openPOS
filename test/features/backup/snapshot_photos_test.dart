@@ -137,7 +137,7 @@ void main() {
     expect(names, containsAll(['receipts/a.jpg', 'receipts/b.jpg']));
 
     await seed(live, receiptPaths: const []);
-    await restoreInto(live, zip);
+    final backup = await restoreInto(live, zip);
 
     final dest = receiptsIn(live).path;
     expect(await receiptPaths(live), [
@@ -147,9 +147,14 @@ void main() {
     ]);
     expect(tree(receiptsIn(live)), {'a.jpg': 'photo A', 'b.jpg': 'photo B'});
     expect(await hasProduct(live, 'NEW'), isTrue);
-    // No staging dir, and no photo backup dir when nothing was replaced.
     expect(Directory('$dest.restore.tmp').existsSync(), isFalse);
+    // After the app accepts the restore, no backup or journal is left.
+    await svc.commit(backup);
     expect(Directory('$dest.bak').existsSync(), isFalse);
+    expect(
+        live.listSync().map((e) => p.basename(e.path)).where(
+            (n) => n.contains('.bak') || n.contains('.journal')),
+        isEmpty);
   });
 
   test('a referenced photo that no longer exists is skipped', () async {

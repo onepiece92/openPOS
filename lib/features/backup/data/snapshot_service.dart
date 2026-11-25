@@ -10,6 +10,11 @@ import 'package:archive/archive.dart' hide ZLibDecoder, ZLibEncoder;
 import 'package:path/path.dart' as p;
 import 'package:sqlite3/sqlite3.dart';
 
+import 'package:pos_app/features/backup/data/restore_journal.dart';
+
+export 'package:pos_app/features/backup/data/restore_journal.dart'
+    show RestoreStep;
+
 /// Full-database snapshot: one `.zip` holding the SQLite file, the Hive
 /// preference boxes, the expense receipt photos and a manifest. Pure Dart —
 /// no Flutter, no Riverpod — so it is unit-testable against temp
@@ -196,34 +201,56 @@ class SnapshotService {
 
   // ── Restore ───────────────────────────────────────────────────────────────
 
+  /// Default ceiling on the bytes a restore may stage: 4 GiB. That is the
+  /// largest a single (non-zip64) entry can declare, far above any real POS
+  /// database plus photos, and bounds the disk a hostile or broken zip can
+  /// make us fill.
+  static const defaultMaxStagedBytes = 4 * 1024 * 1024 * 1024;
+
+  /// The journal [restore] keeps beside [dbFile] while it swaps files.
+  static File journalFileFor(File dbFile) =>
+      File('${dbFile.path}$journalSuffix');
+  static const journalSuffix = '.restore.journal';
+
   /// Replaces [dbFile], the listed Hive box files and (when [receiptsDir]
   /// is given) the backed-up receipt photos with the snapshot's contents.
   ///
   /// Every entry is streamed from the zip to a staged file and its CRC-32
-  /// and size checked against the zip directory. Nothing live is touched
-  /// until the incoming database has been verified with
-  /// [verifyDatabaseFile] (SQLite header, `PRAGMA integrity_check`,
-  /// `PRAGMA user_version` in `1..currentSchemaVersion` — the manifest
-  /// alone is not trusted). The staged database's receipt paths are then
-  /// re-pointed at this device's [receiptsDir] ([repointReceiptPaths]).
+  /// and size checked against the zip directory; the declared sizes must
+  /// total at most [maxStagedBytes]. Nothing live is touched until the
+  /// incoming database has been verified with [verifyDatabaseFile] (SQLite
+  /// header, `PRAGMA integrity_check`, `PRAGMA user_version` in
+  /// `1..currentSchemaVersion` — the manifest alone is not trusted). The
+  /// staged database's receipt paths are then re-pointed at this device's
+  /// [receiptsDir] ([repointReceiptPaths]).
   ///
-  /// The swap moves the current DB and boxes aside as `*.bak`, and any
-  /// photo with the same name into `<receiptsDir>.bak/`, before renaming the
-  /// staged files into place. Photos already on the device that the backup
-  /// doesn't contain are left alone (a format-1 backup carries none, and
-  /// its rows still point at them). If any step of the swap fails, the
-  /// moved-aside files are put back and staged files removed before the
-  /// error is rethrown.
+  /// The swap moves the current DB (with its sidecars) and boxes aside as
+  /// `*.bak`, and any photo with the same name into `<receiptsDir>.bak/`,
+  /// before renaming the staged files into place. Each move is written to a
+  /// [RestoreJournal] first, so [recoverInterruptedRestore] can undo a swap
+  /// the process was killed in. Photos already on the device that the
+  /// backup doesn't contain are left alone (a format-1 backup carries none,
+  /// and its rows still point at them). If any step of the swap fails, the
+  /// moves made so far are undone before the error is rethrown.
   ///
-  /// The returned [RestoreBackup] lets the caller undo a restore that
-  /// succeeded on disk but then failed to open (see [rollback]).
+  /// The returned [RestoreBackup] lets the caller [commit] the restore once
+  /// it has opened, or [rollback] one that then failed to open.
+  ///
+  /// [debugPause] is a test hook awaited at named points of the swap; a
+  /// future that never completes freezes the disk as a killed process
+  /// would leave it.
   Future<RestoreBackup> restore({
     required File zip,
     required File dbFile,
     required Map<String, String> hiveBoxFiles,
     required int currentSchemaVersion,
     Directory? receiptsDir,
+    int maxStagedBytes = defaultMaxStagedBytes,
+    Future<void> Function(String point)? debugPause,
   }) async {
+    // A journal here means an earlier swap never finished (recovery at
+    // startup failed or was skipped); finish undoing it before staging.
+    await recoverInterruptedRestore(journalFileFor(dbFile));
     final input = InputFileStream(zip.path);
     try {
       return await _restore(
@@ -232,6 +259,8 @@ class SnapshotService {
         hiveBoxFiles: hiveBoxFiles,
         currentSchemaVersion: currentSchemaVersion,
         receiptsDir: receiptsDir,
+        maxStagedBytes: maxStagedBytes,
+        pause: debugPause ?? (_) async {},
       );
     } finally {
       input.closeSync();
@@ -244,6 +273,8 @@ class SnapshotService {
     required Map<String, String> hiveBoxFiles,
     required int currentSchemaVersion,
     required Directory? receiptsDir,
+    required int maxStagedBytes,
+    required Future<void> Function(String point) pause,
   }) async {
     final archive = _decodeStream(input);
     final manifest = _manifestOf(archive);
@@ -259,148 +290,283 @@ class SnapshotService {
       throw const SnapshotFormatException('Snapshot has no database file');
     }
 
+    // 0. Decide what will be staged and check it fits, before writing.
+    final hiveEntries = <String, ArchiveFile>{}; // target path → entry
+    for (final e in hiveBoxFiles.entries) {
+      final f = archive.find('$hiveDirName/${e.key}.hive');
+      if (f != null) hiveEntries[e.value] = f; // absent → leave box as-is
+    }
+    final photoEntries = <String, ArchiveFile>{}; // file name → entry
+    if (receiptsDir != null) {
+      const prefix = '$photosDirName/';
+      final seen = <String>{};
+      for (final e in archive) {
+        if (!e.isFile || !e.name.startsWith(prefix)) continue;
+        final name = e.name.substring(prefix.length);
+        if (!_isSafeName(name)) {
+          throw SnapshotFormatException(
+              'Backup contains an unsafe file name: ${e.name}');
+        }
+        // Would overwrite each other on case-insensitive file systems
+        // (iOS, macOS, Android shared storage).
+        if (!seen.add(name.toLowerCase())) {
+          throw SnapshotFormatException(
+              'Backup contains clashing photo names: ${e.name}');
+        }
+        photoEntries[name] = e;
+      }
+    }
+    final declared = [dbEntry, ...hiveEntries.values, ...photoEntries.values]
+        .fold<int>(0, (sum, e) => sum + e.size);
+    if (declared > maxStagedBytes) {
+      throw SnapshotFormatException(
+          'Backup is too large to restore ($declared bytes; '
+          'the limit is $maxStagedBytes)');
+    }
+    final budget = _Budget(maxStagedBytes);
+
     // 1. Stage every incoming file next to its target and verify the DB.
     //    A failure here leaves the live data untouched.
     final dbTmp = File('${dbFile.path}$_tmpSuffix');
     final photoStage = receiptsDir == null
         ? null
         : Directory('${receiptsDir.path}$_tmpSuffix');
-    final staged = <FileSystemEntity>[
-      dbTmp,
-      for (final s in _sidecars) File('${dbTmp.path}$s'),
+    final staged = <String>[
+      dbTmp.path,
+      for (final s in _sidecars) '${dbTmp.path}$s',
     ];
-    Future<void> discardStaged() async {
-      for (final f in staged) {
-        if (await f.exists()) await f.delete(recursive: true);
-      }
-    }
-
     final hiveTmps = <String, File>{}; // target path → staged file
-    final photoNames = <String>[];
     try {
-      _extractTo(dbEntry, dbTmp);
+      _extractTo(dbEntry, dbTmp, budget);
       verifyDatabaseFile(dbTmp, currentSchemaVersion: currentSchemaVersion);
 
-      for (final entry in hiveBoxFiles.entries) {
-        final f = archive.find('$hiveDirName/${entry.key}.hive');
-        if (f == null) continue; // not in the archive — leave the box as-is
-        final tmp = File('${entry.value}$_tmpSuffix');
-        staged.add(tmp);
-        _extractTo(f, tmp);
-        hiveTmps[entry.value] = tmp;
+      for (final e in hiveEntries.entries) {
+        final tmp = File('${e.key}$_tmpSuffix');
+        staged.add(tmp.path);
+        _extractTo(e.value, tmp, budget);
+        hiveTmps[e.key] = tmp;
       }
 
-      if (receiptsDir != null && photoStage != null) {
-        const prefix = '$photosDirName/';
-        final photos =
-            archive.where((e) => e.isFile && e.name.startsWith(prefix));
-        if (photos.isNotEmpty) {
-          staged.add(photoStage);
+      if (receiptsDir != null) {
+        if (photoEntries.isNotEmpty) {
+          staged.add(photoStage!.path);
           if (photoStage.existsSync()) photoStage.deleteSync(recursive: true);
           photoStage.createSync(recursive: true);
-          for (final e in photos) {
-            final name = e.name.substring(prefix.length);
-            if (!_isSafeName(name)) {
-              throw SnapshotFormatException(
-                  'Backup contains an unsafe file name: ${e.name}');
-            }
-            _extractTo(e, File(p.join(photoStage.path, name)));
-            photoNames.add(name);
+          for (final e in photoEntries.entries) {
+            _extractTo(e.value, File(p.join(photoStage.path, e.key)), budget);
           }
         }
         repointReceiptPaths(dbTmp, receiptsDir);
       }
     } catch (_) {
-      await discardStaged();
+      await _deleteAll(staged);
       rethrow;
     }
 
-    // 2. Swap: move current files aside, rename staged files into place.
+    // 2. Swap, journalling each move before making it.
+    final photoBakDir = photoEntries.isEmpty
+        ? null
+        : Directory('${receiptsDir!.path}$_bakSuffix');
+    // No journal exists, so nothing an earlier restore moved aside is still
+    // needed; clear it all so a stale `.bak` can never be mistaken for
+    // this run's.
+    await _deleteAll([
+      for (final t in [dbFile.path, ...hiveBoxFiles.values]) ...[
+        '$t$_bakSuffix',
+        '$t$_absentSuffix',
+      ],
+      for (final s in _sidecars) '${dbFile.path}$_bakSuffix$s',
+    ]);
+    if (receiptsDir != null) {
+      final stale = Directory('${receiptsDir.path}$_bakSuffix');
+      if (stale.existsSync()) stale.deleteSync(recursive: true);
+    }
+    final journalFile = journalFileFor(dbFile);
+    final RestoreJournal journal;
+    try {
+      journal = RestoreJournal.begin(journalFile,
+          staged: staged, photoBakDir: photoBakDir?.path);
+    } catch (_) {
+      await _deleteAll(staged);
+      await _deleteIfExists(journalFile);
+      rethrow;
+    }
     final backup = RestoreBackup(
       manifest: manifest,
       dbPath: dbFile.path,
-      hivePaths: hiveTmps.keys.toList(),
-      photoPaths: <String>[], // filled as photos land, for a partial undo
-      photoBakDir: photoNames.isEmpty ? null : '${receiptsDir!.path}$_bakSuffix',
+      journalPath: journalFile.path,
+      staged: List.of(staged),
+      photoBakDir: photoBakDir?.path,
+      steps: <RestoreStep>[],
     );
+    void record(RestoreStep s) {
+      journal.add(s);
+      backup.steps.add(s);
+    }
+
+    // A stale `.bak` from an earlier restore is never put back: only moves
+    // journalled by this run are.
+    Future<void> moveAside(String target, String bak) async {
+      await _deleteIfExists(File(bak));
+      if (!await File(target).exists()) return;
+      record(RestoreStep.aside(target, bak));
+      await File(target).rename(bak);
+    }
+
+    Future<void> place(File src, String target, List<String> cleanup) async {
+      record(RestoreStep.placed(target, cleanupSuffixes: cleanup));
+      await src.rename(target);
+    }
+
     try {
-      await _backupDb(dbFile);
-      // Stale sidecars must go *before* the new file lands, or SQLite could
-      // replay an old WAL on top of it.
-      for (final suffix in _sidecars) {
-        await _deleteIfExists(File('${dbFile.path}$suffix'));
+      final db = dbFile.path;
+      await _deleteIfExists(File('$db$_absentSuffix')); // pre-journal marker
+      // Sidecars move with the DB: an old WAL replayed onto the restored
+      // file would corrupt it, and the WAL may hold the old DB's commits.
+      await moveAside(db, '$db$_bakSuffix');
+      for (final s in _sidecars) {
+        await moveAside('$db$s', '$db$_bakSuffix$s');
       }
-      await dbTmp.rename(dbFile.path);
+      await pause('db-aside');
+      await place(dbTmp, db, _sidecars);
+      await pause('db-placed');
 
       for (final e in hiveTmps.entries) {
-        await _moveAside(File(e.key));
-        await e.value.rename(e.key);
+        await _deleteIfExists(File('${e.key}$_absentSuffix'));
+        await moveAside(e.key, '${e.key}$_bakSuffix');
+        await pause('hive-aside');
         // Hive keeps a `.lock` beside the box; harmless, but drop it.
+        await place(e.value, e.key, const ['.lock']);
         await _deleteIfExists(File('${e.key}.lock'));
+        await pause('hive-placed');
       }
 
-      if (photoNames.isNotEmpty) {
-        final bakDir = Directory(backup.photoBakDir!);
-        // The previous restore's photo backup is superseded.
-        if (await bakDir.exists()) await bakDir.delete(recursive: true);
-        await bakDir.create(recursive: true);
+      if (photoBakDir != null) {
+        await photoBakDir.create(recursive: true);
         await receiptsDir!.create(recursive: true);
-        for (final name in photoNames) {
-          final target = File(p.join(receiptsDir.path, name));
-          // Order matters for [rollback]: a listed target either has its
-          // original in bakDir or had none.
-          if (await target.exists()) {
-            await target.rename(p.join(bakDir.path, name));
-          }
-          backup.photoPaths.add(target.path);
-          await File(p.join(photoStage!.path, name)).rename(target.path);
+        for (final name in photoEntries.keys) {
+          final target = p.join(receiptsDir.path, name);
+          await moveAside(target, p.join(photoBakDir.path, name));
+          await pause('photo-aside');
+          await place(File(p.join(photoStage!.path, name)), target, const []);
+          await pause('photo-placed');
         }
         await photoStage!.delete(recursive: true);
-        if (await bakDir.list().isEmpty) await bakDir.delete();
       }
+      await pause('swapped');
     } catch (_) {
-      await discardStaged();
+      journal.close();
       await rollback(backup);
       rethrow;
     }
+    journal.close();
     return backup;
   }
 
-  /// Puts back the files [restore] moved aside. Safe after a partial swap:
-  /// a target without a `.bak` / `.bak.absent` marker is left alone, and
-  /// only photos [restore] actually placed are removed or put back.
-  Future<void> rollback(RestoreBackup backup) async {
-    final db = File(backup.dbPath);
-    final dbBak = File('${backup.dbPath}$_bakSuffix');
-    final dbAbsent = File('${backup.dbPath}$_absentSuffix');
-    if (await dbBak.exists() || await dbAbsent.exists()) {
-      await _deleteIfExists(db);
-      for (final suffix in _sidecars) {
-        await _deleteIfExists(File('${backup.dbPath}$suffix'));
-      }
-      if (await dbBak.exists()) {
-        await dbBak.rename(db.path);
-        final walBak = File('${dbBak.path}-wal');
-        if (await walBak.exists()) await walBak.rename('${db.path}-wal');
-      }
-      await _deleteIfExists(dbAbsent);
-    }
-    for (final path in backup.hivePaths) {
-      await _restoreAside(File(path));
-    }
+  /// Undoes exactly the moves [restore] journalled for [backup], then
+  /// removes its staged files, photo backup and journal. Idempotent.
+  Future<void> rollback(RestoreBackup backup) => _rollback(
+        steps: backup.steps,
+        staged: backup.staged,
+        photoBakDir: backup.photoBakDir,
+        journal: File(backup.journalPath),
+      );
 
-    final bakDir =
-        backup.photoBakDir == null ? null : Directory(backup.photoBakDir!);
-    for (final path in backup.photoPaths) {
-      await _deleteIfExists(File(path));
-      if (bakDir != null) {
-        final original = File(p.join(bakDir.path, p.basename(path)));
-        if (await original.exists()) await original.rename(path);
+  /// Accepts a restore whose data has opened: durably marks the journal
+  /// committed (throws if it can't — the caller should then [rollback]),
+  /// then deletes the `.bak` files and `receipts.bak` this run made.
+  /// Cleanup after the mark is best effort; [recoverInterruptedRestore]
+  /// finishes it on the next launch.
+  Future<void> commit(RestoreBackup backup) async {
+    RestoreJournal.markCommitted(File(backup.journalPath));
+    await _finishCommitted(
+      steps: backup.steps,
+      staged: backup.staged,
+      photoBakDir: backup.photoBakDir,
+      journal: File(backup.journalPath),
+    );
+  }
+
+  /// Run before the DB or Hive opens. If [journal] exists, a restore was
+  /// interrupted: a committed one only has its cleanup finished; otherwise
+  /// every journalled move is undone, so the app comes back on the data it
+  /// had before the restore. Costs one `exists` check when there is none.
+  static Future<RestoreRecovery> recoverInterruptedRestore(
+      File journal) async {
+    if (!journal.existsSync()) return RestoreRecovery.none;
+    final c = RestoreJournal.read(journal);
+    if (c.committed) {
+      await _finishCommitted(
+          steps: c.steps,
+          staged: c.staged,
+          photoBakDir: c.photoBakDir,
+          journal: journal);
+      return RestoreRecovery.completed;
+    }
+    await _rollback(
+        steps: c.steps,
+        staged: c.staged,
+        photoBakDir: c.photoBakDir,
+        journal: journal);
+    return RestoreRecovery.rolledBack;
+  }
+
+  static Future<void> _rollback({
+    required List<RestoreStep> steps,
+    required List<String> staged,
+    required String? photoBakDir,
+    required File journal,
+  }) async {
+    // Per target: a journalled aside whose `.bak` still exists is put back;
+    // one whose `.bak` is gone was never moved or is already back. A target
+    // only ever placed had no original and is removed.
+    final asides = <String, String>{};
+    final placed = <String, List<String>>{};
+    final order = <String>[];
+    for (final s in steps) {
+      if (!asides.containsKey(s.target) && !placed.containsKey(s.target)) {
+        order.add(s.target);
+      }
+      if (s.placed) {
+        placed[s.target] = s.cleanupSuffixes;
+      } else {
+        asides[s.target] = s.bak!;
       }
     }
-    if (bakDir != null && await bakDir.exists()) {
-      await bakDir.delete(recursive: true);
+    for (final target in order.reversed) {
+      final bak = asides[target];
+      if (bak != null) {
+        if (await File(bak).exists()) {
+          await _deleteIfExists(File(target));
+          await File(bak).rename(target);
+        }
+      } else if (placed.containsKey(target)) {
+        await _deleteIfExists(File(target));
+      }
+      for (final suffix in placed[target] ?? const <String>[]) {
+        final extra = '$target$suffix';
+        if (!asides.containsKey(extra)) await _deleteIfExists(File(extra));
+      }
     }
+    await _deleteAll([...staged, if (photoBakDir != null) photoBakDir]);
+    await _deleteIfExists(journal);
+  }
+
+  static Future<void> _finishCommitted({
+    required List<RestoreStep> steps,
+    required List<String> staged,
+    required String? photoBakDir,
+    required File journal,
+  }) async {
+    try {
+      await _deleteAll([
+        for (final s in steps)
+          if (!s.placed) s.bak!,
+        ...staged,
+        if (photoBakDir != null) photoBakDir,
+      ]);
+      await _deleteIfExists(journal);
+    } catch (_) {/* journal stays committed; next launch retries */}
   }
 
   /// Full restore choreography with automatic rollback, independent of
@@ -414,6 +580,9 @@ class SnapshotService {
   ///   a successful swap, [release] closes whatever it half-opened, the
   ///   `.bak` files are put back via [rollback], and [reopen] runs again;
   ///   then [RestoreRolledBackException] is thrown.
+  /// * After a verified reopen the restore is [commit]ted, which removes
+  ///   this run's `.bak` files. Failing to mark the commit is treated like a
+  ///   failed reopen.
   /// * If reopening the old data fails too, [RestoreFatalException] is
   ///   thrown — the caller must show it, not spin forever.
   Future<SnapshotManifest> restoreWithRollback({
@@ -435,6 +604,7 @@ class SnapshotService {
 
     try {
       await reopen();
+      await commit(backup);
       return backup.manifest;
     } catch (e) {
       try {
@@ -687,7 +857,7 @@ class SnapshotService {
   /// Streams [entry] out of the zip into [dst], inflating chunk by chunk,
   /// and checks its CRC-32 and size against the zip directory (archive's
   /// `verify` flag is a no-op in 4.0.x).
-  static void _extractTo(ArchiveFile entry, File dst) {
+  static void _extractTo(ArchiveFile entry, File dst, _Budget budget) {
     final zf = entry.rawContent;
     if (zf is! ZipFile) {
       throw SnapshotFormatException('Unreadable backup entry ${entry.name}');
@@ -699,7 +869,8 @@ class SnapshotService {
     dst.parent.createSync(recursive: true);
     final out = dst.openSync(mode: FileMode.write);
     try {
-      final sink = _FileSink(out, limit: zf.uncompressedSize);
+      final sink =
+          _FileSink(out, limit: zf.uncompressedSize, budget: budget);
       final Sink<List<int>> target = switch (zf.compressionMethod) {
         CompressionType.none => sink,
         CompressionType.deflate =>
@@ -757,62 +928,32 @@ class SnapshotService {
     return true;
   }
 
-  /// Moves the live DB (and its WAL, which may hold committed pages) to
-  /// `<db>.bak` / `<db>.bak-wal`. The `-shm` index is rebuildable and is
-  /// deleted by the caller. A missing DB is recorded with a `.bak.absent`
-  /// marker so [rollback] knows to remove the restored file instead.
-  static Future<void> _backupDb(File db) async {
-    final bak = File('${db.path}$_bakSuffix');
-    await _deleteIfExists(bak);
-    await _deleteIfExists(File('${bak.path}-wal'));
-    await _deleteIfExists(File('${bak.path}-shm'));
-    await _deleteIfExists(File('${db.path}$_absentSuffix'));
-    if (await db.exists()) {
-      await db.rename(bak.path);
-      final wal = File('${db.path}-wal');
-      if (await wal.exists()) await wal.rename('${bak.path}-wal');
-    } else {
-      await File('${db.path}$_absentSuffix').create(recursive: true);
-    }
-  }
-
-  static Future<void> _moveAside(File target) async {
-    final bak = File('${target.path}$_bakSuffix');
-    final absent = File('${target.path}$_absentSuffix');
-    await _deleteIfExists(bak);
-    await _deleteIfExists(absent);
-    if (await target.exists()) {
-      await target.rename(bak.path);
-    } else {
-      await absent.create(recursive: true);
-    }
-  }
-
-  static Future<void> _restoreAside(File target) async {
-    final bak = File('${target.path}$_bakSuffix');
-    final absent = File('${target.path}$_absentSuffix');
-    if (await bak.exists()) {
-      await _deleteIfExists(target);
-      await bak.rename(target.path);
-    } else if (await absent.exists()) {
-      await _deleteIfExists(target);
-    }
-    await _deleteIfExists(absent);
-    await _deleteIfExists(File('${target.path}.lock'));
-  }
-
   static Future<void> _deleteIfExists(File f) async {
     if (await f.exists()) await f.delete();
+  }
+
+  /// Deletes each path that exists, file or directory.
+  static Future<void> _deleteAll(Iterable<String> paths) async {
+    for (final path in paths) {
+      final type = await FileSystemEntity.type(path, followLinks: false);
+      if (type == FileSystemEntityType.directory) {
+        await Directory(path).delete(recursive: true);
+      } else if (type != FileSystemEntityType.notFound) {
+        await File(path).delete();
+      }
+    }
   }
 }
 
 /// Writes chunks straight to a file, counting bytes and the CRC-32. With a
 /// [limit], throws as soon as more than [limit] bytes arrive (an entry
-/// inflating past its declared size).
+/// inflating past its declared size); with a [budget], as soon as the
+/// restore as a whole exceeds it.
 class _FileSink implements Sink<List<int>> {
-  _FileSink(this._raf, {this.limit});
+  _FileSink(this._raf, {this.limit, this.budget});
   final RandomAccessFile _raf;
   final int? limit;
+  final _Budget? budget;
   int length = 0;
   int crc = 0;
 
@@ -823,6 +964,7 @@ class _FileSink implements Sink<List<int>> {
       throw const SnapshotFormatException(
           'Backup entry is larger than its declared size');
     }
+    budget?.take(chunk.length);
     if (limit != null) crc = getCrc32(chunk, crc);
     _raf.writeFromSync(chunk);
   }
@@ -859,24 +1001,57 @@ class _DeflatedFile extends FileContent {
   void closeSync() => _stream.closeSync();
 }
 
-/// What [SnapshotService.restore] moved aside, so it can be undone.
-/// Plain data — safe to return from an isolate.
+/// Shared byte allowance for one restore's staged files.
+class _Budget {
+  _Budget(this.limit) : remaining = limit;
+  final int limit;
+  int remaining;
+
+  void take(int n) {
+    remaining -= n;
+    if (remaining < 0) {
+      throw SnapshotFormatException(
+          'Backup expands past the $limit-byte restore limit');
+    }
+  }
+}
+
+/// What [SnapshotService.restore] moved, so it can be committed or undone.
+/// Mirrors the on-disk journal. Plain data — safe to return from an
+/// isolate.
 class RestoreBackup {
   const RestoreBackup({
     required this.manifest,
     required this.dbPath,
-    required this.hivePaths,
-    this.photoPaths = const [],
+    required this.journalPath,
+    required this.staged,
+    required this.steps,
     this.photoBakDir,
   });
   final SnapshotManifest manifest;
   final String dbPath;
-  final List<String> hivePaths;
+  final String journalPath;
 
-  /// Receipt photos the restore placed; [photoBakDir] holds any same-named
-  /// originals they replaced.
-  final List<String> photoPaths;
+  /// Staged files / dirs, deleted on commit or rollback if still there.
+  final List<String> staged;
+
+  /// This run's moves, in order (see [RestoreStep]).
+  final List<RestoreStep> steps;
+
+  /// Holds originals of photos the restore replaced.
   final String? photoBakDir;
+}
+
+/// What [SnapshotService.recoverInterruptedRestore] found at startup.
+enum RestoreRecovery {
+  /// No interrupted restore.
+  none,
+
+  /// An unfinished restore was undone; the previous data is back.
+  rolledBack,
+
+  /// A restore had been accepted; only its cleanup was left to do.
+  completed,
 }
 
 // ─── Manifest ────────────────────────────────────────────────────────────────

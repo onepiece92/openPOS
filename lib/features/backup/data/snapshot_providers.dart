@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import 'package:pos_app/core/database/app_database.dart';
+import 'package:pos_app/core/database/connection/native.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/features/backup/data/share_files.dart';
@@ -28,6 +29,30 @@ Map<String, String> snapshotHiveBoxFiles() => {
       for (final name in kSnapshotHiveBoxes)
         if (Hive.isBoxOpen(name) && Hive.box<dynamic>(name).path != null)
           name: Hive.box<dynamic>(name).path!,
+    };
+
+/// Undoes (or finishes) a restore the app was killed in the middle of.
+/// Must run before Hive boxes or the DB open; when no restore was
+/// interrupted it is a single file-exists check. Never throws: on failure
+/// the journal stays, so the next launch (or the next restore) retries,
+/// and the moved-aside data is still in the `.bak` files.
+Future<RestoreRecovery?> recoverInterruptedRestoreAtStartup() async {
+  try {
+    final journal = SnapshotService.journalFileFor(await databaseFile());
+    return await SnapshotService.recoverInterruptedRestore(journal);
+  } catch (e, st) {
+    debugPrint('Restore recovery failed: $e\n$st');
+    return null;
+  }
+}
+
+/// Toast for the first frame after [recoverInterruptedRestoreAtStartup].
+String? restoreRecoveryNotice(RestoreRecovery? r) => switch (r) {
+      RestoreRecovery.rolledBack =>
+        'A restore was interrupted. Your previous data was put back.',
+      null => 'An interrupted restore could not be undone yet. '
+          'Restart the app; if this persists, contact support.',
+      _ => null,
     };
 
 /// Where expense receipt photos live (the expense form copies them here).

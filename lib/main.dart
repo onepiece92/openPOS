@@ -8,6 +8,10 @@ import 'package:pos_app/features/review/data/review_state_store.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Before any store opens: a restore killed mid-swap would otherwise leave
+  // Drift creating an empty DB while the real one sits in `.bak`.
+  final recovery = await recoverInterruptedRestoreAtStartup();
+
   // Open Hive boxes before the ProviderContainer exists so providers can
   // read synchronously. The DB itself is owned by databaseProvider.
   await Hive.initFlutter();
@@ -18,5 +22,5 @@ Future<void> main() async {
   await ReviewStateStore(Hive.box<dynamic>('settings'))
       .ensureFirstLaunch(DateTime.now());
 
-  runApp(const AppRoot());
+  runApp(AppRoot(startupNotice: restoreRecoveryNotice(recovery)));
 }

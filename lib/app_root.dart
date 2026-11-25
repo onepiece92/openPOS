@@ -19,7 +19,10 @@ import 'package:pos_app/features/review/data/review_state_store.dart';
 /// needed to restore a backup: close DB + Hive, swap files on disk, then
 /// bring everything back up on the restored data.
 class AppRoot extends StatefulWidget {
-  const AppRoot({super.key});
+  const AppRoot({super.key, this.startupNotice});
+
+  /// Toast for the first frame, e.g. after startup restore recovery.
+  final String? startupNotice;
 
   static AppRootState of(BuildContext context) =>
       context.findAncestorStateOfType<AppRootState>()!;
@@ -45,6 +48,7 @@ class AppRootState extends State<AppRoot> {
   @override
   void initState() {
     super.initState();
+    _notice = widget.startupNotice;
     _exitGuard = DatabaseExitGuard(_closeDatabaseForExit);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -237,6 +241,9 @@ class AppRootState extends State<AppRoot> {
       try {
         await _releaseStores();
       } catch (_) {/* stores may already be half-closed */}
+      // A rollback that failed part-way left its journal: finish it first.
+      await SnapshotService.recoverInterruptedRestore(
+          SnapshotService.journalFileFor(await databaseFile()));
       await _reopenStores();
     } catch (e) {
       fatal = 'Still unable to open the app data: $e';
