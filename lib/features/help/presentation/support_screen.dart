@@ -30,12 +30,12 @@ class SupportScreen extends StatelessWidget {
           _SupportTile(
             icon: Icons.chat_rounded,
             title: 'WhatsApp Chat',
-            subtitle: '+977 982-6189697',
+            subtitle: '+977 9802850777',
             cs: cs,
             tt: tt,
             onTap: () async {
-              final native = Uri.parse('whatsapp://send?phone=9779826189697');
-              final web = Uri.parse('https://wa.me/9779826189697');
+              final native = Uri.parse('whatsapp://send?phone=9779802850777');
+              final web = Uri.parse('https://wa.me/9779802850777');
               if (await canLaunchUrl(native)) {
                 await launchUrl(native, mode: LaunchMode.externalApplication);
               } else {
