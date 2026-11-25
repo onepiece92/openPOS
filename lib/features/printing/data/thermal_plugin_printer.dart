@@ -1,3 +1,4 @@
+import 'dart:async' show TimeoutException;
 import 'dart:io' show Platform;
 import 'dart:typed_data';
 
@@ -17,6 +18,8 @@ import 'package:pos_app/features/printing/domain/render_receipt_image.dart';
 /// Receipts go out as raster images rather than ESC/POS text so that any
 /// script prints correctly and the output matches every other driver.
 class ThermalPluginPrinter implements ReceiptPrinter {
+  static const _connectTimeout = Duration(seconds: 10);
+
   final _ftp = FlutterThermalPrinter.instance;
 
   @override
@@ -72,21 +75,7 @@ class ThermalPluginPrinter implements ReceiptPrinter {
     int paperMm,
   ) async {
     final bytes = await escPosRasterBytes(pages, paperMm);
-    final device = Printer(
-      address: target.address,
-      name: target.name,
-      connectionType: ConnectionType.BLE,
-    );
-    final bool connected;
-    try {
-      connected = await _ftp.connect(device);
-    } catch (e) {
-      throw StateError(friendlyPrinterError(e, printerName: target.name));
-    }
-    if (!connected) {
-      throw StateError('${target.name}: could not connect — check it is '
-          'switched on and in range');
-    }
+    await _connect(target);
     try {
       await _write(target, bytes);
     } on StateError {
@@ -96,12 +85,65 @@ class ThermalPluginPrinter implements ReceiptPrinter {
     } finally {
       // Leaving the link open holds the printer: most BLE heads take one
       // central at a time, so the next print (or another till) cannot reach
-      // it. The plugin's disconnect already swallows its own errors.
+      // it. Awaited so a print straight after this one starts from a clean
+      // link rather than racing the teardown.
       try {
-        await _ftp.disconnect(device);
+        await _disconnect(target);
       } catch (_) {}
     }
   }
+
+  /// Opens the BLE link to [target], failing with a readable message.
+  ///
+  /// Not the plugin's `connect` on BLE: that always sleeps 3 s after
+  /// connecting, even once the link is up.
+  Future<void> _connect(PrinterTarget target) async {
+    final notReachable = StateError('${target.name}: could not connect — '
+        'check it is switched on and in range');
+    if (Platform.isWindows) {
+      // flutter_blue_plus does not run on Windows; keep the plugin there.
+      final bool connected;
+      try {
+        connected = await _ftp.connect(_pluginDevice(target));
+      } catch (e) {
+        throw StateError(friendlyPrinterError(e, printerName: target.name));
+      }
+      if (!connected) throw notReachable;
+      return;
+    }
+    final bt = BluetoothDevice.fromId(target.address);
+    if (bt.isConnected) return;
+    try {
+      await bt.connect(timeout: _connectTimeout);
+      if (!bt.isConnected) {
+        await bt.connectionState
+            .firstWhere((s) => s == BluetoothConnectionState.connected)
+            .timeout(_connectTimeout);
+      }
+    } on TimeoutException {
+      throw notReachable;
+    } on FlutterBluePlusException catch (e) {
+      if (e.code == FbpErrorCode.timeout.index) throw notReachable;
+      throw StateError(friendlyPrinterError(e, printerName: target.name));
+    } catch (e) {
+      throw StateError(friendlyPrinterError(e, printerName: target.name));
+    }
+  }
+
+  Future<void> _disconnect(PrinterTarget target) async {
+    if (Platform.isWindows) {
+      // The plugin's disconnect swallows its own errors.
+      await _ftp.disconnect(_pluginDevice(target));
+      return;
+    }
+    await BluetoothDevice.fromId(target.address).disconnect();
+  }
+
+  Printer _pluginDevice(PrinterTarget target) => Printer(
+        address: target.address,
+        name: target.name,
+        connectionType: ConnectionType.BLE,
+      );
 
   /// Sends [bytes] over BLE, failing loudly.
   ///
@@ -112,12 +154,7 @@ class ThermalPluginPrinter implements ReceiptPrinter {
     if (Platform.isWindows) {
       // flutter_blue_plus does not run on Windows; the plugin has its own
       // transport there, so fall back to it.
-      final device = Printer(
-        address: target.address,
-        name: target.name,
-        connectionType: ConnectionType.BLE,
-      );
-      await _ftp.printData(device, bytes, longData: true);
+      await _ftp.printData(_pluginDevice(target), bytes, longData: true);
       return;
     }
     final bt = BluetoothDevice.fromId(target.address);
