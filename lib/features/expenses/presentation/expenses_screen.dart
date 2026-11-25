@@ -266,6 +266,9 @@ class _TotalBar extends StatelessWidget {
 
 // ── Expense tile ───────────────────────────────────────────────────────────────
 
+/// Dates on expense rows and in the form. Built once, not per tile build.
+final _expenseDateFormat = DateFormat('d MMM y');
+
 class _ExpenseTile extends StatelessWidget {
   const _ExpenseTile({
     required this.expense,
@@ -283,10 +286,9 @@ class _ExpenseTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
-    final dateLabel = DateFormat('d MMM y').format(expense.date.toLocal());
+    final dateLabel = _expenseDateFormat.format(expense.date.toLocal());
     final catColor = _parseColor(category?.color) ?? cs.primary;
-    final hasReceipt = expense.receiptImagePath != null &&
-        File(expense.receiptImagePath!).existsSync();
+    final receiptPath = expense.receiptImagePath;
 
     return ListTile(
       onTap: onTap,
@@ -309,11 +311,8 @@ class _ExpenseTile extends StatelessWidget {
               style: TextStyle(color: cs.onSurfaceVariant),
             ),
           ),
-          if (hasReceipt) ...[
-            const SizedBox(width: 4),
-            Icon(Icons.photo_camera_rounded,
-                size: 12, color: cs.onSurfaceVariant),
-          ],
+          if (receiptPath != null)
+            _ReceiptMark(path: receiptPath, color: cs.onSurfaceVariant),
         ],
       ),
       trailing: Text(
@@ -339,6 +338,55 @@ class _ExpenseTile extends StatelessWidget {
 }
 
 // ── Expense form ───────────────────────────────────────────────────────────────
+
+/// The small camera mark on a row whose receipt photo is still on disk.
+///
+/// The file is looked up off the build path, once per path — a synchronous
+/// existsSync() in the tile's build stalled scrolling on slow storage.
+class _ReceiptMark extends StatefulWidget {
+  const _ReceiptMark({required this.path, required this.color});
+  final String path;
+  final Color color;
+
+  @override
+  State<_ReceiptMark> createState() => _ReceiptMarkState();
+}
+
+class _ReceiptMarkState extends State<_ReceiptMark> {
+  bool _exists = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _check();
+  }
+
+  @override
+  void didUpdateWidget(_ReceiptMark old) {
+    super.didUpdateWidget(old);
+    if (old.path != widget.path) {
+      _exists = false;
+      _check();
+    }
+  }
+
+  Future<void> _check() async {
+    final path = widget.path;
+    final exists = await File(path).exists();
+    if (mounted && path == widget.path && exists != _exists) {
+      setState(() => _exists = exists);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_exists) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(left: 4),
+      child: Icon(Icons.photo_camera_rounded, size: 12, color: widget.color),
+    );
+  }
+}
 
 class _ExpenseForm extends ConsumerStatefulWidget {
   const _ExpenseForm({this.expense});
@@ -692,7 +740,7 @@ class _ExpenseFormState extends ConsumerState<_ExpenseForm> {
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.calendar_today_outlined),
                 title: const Text('Date'),
-                subtitle: Text(DateFormat('d MMM y').format(_date)),
+                subtitle: Text(_expenseDateFormat.format(_date)),
                 trailing: const Icon(Icons.chevron_right_rounded),
                 onTap: _pickDate,
                 shape: RoundedRectangleBorder(
