@@ -1,13 +1,29 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' show min;
+import 'dart:typed_data';
 
-import 'package:archive/archive.dart';
+// archive's ZLib classes would shadow dart:io's; we use dart:io's chunked
+// ZLibCodec directly because archive's own (de)compression buffers whole
+// entries in memory.
+import 'package:archive/archive.dart' hide ZLibDecoder, ZLibEncoder;
 import 'package:path/path.dart' as p;
 import 'package:sqlite3/sqlite3.dart';
 
 /// Full-database snapshot: one `.zip` holding the SQLite file, the Hive
-/// preference boxes and a manifest. Pure Dart — no Flutter, no Riverpod —
-/// so it is unit-testable against temp directories.
+/// preference boxes, the expense receipt photos and a manifest. Pure Dart —
+/// no Flutter, no Riverpod — so it is unit-testable against temp
+/// directories.
+///
+/// Zip layout (format 2):
+/// * `pos_database.db` — deflated SQLite file
+/// * `hive/<box>.hive` — deflated Hive box files
+/// * `receipts/<file name>` — stored (JPEG, already compressed) photos
+/// * `manifest.json`
+/// Format 1 is the same without `receipts/`; it still restores.
+///
+/// Both directions stream through disk in [chunkSize] pieces, so memory use
+/// does not grow with the database size.
 ///
 /// The caller owns lifecycle: [create] expects a self-contained, quiescent
 /// DB file (the app produces one with `VACUUM INTO`), and before [restore]
@@ -16,17 +32,29 @@ import 'package:sqlite3/sqlite3.dart';
 class SnapshotService {
   const SnapshotService();
 
-  static const formatVersion = 1;
+  static const formatVersion = 2;
   static const manifestName = 'manifest.json';
   static const dbEntryName = 'pos_database.db';
   static const hiveDirName = 'hive';
+  static const photosDirName = 'receipts';
   static const filePrefix = 'pos_backup_';
   static const fileSuffix = '.zip';
 
+  /// Largest piece of any file held in memory while zipping / unzipping.
+  static const chunkSize = 256 * 1024;
+
   // ── Create ────────────────────────────────────────────────────────────────
 
-  /// Zips [dbFile] + [hiveBoxFiles] (`box name → path`) into
-  /// `outDir/pos_backup_<timestamp>.zip` and returns it.
+  /// Zips [dbFile] + [hiveBoxFiles] (`box name → path`) + every receipt
+  /// photo the database references into `outDir/pos_backup_<timestamp>.zip`
+  /// and returns it.
+  ///
+  /// Each deflated entry is compressed chunk by chunk into a scratch file
+  /// beside the output, then copied into the zip in chunks.
+  ///
+  /// Photos come from `expenses.receipt_image_path` in [dbFile] itself (the
+  /// consistent `VACUUM INTO` copy) — see [referencedPhotos]. A photo that
+  /// can't be found is skipped, never fatal.
   ///
   /// The zip is written under a temp name and renamed into place, so a
   /// failed write never leaves a truncated file that looks like a snapshot.
@@ -35,47 +63,65 @@ class SnapshotService {
     required Map<String, String> hiveBoxFiles,
     required Directory outDir,
     required int schemaVersion,
+    Directory? receiptsDir,
     DateTime? now,
   }) async {
     if (!await dbFile.exists()) {
       throw StateError('Database file not found: ${dbFile.path}');
     }
     final createdAt = now ?? DateTime.now();
-    final archive = Archive();
-
-    final dbBytes = await dbFile.readAsBytes();
-    archive.addFile(ArchiveFile.bytes(dbEntryName, dbBytes));
-
-    final boxes = <String>[];
-    for (final entry in hiveBoxFiles.entries) {
-      final f = File(entry.value);
-      if (!await f.exists()) continue; // box never written — nothing to save
-      archive.addFile(
-        ArchiveFile.bytes('$hiveDirName/${entry.key}.hive', await f.readAsBytes()),
-      );
-      boxes.add(entry.key);
-    }
-
-    final manifest = SnapshotManifest(
-      formatVersion: formatVersion,
-      schemaVersion: schemaVersion,
-      createdAt: createdAt,
-      dbBytes: dbBytes.length,
-      hiveBoxes: boxes,
-    );
-    archive.addFile(
-      ArchiveFile.string(manifestName, jsonEncode(manifest.toJson())),
-    );
+    final photos = referencedPhotos(dbFile, receiptsDir: receiptsDir);
 
     await outDir.create(recursive: true);
     final out = File(p.join(outDir.path, fileNameFor(createdAt)));
     final tmp = File('${out.path}.part');
+    final scratch = File('${out.path}.deflate.part');
+    final output = OutputFileStream(tmp.path);
+    var closed = false;
     try {
-      await tmp.writeAsBytes(ZipEncoder().encodeBytes(archive), flush: true);
+      final encoder = ZipEncoder()..startEncode(output, modified: createdAt);
+      _addDeflated(encoder, dbEntryName, dbFile, scratch);
+
+      final boxes = <String>[];
+      for (final entry in hiveBoxFiles.entries) {
+        final f = File(entry.value);
+        if (!f.existsSync()) continue; // box never written — nothing to save
+        _addDeflated(encoder, '$hiveDirName/${entry.key}.hive', f, scratch);
+        boxes.add(entry.key);
+      }
+
+      final photoNames = <String>[];
+      for (final photo in photos) {
+        final name = p.basename(photo.path);
+        if (_addStored(encoder, '$photosDirName/$name', photo)) {
+          photoNames.add(name);
+        }
+      }
+
+      final manifest = SnapshotManifest(
+        formatVersion: formatVersion,
+        schemaVersion: schemaVersion,
+        createdAt: createdAt,
+        dbBytes: dbFile.lengthSync(),
+        hiveBoxes: boxes,
+        photos: photoNames,
+      );
+      encoder
+        ..add(ArchiveFile.string(manifestName, jsonEncode(manifest.toJson())))
+        ..endEncode();
+      output.closeSync();
+      closed = true;
       return await tmp.rename(out.path);
     } catch (_) {
+      if (!closed) {
+        try {
+          output.closeSync();
+        } catch (_) {/* already failing */}
+      }
       await _deleteIfExists(tmp);
       rethrow;
+    } finally {
+      await _deleteIfExists(scratch);
     }
   }
 
@@ -83,6 +129,41 @@ class SnapshotService {
     String two(int n) => n.toString().padLeft(2, '0');
     return '$filePrefix${t.year}${two(t.month)}${two(t.day)}_'
         '${two(t.hour)}${two(t.minute)}${two(t.second)}$fileSuffix';
+  }
+
+  /// Existing receipt photos referenced by `expenses` in [dbFile], one per
+  /// file name. The stored path is absolute and may belong to another
+  /// device or an old iOS container, so when it doesn't exist the photo is
+  /// looked for as `receiptsDir/<file name>`. Rows whose photo is found
+  /// nowhere are skipped.
+  static List<File> referencedPhotos(File dbFile, {Directory? receiptsDir}) {
+    final db = _openReadOnly(dbFile);
+    final List<String> stored;
+    try {
+      if (!_hasColumn(db, 'expenses', _receiptColumn)) return const [];
+      stored = db
+          .select('SELECT $_receiptColumn FROM expenses '
+              "WHERE $_receiptColumn IS NOT NULL AND $_receiptColumn != ''")
+          .map((r) => r.columnAt(0) as String)
+          .toList();
+    } finally {
+      db.dispose();
+    }
+    final byName = <String, File>{};
+    for (final path in stored) {
+      final name = _baseName(path);
+      if (!_isSafeName(name) || byName.containsKey(name)) continue;
+      for (final f in [
+        File(path),
+        if (receiptsDir != null) File(p.join(receiptsDir.path, name)),
+      ]) {
+        if (f.existsSync()) {
+          byName[name] = f;
+          break;
+        }
+      }
+    }
+    return byName.values.toList();
   }
 
   // ── Inspect ───────────────────────────────────────────────────────────────
@@ -102,12 +183,7 @@ class SnapshotService {
   static SnapshotManifest inspectSync(String zipPath) {
     final input = InputFileStream(zipPath);
     try {
-      final Archive archive;
-      try {
-        archive = ZipDecoder().decodeStream(input);
-      } catch (e) {
-        throw SnapshotFormatException('Not a valid zip file: $e');
-      }
+      final archive = _decodeStream(input);
       final manifest = _manifestOf(archive);
       if (archive.find(dbEntryName) == null) {
         throw const SnapshotFormatException('Snapshot has no database file');
@@ -120,16 +196,24 @@ class SnapshotService {
 
   // ── Restore ───────────────────────────────────────────────────────────────
 
-  /// Replaces [dbFile] and the listed Hive box files with the snapshot's
-  /// contents.
+  /// Replaces [dbFile], the listed Hive box files and (when [receiptsDir]
+  /// is given) the backed-up receipt photos with the snapshot's contents.
   ///
-  /// Nothing live is touched until the incoming database has been written to
-  /// a temp file and verified with [verifyDatabaseFile] (SQLite header,
-  /// `PRAGMA integrity_check`, `PRAGMA user_version` in
-  /// `1..currentSchemaVersion` — the manifest alone is not trusted). The
-  /// current files are then moved aside as `*.bak` and the new ones renamed
-  /// into place. If any step of the swap fails, the `.bak` files are put
-  /// back and temp files removed before the error is rethrown.
+  /// Every entry is streamed from the zip to a staged file and its CRC-32
+  /// and size checked against the zip directory. Nothing live is touched
+  /// until the incoming database has been verified with
+  /// [verifyDatabaseFile] (SQLite header, `PRAGMA integrity_check`,
+  /// `PRAGMA user_version` in `1..currentSchemaVersion` — the manifest
+  /// alone is not trusted). The staged database's receipt paths are then
+  /// re-pointed at this device's [receiptsDir] ([repointReceiptPaths]).
+  ///
+  /// The swap moves the current DB and boxes aside as `*.bak`, and any
+  /// photo with the same name into `<receiptsDir>.bak/`, before renaming the
+  /// staged files into place. Photos already on the device that the backup
+  /// doesn't contain are left alone (a format-1 backup carries none, and
+  /// its rows still point at them). If any step of the swap fails, the
+  /// moved-aside files are put back and staged files removed before the
+  /// error is rethrown.
   ///
   /// The returned [RestoreBackup] lets the caller undo a restore that
   /// succeeded on disk but then failed to open (see [rollback]).
@@ -138,8 +222,30 @@ class SnapshotService {
     required File dbFile,
     required Map<String, String> hiveBoxFiles,
     required int currentSchemaVersion,
+    Directory? receiptsDir,
   }) async {
-    final archive = _decode(await zip.readAsBytes());
+    final input = InputFileStream(zip.path);
+    try {
+      return await _restore(
+        input: input,
+        dbFile: dbFile,
+        hiveBoxFiles: hiveBoxFiles,
+        currentSchemaVersion: currentSchemaVersion,
+        receiptsDir: receiptsDir,
+      );
+    } finally {
+      input.closeSync();
+    }
+  }
+
+  Future<RestoreBackup> _restore({
+    required InputFileStream input,
+    required File dbFile,
+    required Map<String, String> hiveBoxFiles,
+    required int currentSchemaVersion,
+    required Directory? receiptsDir,
+  }) async {
+    final archive = _decodeStream(input);
     final manifest = _manifestOf(archive);
     if (manifest.schemaVersion > currentSchemaVersion) {
       throw SnapshotFormatException(
@@ -155,18 +261,24 @@ class SnapshotService {
 
     // 1. Stage every incoming file next to its target and verify the DB.
     //    A failure here leaves the live data untouched.
-    final staged = <File>[];
+    final dbTmp = File('${dbFile.path}$_tmpSuffix');
+    final photoStage = receiptsDir == null
+        ? null
+        : Directory('${receiptsDir.path}$_tmpSuffix');
+    final staged = <FileSystemEntity>[
+      dbTmp,
+      for (final s in _sidecars) File('${dbTmp.path}$s'),
+    ];
     Future<void> discardStaged() async {
       for (final f in staged) {
-        await _deleteIfExists(f);
+        if (await f.exists()) await f.delete(recursive: true);
       }
     }
 
-    final dbTmp = File('${dbFile.path}$_tmpSuffix');
     final hiveTmps = <String, File>{}; // target path → staged file
+    final photoNames = <String>[];
     try {
-      staged.add(dbTmp);
-      await _writeFresh(dbTmp, dbEntry.readBytes()!);
+      _extractTo(dbEntry, dbTmp);
       verifyDatabaseFile(dbTmp, currentSchemaVersion: currentSchemaVersion);
 
       for (final entry in hiveBoxFiles.entries) {
@@ -174,19 +286,42 @@ class SnapshotService {
         if (f == null) continue; // not in the archive — leave the box as-is
         final tmp = File('${entry.value}$_tmpSuffix');
         staged.add(tmp);
-        await _writeFresh(tmp, f.readBytes()!);
+        _extractTo(f, tmp);
         hiveTmps[entry.value] = tmp;
+      }
+
+      if (receiptsDir != null && photoStage != null) {
+        const prefix = '$photosDirName/';
+        final photos =
+            archive.where((e) => e.isFile && e.name.startsWith(prefix));
+        if (photos.isNotEmpty) {
+          staged.add(photoStage);
+          if (photoStage.existsSync()) photoStage.deleteSync(recursive: true);
+          photoStage.createSync(recursive: true);
+          for (final e in photos) {
+            final name = e.name.substring(prefix.length);
+            if (!_isSafeName(name)) {
+              throw SnapshotFormatException(
+                  'Backup contains an unsafe file name: ${e.name}');
+            }
+            _extractTo(e, File(p.join(photoStage.path, name)));
+            photoNames.add(name);
+          }
+        }
+        repointReceiptPaths(dbTmp, receiptsDir);
       }
     } catch (_) {
       await discardStaged();
       rethrow;
     }
 
-    // 2. Swap: move current files to `.bak`, rename staged files into place.
+    // 2. Swap: move current files aside, rename staged files into place.
     final backup = RestoreBackup(
       manifest: manifest,
       dbPath: dbFile.path,
       hivePaths: hiveTmps.keys.toList(),
+      photoPaths: <String>[], // filled as photos land, for a partial undo
+      photoBakDir: photoNames.isEmpty ? null : '${receiptsDir!.path}$_bakSuffix',
     );
     try {
       await _backupDb(dbFile);
@@ -203,6 +338,26 @@ class SnapshotService {
         // Hive keeps a `.lock` beside the box; harmless, but drop it.
         await _deleteIfExists(File('${e.key}.lock'));
       }
+
+      if (photoNames.isNotEmpty) {
+        final bakDir = Directory(backup.photoBakDir!);
+        // The previous restore's photo backup is superseded.
+        if (await bakDir.exists()) await bakDir.delete(recursive: true);
+        await bakDir.create(recursive: true);
+        await receiptsDir!.create(recursive: true);
+        for (final name in photoNames) {
+          final target = File(p.join(receiptsDir.path, name));
+          // Order matters for [rollback]: a listed target either has its
+          // original in bakDir or had none.
+          if (await target.exists()) {
+            await target.rename(p.join(bakDir.path, name));
+          }
+          backup.photoPaths.add(target.path);
+          await File(p.join(photoStage!.path, name)).rename(target.path);
+        }
+        await photoStage!.delete(recursive: true);
+        if (await bakDir.list().isEmpty) await bakDir.delete();
+      }
     } catch (_) {
       await discardStaged();
       await rollback(backup);
@@ -212,7 +367,8 @@ class SnapshotService {
   }
 
   /// Puts back the files [restore] moved aside. Safe after a partial swap:
-  /// a target without a `.bak` / `.bak.absent` marker is left alone.
+  /// a target without a `.bak` / `.bak.absent` marker is left alone, and
+  /// only photos [restore] actually placed are removed or put back.
   Future<void> rollback(RestoreBackup backup) async {
     final db = File(backup.dbPath);
     final dbBak = File('${backup.dbPath}$_bakSuffix');
@@ -231,6 +387,19 @@ class SnapshotService {
     }
     for (final path in backup.hivePaths) {
       await _restoreAside(File(path));
+    }
+
+    final bakDir =
+        backup.photoBakDir == null ? null : Directory(backup.photoBakDir!);
+    for (final path in backup.photoPaths) {
+      await _deleteIfExists(File(path));
+      if (bakDir != null) {
+        final original = File(p.join(bakDir.path, p.basename(path)));
+        if (await original.exists()) await original.rename(path);
+      }
+    }
+    if (bakDir != null && await bakDir.exists()) {
+      await bakDir.delete(recursive: true);
     }
   }
 
@@ -281,6 +450,49 @@ class SnapshotService {
     }
   }
 
+  /// Rewrites every `expenses.receipt_image_path` in [dbFile] to
+  /// `receiptsDir/<file name>`. Stored paths are absolute, so they break
+  /// on another device — and on iOS even on the same one, whose container
+  /// path changes between installs. Unusable names are cleared. Returns the
+  /// number of rows changed. Leaves no `-wal` / `-shm` beside [dbFile].
+  static int repointReceiptPaths(File dbFile, Directory receiptsDir) {
+    final db = sqlite3.open(dbFile.path);
+    var changed = 0;
+    try {
+      if (!_hasColumn(db, 'expenses', _receiptColumn)) return 0;
+      final rows = db.select('SELECT id, $_receiptColumn FROM expenses '
+          'WHERE $_receiptColumn IS NOT NULL');
+      final update = db.prepare(
+          'UPDATE expenses SET $_receiptColumn = ? WHERE id = ?');
+      try {
+        db.execute('BEGIN');
+        for (final r in rows) {
+          final old = r.columnAt(1) as String;
+          final name = _baseName(old);
+          final next =
+              _isSafeName(name) ? p.join(receiptsDir.path, name) : null;
+          if (next == old) continue;
+          update.execute([next, r.columnAt(0)]);
+          changed++;
+        }
+        db.execute('COMMIT');
+      } catch (_) {
+        if (!db.autocommit) db.execute('ROLLBACK');
+        rethrow;
+      } finally {
+        update.dispose();
+      }
+      db.execute('PRAGMA wal_checkpoint(TRUNCATE)');
+    } finally {
+      db.dispose();
+    }
+    for (final s in _sidecars) {
+      final f = File('${dbFile.path}$s');
+      if (f.existsSync()) f.deleteSync();
+    }
+    return changed;
+  }
+
   /// Throws [SnapshotFormatException] unless [f] is an intact SQLite
   /// database whose `user_version` is in `1..currentSchemaVersion`.
   /// Opens the file read-only; never trusts the manifest.
@@ -299,11 +511,7 @@ class SnapshotService {
 
     final Database db;
     try {
-      // `immutable=1`: the staged file has no -wal/-shm and nothing else
-      // writes it, so SQLite can skip locking and the shared-memory index —
-      // a read-only open of a WAL-mode file would otherwise fail (code 14).
-      final uri = Uri.file(f.absolute.path).replace(query: 'immutable=1');
-      db = sqlite3.open(uri.toString(), mode: OpenMode.readOnly, uri: true);
+      db = _openReadOnly(f);
     } catch (e) {
       throw SnapshotFormatException('Backup database cannot be opened: $e');
     }
@@ -386,6 +594,7 @@ class SnapshotService {
 
   // ── Internals ─────────────────────────────────────────────────────────────
 
+  static const _receiptColumn = 'receipt_image_path';
   static const _tmpSuffix = '.restore.tmp';
   static const _bakSuffix = '.bak';
   static const _absentSuffix = '.bak.absent';
@@ -395,9 +604,10 @@ class SnapshotService {
     0x6f, 0x72, 0x6d, 0x61, 0x74, 0x20, 0x33, 0x00, // "ormat 3\0"
   ];
 
-  Archive _decode(List<int> bytes) {
+  /// Parses only the zip's central directory; entry data stays on disk.
+  static Archive _decodeStream(InputStream input) {
     try {
-      return ZipDecoder().decodeBytes(bytes, verify: true);
+      return ZipDecoder().decodeStream(input);
     } catch (e) {
       throw SnapshotFormatException('Not a valid zip file: $e');
     }
@@ -426,6 +636,118 @@ class SnapshotService {
     }
     return manifest;
   }
+
+  /// Deflates [src] into [scratch] chunk by chunk, then adds it to the zip
+  /// as an already-compressed entry, which the encoder copies in chunks.
+  static void _addDeflated(
+      ZipEncoder encoder, String name, File src, File scratch) {
+    final input = src.openSync();
+    final out = scratch.openSync(mode: FileMode.write);
+    var crc = 0;
+    var size = 0;
+    try {
+      final deflater = ZLibCodec(raw: true, level: 6)
+          .encoder
+          .startChunkedConversion(_FileSink(out));
+      final buf = Uint8List(chunkSize);
+      while (true) {
+        final n = input.readIntoSync(buf);
+        if (n <= 0) break;
+        final chunk = buf.sublist(0, n);
+        crc = getCrc32(chunk, crc);
+        size += n;
+        deflater.add(chunk);
+      }
+      deflater.close();
+      out.flushSync();
+    } finally {
+      input.closeSync();
+      out.closeSync();
+    }
+    // `add` closes the entry (and so the scratch stream) once written.
+    encoder.add(ArchiveFile.file(name, size, _DeflatedFile(scratch.path))
+      ..crc32 = crc
+      ..compression = CompressionType.deflate);
+  }
+
+  /// Adds [src] uncompressed, streamed. False if it can't be opened (e.g.
+  /// deleted since it was listed).
+  static bool _addStored(ZipEncoder encoder, String name, File src) {
+    final InputFileStream stream;
+    try {
+      stream = InputFileStream(src.path);
+    } catch (_) {
+      return false;
+    }
+    encoder.add(
+        ArchiveFile.stream(name, stream)..compression = CompressionType.none);
+    return true;
+  }
+
+  /// Streams [entry] out of the zip into [dst], inflating chunk by chunk,
+  /// and checks its CRC-32 and size against the zip directory (archive's
+  /// `verify` flag is a no-op in 4.0.x).
+  static void _extractTo(ArchiveFile entry, File dst) {
+    final zf = entry.rawContent;
+    if (zf is! ZipFile) {
+      throw SnapshotFormatException('Unreadable backup entry ${entry.name}');
+    }
+    if (zf.flags & 0x1 != 0) {
+      throw const SnapshotFormatException(
+          'Encrypted backups are not supported');
+    }
+    dst.parent.createSync(recursive: true);
+    final out = dst.openSync(mode: FileMode.write);
+    try {
+      final sink = _FileSink(out, limit: zf.uncompressedSize);
+      final Sink<List<int>> target = switch (zf.compressionMethod) {
+        CompressionType.none => sink,
+        CompressionType.deflate =>
+          ZLibCodec(raw: true).decoder.startChunkedConversion(sink),
+        CompressionType.bzip2 => throw SnapshotFormatException(
+            'Unsupported compression in backup entry ${entry.name}'),
+      };
+      final raw = zf.getStream(decompress: false);
+      while (!raw.isEOS) {
+        target.add(raw.readBytes(min(chunkSize, raw.length)).toUint8List());
+      }
+      target.close();
+      out.flushSync();
+      if (sink.length != zf.uncompressedSize || sink.crc != zf.crc32) {
+        throw SnapshotFormatException(
+            'Backup entry ${entry.name} is corrupt (checksum mismatch)');
+      }
+    } on SnapshotFormatException {
+      rethrow;
+    } catch (e) {
+      throw SnapshotFormatException('Backup entry ${entry.name} is corrupt: $e');
+    } finally {
+      out.closeSync();
+    }
+  }
+
+  static Database _openReadOnly(File f) {
+    // `immutable=1`: the file has no -wal/-shm and nothing else writes it,
+    // so SQLite can skip locking and the shared-memory index — a read-only
+    // open of a WAL-mode file would otherwise fail (code 14).
+    final uri = Uri.file(f.absolute.path).replace(query: 'immutable=1');
+    return sqlite3.open(uri.toString(), mode: OpenMode.readOnly, uri: true);
+  }
+
+  static bool _hasColumn(Database db, String table, String column) => db
+      .select('PRAGMA table_info($table)')
+      .any((r) => r['name'] == column);
+
+  /// File name of a stored path from any platform.
+  static String _baseName(String path) => path.split(RegExp(r'[/\\]')).last;
+
+  static bool _isSafeName(String name) =>
+      name.isNotEmpty &&
+      name != '.' &&
+      name != '..' &&
+      !name.contains('/') &&
+      !name.contains(r'\') &&
+      !name.contains('\u0000');
 
   static bool _startsWith(List<int> a, List<int> prefix) {
     if (a.length < prefix.length) return false;
@@ -479,14 +801,62 @@ class SnapshotService {
     await _deleteIfExists(File('${target.path}.lock'));
   }
 
-  static Future<void> _writeFresh(File f, List<int> bytes) async {
-    await f.parent.create(recursive: true);
-    await f.writeAsBytes(bytes, flush: true);
-  }
-
   static Future<void> _deleteIfExists(File f) async {
     if (await f.exists()) await f.delete();
   }
+}
+
+/// Writes chunks straight to a file, counting bytes and the CRC-32. With a
+/// [limit], throws as soon as more than [limit] bytes arrive (an entry
+/// inflating past its declared size).
+class _FileSink implements Sink<List<int>> {
+  _FileSink(this._raf, {this.limit});
+  final RandomAccessFile _raf;
+  final int? limit;
+  int length = 0;
+  int crc = 0;
+
+  @override
+  void add(List<int> chunk) {
+    length += chunk.length;
+    if (limit != null && length > limit!) {
+      throw const SnapshotFormatException(
+          'Backup entry is larger than its declared size');
+    }
+    if (limit != null) crc = getCrc32(chunk, crc);
+    _raf.writeFromSync(chunk);
+  }
+
+  @override
+  void close() {}
+}
+
+/// Raw-deflate data in a scratch file, handed to [ZipEncoder] as an entry
+/// that is already compressed so it is copied, not re-encoded in memory.
+class _DeflatedFile extends FileContent {
+  _DeflatedFile(String path) : _stream = InputFileStream(path);
+  final InputFileStream _stream;
+
+  @override
+  bool get isCompressed => true;
+
+  @override
+  int get length => _stream.length;
+
+  @override
+  InputStream getStream({bool decompress = true}) {
+    if (decompress) throw UnsupportedError('raw deflate data only');
+    return _stream;
+  }
+
+  @override
+  void write(OutputStream output) => output.writeStream(_stream);
+
+  @override
+  Future<void> close() => _stream.close();
+
+  @override
+  void closeSync() => _stream.closeSync();
 }
 
 /// What [SnapshotService.restore] moved aside, so it can be undone.
@@ -496,10 +866,17 @@ class RestoreBackup {
     required this.manifest,
     required this.dbPath,
     required this.hivePaths,
+    this.photoPaths = const [],
+    this.photoBakDir,
   });
   final SnapshotManifest manifest;
   final String dbPath;
   final List<String> hivePaths;
+
+  /// Receipt photos the restore placed; [photoBakDir] holds any same-named
+  /// originals they replaced.
+  final List<String> photoPaths;
+  final String? photoBakDir;
 }
 
 // ─── Manifest ────────────────────────────────────────────────────────────────
@@ -511,6 +888,7 @@ class SnapshotManifest {
     required this.createdAt,
     required this.dbBytes,
     required this.hiveBoxes,
+    this.photos = const [],
   });
 
   final int formatVersion;
@@ -519,6 +897,9 @@ class SnapshotManifest {
   final int dbBytes;
   final List<String> hiveBoxes;
 
+  /// Receipt photo file names under `receipts/` (format 2+; empty before).
+  final List<String> photos;
+
   Map<String, dynamic> toJson() => {
         'app': 'pos_app',
         'formatVersion': formatVersion,
@@ -526,6 +907,7 @@ class SnapshotManifest {
         'createdAt': createdAt.toIso8601String(),
         'dbBytes': dbBytes,
         'hiveBoxes': hiveBoxes,
+        'photos': photos,
       };
 
   factory SnapshotManifest.fromJson(Map<String, dynamic> j) {
@@ -538,6 +920,7 @@ class SnapshotManifest {
       createdAt: DateTime.parse(j['createdAt'] as String),
       dbBytes: j['dbBytes'] as int,
       hiveBoxes: (j['hiveBoxes'] as List).cast<String>(),
+      photos: (j['photos'] as List?)?.cast<String>() ?? const [],
     );
   }
 }

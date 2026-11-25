@@ -90,7 +90,9 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
       builder: (context) => AlertDialog(
         title: const Text('Restore this backup?'),
         content: Text(
-          'Backup from $when ($size).\n\n'
+          'Backup from $when ($size)'
+          '${manifest.photos.isEmpty ? '' : ', with ${manifest.photos.length} '
+              'receipt photo${manifest.photos.length == 1 ? '' : 's'}'}.\n\n'
           'This REPLACES all current data — products, orders, customers, '
           'settings — with the backup. The app will restart.\n\n'
           'Tip: create a fresh backup first if you might need today\'s data.',

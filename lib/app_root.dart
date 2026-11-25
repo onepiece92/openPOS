@@ -112,6 +112,7 @@ class AppRootState extends State<AppRoot> {
     // Resolve paths while Hive is still open (box.path needs an open box).
     final dbPath = (await databaseFile()).path;
     final hiveFiles = snapshotHiveBoxFiles();
+    final photosPath = (await receiptsDir()).path;
     final zipPath = zip.path;
     // Review-reminder bookkeeping lives in the settings box, which the
     // restore replaces: remember it now, merge it back after the reopen so
@@ -153,7 +154,8 @@ class AppRootState extends State<AppRoot> {
         // 3. Verify + swap off the UI isolate, reopen, roll back on failure.
         try {
           await const SnapshotService().restoreWithRollback(
-            swap: () => _swapInIsolate(zipPath, dbPath, hiveFiles),
+            swap: () =>
+                _swapInIsolate(zipPath, dbPath, hiveFiles, photosPath),
             reopen: _reopenStores,
             release: _releaseStores,
           );
@@ -195,11 +197,13 @@ class AppRootState extends State<AppRoot> {
     String zipPath,
     String dbPath,
     Map<String, String> hiveFiles,
+    String photosPath,
   ) =>
       Isolate.run(() => const SnapshotService().restore(
             zip: File(zipPath),
             dbFile: File(dbPath),
             hiveBoxFiles: hiveFiles,
+            receiptsDir: Directory(photosPath),
             currentSchemaVersion: AppDatabase.currentSchemaVersion,
           ));
 

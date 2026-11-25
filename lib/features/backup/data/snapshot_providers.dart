@@ -30,6 +30,13 @@ Map<String, String> snapshotHiveBoxFiles() => {
           name: Hive.box<dynamic>(name).path!,
     };
 
+/// Where expense receipt photos live (the expense form copies them here).
+/// Snapshots carry these photos; restore re-points the DB at this folder.
+Future<Directory> receiptsDir() async {
+  final docs = await getApplicationDocumentsDirectory();
+  return Directory(p.join(docs.path, 'receipts'));
+}
+
 Future<Directory> autoBackupDir() async {
   final docs = await getApplicationDocumentsDirectory();
   return Directory(p.join(docs.path, 'backups', 'auto'));
@@ -66,11 +73,13 @@ class SnapshotCoordinator {
       final dbPath = copy.path;
       final hiveFiles = snapshotHiveBoxFiles();
       final outPath = outDir.path;
+      final photosPath = (await receiptsDir()).path;
       // Pure-Dart work with only paths captured → safe to run in an isolate.
       return await Isolate.run(() => _svc.create(
             dbFile: File(dbPath),
             hiveBoxFiles: hiveFiles,
             outDir: Directory(outPath),
+            receiptsDir: Directory(photosPath),
             schemaVersion: AppDatabase.currentSchemaVersion,
             now: now,
           ));
