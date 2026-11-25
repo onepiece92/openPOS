@@ -5,25 +5,25 @@ const kReviewMinDaysSinceInstall = 7;
 const kReviewMinCompletedSales = 20;
 const kReviewMinDaysBetweenPrompts = 60;
 
-/// Persisted trigger state (see `ReviewStateStore`).
+/// Persisted trigger state (see `ReviewStateStore`). The number of sales is
+/// not part of it: that is counted from the orders table when needed.
 @immutable
 class ReviewState {
   const ReviewState({
     this.firstLaunchAt,
-    this.completedSales = 0,
     this.lastPromptAt,
     this.lastPromptVersion,
   });
 
   final DateTime? firstLaunchAt;
-  final int completedSales;
   final DateTime? lastPromptAt;
   final String? lastPromptVersion;
 }
 
 /// Pure decision: request a review only when ALL hold —
 /// * ≥ [kReviewMinDaysSinceInstall] days since first launch,
-/// * ≥ [kReviewMinCompletedSales] completed sales,
+/// * [completedSales] ≥ [kReviewMinCompletedSales] (orders with status
+///   'completed' in the database),
 /// * ≥ [kReviewMinDaysBetweenPrompts] days since the last request (or never),
 /// * [currentVersion] has not been prompted yet.
 ///
@@ -31,6 +31,7 @@ class ReviewState {
 /// restored first-launch date in the future) simply reads as "not yet".
 bool shouldRequestReview(
   ReviewState s, {
+  required int completedSales,
   required DateTime now,
   required String currentVersion,
 }) {
@@ -39,7 +40,7 @@ bool shouldRequestReview(
   if (now.difference(first) < const Duration(days: kReviewMinDaysSinceInstall)) {
     return false;
   }
-  if (s.completedSales < kReviewMinCompletedSales) return false;
+  if (completedSales < kReviewMinCompletedSales) return false;
   final last = s.lastPromptAt;
   if (last != null &&
       now.difference(last) <

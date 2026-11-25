@@ -45,7 +45,6 @@ const kTimezone = 'timezone';
 // review_state_store.dart, which reads/writes them directly — they are
 // bookkeeping, not user-facing settings, so they stay out of AppSettings).
 const kReviewFirstLaunchAt = 'review_first_launch_at'; // ISO-8601
-const kReviewCompletedSales = 'review_completed_sales'; // int
 const kReviewLastPromptAt = 'review_last_prompt_at'; // ISO-8601
 const kReviewLastPromptVersion = 'review_last_prompt_version'; // kAppVersionFull, e.g. '1.1.0+10'
 

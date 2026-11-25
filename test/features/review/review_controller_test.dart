@@ -37,6 +37,9 @@ void main() {
   late Box<dynamic> box;
   late ReviewStateStore store;
   final now = DateTime(2026, 6, 1);
+  // What the fake "database" reports, and how often it was asked.
+  late int sales;
+  late int salesQueries;
   const version = '1.0.0+9';
 
   setUp(() async {
@@ -44,6 +47,8 @@ void main() {
     Hive.init(tmp.path);
     box = await Hive.openBox<dynamic>('settings');
     store = ReviewStateStore(box);
+    sales = 0;
+    salesQueries = 0;
   });
 
   tearDown(() async {
@@ -53,25 +58,81 @@ void main() {
 
   Future<void> eligible() async {
     await store.ensureFirstLaunch(now.subtract(const Duration(days: 10)));
-    await box.put(kReviewCompletedSales, kReviewMinCompletedSales);
+    sales = kReviewMinCompletedSales;
   }
 
-  ReviewController controller(_FakePrompter p) => ReviewController(
+  ReviewController controller(_FakePrompter p,
+          {Future<int> Function()? completedSales}) =>
+      ReviewController(
         store: store,
         prompter: p,
+        completedSales: completedSales ??
+            () async {
+              salesQueries++;
+              return sales;
+            },
         appVersion: version,
         clock: () => now,
         settleDelay: Duration.zero,
         timeout: const Duration(milliseconds: 50),
       );
 
-  test('store: first launch kept, sales counted', () async {
+  test('store: first launch kept', () async {
     await store.ensureFirstLaunch(now);
     await store.ensureFirstLaunch(now.add(const Duration(days: 5)));
     expect(store.read().firstLaunchAt, now);
-    await store.incrementCompletedSales();
-    await store.incrementCompletedSales();
-    expect(store.read().completedSales, 2);
+  });
+
+  test('sales come from the database count: 19 no, 20 yes', () async {
+    await eligible();
+    sales = kReviewMinCompletedSales - 1;
+    final p = _FakePrompter(_Mode.ok);
+    final c = controller(p);
+    await c.runCheck();
+    expect(p.calls, 0);
+    sales = kReviewMinCompletedSales;
+    await c.runCheck();
+    expect(p.calls, 1);
+    expect(salesQueries, 2);
+  });
+
+  test('a leftover counter key from the old scheme is ignored', () async {
+    await eligible();
+    sales = 0;
+    await box.put('review_completed_sales', 500);
+    final p = _FakePrompter(_Mode.ok);
+    await controller(p).runCheck();
+    expect(p.calls, 0);
+  });
+
+  test('database is not queried when dates or version already say no',
+      () async {
+    await store.ensureFirstLaunch(now); // installed today
+    sales = 500;
+    final p = _FakePrompter(_Mode.ok);
+    await controller(p).runCheck();
+    expect(salesQueries, 0);
+    expect(p.calls, 0);
+  });
+
+  test('a throwing or hanging sales count is swallowed and bounded',
+      () async {
+    await eligible();
+    final p = _FakePrompter(_Mode.ok);
+    final throwing = controller(p,
+        completedSales: () => Future.error(StateError('db closed')));
+    await expectLater(throwing.runCheck(), completes);
+    final hanging =
+        controller(p, completedSales: () => Completer<int>().future);
+    await hanging.runCheck().timeout(const Duration(seconds: 2));
+    expect(p.calls, 0);
+    expect(store.read().lastPromptAt, isNull);
+    // Neither failure leaves the controller stuck "in flight".
+    await throwing.runCheck();
+    await hanging.runCheck();
+    final ok = controller(p);
+    await ok.runCheck();
+    expect(p.calls, 1);
   });
 
   test('eligible + available → asks once and records date/version', () async {
@@ -119,33 +180,29 @@ void main() {
         reason: 'a timed-out request counts so we do not re-ask every sale');
   });
 
-  test('receipt hooks return synchronously even if the prompter hangs',
+  test('receipt hook returns synchronously even if the prompter hangs',
       () async {
     await eligible();
     final c = controller(_FakePrompter(_Mode.hangs));
     final sw = Stopwatch()..start();
-    c.recordCompletedSale();
     c.onReceiptDismissed();
     expect(sw.elapsedMilliseconds, lessThan(20));
     await Future<void>.delayed(const Duration(milliseconds: 150));
   });
 
-  test('restore merge keeps earliest install, latest prompt, higher count',
+  test('restore merge keeps earliest install and latest prompt',
       () async {
     final before = ReviewState(
       firstLaunchAt: DateTime(2026, 1, 1),
-      completedSales: 40,
       lastPromptAt: DateTime(2026, 5, 1),
       lastPromptVersion: '1.0.0+9',
     );
     // Box now holds an older backup's values.
     await box.put(kReviewFirstLaunchAt, DateTime(2026, 2, 1).toIso8601String());
-    await box.put(kReviewCompletedSales, 10);
     await store.markPrompted(DateTime(2026, 3, 1), '1.0.0+8');
     await store.mergeAfterRestore(before);
     final s = store.read();
     expect(s.firstLaunchAt, DateTime(2026, 1, 1));
-    expect(s.completedSales, 40);
     expect(s.lastPromptAt, DateTime(2026, 5, 1));
     expect(s.lastPromptVersion, '1.0.0+9');
   });

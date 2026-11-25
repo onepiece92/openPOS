@@ -61,8 +61,6 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
   void initState() {
     super.initState();
     _review = ref.read(reviewControllerProvider);
-    // A receipt is only reached after a completed payment.
-    _review.recordCompletedSale();
   }
 
   @override

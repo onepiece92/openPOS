@@ -9,11 +9,11 @@ import 'package:pos_app/features/review/domain/review_prompter.dart';
 /// Wires the pure [shouldRequestReview] rule to persisted state and the
 /// platform [ReviewPrompter].
 ///
-/// Hooks (both in the receipt screen):
-/// * [recordCompletedSale] when a receipt is shown,
-/// * [onReceiptDismissed] when the receipt screen goes away.
+/// Hook: [onReceiptDismissed] when the receipt screen goes away. Sales are
+/// not counted here — [completedSales] reads the number of completed orders
+/// from the database, so viewing a receipt again can never inflate it.
 ///
-/// Neither returns a Future: everything runs unawaited, after
+/// The hook returns no Future: everything runs unawaited, after
 /// [settleDelay] (so the next screen has finished navigating), bounded by
 /// [timeout] and wrapped in a catch-all. A throwing, hanging or "unavailable"
 /// store (no network, sideloaded APK, no Play services) is silently ignored
@@ -22,6 +22,7 @@ class ReviewController {
   ReviewController({
     required this.store,
     required this.prompter,
+    required this.completedSales,
     required this.appVersion,
     DateTime Function()? clock,
     this.settleDelay = const Duration(seconds: 1),
@@ -30,16 +31,16 @@ class ReviewController {
 
   final ReviewStateStore store;
   final ReviewPrompter prompter;
+
+  /// Completed orders in the database; may stop counting at
+  /// [kReviewMinCompletedSales].
+  final Future<int> Function() completedSales;
   final String appVersion;
   final Duration settleDelay;
   final Duration timeout;
   final DateTime Function() _clock;
 
   bool _inFlight = false;
-
-  void recordCompletedSale() {
-    unawaited(_guard(store.incrementCompletedSales));
-  }
 
   void onReceiptDismissed() {
     unawaited(_guard(() async {
@@ -54,12 +55,15 @@ class ReviewController {
   Future<void> runCheck() => _guard(() async {
         if (_inFlight) return;
         final now = _clock();
-        if (!shouldRequestReview(store.read(),
-            now: now, currentVersion: appVersion)) {
-          return;
-        }
+        final state = store.read();
+        bool passes(int sales) => shouldRequestReview(state,
+            completedSales: sales, now: now, currentVersion: appVersion);
+        // Dates and version first (no I/O): the database is only asked
+        // when the sale count is the one thing left to decide.
+        if (!passes(kReviewMinCompletedSales)) return;
         _inFlight = true;
         try {
+          if (!passes(await completedSales().timeout(timeout))) return;
           bool asked;
           try {
             asked = await prompter.maybeRequestReview().timeout(timeout);

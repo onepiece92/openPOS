@@ -8,21 +8,20 @@ void main() {
 
   ReviewState passing({
     int installDaysAgo = 30,
-    int sales = 25,
     int? lastPromptDaysAgo,
     String? lastVersion,
   }) =>
       ReviewState(
         firstLaunchAt: now.subtract(Duration(days: installDaysAgo)),
-        completedSales: sales,
         lastPromptAt: lastPromptDaysAgo == null
             ? null
             : now.subtract(Duration(days: lastPromptDaysAgo)),
         lastPromptVersion: lastVersion,
       );
 
-  bool decide(ReviewState s, {String version = v}) =>
-      shouldRequestReview(s, now: now, currentVersion: version);
+  bool decide(ReviewState s, {String version = v, int sales = 25}) =>
+      shouldRequestReview(s,
+          completedSales: sales, now: now, currentVersion: version);
 
   test('all conditions met → request', () {
     expect(decide(passing()), isTrue);
@@ -32,16 +31,16 @@ void main() {
     expect(decide(passing(installDaysAgo: 6)), isFalse);
     expect(
         decide(ReviewState(
-            firstLaunchAt: now.subtract(const Duration(days: 7, seconds: -1)),
-            completedSales: 25)),
+            firstLaunchAt:
+                now.subtract(const Duration(days: 7, seconds: -1)))),
         isFalse,
         reason: 'one second short of 7 days');
     expect(decide(passing(installDaysAgo: 7)), isTrue);
   });
 
   test('sales: 19 no, 20 yes', () {
-    expect(decide(passing(sales: 19)), isFalse);
-    expect(decide(passing(sales: 20)), isTrue);
+    expect(decide(passing(), sales: 19), isFalse);
+    expect(decide(passing(), sales: 20), isTrue);
   });
 
   test('since last prompt: 59 days no, 60 days yes', () {
@@ -59,7 +58,7 @@ void main() {
   });
 
   test('unknown first launch or future-dated install → no', () {
-    expect(decide(const ReviewState(completedSales: 100)), isFalse);
+    expect(decide(const ReviewState(), sales: 100), isFalse);
     expect(decide(passing(installDaysAgo: -3)), isFalse);
   });
 }

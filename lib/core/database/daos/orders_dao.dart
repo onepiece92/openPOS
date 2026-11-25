@@ -113,6 +113,25 @@ class OrdersDao extends DatabaseAccessor<AppDatabase> with _$OrdersDaoMixin {
     return row.read<int>('c');
   }
 
+  /// How many orders have status 'completed', counting no further than
+  /// [upTo] — the review reminder only needs to know whether a threshold
+  /// has been reached. Partly refunded orders (still 'completed') and
+  /// imported ones count; held, voided and fully refunded ones do not.
+  ///
+  /// No index covers `status`; the LIMIT is what keeps this cheap: SQLite
+  /// walks the table in rowid order and stops at the [upTo]-th match, so
+  /// once a shop has that many sales it reads about [upTo] rows however
+  /// long the history is.
+  Future<int> completedOrderCount({required int upTo}) async {
+    final row = await customSelect(
+      'SELECT COUNT(*) AS c FROM '
+      "(SELECT 1 FROM orders WHERE status = 'completed' LIMIT ?)",
+      variables: [Variable(upTo)],
+      readsFrom: {orders},
+    ).getSingle();
+    return row.read<int>('c');
+  }
+
   Stream<List<Order>> watchByCustomer(int customerId) => (select(orders)
         ..where((o) => o.customerId.equals(customerId))
         ..orderBy([(o) => OrderingTerm.desc(o.createdAt)]))
