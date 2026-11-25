@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import 'package:pos_app/core/database/app_database.dart';
@@ -90,6 +91,18 @@ class OrderDetailScreen extends ConsumerWidget {
                 case 'pdf':
                   await downloadReceiptPdf(context, data.receipt, fmt);
                 case 'print':
+                  // With no printer paired, printOrder is a silent no-op
+                  // (right for auto-print, confusing for a tapped Print).
+                  if (ref.read(printerDeviceAddressProvider) == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: const Text('No printer set up yet'),
+                      action: SnackBarAction(
+                        label: 'Set up',
+                        onPressed: () => context.push('/settings/printer'),
+                      ),
+                    ));
+                    return;
+                  }
                   final err = await ref
                       .read(autoPrintServiceProvider)
                       .printOrder(orderId);

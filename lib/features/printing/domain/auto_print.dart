@@ -58,18 +58,19 @@ class AutoPrintService {
         table: table,
       );
 
-      // Count first: anything after the original is a marked copy, and a
-      // print that fails half-way was still an issue attempt.
-      final printsBefore = await db.ordersDao.incrementPrintCount(orderId);
+      // Anything after the original is a marked copy. The count only goes up
+      // once the printer has taken the job, so a failed first print (printer
+      // off, out of range) does not turn the retry into a "COPY".
       await _ref.read(receiptPrinterProvider).printReceipt(
             PrinterTarget(address: address, name: name),
             ReceiptPrintJob(
               data: data,
               fmt: fmt,
               paperMm: paper,
-              isCopy: printsBefore > 0,
+              isCopy: order.printCount > 0,
             ),
           );
+      await db.ordersDao.incrementPrintCount(orderId);
       return null;
     } catch (e) {
       return 'Printer: $e';

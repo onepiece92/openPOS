@@ -31,6 +31,35 @@ int _countSequence(List<int> haystack, List<int> needle) {
   return found;
 }
 
+/// The first `GS v 0` raster in [bytes]: its width in dots and its bitmap.
+({int widthDots, int height, List<int> data}) _firstRaster(List<int> bytes) {
+  for (var i = 0; i + 8 <= bytes.length; i++) {
+    if (bytes[i] == 0x1D && bytes[i + 1] == 0x76 && bytes[i + 2] == 0x30) {
+      final widthBytes = bytes[i + 4] | (bytes[i + 5] << 8);
+      final height = bytes[i + 6] | (bytes[i + 7] << 8);
+      final start = i + 8;
+      return (
+        widthDots: widthBytes * 8,
+        height: height,
+        data: bytes.sublist(start, start + widthBytes * height),
+      );
+    }
+  }
+  throw StateError('no raster in job');
+}
+
+/// A white page [width] wide with a solid black block at the top-left.
+Uint8List _blockPage(int width, {bool transparent = false}) {
+  final image = img.Image(width: width, height: 16, numChannels: 4);
+  img.fill(image,
+      color: transparent
+          ? img.ColorRgba8(0, 0, 0, 0)
+          : img.ColorRgba8(255, 255, 255, 255));
+  img.fillRect(image,
+      x1: 0, y1: 0, x2: 15, y2: 7, color: img.ColorRgba8(0, 0, 0, 255));
+  return Uint8List.fromList(img.encodePng(image));
+}
+
 void main() {
   // CapabilityProfile.load() reads its profile from rootBundle.
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -75,5 +104,41 @@ void main() {
       () => escPosRasterBytes([Uint8List.fromList([1, 2, 3])], 80),
       throwsA(isA<StateError>()),
     );
+  });
+
+  group('render width is fitted to the print head', () {
+    for (final (src, paper, dots) in [
+      (575, 80, 576),
+      (577, 80, 576),
+      (383, 58, 384),
+      (720, 80, 576),
+    ]) {
+      test('$src px on ${paper}mm prints $dots dots with the ink intact',
+          () async {
+        final raster =
+            _firstRaster(await escPosRasterBytes([_blockPage(src)], paper));
+
+        expect(raster.widthDots, dots);
+        final rowBytes = dots ~/ 8;
+        expect(raster.data[0], 0xFF,
+            reason: 'the black block must print as set dots, not zeros');
+        expect(raster.data[rowBytes - 1], 0x00,
+            reason: 'the padded right edge is white');
+        expect(raster.data.last, 0x00,
+            reason: 'the white background prints nothing');
+      });
+    }
+  });
+
+  test('a transparent background prints as white paper, not solid black',
+      () async {
+    final raster = _firstRaster(
+        await escPosRasterBytes([_blockPage(575, transparent: true)], 80));
+
+    expect(raster.widthDots, 576);
+    expect(raster.data[0], 0xFF, reason: 'the opaque black block prints');
+    final setBytes = raster.data.where((b) => b != 0).length;
+    expect(setBytes, lessThanOrEqualTo(2 * 8),
+        reason: 'only the 16x8 block is inked');
   });
 }

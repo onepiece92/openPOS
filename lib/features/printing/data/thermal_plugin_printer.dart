@@ -1,5 +1,7 @@
+import 'dart:io' show Platform;
 import 'dart:typed_data';
 
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_thermal_printer/flutter_thermal_printer.dart';
 import 'package:flutter_thermal_printer/utils/printer.dart';
 
@@ -86,9 +88,63 @@ class ThermalPluginPrinter implements ReceiptPrinter {
           'switched on and in range');
     }
     try {
-      await _ftp.printData(device, bytes, longData: true);
+      await _write(target, bytes);
+    } on StateError {
+      rethrow;
     } catch (e) {
       throw StateError(friendlyPrinterError(e, printerName: target.name));
+    } finally {
+      // Leaving the link open holds the printer: most BLE heads take one
+      // central at a time, so the next print (or another till) cannot reach
+      // it. The plugin's disconnect already swallows its own errors.
+      try {
+        await _ftp.disconnect(device);
+      } catch (_) {}
+    }
+  }
+
+  /// Sends [bytes] over BLE, failing loudly.
+  ///
+  /// The plugin's own `printData` logs and returns on every failure — not
+  /// connected, no writable characteristic, a write error — so a print that
+  /// never reached the printer would be reported (and counted) as done.
+  Future<void> _write(PrinterTarget target, List<int> bytes) async {
+    if (Platform.isWindows) {
+      // flutter_blue_plus does not run on Windows; the plugin has its own
+      // transport there, so fall back to it.
+      final device = Printer(
+        address: target.address,
+        name: target.name,
+        connectionType: ConnectionType.BLE,
+      );
+      await _ftp.printData(device, bytes, longData: true);
+      return;
+    }
+    final bt = BluetoothDevice.fromId(target.address);
+    if (!bt.isConnected) {
+      throw StateError('${target.name}: not connected — check it is '
+          'switched on and in range');
+    }
+    BluetoothCharacteristic? out;
+    for (final service in await bt.discoverServices()) {
+      for (final c in service.characteristics) {
+        if (c.properties.write || c.properties.writeWithoutResponse) {
+          out = c;
+          break;
+        }
+      }
+      if (out != null) break;
+    }
+    if (out == null) {
+      throw StateError('${target.name}: does not accept print data over '
+          'Bluetooth — is it an ESC/POS printer?');
+    }
+    final withResponse = out.properties.write;
+    // 3 bytes of ATT header per write; keep a margin like the plugin does.
+    final chunk = (bt.mtuNow - 30).clamp(20, 512);
+    for (var i = 0; i < bytes.length; i += chunk) {
+      final end = i + chunk > bytes.length ? bytes.length : i + chunk;
+      await out.write(bytes.sublist(i, end), withoutResponse: !withResponse);
     }
   }
 }
