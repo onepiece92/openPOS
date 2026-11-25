@@ -9,7 +9,7 @@ import '../../_support/temp_hive.dart';
 void main() {
   group('effective flags', () {
     test('a child is off while its parent is off; its own switch is kept', () {
-      final f = FeatureFlags.only({Feature.loyalty, Feature.tables,
+      final f = FeatureFlags.only(const {Feature.loyalty, Feature.tables,
         Feature.bundles});
       expect(f.stored(Feature.loyalty), isTrue);
       expect(f.loyalty, isFalse, reason: 'needs Customers');
@@ -33,7 +33,7 @@ void main() {
     });
 
     test('a parent switched off and on brings the child back as it was', () {
-      final on = FeatureFlags.only({Feature.customers, Feature.loyalty});
+      final on = FeatureFlags.only(const {Feature.customers, Feature.loyalty});
       final off = on.withStored(Feature.customers, false);
       expect(off.loyalty, isFalse);
       expect(off.withStored(Feature.customers, true).loyalty, isTrue);
@@ -108,10 +108,12 @@ void main() {
       var fired = 0;
       c.listen(featureOnProvider(Feature.customers), (_, __) => fired++);
       await c.read(settingsProvider.notifier).setFeature(Feature.taxes, false);
+      await pumpEventQueue();
       expect(fired, 0);
       await c
           .read(settingsProvider.notifier)
           .setFeature(Feature.customers, false);
+      await pumpEventQueue();
       expect(fired, 1);
     });
   });

@@ -15,6 +15,7 @@ import 'package:pos_app/features/cart/presentation/home.dart';
 import 'package:pos_app/features/cart/presentation/payment_screen.dart';
 import 'package:pos_app/features/customers/presentation/customers_screen.dart';
 import 'package:pos_app/features/expenses/presentation/expenses_screen.dart';
+import 'package:pos_app/features/features/presentation/features_screen.dart';
 import 'package:pos_app/features/inventory/presentation/inventory_screen.dart';
 import 'package:pos_app/features/onboarding/presentation/onboarding_screen.dart';
 import 'package:pos_app/features/orders/presentation/order_detail_screen.dart';
@@ -28,6 +29,7 @@ import 'package:pos_app/features/receipts/presentation/receipt_screen.dart';
 import 'package:pos_app/features/reports/presentation/dashboard_screen.dart';
 import 'package:pos_app/features/settings/presentation/settings_screen.dart';
 import 'package:pos_app/features/settings/presentation/store_profile_edit_screen.dart';
+import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
 import 'package:pos_app/features/tax/presentation/tax_settings_screen.dart';
 import 'package:pos_app/features/theme/presentation/theme_preview_screen.dart';
 import 'package:pos_app/features/usage/presentation/usage_host.dart';
@@ -146,6 +148,8 @@ final routerProvider = Provider<GoRouter>((ref) {
   // router (which would throw away the navigation stack).
   final refresh = _RouterRefresh();
   ref.listen(onboardingCompleteProvider, (_, __) => refresh.ping());
+  // A switched-off feature's screen must not stay open.
+  ref.listen(featureFlagsProvider, (_, __) => refresh.ping());
   ref.onDispose(refresh.dispose);
 
   final router = GoRouter(
@@ -156,7 +160,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (!isOnboarded && state.matchedLocation != '/onboarding') {
         return '/onboarding';
       }
-      return null;
+      return featureRedirect(
+          ref.read(featureFlagsProvider), state.matchedLocation);
     },
     routes: [
       GoRoute(
@@ -249,6 +254,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/audit',
         pageBuilder: (_, state) => _slide(state, const AuditLogScreen()),
+      ),
+      GoRoute(
+        path: '/features',
+        pageBuilder: (_, state) => _slide(state, const FeaturesScreen()),
       ),
       GoRoute(
         path: '/settings',
