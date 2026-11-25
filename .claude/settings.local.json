@@ -1,7 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(ls -la \"/e/New folder \\(4\\)/openPOS/\")"
-    ]
-  }
-}
