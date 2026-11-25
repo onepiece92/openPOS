@@ -1,8 +1,8 @@
-import 'package:flutter/services.dart' show rootBundle;
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import 'package:pos_app/core/utils/bundled_fonts.dart';
 import 'package:pos_app/core/utils/currency_formatter.dart';
 import 'package:pos_app/features/orders/domain/order_number.dart';
 import 'package:pos_app/features/receipts/presentation/receipt_body.dart';
@@ -27,10 +27,8 @@ Future<pw.Document> buildReceiptRollPdf(
   final width = rollWidthMm(widthDots) * PdfPageFormat.mm;
   final narrow = widthDots < 500;
 
-  final font = pw.Font.ttf(
-      await rootBundle.load('assets/fonts/JetBrainsMono-Regular.ttf'));
-  final fontBold =
-      pw.Font.ttf(await rootBundle.load('assets/fonts/JetBrainsMono-Bold.ttf'));
+  final font = await bundledPdfFont(jetBrainsMonoRegular);
+  final fontBold = await bundledPdfFont(jetBrainsMonoBold);
 
   // Sized so a full line of monospace text just fits the roll: ~42 chars on
   // 80mm, ~30 on 58mm.
@@ -191,10 +189,8 @@ Future<pw.Document> buildTestPageRollPdf({
   final width = rollWidthMm(widthDots) * PdfPageFormat.mm;
   final base = widthDots < 500 ? 7.0 : 8.0;
 
-  final font = pw.Font.ttf(
-      await rootBundle.load('assets/fonts/JetBrainsMono-Regular.ttf'));
-  final fontBold =
-      pw.Font.ttf(await rootBundle.load('assets/fonts/JetBrainsMono-Bold.ttf'));
+  final font = await bundledPdfFont(jetBrainsMonoRegular);
+  final fontBold = await bundledPdfFont(jetBrainsMonoBold);
 
   final body = pw.TextStyle(font: font, fontSize: base);
   final title = pw.TextStyle(font: fontBold, fontSize: base * 1.75);

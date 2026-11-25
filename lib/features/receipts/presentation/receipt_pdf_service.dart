@@ -1,18 +1,13 @@
 import 'package:flutter/material.dart' show BuildContext;
-import 'package:flutter/services.dart' show rootBundle;
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
+import 'package:pos_app/core/utils/bundled_fonts.dart';
 import 'package:pos_app/core/utils/currency_formatter.dart';
 import 'package:pos_app/features/receipts/presentation/receipt_body.dart';
 import 'package:pos_app/features/orders/domain/order_number.dart';
-
-Future<pw.Font> _loadFont(String path) async {
-  final data = await rootBundle.load(path);
-  return pw.Font.ttf(data);
-}
 
 // ─── PDF builder ──────────────────────────────────────────────────────────────
 
@@ -23,9 +18,9 @@ Future<pw.Document> buildReceiptPdf(
   final symbolLabel = fmt.symbol.trim();
 
   // Load JetBrains Mono for PDF (bundled, offline)
-  final font = await _loadFont('assets/fonts/JetBrainsMono-Regular.ttf');
-  final fontBold = await _loadFont('assets/fonts/JetBrainsMono-Bold.ttf');
-  final fontItalic = await _loadFont('assets/fonts/JetBrainsMono-Italic.ttf');
+  final font = await bundledPdfFont(jetBrainsMonoRegular);
+  final fontBold = await bundledPdfFont(jetBrainsMonoBold);
+  final fontItalic = await bundledPdfFont(jetBrainsMonoItalic);
 
   // Styles
   final baseStyle = pw.TextStyle(fontSize: 10, font: font);
