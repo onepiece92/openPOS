@@ -53,7 +53,8 @@ class OnboardingNotifier extends Notifier<OnboardingState> {
 
   /// Writes the switches (features_v1), the business type and whether the
   /// "turn features on or off" intro is still due. [taxFromRate]: the tax
-  /// step was passed, so Taxes follows its rate (> 0 = on).
+  /// step was passed. One way only: a rate > 0 turns Taxes on; a 0 rate
+  /// leaves the preset's (or the user's) switch alone.
   Future<void> _saveFeatures({required bool taxFromRate}) async {
     final settings = ref.read(settingsProvider.notifier);
     final type = state.businessType;
@@ -67,12 +68,54 @@ class OnboardingNotifier extends Notifier<OnboardingState> {
         // keeps its own key untouched.
         for (final f in Feature.values)
           if (f != Feature.loyalty) f: _defaults.stored(f),
-      if (taxFromRate) Feature.taxes: state.taxRate > 0,
+      if (taxFromRate && state.taxRate > 0) Feature.taxes: true,
     };
     await settings.setFeatures(values);
     // The suggestions step showed what Features does: no drawer intro.
+    // Skipped before it: a fresh install gets the neutral line, not "New:".
     if (_passed(OnboardingStep.businessType)) {
       await settings.markFeaturesIntroSeen();
+    } else {
+      await settings.markFeaturesIntroFresh();
+    }
+  }
+
+  /// Saves what setup has collected. [all] (Finish): every step, with the
+  /// existing fallbacks for blank ones. Otherwise (Skip) only the steps
+  /// already passed, so a skip keeps the name, country and currency the
+  /// shopkeeper entered — and nothing they never saw.
+  Future<void> _saveProfile({required bool all}) async {
+    final db = ref.read(databaseProvider);
+    final settings = ref.read(settingsProvider.notifier);
+
+    // A blank name stays blank: businessNameOrDefault prints "My Store"
+    // until one is set.
+    if (all || _passed(OnboardingStep.name) || state.businessName.isNotEmpty) {
+      await settings.setStoreProfile(name: state.businessName);
+    }
+    if (all || (_passed(OnboardingStep.country) && state.country != null)) {
+      await settings.setCurrency(
+        symbol: state.country?.symbol ?? '\$',
+        code: state.country?.currency ?? 'USD',
+      );
+      await settings.setLocale(
+        countryCode: state.country?.code ?? 'US',
+        timezone: state.country?.timezone ?? 'UTC',
+      );
+    }
+
+    // The default tax rate, only when one was given: a blank (0) rate
+    // creates no "Tax 0%" (rate stored as decimal: 13% → 0.13).
+    if ((all || _passed(OnboardingStep.tax)) && state.taxRate > 0) {
+      final taxId = await db.taxDao.upsertRate(
+        TaxRatesCompanion.insert(
+          name: state.taxName.isNotEmpty ? state.taxName : 'Tax',
+          rate: state.taxRate / 100.0,
+          inclusionType: const Value('exclusive'),
+          roundingMode: const Value('half_up'),
+        ),
+      );
+      await settings.setDefaultTaxId(taxId);
     }
   }
 
@@ -80,31 +123,9 @@ class OnboardingNotifier extends Notifier<OnboardingState> {
     state = state.copyWith(saving: true);
 
     final box = ref.read(settingsBoxProvider);
-    final db = ref.read(databaseProvider);
     final settings = ref.read(settingsProvider.notifier);
 
-    // Save store profile. A blank name stays blank: businessNameOrDefault
-    // prints "My Store" until one is set.
-    await settings.setStoreProfile(name: state.businessName);
-    await settings.setCurrency(
-      symbol: state.country?.symbol ?? '\$',
-      code: state.country?.currency ?? 'USD',
-    );
-    await settings.setLocale(
-      countryCode: state.country?.code ?? 'US',
-      timezone: state.country?.timezone ?? 'UTC',
-    );
-
-    // Insert default tax rate (rate stored as decimal: 13% → 0.13)
-    final taxId = await db.taxDao.upsertRate(
-      TaxRatesCompanion.insert(
-        name: state.taxName.isNotEmpty ? state.taxName : 'Tax',
-        rate: state.taxRate / 100.0,
-        inclusionType: const Value('exclusive'),
-        roundingMode: const Value('half_up'),
-      ),
-    );
-    await settings.setDefaultTaxId(taxId);
+    await _saveProfile(all: true);
 
     // Seed checklist state
     await box.put('checklist_state', {
@@ -119,9 +140,11 @@ class OnboardingNotifier extends Notifier<OnboardingState> {
     state = state.copyWith(saving: false);
   }
 
-  /// Skip (on any step): the switches chosen so far, or the defaults.
+  /// Skip (on any step): what was entered so far, and the switches chosen
+  /// so far (or the defaults).
   Future<void> skip() async {
     state = state.copyWith(saving: true);
+    await _saveProfile(all: false);
     await _saveFeatures(taxFromRate: _passed(OnboardingStep.tax));
     await ref.read(settingsProvider.notifier).setOnboardingComplete(true);
     state = state.copyWith(saving: false);

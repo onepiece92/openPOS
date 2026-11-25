@@ -77,6 +77,9 @@ int? selectedNavIndex(List<NavEntry> entries, String location) {
 /// Text of the one-time drawer line shown after an upgrade.
 const kFeaturesIntroText = 'New: turn features on or off in Features';
 
+/// The same line for a fresh install that skipped setup's suggestions.
+const kFeaturesIntroFreshText = 'Turn features on or off any time in Features';
+
 class PosDrawer extends ConsumerWidget {
   const PosDrawer({super.key});
 
@@ -158,6 +161,7 @@ class _FeaturesIntroLine extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tt = Theme.of(context).textTheme;
+    final fresh = ref.watch(featuresIntroFreshProvider);
     void seen() => ref.read(settingsProvider.notifier).markFeaturesIntroSeen();
     return Padding(
       key: const ValueKey('features-intro'),
@@ -171,7 +175,8 @@ class _FeaturesIntroLine extends ConsumerWidget {
                 Navigator.of(context).pop();
                 context.go('/features');
               },
-              child: Text(kFeaturesIntroText, style: tt.bodyMedium),
+              child: Text(fresh ? kFeaturesIntroFreshText : kFeaturesIntroText,
+                  style: tt.bodyMedium),
             ),
           ),
           TextButton(

@@ -9,6 +9,7 @@ import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/features/onboarding/domain/business_type.dart';
+import 'package:pos_app/features/onboarding/domain/country_default.dart';
 import 'package:pos_app/features/onboarding/domain/onboarding_state.dart';
 import 'package:pos_app/features/onboarding/presentation/onboarding_notifier.dart';
 import 'package:pos_app/features/onboarding/presentation/onboarding_screen.dart';
@@ -164,8 +165,8 @@ void main() {
           reason: 'skipped before the suggestions: the drawer line explains');
     });
 
-    test('finish writes the edited switches, the business type, and the tax '
-        'step sets Taxes (rate > 0 = on)', () async {
+    test('finish writes the edited switches and the business type; a 0 rate '
+        'leaves Taxes alone and adds no rate', () async {
       final c = container();
       final n = c.read(onboardingNotifierProvider.notifier)
         ..setBusinessType(BusinessType.cafe)
@@ -177,7 +178,11 @@ void main() {
       await n.finish();
       expect(stored()['discounts'], isFalse);
       expect(stored()['customers'], isTrue);
-      expect(stored()['taxes'], isFalse, reason: 'rate 0 → Taxes off');
+      expect(stored()['taxes'], isTrue,
+          reason: "one way only: a 0 rate keeps the preset's Taxes on");
+      expect(await db.select(db.taxRates).get(), isEmpty,
+          reason: 'no "Tax 0%" rate for a blank tax step');
+      expect(c.read(defaultTaxIdProvider), isNull);
       expect(box.get(kLoyaltyEnabled), isTrue);
       expect(box.get(kBusinessType), 'cafe');
       expect(c.read(featuresIntroSeenProvider), isTrue);
@@ -188,7 +193,71 @@ void main() {
         ..setBusinessType(BusinessType.marketStall)
         ..setTaxRate(8.5);
       await n2.finish();
-      expect(c2.read(featureFlagsProvider).taxes, isTrue);
+      expect(c2.read(featureFlagsProvider).taxes, isTrue,
+          reason: 'a rate > 0 turns Taxes on over the preset');
+      final rates = await db.select(db.taxRates).get();
+      expect(rates.single.rate, closeTo(0.085, 1e-9));
+      expect(c2.read(defaultTaxIdProvider), rates.single.id);
+    });
+
+    test("a 0 rate never turns off Taxes the user switched on", () async {
+      final c = container();
+      final n = c.read(onboardingNotifierProvider.notifier)
+        ..setBusinessType(BusinessType.marketStall) // preset: Taxes off
+        ..setSwitch(Feature.taxes, true)
+        ..setTaxRate(0);
+      await n.finish();
+      expect(stored()['taxes'], isTrue);
+    });
+
+    test('skip keeps the name, country and currency already entered',
+        () async {
+      final c = container();
+      final n = c.read(onboardingNotifierProvider.notifier)
+        ..setBusinessName('Corner Cafe')
+        ..setCountry(const CountryDefault(
+            code: 'KE',
+            name: 'Kenya',
+            currency: 'KES',
+            symbol: 'KSh',
+            timezone: 'Africa/Nairobi',
+            taxName: 'VAT',
+            taxRate: 16));
+      for (var i = 0; i <= OnboardingStep.country.index; i++) {
+        n.next(); // now on the Tax step: name and country passed
+      }
+      await n.skip();
+      final s = c.read(settingsProvider);
+      expect(s.businessName, 'Corner Cafe');
+      expect(s.currencyCode, 'KES');
+      expect(s.currencySymbol, 'KSh');
+      expect(s.countryCode, 'KE');
+      expect(await db.select(db.taxRates).get(), isEmpty,
+          reason: 'the tax step was not passed');
+    });
+
+    test('skip before the country step leaves currency as it was', () async {
+      final c = container();
+      final before = c.read(settingsProvider).currencyCode;
+      final n = c.read(onboardingNotifierProvider.notifier)
+        ..setCountry(const CountryDefault(
+            code: 'KE',
+            name: 'Kenya',
+            currency: 'KES',
+            symbol: 'KSh',
+            timezone: 'Africa/Nairobi',
+            taxName: 'VAT',
+            taxRate: 16))
+        ..next();
+      await n.skip();
+      expect(c.read(settingsProvider).currencyCode, before);
+    });
+
+    test('a fresh install skipping at step 1 gets the neutral intro', () async {
+      final c = container();
+      await c.read(onboardingNotifierProvider.notifier).skip();
+      expect(c.read(featuresIntroSeenProvider), isFalse);
+      expect(c.read(featuresIntroFreshProvider), isTrue);
     });
 
     test('skip before the tax step does not touch Taxes from the rate',
@@ -200,6 +269,20 @@ void main() {
         ..next();
       await n.skip();
       expect(stored()['taxes'], isTrue, reason: "the preset's choice");
+    });
+
+    test('skip after the tax step with a rate turns Taxes on and adds it',
+        () async {
+      final c = container();
+      final n = c.read(onboardingNotifierProvider.notifier)
+        ..setBusinessType(BusinessType.marketStall)
+        ..setTaxRate(5);
+      for (var i = 0; i <= OnboardingStep.tax.index; i++) {
+        n.next();
+      }
+      await n.skip();
+      expect(stored()['taxes'], isTrue);
+      expect(await db.select(db.taxRates).get(), hasLength(1));
     });
   });
 
@@ -294,6 +377,27 @@ void main() {
       expect(box.get(kFeaturesIntroSeen), isTrue);
 
       await open(); // a later launch
+      expect(find.text(kFeaturesIntroText), findsNothing);
+    });
+
+    testWidgets('a fresh install that skipped setup sees the neutral line',
+        (tester) async {
+      await box.put(kOnboardingCompleteKeyForTest, true);
+      await box.put(kFeaturesIntroFresh, true);
+      final router = GoRouter(routes: [
+        GoRoute(
+          path: '/',
+          builder: (_, __) =>
+              const Scaffold(drawer: PosDrawer(), body: Text('home')),
+        ),
+      ]);
+      addTearDown(router.dispose);
+      await tester.pumpWidget(UncontrolledProviderScope(
+          container: container(),
+          child: MaterialApp.router(routerConfig: router)));
+      tester.firstState<ScaffoldState>(find.byType(Scaffold)).openDrawer();
+      await tester.pumpAndSettle();
+      expect(find.text(kFeaturesIntroFreshText), findsOneWidget);
       expect(find.text(kFeaturesIntroText), findsNothing);
     });
   });

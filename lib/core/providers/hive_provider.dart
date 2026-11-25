@@ -30,6 +30,9 @@ const kStockOffSince = 'stock_off_since';
 /// The one-time "New: turn features on or off" drawer line was dismissed
 /// (or setup showed the suggested features).
 const kFeaturesIntroSeen = 'features_intro_seen';
+/// Setup was skipped before its suggestions step (a fresh install): the
+/// drawer line is the neutral one, not "New: …".
+const kFeaturesIntroFresh = 'features_intro_fresh';
 /// `BusinessType.name` chosen in setup (lib/features/onboarding/domain).
 const kBusinessType = 'business_type';
 
@@ -108,6 +111,7 @@ class AppSettings {
     FeatureFlags? features,
     this.stockOffSince,
     this.featuresIntroSeen = false,
+    this.featuresIntroFresh = false,
     this.businessType,
   }) : _features = features;
 
@@ -152,6 +156,7 @@ class AppSettings {
   /// until the recount line is dismissed.
   final DateTime? stockOffSince;
   final bool featuresIntroSeen;
+  final bool featuresIntroFresh;
 
   /// Raw `BusinessType.name`; parse it with `parseBusinessType`.
   final String? businessType;
@@ -213,6 +218,7 @@ class AppSettings {
       stockOffSince:
           rawStockOff is String ? DateTime.tryParse(rawStockOff) : null,
       featuresIntroSeen: get(kFeaturesIntroSeen, false),
+      featuresIntroFresh: get(kFeaturesIntroFresh, false),
       businessType: box.get(kBusinessType) as String?,
     );
   }
@@ -247,6 +253,7 @@ class AppSettings {
     DateTime? stockOffSince,
     bool clearStockOffSince = false,
     bool? featuresIntroSeen,
+    bool? featuresIntroFresh,
     String? businessType,
   }) =>
       AppSettings(
@@ -283,6 +290,7 @@ class AppSettings {
             ? null
             : (stockOffSince ?? this.stockOffSince),
         featuresIntroSeen: featuresIntroSeen ?? this.featuresIntroSeen,
+        featuresIntroFresh: featuresIntroFresh ?? this.featuresIntroFresh,
         businessType: businessType ?? this.businessType,
       );
 
@@ -459,6 +467,9 @@ class SettingsNotifier extends Notifier<AppSettings> {
   Future<void> markFeaturesIntroSeen() => _write(
       state.copyWith(featuresIntroSeen: true), {kFeaturesIntroSeen: true});
 
+  Future<void> markFeaturesIntroFresh() => _write(
+      state.copyWith(featuresIntroFresh: true), {kFeaturesIntroFresh: true});
+
   Future<void> setBusinessType(String name) =>
       _write(state.copyWith(businessType: name), {kBusinessType: name});
 }
@@ -527,4 +538,5 @@ final featureOnProvider = Provider.family<bool, Feature>((ref, f) =>
 
 final stockOffSinceProvider = _field((s) => s.stockOffSince);
 final featuresIntroSeenProvider = _field((s) => s.featuresIntroSeen);
+final featuresIntroFreshProvider = _field((s) => s.featuresIntroFresh);
 final businessTypeNameProvider = _field((s) => s.businessType);
