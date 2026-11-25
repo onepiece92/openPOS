@@ -61,14 +61,14 @@ HOLD -->
 | --- | --- |
 | ![Sell screen with product grid and cart](docs/screenshots/sell.png) | ![Table management for cafes and restaurants](docs/screenshots/tables.png) |
 | **Reports** | **Receipt** |
-| ![Reports dashboard with revenue and profit](docs/screenshots/reports.png) | ![Receipt preview](docs/screenshots/receipt.png) |
+| ![Reports dashboard with revenue and expenses](docs/screenshots/reports.png) | ![Receipt preview](docs/screenshots/receipt.png) |
 HOLD -->
 
 ---
 
 ## Why Open POS
 
-- **Your data stays with you.** The app's own code makes no network calls: no accounts, no cloud, no analytics. Sales, customers and stock live in a database on your device. Your phone's own backup (Google or iCloud), if you have it turned on, may include app data.
+- **The app never sends your data anywhere.** Its own code makes no network calls: no accounts, no cloud, no analytics. Sales, customers and stock live in a database on your device. Your phone's own backup (Google or iCloud), if you have it turned on, may include app data.
 - **Free, for good.** No subscription, no per-device fee, no premium tier. MIT licensed.
 - **Works with no internet.** A dropped connection never stops a sale, because the app never needed one.
 - **Made for small shops and cafes.** Tables, held tickets and simple reports, without the setup of a big system.
@@ -173,7 +173,7 @@ codesign -d --entitlements - "/Applications/Open POS.app"
 ```
 HOLD -->
 
-**What this means in practice:** no analytics, no crash reporting, no cloud backup, no update checks, no account. Receipts you share by SMS or email go through your device's own Messages or Mail app, which you control.
+**What this means in practice:** no analytics, no crash reporting, no cloud backup built into the app, no update checks, no account. Receipts you share by SMS or email go through your device's own Messages or Mail app, which you control.
 
 ---
 
