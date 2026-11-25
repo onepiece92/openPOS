@@ -13,6 +13,7 @@ import 'package:pos_app/features/settings/presentation/widgets/printer_section.d
 import 'package:pos_app/features/settings/presentation/widgets/settings_section_header.dart';
 import 'package:pos_app/features/settings/presentation/widgets/store_profile_section.dart';
 import 'package:pos_app/features/settings/presentation/widgets/tax_section.dart';
+import 'package:pos_app/features/tips/tips_section.dart';
 import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
 
 /// Settings hub. Each section (and the sheet it opens) lives in
@@ -50,6 +51,8 @@ class SettingsScreen extends ConsumerWidget {
             SettingsSectionHeader('Loyalty'),
             LoyaltySection(),
           ],
+          const SettingsSectionHeader('Tips'),
+          const TipsSection(),
           const SettingsSectionHeader('Appearance'),
           const AppearanceSection(),
           const SettingsSectionHeader('Hardware'),
