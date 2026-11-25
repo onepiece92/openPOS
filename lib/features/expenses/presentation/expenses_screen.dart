@@ -24,12 +24,12 @@ import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
 
 // ── Providers ─────────────────────────────────────────────────────────────────
 
-final _expensesStreamProvider = StreamProvider<List<Expense>>((ref) {
+final expensesStreamProvider = StreamProvider.autoDispose<List<Expense>>((ref) {
   return ref.watch(databaseProvider).expensesDao.watchAll();
 });
 
-final _expenseCategoriesStreamProvider =
-    StreamProvider<List<ExpenseCategory>>((ref) {
+final expenseCategoriesStreamProvider =
+    StreamProvider.autoDispose<List<ExpenseCategory>>((ref) {
   return ref.watch(databaseProvider).expensesDao.watchCategories();
 });
 
@@ -54,8 +54,8 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final expensesAsync = ref.watch(_expensesStreamProvider);
-    final categoriesAsync = ref.watch(_expenseCategoriesStreamProvider);
+    final expensesAsync = ref.watch(expensesStreamProvider);
+    final categoriesAsync = ref.watch(expenseCategoriesStreamProvider);
     final fmt = ref.watch(currencyFormatterProvider);
     final cs = Theme.of(context).colorScheme;
 
@@ -598,7 +598,7 @@ class _ExpenseFormState extends ConsumerState<_ExpenseForm> {
 
   @override
   Widget build(BuildContext context) {
-    final categoriesAsync = ref.watch(_expenseCategoriesStreamProvider);
+    final categoriesAsync = ref.watch(expenseCategoriesStreamProvider);
     final cs = Theme.of(context).colorScheme;
 
     return Padding(

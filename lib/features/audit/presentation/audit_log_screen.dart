@@ -8,7 +8,7 @@ import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
 
-final _auditLogsProvider = StreamProvider<List<AuditLogData>>((ref) {
+final auditLogsProvider = StreamProvider.autoDispose<List<AuditLogData>>((ref) {
   return ref.watch(databaseProvider).auditDao.watchRecent(limit: 200);
 });
 
@@ -17,7 +17,7 @@ class AuditLogScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final logsAsync = ref.watch(_auditLogsProvider);
+    final logsAsync = ref.watch(auditLogsProvider);
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
     final dateFmt = DateFormat('dd MMM yyyy  HH:mm');
