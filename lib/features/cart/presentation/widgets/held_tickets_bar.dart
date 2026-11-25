@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/core/theme/tron_border.dart';
 import 'package:pos_app/core/utils/currency_formatter.dart';
 import 'package:pos_app/shared/widgets/app_sheet.dart';
@@ -412,7 +413,11 @@ class _HeldTicketsSheetState extends ConsumerState<_HeldTicketsSheet>
     final sessionNotifier = ref.read(cartSessionProvider.notifier);
     sessionNotifier.resumeTicket(ticket);
 
-    if (ticket.orderDiscount <= 0 && ticket.customerId != null) {
+    // The customer's default discount needs Customers and Discounts.
+    if (ticket.orderDiscount <= 0 &&
+        ticket.customerId != null &&
+        ref.read(featureOnProvider(Feature.customers)) &&
+        ref.read(featureOnProvider(Feature.discounts))) {
       final customers =
           ref.read(customersStreamProvider).valueOrNull ?? [];
       try {

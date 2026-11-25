@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/services/demo_data_service.dart';
 import 'package:pos_app/features/cart/presentation/providers/cart_notifier.dart';
@@ -82,6 +83,8 @@ class _CartScreenState extends ConsumerState<CartScreen> {
             },
             itemBuilder: (_) {
               final cartEmpty = ref.read(cartProvider).isEmpty;
+              final customersOn =
+                  ref.read(featureOnProvider(Feature.customers));
               return [
                 const PopupMenuItem(
                   value: 'products',
@@ -99,14 +102,15 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                     contentPadding: EdgeInsets.zero,
                   ),
                 ),
-                const PopupMenuItem(
-                  value: 'customers',
-                  child: ListTile(
-                    leading: Icon(Icons.people_outline_rounded),
-                    title: Text('Customers'),
-                    contentPadding: EdgeInsets.zero,
+                if (customersOn)
+                  const PopupMenuItem(
+                    value: 'customers',
+                    child: ListTile(
+                      leading: Icon(Icons.people_outline_rounded),
+                      title: Text('Customers'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
                   ),
-                ),
                 if (!cartEmpty) ...[
                   const PopupMenuDivider(),
                   const PopupMenuItem(
@@ -123,13 +127,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: const Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          HeldTicketsBar(),
-          CheckoutBar(),
-        ],
-      ),
+      bottomNavigationBar: const PosBottomBars(),
       body: CallbackShortcuts(
         bindings: {
           const SingleActivator(LogicalKeyboardKey.keyF, meta: true): () {
@@ -317,8 +315,8 @@ class _ProductArea extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final catalog = ref.watch(posCatalogProvider);
-    final (isGrid, favoritesOnly) = ref.watch(
-        posFilterProvider.select((f) => (f.isGrid, f.favoritesOnly)));
+    final (isGrid, favoritesOnly) =
+        ref.watch(posFilterProvider.select((f) => (f.isGrid, f.favoritesOnly)));
     return catalog.when(
       data: (view) {
         if (view.catalogEmpty) {
@@ -549,17 +547,33 @@ class _ListSeparator extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final eitherInCart = ref.watch(cartMainUnitQtyProvider.select((qty) =>
-        (qty[productId] ?? 0) > 0 || (qty[nextProductId] ?? 0) > 0));
+    final eitherInCart = ref.watch(cartMainUnitQtyProvider.select(
+        (qty) => (qty[productId] ?? 0) > 0 || (qty[nextProductId] ?? 0) > 0));
     if (eitherInCart) return const SizedBox(height: 2);
     return Divider(
       height: 1,
       indent: 16,
       endIndent: 16,
-      color: Theme.of(context)
-          .colorScheme
-          .outlineVariant
-          .withValues(alpha: 0.5),
+      color:
+          Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.5),
+    );
+  }
+}
+
+/// The sell screen's bottom bars. The held-tickets bar (and the held
+/// tickets list it watches) is only built while Held tickets is on.
+class PosBottomBars extends ConsumerWidget {
+  const PosBottomBars({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final held = ref.watch(featureOnProvider(Feature.heldTickets));
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (held) const HeldTicketsBar(),
+        const CheckoutBar(),
+      ],
     );
   }
 }

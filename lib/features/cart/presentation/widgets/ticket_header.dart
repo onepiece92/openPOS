@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:pos_app/core/database/app_database.dart';
+import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/shared/widgets/app_sheet.dart';
 import 'package:pos_app/features/cart/presentation/providers/cart_notifier.dart';
 import 'package:pos_app/features/customers/domain/customers_provider.dart';
@@ -20,12 +21,10 @@ class TicketHeader extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
-    final customersAsync = ref.watch(customersStreamProvider);
-    final customers = customersAsync.valueOrNull ?? [];
-    final selectedCustomer = customers.cast<Customer?>().firstWhere(
-          (c) => c?.id == session.customerId,
-          orElse: () => null,
-        );
+    // Each optional row is its own widget behind its switch: with the
+    // feature off it is never built, so its stream never starts.
+    final customersOn = ref.watch(featureOnProvider(Feature.customers));
+    final tablesOn = ref.watch(featureOnProvider(Feature.tables));
     final dateFmt = DateFormat('dd MMM yyyy  HH:mm');
 
     return Container(
@@ -65,63 +64,82 @@ class TicketHeader extends ConsumerWidget {
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          // ── Customer selector ─────────────────────────────────────────
-          InkWell(
-            borderRadius: BorderRadius.circular(10),
-            onTap: customers.isEmpty
-                ? null
-                : () => _pickCustomer(context, ref, customers, session.customerId),
-            child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-              decoration: BoxDecoration(
-                border: Border.all(color: cs.outlineVariant),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    selectedCustomer != null
-                        ? Icons.person_rounded
-                        : Icons.person_add_alt_1_rounded,
-                    size: 18,
-                    color: selectedCustomer != null
-                        ? cs.primary
-                        : cs.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      selectedCustomer?.name ?? 'Select customer (optional)',
-                      style: tt.bodyMedium?.copyWith(
-                        color: selectedCustomer != null
-                            ? cs.onSurface
-                            : cs.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                  if (selectedCustomer != null)
-                    GestureDetector(
-                      onTap: () {
-                        final n = ref.read(cartSessionProvider.notifier);
-                        n.setCustomer(null);
-                        n.setOrderDiscount(0, isPercent: false);
-                      },
-                      child: Icon(Icons.close_rounded,
-                          size: 16, color: cs.onSurfaceVariant),
-                    )
-                  else
-                    Icon(Icons.expand_more_rounded,
-                        size: 18, color: cs.onSurfaceVariant),
-                ],
+          if (customersOn) ...[
+            const SizedBox(height: 10),
+            _CustomerRow(session: session),
+          ],
+          if (tablesOn) ...[
+            const SizedBox(height: 8),
+            TableSelectorRow(session: session),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// The customer row of the ticket. Only built while Customers is on: it is
+/// the one widget on the sell screen that watches the customer list.
+class _CustomerRow extends ConsumerWidget {
+  const _CustomerRow({required this.session});
+  final CartSession session;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    final customers = ref.watch(customersStreamProvider).valueOrNull ?? [];
+    final selectedCustomer = customers.cast<Customer?>().firstWhere(
+          (c) => c?.id == session.customerId,
+          orElse: () => null,
+        );
+    return InkWell(
+      borderRadius: BorderRadius.circular(10),
+      onTap: customers.isEmpty
+          ? null
+          : () => _pickCustomer(context, ref, customers, session.customerId),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        decoration: BoxDecoration(
+          border: Border.all(color: cs.outlineVariant),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              selectedCustomer != null
+                  ? Icons.person_rounded
+                  : Icons.person_add_alt_1_rounded,
+              size: 18,
+              color:
+                  selectedCustomer != null ? cs.primary : cs.onSurfaceVariant,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                selectedCustomer?.name ?? 'Select customer (optional)',
+                style: tt.bodyMedium?.copyWith(
+                  color: selectedCustomer != null
+                      ? cs.onSurface
+                      : cs.onSurfaceVariant,
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 8),
-          // ── Table selector ────────────────────────────────────────────
-          TableSelectorRow(session: session),
-        ],
+            if (selectedCustomer != null)
+              GestureDetector(
+                onTap: () {
+                  final n = ref.read(cartSessionProvider.notifier);
+                  n.setCustomer(null);
+                  n.setOrderDiscount(0, isPercent: false);
+                },
+                child: Icon(Icons.close_rounded,
+                    size: 16, color: cs.onSurfaceVariant),
+              )
+            else
+              Icon(Icons.expand_more_rounded,
+                  size: 18, color: cs.onSurfaceVariant),
+          ],
+        ),
       ),
     );
   }
@@ -138,7 +156,9 @@ class TicketHeader extends ConsumerWidget {
         onSelect: (c) {
           ref.read(usageCounterProvider).record(UsageEvent.customerAddedToSale);
           ref.read(cartSessionProvider.notifier).setCustomer(c.id);
-          if (c.defaultDiscount > 0) {
+          // A customer's default discount needs Discounts on too.
+          if (c.defaultDiscount > 0 &&
+              ref.read(featureOnProvider(Feature.discounts))) {
             ref.read(cartSessionProvider.notifier).setOrderDiscount(
                   c.defaultDiscount,
                   isPercent: c.defaultDiscountIsPercent,

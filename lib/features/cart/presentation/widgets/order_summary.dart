@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/core/utils/percent.dart';
 import 'package:pos_app/core/theme/tokens.dart';
 import 'package:pos_app/core/utils/currency_formatter.dart';
@@ -23,6 +24,11 @@ class OrderSummary extends ConsumerWidget {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
     final session = ref.watch(cartSessionProvider);
+    final discounts = ref.watch(featureOnProvider(Feature.discounts));
+    final taxes = ref.watch(featureOnProvider(Feature.taxes));
+    // Discounts off: no "+ Add Discount"; a discount already on this ticket
+    // (a resumed held ticket) still shows, and can be changed or removed.
+    final showDiscount = discounts || summary.orderDiscount > 0;
 
     return Container(
       decoration: BoxDecoration(
@@ -38,24 +44,28 @@ class OrderSummary extends ConsumerWidget {
           ),
           const SizedBox(height: 6),
           // ── Discount row ─────────────────────────────────────────────
-          _TappableRow(
-            label: summary.orderDiscount > 0
-                ? 'Discount${session.orderDiscountIsPercent ? ' (${formatPercent(session.orderDiscount)})' : ''}'
-                : '+ Add Discount',
-            value: summary.orderDiscount > 0
-                ? '− ${fmt.format(summary.orderDiscount)}'
-                : null,
-            valueColor: cs.error,
-            addColor: cs.primary,
-            tt: tt,
-            cs: cs,
-            onTap: () => _showDiscountSheet(context, ref, session, summary.subtotal),
-          ),
-          const SizedBox(height: 6),
+          if (showDiscount) ...[
+            _TappableRow(
+              key: const ValueKey('summary-discount'),
+              label: summary.orderDiscount > 0
+                  ? 'Discount${session.orderDiscountIsPercent ? ' (${formatPercent(session.orderDiscount)})' : ''}'
+                  : '+ Add Discount',
+              value: summary.orderDiscount > 0
+                  ? '− ${fmt.format(summary.orderDiscount)}'
+                  : null,
+              valueColor: cs.error,
+              addColor: cs.primary,
+              tt: tt,
+              cs: cs,
+              onTap: () =>
+                  _showDiscountSheet(context, ref, session, summary.subtotal),
+            ),
+            const SizedBox(height: 6),
+          ],
           // ── Tax row (a cart carries one rate) ────────────────────────
+          // Taxes off: no tax lines (the summary has none) and no picker.
           ...summary.taxLines.map((line) {
-            final label =
-                '${line.name} (${formatRatePercent(line.rate)}'
+            final label = '${line.name} (${formatRatePercent(line.rate)}'
                 '${line.isInclusive ? ', incl.' : ''})';
             return Padding(
               padding: const EdgeInsets.only(bottom: 4),
@@ -105,14 +115,16 @@ class OrderSummary extends ConsumerWidget {
             );
           }),
           // ── Add Tax button ────────────────────────────────────────────
-          _TappableRow(
-            label: summary.taxLines.isEmpty ? '+ Add Tax' : 'Change Tax',
-            value: null,
-            addColor: cs.primary,
-            tt: tt,
-            cs: cs,
-            onTap: () => _showTaxPicker(context, ref),
-          ),
+          if (taxes)
+            _TappableRow(
+              key: const ValueKey('summary-tax'),
+              label: summary.taxLines.isEmpty ? '+ Add Tax' : 'Change Tax',
+              value: null,
+              addColor: cs.primary,
+              tt: tt,
+              cs: cs,
+              onTap: () => _showTaxPicker(context, ref),
+            ),
           const Divider(height: 16),
           SummaryRow(
             label: 'Total',
@@ -188,8 +200,8 @@ class _TaxPickerSheet extends ConsumerWidget {
           child: allRates.isEmpty
               ? Center(
                   child: Text('No tax rates configured',
-                      style: tt.bodyMedium
-                          ?.copyWith(color: cs.onSurfaceVariant)),
+                      style:
+                          tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
                 )
               : ListView.builder(
                   itemCount: allRates.length,
@@ -211,8 +223,8 @@ class _TaxPickerSheet extends ConsumerWidget {
                       title: Text(label),
                       selected: selected,
                       onTap: () {
-                        final notifier = innerRef
-                            .read(selectedTaxRatesProvider.notifier);
+                        final notifier =
+                            innerRef.read(selectedTaxRatesProvider.notifier);
                         if (selected) {
                           notifier.clear();
                         } else {
@@ -241,6 +253,7 @@ class _TaxPickerSheet extends ConsumerWidget {
 
 class _TappableRow extends StatelessWidget {
   const _TappableRow({
+    super.key,
     required this.label,
     required this.tt,
     required this.cs,
@@ -281,8 +294,8 @@ class _TappableRow extends StatelessWidget {
               ),
             ),
           const SizedBox(width: 4),
-          Icon(Icons.edit_rounded, size: 14,
-              color: isAdd ? addColor : cs.onSurfaceVariant),
+          Icon(Icons.edit_rounded,
+              size: 14, color: isAdd ? addColor : cs.onSurfaceVariant),
         ],
       ),
     );

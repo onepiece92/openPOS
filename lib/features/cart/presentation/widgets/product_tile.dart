@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:pos_app/core/database/app_database.dart';
+import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/features/cart/domain/pos_catalog_provider.dart';
 import 'package:pos_app/features/cart/presentation/pos_cart_actions.dart';
 import 'package:pos_app/features/products/domain/favorites_provider.dart';
@@ -30,16 +31,22 @@ class PosProductTile extends ConsumerWidget {
     void onDecrement() => PosCartActions.of(context).step(product, -1);
     void onToggleFavorite() =>
         ref.read(favoritesProvider.notifier).toggle(product.id);
-    final onLongPress = product.secondaryUnit == null
+    // Units off: no second-unit picker. Stock tracking off: no caps or
+    // out-of-stock state (one bool each, watched per tile).
+    final units = ref.watch(featureOnProvider(Feature.units));
+    final stock = ref.watch(featureOnProvider(Feature.stockTracking));
+    final onLongPress = !units || product.secondaryUnit == null
         ? null
         : () => PosCartActions.of(context).pickUnit(context, product);
 
     final inCart = qtyInCart > 0;
     // is_out_of_stock flag OR negative qty (over-sold) → blocked.
     // 0 = unlimited — tappable.
-    final outOfStock = product.isOutOfStock || product.stockQuantity < 0;
+    final outOfStock =
+        stock && (product.isOutOfStock || product.stockQuantity < 0);
     // Tracked product already at its stock cap in the cart.
-    final atCap = !outOfStock &&
+    final atCap = stock &&
+        !outOfStock &&
         product.stockQuantity > 0 &&
         qtyInCart >= product.stockQuantity;
 

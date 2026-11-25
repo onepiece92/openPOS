@@ -173,6 +173,8 @@ class CartNotifier extends Notifier<List<CartItem>> {
   /// 3 pcs of the same product weigh 27 against the cap. Products the POS
   /// catalog doesn't know (not loaded yet, hidden) are not capped.
   bool _fitsStock(CartItem line) {
+    // Stock tracking off: nothing is capped (and the catalog isn't read).
+    if (!ref.read(featureOnProvider(Feature.stockTracking))) return true;
     final products = ref.read(productsStreamProvider).valueOrNull ?? const [];
     final product =
         products.where((p) => p.id == line.productId).firstOrNull;
@@ -267,18 +269,32 @@ final cartProvider =
 // ─── Cart summary provider (derived) ─────────────────────────────────────────
 
 /// Thin Riverpod shell around [CartCalculator.compute] — all math lives there.
+///
+/// Switched-off features are not watched at all: with Taxes off the tax
+/// rates stream never starts (the sale has no tax — the selected rate is
+/// kept, so a held ticket gets its tax back once Taxes is on again), and
+/// with Loyalty off (or Customers off) the customer list is not read.
 final cartSummaryProvider = Provider<CartSummary>((ref) {
-  final selectedIds = ref.watch(selectedTaxRatesProvider);
-  final allRates = ref.watch(taxRatesStreamProvider).valueOrNull ?? const [];
+  final taxes = ref.watch(featureOnProvider(Feature.taxes));
+  final loyalty = ref.watch(featureOnProvider(Feature.loyalty));
+  final List<TaxRate> selectedRates;
+  if (taxes) {
+    final selectedIds = ref.watch(selectedTaxRatesProvider);
+    final allRates = ref.watch(taxRatesStreamProvider).valueOrNull ?? const [];
+    selectedRates = [
+      for (final id in selectedIds) ...allRates.where((r) => r.id == id),
+    ];
+  } else {
+    selectedRates = const [];
+  }
   return CartCalculator.compute(
     items: ref.watch(cartProvider),
     session: ref.watch(cartSessionProvider),
-    selectedRates: [
-      for (final id in selectedIds) ...allRates.where((r) => r.id == id),
-    ],
-    loyaltyEnabled: ref.watch(loyaltyEnabledProvider),
-    loyaltyEarnRate: ref.watch(loyaltyEarnRateProvider),
-    loyaltyPointValue: ref.watch(loyaltyPointValueProvider),
-    customerLoyaltyPoints: ref.watch(cartCustomerProvider)?.loyaltyPoints ?? 0,
+    selectedRates: selectedRates,
+    loyaltyEnabled: loyalty,
+    loyaltyEarnRate: loyalty ? ref.watch(loyaltyEarnRateProvider) : 0,
+    loyaltyPointValue: loyalty ? ref.watch(loyaltyPointValueProvider) : 0,
+    customerLoyaltyPoints:
+        loyalty ? ref.watch(cartCustomerProvider)?.loyaltyPoints ?? 0 : 0,
   );
 });

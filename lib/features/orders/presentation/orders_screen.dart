@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/theme/tokens.dart';
 import 'package:pos_app/core/utils/currency_formatter.dart';
@@ -70,7 +71,10 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
   Widget build(BuildContext context) {
     final history = ref.watch(orderHistoryProvider);
     final fmt = ref.watch(currencyFormatterProvider);
-    final customers = ref.watch(customersStreamProvider).valueOrNull ?? [];
+    // Customers off: the customer list is not loaded (no names on rows).
+    final customers = ref.watch(featureOnProvider(Feature.customers))
+        ? ref.watch(customersStreamProvider).valueOrNull ?? const []
+        : const <Customer>[];
     final customerNames = {for (final c in customers) c.id: c.name};
 
     return Scaffold(

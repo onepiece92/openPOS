@@ -9,6 +9,7 @@ import 'package:pos_app/features/cart/presentation/providers/cart_notifier.dart'
 import 'package:pos_app/features/products/domain/products_provider.dart';
 
 import '../../_support/fake_products.dart';
+import '../../_support/features.dart';
 
 /// The sell-screen tile stepper. Raising a quantity is capped at stock;
 /// lowering one never is, even when the line already sits above stock
@@ -17,6 +18,7 @@ void main() {
   Future<(ProviderContainer, PosCartActions)> pump(
       WidgetTester tester, Product p) async {
     final c = ProviderContainer(overrides: [
+      allFeaturesOn,
       productsStreamProvider.overrideWith((ref) => Stream.value([p])),
     ]);
     addTearDown(c.dispose);
