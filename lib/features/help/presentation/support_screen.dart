@@ -8,7 +8,6 @@ import 'package:pos_app/features/review/review_providers.dart';
 import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
 import 'package:pos_app/features/usage/presentation/usage_host.dart';
 import 'package:pos_app/features/usage/usage_constants.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class SupportScreen extends ConsumerWidget {
   const SupportScreen({super.key});
@@ -90,10 +89,7 @@ class SupportScreen extends ConsumerWidget {
             gradient: const [Color(0xFF6B68FF), Color(0xFF00B8C8)],
             cs: cs,
             tt: tt,
-            onTap: () => launchUrl(
-              Uri.parse('https://rebuzzpos.com'),
-              mode: LaunchMode.externalApplication,
-            ),
+            onTap: () => openRebuzzSiteOrExplain(context),
           ),
           const SizedBox(height: 20),
           _SectionHeader('App Info', tt, cs),

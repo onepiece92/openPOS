@@ -49,4 +49,41 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text(kSupportMailUnavailable), findsOneWidget);
   });
+
+  Future<void> pumpSite(
+      WidgetTester tester, Future<bool> Function(Uri) launch) async {
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: Builder(
+          builder: (context) => TextButton(
+            onPressed: () => openRebuzzSiteOrExplain(context, launch: launch),
+            child: const Text('go'),
+          ),
+        ),
+      ),
+    ));
+    await tester.tap(find.text('go'));
+    await tester.pump();
+  }
+
+  testWidgets('site opens: right url, no message', (tester) async {
+    final seen = <String>[];
+    await pumpSite(tester, (u) async {
+      seen.add('$u');
+      return true;
+    });
+    expect(seen, ['https://rebuzzpos.com']);
+    expect(find.byType(SnackBar), findsNothing);
+  });
+
+  testWidgets('site fails (false): SnackBar', (tester) async {
+    await pumpSite(tester, no);
+    expect(find.text(kSiteUnavailable), findsOneWidget);
+    expect(kSiteUnavailable, "Couldn't open the browser. Visit rebuzzpos.com.");
+  });
+
+  testWidgets('site fails (PlatformException): SnackBar', (tester) async {
+    await pumpSite(tester, throws);
+    expect(find.text(kSiteUnavailable), findsOneWidget);
+  });
 }

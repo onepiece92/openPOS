@@ -66,7 +66,7 @@ void main() {
 
   group('Star channel fails soft', () {
     Matcher androidNote() => isA<StateError>()
-        .having((e) => e.message, 'message', kStarAndroidOnlyNote);
+        .having((e) => e.message, 'message', kStarUnsupportedNote);
 
     for (final p in apple) {
       test('$p: guarded before the channel is touched', () async {
@@ -133,7 +133,7 @@ void main() {
         expect(find.text('Bluetooth LE'), findsOneWidget);
         expect(find.text('Classic'), findsNothing);
         expect(find.text('Star'), findsNothing);
-        expect(find.text(kStarAndroidOnlyNote), findsOneWidget);
+        expect(find.text(kStarUnsupportedNote), findsOneWidget);
         // A saved 'star' preselects BLE instead.
         expect(find.text('Nearby Bluetooth Printers'), findsOneWidget);
         debugDefaultTargetPlatformOverride = null;
@@ -146,7 +146,7 @@ void main() {
       expect(find.text('Bluetooth LE'), findsOneWidget);
       expect(find.text('Classic'), findsOneWidget);
       expect(find.text('Star'), findsOneWidget);
-      expect(find.text(kStarAndroidOnlyNote), findsNothing);
+      expect(find.text(kStarUnsupportedNote), findsNothing);
       expect(find.text('Paired Star Printers'), findsOneWidget);
       debugDefaultTargetPlatformOverride = null;
     });

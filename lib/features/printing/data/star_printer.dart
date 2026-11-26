@@ -18,7 +18,7 @@ import 'package:pos_app/features/printing/domain/render_receipt_image.dart';
 /// Android only. On iOS and macOS the channel isn't registered: every entry
 /// point checks [_isSupported] first, and a [MissingPluginException] is
 /// still caught as a backstop, so the user only ever sees
-/// [kStarAndroidOnlyNote].
+/// [kStarUnsupportedNote].
 class StarBluetoothPrinter implements ReceiptPrinter {
   static const _methods = MethodChannel('pos_app/star_printer');
   static const _discovery = EventChannel('pos_app/star_printer/devices');
@@ -62,7 +62,7 @@ class StarBluetoothPrinter implements ReceiptPrinter {
     try {
       await _methods.invokeMethod<void>('startDiscovery');
     } on MissingPluginException {
-      throw StateError(kStarAndroidOnlyNote);
+      throw StateError(kStarUnsupportedNote);
     }
   }
 
@@ -115,7 +115,7 @@ class StarBluetoothPrinter implements ReceiptPrinter {
         'width': starPrintWidthDots(paperMm),
       });
     } on MissingPluginException {
-      throw StateError(kStarAndroidOnlyNote);
+      throw StateError(kStarUnsupportedNote);
     } on PlatformException catch (e) {
       throw StateError(friendlyPrinterError(e, printerName: target.name));
     }
@@ -127,6 +127,6 @@ class StarBluetoothPrinter implements ReceiptPrinter {
   bool get _isSupported => isSupported;
 
   void _requireSupportedPlatform() {
-    if (!_isSupported) throw StateError(kStarAndroidOnlyNote);
+    if (!_isSupported) throw StateError(kStarUnsupportedNote);
   }
 }

@@ -91,3 +91,26 @@ Future<void> openSupportMailOrExplain(
     duration: kLinkFailureMessageDuration,
   ));
 }
+
+/// Shown when the browser did not open the RebuzzPOS site.
+const kSiteUnavailable = "Couldn't open the browser. Visit rebuzzpos.com.";
+
+/// Opens rebuzzpos.com in the browser, and when nothing opens says so.
+/// A user-initiated hand-off; never throws.
+Future<void> openRebuzzSiteOrExplain(
+  BuildContext context, {
+  UrlOpener? launch,
+}) async {
+  final messenger = ScaffoldMessenger.maybeOf(context);
+  final open =
+      launch ?? (Uri u) => launchUrl(u, mode: LaunchMode.externalApplication);
+  var ok = false;
+  try {
+    ok = await open(Uri.parse('https://rebuzzpos.com'));
+  } catch (_) {}
+  if (ok) return;
+  messenger?.showSnackBar(const SnackBar(
+    content: Text(kSiteUnavailable),
+    duration: kLinkFailureMessageDuration,
+  ));
+}

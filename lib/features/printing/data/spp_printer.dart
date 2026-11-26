@@ -110,8 +110,7 @@ class SppPrinter implements ReceiptPrinter {
   void _requireAndroid() {
     if (defaultTargetPlatform != TargetPlatform.android) {
       throw StateError(
-          'Classic Bluetooth printers are Android only — iOS allows classic '
-          'Bluetooth to MFi accessories only');
+          'Classic Bluetooth printers are not supported on this device.');
     }
   }
 }

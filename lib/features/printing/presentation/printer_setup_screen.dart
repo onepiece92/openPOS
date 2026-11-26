@@ -316,7 +316,7 @@ class _PrinterSetupScreenState extends ConsumerState<PrinterSetupScreen> {
                   if (!classicBluetoothDriversAvailable) ...[
                     const SizedBox(height: 8),
                     Text(
-                      kStarAndroidOnlyNote,
+                      kStarUnsupportedNote,
                       style:
                           tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                     ),
@@ -398,8 +398,8 @@ class _PrinterSetupScreenState extends ConsumerState<PrinterSetupScreen> {
                         _scanning
                             ? 'Scanning for printers…'
                             : _driver == PrinterDriver.spp
-                                ? 'Tap List to show printers paired in Android '
-                                    'Bluetooth settings.'
+                                ? 'Tap List to show printers paired in your '
+                                    'device Bluetooth settings.'
                                 : 'Tap Scan to find a printer.',
                         style:
                             tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
@@ -446,9 +446,9 @@ class _PrinterSetupScreenState extends ConsumerState<PrinterSetupScreen> {
           'Most newer ESC/POS printers. Switch the printer on and scan — no '
               'pairing needed.',
         PrinterDriver.spp =>
-          'Older and cheaper ESC/POS printers. Pair the printer in Android '
-              'Bluetooth settings first, then list it here. Not available on '
-              'iPhone or iPad, which only allow certified accessories.',
+          'Older and cheaper ESC/POS printers. Pair the printer in your '
+              'device Bluetooth settings first, then list it here. Not '
+              'available on every device.',
         PrinterDriver.star =>
           'Star TSP100III and friends. Pair in Bluetooth settings first. '
               'These print receipts as images — they cannot be sent text.',

@@ -111,9 +111,9 @@ class ThermalPluginPrinter implements ReceiptPrinter {
       if (!connected) throw notReachable;
       return;
     }
-    final bt = BluetoothDevice.fromId(target.address);
-    if (bt.isConnected) return;
     try {
+      final bt = BluetoothDevice.fromId(target.address);
+      if (bt.isConnected) return;
       await bt.connect(timeout: _connectTimeout);
       if (!bt.isConnected) {
         await bt.connectionState

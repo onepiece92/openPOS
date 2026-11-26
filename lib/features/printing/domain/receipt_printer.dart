@@ -10,7 +10,7 @@ import 'package:pos_app/features/printing/data/thermal_plugin_printer.dart';
 import 'package:pos_app/features/receipts/presentation/receipt_body.dart';
 
 /// Shown wherever Star / Classic printing is unavailable.
-const kStarAndroidOnlyNote = 'Star printers are available on Android.';
+const kStarUnsupportedNote = 'Star printers are not supported on this device.';
 
 /// Whether the classic-Bluetooth drivers ([PrinterDriver.spp] and
 /// [PrinterDriver.star]) can be offered. False on iOS and macOS: Apple only

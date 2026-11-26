@@ -1,5 +1,7 @@
 import 'package:flutter/services.dart' show PlatformException;
 
+const kRepairPrinterNote = 'Pair this printer again on this device.';
+
 /// Turns a driver failure into something a shopkeeper can act on.
 ///
 /// The platform channels hand back SDK error names and Java/Swift exception
@@ -10,6 +12,9 @@ String friendlyPrinterError(Object error, {required String printerName}) {
       ? '${error.code} ${error.message ?? ''}'
       : error.toString();
 
+  // A saved address from another platform (e.g. a restored Android MAC on
+  // iOS) is not a valid remoteId here.
+  if (raw.contains('invalid remoteId')) return kRepairPrinterNote;
   final known = _match(raw);
   if (known != null) return '$printerName: $known';
   return '$printerName: ${error is PlatformException ? error.message ?? error.code : error}';

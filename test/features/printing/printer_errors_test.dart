@@ -7,6 +7,16 @@ import 'package:pos_app/features/printing/domain/printer_errors.dart';
 /// say what to do, not which SDK class threw.
 
 void main() {
+  test('an address from another platform says to pair again', () {
+    expect(
+      friendlyPrinterError(
+        StateError('Bad state: invalid remoteId "AA:BB:CC:DD:EE:FF"'),
+        printerName: 'TSP100III',
+      ),
+      'Pair this printer again on this device.',
+    );
+  });
+
   test('Star SDK error types become an instruction', () {
     final notFound = friendlyPrinterError(
       PlatformException(code: 'print_failed', message: 'StarIO10NotFoundError'),
@@ -58,7 +68,8 @@ void main() {
       printerName: 'XP-58',
     );
     expect(message, contains('XP-58'));
-    expect(message, anyOf(contains('switch the printer off'), contains('closer')));
+    expect(
+        message, anyOf(contains('switch the printer off'), contains('closer')));
   });
 
   test('an unrecognised failure keeps its original text', () {
