@@ -10,7 +10,6 @@ import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/core/theme/tokens.dart';
 import 'package:pos_app/core/utils/async_feedback.dart';
 import 'package:pos_app/core/utils/bundled_fonts.dart';
-import 'package:pos_app/core/utils/currency_formatter.dart';
 import 'package:pos_app/core/utils/link_uris.dart';
 import 'package:pos_app/core/utils/share_origin.dart';
 import 'package:pos_app/features/backup/data/share_files.dart';
@@ -18,21 +17,76 @@ import 'package:pos_app/features/printing/domain/receipt_printer.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
 import 'package:pos_app/features/usage/usage_providers.dart';
 
-/// Shown when Print is tapped with no printer saved.
-const kNoPrinterMessage =
-    'No printer is set up. Go to Settings, then Printer, to add one.';
+/// Shown when Print is tapped with no printer saved. Names the real row:
+/// Settings → Hardware → Thermal Printer.
+const kNoPrinterMessage = 'No printer is set up. Go to Settings, then '
+    'Thermal Printer under Hardware, to add one.';
 
-/// The lines of [text] to print, with the shop's currency symbol swapped
-/// for its code when the receipt fonts can't draw it (the same rule as the
-/// receipt: [receiptCurrencySymbol]). The stored text is never changed.
-Future<List<String>> summaryPrintLines(
-    String text, CurrencyFormatter fmt) async {
-  final symbol = fmt.symbol.trim();
-  final printable = await receiptCurrencySymbol(symbol, fmt.currencyCode);
-  final out = symbol.isEmpty || printable == symbol
-      ? text
-      : text.replaceAll(symbol, printable);
-  return out.split('\n');
+/// The currency symbol the frozen [text] was written with, read back from
+/// its "Opening cash" line (always present, always money), or null.
+String? frozenSummarySymbol(String text) {
+  for (final line in text.split('\n')) {
+    if (!line.startsWith('Opening cash')) continue;
+    final value = line.substring('Opening cash'.length).trim();
+    final symbol = value
+        .replaceFirst(RegExp(r'^-'), '')
+        .replaceFirst(RegExp(r'[\d.,]+$'), '')
+        .trim();
+    return symbol.isEmpty ? null : symbol;
+  }
+  return null;
+}
+
+/// The paper width the frozen [text] was laid out for: its `====` rule.
+int frozenSummaryColumns(String text) {
+  var cols = 0;
+  for (final line in text.split('\n')) {
+    if (line.isNotEmpty && RegExp(r'^=+$').hasMatch(line)) {
+      cols = line.length > cols ? line.length : cols;
+    }
+  }
+  return cols == 0 ? 32 : cols;
+}
+
+/// The lines of the frozen summary [text] to print.
+///
+/// The symbol is the one stored in the summary ([frozenSummarySymbol]),
+/// not today's setting. When the receipt fonts can't draw it it is
+/// swapped for [currencyCode] (the receipt rule, [receiptCurrencySymbol]),
+/// and every money line is padded again to the summary's own width, so
+/// the right edges stay aligned and no line grows past the paper (which
+/// would shrink the font). The stored text is never changed.
+Future<List<String>> summaryPrintLines(String text,
+    {String? currencyCode}) async {
+  final lines = text.split('\n');
+  final symbol = frozenSummarySymbol(text);
+  if (symbol == null) return lines;
+  final printable = await receiptCurrencySymbol(symbol, currencyCode);
+  if (printable == symbol) return lines;
+
+  final columns = frozenSummaryColumns(text);
+  final money = RegExp(
+      '^(.*?) +(-?${RegExp.escape(symbol)}\\s?[\\d.,]+)\$');
+  return [
+    for (final line in lines)
+      if (!line.contains(symbol))
+        line
+      else if (money.firstMatch(line) case final m?)
+        _padRow(m.group(1)!, m.group(2)!.replaceFirst(symbol, printable),
+            columns)
+      else
+        line.replaceAll(symbol, printable),
+  ];
+}
+
+/// [label] and [value] across [columns], the value flush right; the label
+/// is cut if both don't fit (as `buildShiftSummary` does).
+String _padRow(String label, String value, int columns) {
+  final room = columns - value.length - 1;
+  var l = label;
+  if (l.length > room) l = room > 0 ? l.substring(0, room) : '';
+  final pad = columns - l.length - value.length;
+  return '$l${' ' * (pad < 1 ? 1 : pad)}$value';
 }
 
 /// The frozen summary text in monospace, with Print, Share, Email and Copy.
@@ -51,7 +105,7 @@ class ShiftSummaryPanel extends ConsumerWidget {
     final name = ref.read(printerDeviceNameProvider);
     final paper = ref.read(printerPaperWidthProvider);
     final printer = ref.read(receiptPrinterProvider);
-    final fmt = ref.read(currencyFormatterProvider);
+    final code = ref.read(currencyFormatterProvider).currencyCode;
     if (address == null || name == null) {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text(kNoPrinterMessage)));
@@ -62,7 +116,7 @@ class ShiftSummaryPanel extends ConsumerWidget {
       () async {
         await printer.printTextSlip(
           PrinterTarget(address: address, name: name),
-          await summaryPrintLines(text, fmt),
+          await summaryPrintLines(text, currencyCode: code),
           paperMm: paper,
         );
         return true;

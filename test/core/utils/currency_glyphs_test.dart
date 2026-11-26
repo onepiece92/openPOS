@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 import 'package:pos_app/core/database/app_database.dart';
+import 'package:pos_app/core/database/daos/shifts_dao.dart';
 import 'package:pos_app/core/theme/app_theme.dart';
 import 'package:pos_app/core/theme/tokens.dart';
 import 'package:pos_app/core/utils/bundled_fonts.dart';
@@ -14,6 +15,7 @@ import 'package:pos_app/core/utils/currency_formatter.dart';
 import 'package:pos_app/features/printing/domain/receipt_roll_pdf.dart';
 import 'package:pos_app/features/receipts/presentation/receipt_body.dart';
 import 'package:pos_app/features/receipts/presentation/receipt_pdf_service.dart';
+import 'package:pos_app/features/shifts/domain/shift_summary.dart';
 import 'package:pos_app/features/shifts/presentation/shift_summary_panel.dart';
 
 /// JetBrains Mono has no ৳ ₵ ₹ ₩ ₦ ₱ ฿, and the pdf package has no system
@@ -157,14 +159,70 @@ void main() {
     }
   });
 
-  test('the end-of-day slip prints an undrawable symbol as its code', () async {
-    const text = 'Cash sales  ₺ 12.50\n= Expected  ₺ 20.00';
-    expect(await summaryPrintLines(text, _fmt('₺', 'TRY')),
-        ['Cash sales  TRY 12.50', '= Expected  TRY 20.00']);
-    expect(await summaryPrintLines('Net  ₹ 5.00', _fmt('₹', 'INR')),
-        ['Net  ₹ 5.00']);
-    expect(await summaryPrintLines('Net  ₺ 5.00', _fmt('₺', '')),
-        ['Net  ₺ 5.00']);
+  group('the end-of-day slip after a symbol-to-code swap', () {
+    ShiftClose close() => ShiftClose(
+          shiftId: 1,
+          openingCash: 100,
+          paidOut: 5,
+          countedCash: 160,
+          figures: ShiftFigures(
+            from: DateTime(2026, 6, 10, 9),
+            to: DateTime(2026, 6, 10, 21),
+            sales: const FlowByMethod({
+              'cash': MethodFlow(count: 3, amount: 60, tips: 4, tax: 6),
+              'card': MethodFlow(count: 1, amount: 1234.5, tips: 0, tax: 0),
+            }),
+            refunds: const FlowByMethod({}),
+            voids: const FlowByMethod({}),
+          ),
+        );
+
+    for (final cols in [32, 48]) {
+      test('$cols columns: right edges stay aligned, nothing grows', () async {
+        final text = buildShiftSummary(close(),
+            shopName: 'Shop',
+            taxName: 'KDV',
+            fmt: _fmt('₺', 'TRY'),
+            columns: cols,
+            notes: 'Paid the ₺ 5.00 for milk');
+        final lines = await summaryPrintLines(text, currencyCode: 'TRY');
+        expect(lines.length, text.split('\n').length);
+        expect(lines.join('\n'), isNot(contains('₺')));
+        final original = text.split('\n');
+        for (var i = 0; i < lines.length; i++) {
+          expect(lines[i].length, lessThanOrEqualTo(cols), reason: lines[i]);
+          if (original[i].length == cols && original[i].contains('₺ ')) {
+            expect(lines[i].length, cols, reason: 'flush right: ${lines[i]}');
+          }
+        }
+        expect(lines, contains(startsWith('Opening cash')));
+        final opening = lines.firstWhere((l) => l.startsWith('Opening cash'));
+        expect(opening, endsWith('TRY 100.00'));
+        expect(opening.length, cols);
+        expect(lines.firstWhere((l) => l.startsWith('Card')),
+            endsWith('TRY 1,234.50'));
+        // The longest line is the paper width, so the slip's font is the
+        // same size as for a summary that needed no swap.
+        expect(lines.map((l) => l.length).reduce((a, b) => a > b ? a : b),
+            cols);
+      });
+    }
+
+    test('the symbol comes from the frozen text, not today\'s setting',
+        () async {
+      final text = buildShiftSummary(close(),
+          shopName: 'Shop', taxName: 'VAT', fmt: _fmt('₹', 'INR'));
+      expect(frozenSummarySymbol(text), '₹');
+      // ₹ is drawable: printed as stored even if the shop now uses TRY.
+      expect(await summaryPrintLines(text, currencyCode: 'TRY'),
+          text.split('\n'));
+      final lira = buildShiftSummary(close(),
+          shopName: 'Shop', taxName: 'VAT', fmt: _fmt('₺', 'TRY'));
+      expect(await summaryPrintLines(lira, currencyCode: ''),
+          lira.split('\n'));
+      expect(await summaryPrintLines('x\ny', currencyCode: 'TRY'), ['x', 'y']);
+      expect(frozenSummaryColumns(lira), 32);
+    });
   });
 
   test('every symbol in country_defaults.json has a glyph in the bundled fonts',
