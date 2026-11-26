@@ -149,7 +149,7 @@ void main() {
     test('a partial refund scales revenue, VAT and cost by the share kept',
         () async {
       // 508.50 of 1017 refunded → exactly half of the sale is kept.
-      await processReturn(db, audit,
+      await processReturn(db, audit, trackStock: true,
           orderId: orderId, amount: 508.50, restock: false);
       final d = await report();
       expect(d.revenue, 508.50);
@@ -161,7 +161,7 @@ void main() {
     });
 
     test('a fully refunded order contributes nothing', () async {
-      await processReturn(db, audit,
+      await processReturn(db, audit, trackStock: true,
           orderId: orderId, amount: 1017, restock: false);
       final d = await report();
       expect(d.revenue, 0);
@@ -172,7 +172,7 @@ void main() {
     });
 
     test('a voided order contributes nothing', () async {
-      await voidOrder(db, audit, orderId: orderId, reason: 'test');
+      await voidOrder(db, audit, trackStock: true, orderId: orderId, reason: 'test');
       final d = await report();
       expect(d.revenue, 0);
       expect(d.vatCollected, 0);

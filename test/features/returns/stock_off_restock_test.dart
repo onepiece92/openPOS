@@ -63,7 +63,7 @@ void main() {
       final p = await seedProduct(db, sku: 'A', stock: 10);
       final order = await sell(db, audit, [line(p, qty: 3)]);
       expect(await stockOf(p), 7);
-      await voidOrder(db, audit, orderId: order, reason: 'x');
+      await voidOrder(db, audit, trackStock: true, orderId: order, reason: 'x');
       expect(await stockOf(p), 10);
       expect((await log()).map((a) => a.reasonCode), contains('void'));
     });

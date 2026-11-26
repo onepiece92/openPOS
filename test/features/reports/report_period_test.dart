@@ -65,10 +65,10 @@ void main() {
     addTearDown(sub.close);
     expect(await revenue(), 30);
 
-    await processReturn(db, audit, orderId: b, amount: 5, restock: false);
+    await processReturn(db, audit, trackStock: true, orderId: b, amount: 5, restock: false);
     expect(await revenue(), 25);
 
-    await voidOrder(db, audit, orderId: a, reason: 't');
+    await voidOrder(db, audit, trackStock: true, orderId: a, reason: 't');
     expect(await revenue(), 15);
   });
 

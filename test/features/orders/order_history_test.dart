@@ -258,7 +258,7 @@ void main() {
           reason: 'still the five rows the cashier had loaded');
       expect(state().hasMore, isTrue);
 
-      await voidOrder(db, audit, orderId: sale, reason: 'test');
+      await voidOrder(db, audit, trackStock: true, orderId: sale, reason: 'test');
       await pumpEventQueue();
       expect(state().orders.first.status, 'voided');
     });
@@ -272,11 +272,11 @@ void main() {
         for (var i = 0; i < 6; i++)
           await sell(db, audit, [line(p, qty: 10, price: 10)]), // 100 each
       ];
-      await processReturn(db, audit,
+      await processReturn(db, audit, trackStock: true,
           orderId: sales[0], amount: 30, restock: false); // partly refunded
-      await processReturn(db, audit,
+      await processReturn(db, audit, trackStock: true,
           orderId: sales[1], amount: 100, restock: false); // fully refunded
-      await voidOrder(db, audit, orderId: sales[2], reason: 'test');
+      await voidOrder(db, audit, trackStock: true, orderId: sales[2], reason: 'test');
       await order(invoiceNo: 9000, total: 999, daysAgo: 30); // not today
 
       await open();

@@ -116,7 +116,7 @@ void main() {
     final p = await seedProduct();
     await sell(p);
     final second = await sell(p);
-    await voidOrder(db, audit, orderId: second, reason: 'test');
+    await voidOrder(db, audit, trackStock: true, orderId: second, reason: 'test');
     final third = await sell(p);
 
     expect((await db.ordersDao.getById(second))!.status, 'voided');

@@ -80,7 +80,7 @@ void main() {
 
     final returnId = await processReturn(
       db,
-      audit,
+      audit, trackStock: true,
       orderId: orderId,
       amount: 15.0,
       restock: true,
@@ -125,7 +125,7 @@ void main() {
 
     await processReturn(
       db,
-      audit,
+      audit, trackStock: true,
       orderId: orderId,
       amount: 5.0,
       restock: false,
@@ -201,7 +201,7 @@ void main() {
 
     await processReturn(
       db,
-      audit,
+      audit, trackStock: true,
       orderId: orderId,
       amount: 20.0,
       restock: true,
@@ -217,7 +217,7 @@ void main() {
     expect(
       () => processReturn(
         db,
-        audit,
+        audit, trackStock: true,
         orderId: 9999,
         amount: 5.0,
         restock: true,

@@ -21,8 +21,8 @@ void main() {
   tearDown(() => db.close());
 
   Future<void> reverse(String how, int orderId, double total) => how == 'void'
-      ? voidOrder(db, audit, orderId: orderId, reason: 't')
-      : processReturn(db, audit,
+      ? voidOrder(db, audit, trackStock: true, orderId: orderId, reason: 't')
+      : processReturn(db, audit, trackStock: true,
           orderId: orderId, amount: total, restock: true);
 
   for (final how in ['void', 'refund']) {
