@@ -91,6 +91,20 @@ class SppPrinter implements ReceiptPrinter {
     await _print(target, pages, paperMm);
   }
 
+  @override
+  Future<void> printTextSlip(
+    PrinterTarget target,
+    List<String> lines, {
+    required int paperMm,
+  }) async {
+    _requireAndroid();
+    final pages = await renderTextSlipImages(
+      lines: lines,
+      widthDots: escPosPrintWidthDots(paperMm),
+    );
+    await _print(target, pages, paperMm);
+  }
+
   Future<void> _print(
     PrinterTarget target,
     List<Uint8List> pages,

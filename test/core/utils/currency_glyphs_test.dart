@@ -14,6 +14,7 @@ import 'package:pos_app/core/utils/currency_formatter.dart';
 import 'package:pos_app/features/printing/domain/receipt_roll_pdf.dart';
 import 'package:pos_app/features/receipts/presentation/receipt_body.dart';
 import 'package:pos_app/features/receipts/presentation/receipt_pdf_service.dart';
+import 'package:pos_app/features/shifts/presentation/shift_summary_panel.dart';
 
 /// JetBrains Mono has no ৳ ₵ ₹ ₩ ₦ ₱ ฿, and the pdf package has no system
 /// fallback: without the bundled OpenPOS Symbols fallback every receipt for
@@ -146,8 +147,24 @@ void main() {
                 storeName: 'Shop $symbol', paperMm: 80, widthDots: 576)),
             isEmpty,
             reason: 'printer test page');
+        expect(
+            await _missingGlyphWarnings(() => buildTextSlipRollPdf(
+                lines: ['Cash sales   ${fmt.format(12.5)}', 'x' * 32],
+                widthDots: 384)),
+            isEmpty,
+            reason: 'end-of-day text slip');
       });
     }
+  });
+
+  test('the end-of-day slip prints an undrawable symbol as its code', () async {
+    const text = 'Cash sales  ₺ 12.50\n= Expected  ₺ 20.00';
+    expect(await summaryPrintLines(text, _fmt('₺', 'TRY')),
+        ['Cash sales  TRY 12.50', '= Expected  TRY 20.00']);
+    expect(await summaryPrintLines('Net  ₹ 5.00', _fmt('₹', 'INR')),
+        ['Net  ₹ 5.00']);
+    expect(await summaryPrintLines('Net  ₺ 5.00', _fmt('₺', '')),
+        ['Net  ₺ 5.00']);
   });
 
   test('every symbol in country_defaults.json has a glyph in the bundled fonts',

@@ -69,6 +69,19 @@ class ThermalPluginPrinter implements ReceiptPrinter {
     await _printPages(target, pages, paperMm);
   }
 
+  @override
+  Future<void> printTextSlip(
+    PrinterTarget target,
+    List<String> lines, {
+    required int paperMm,
+  }) async {
+    final pages = await renderTextSlipImages(
+      lines: lines,
+      widthDots: escPosPrintWidthDots(paperMm),
+    );
+    await _printPages(target, pages, paperMm);
+  }
+
   Future<void> _printPages(
     PrinterTarget target,
     List<Uint8List> pages,

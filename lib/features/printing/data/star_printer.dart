@@ -103,6 +103,20 @@ class StarBluetoothPrinter implements ReceiptPrinter {
     await _printImages(target, images, paperMm);
   }
 
+  @override
+  Future<void> printTextSlip(
+    PrinterTarget target,
+    List<String> lines, {
+    required int paperMm,
+  }) async {
+    _requireSupportedPlatform();
+    final images = await renderTextSlipImages(
+      lines: lines,
+      widthDots: starPrintWidthDots(paperMm),
+    );
+    await _printImages(target, images, paperMm);
+  }
+
   Future<void> _printImages(
     PrinterTarget target,
     List<Uint8List> images,

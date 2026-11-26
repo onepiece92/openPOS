@@ -33,15 +33,14 @@ const kAlwaysSuggested = {Feature.reviewReminder, Feature.usageCounting};
 const _app = {...kAlwaysSuggested, Feature.autoPrint};
 
 /// What setup suggests for each business type. Anything not listed is off.
-/// Market stall and Something else are minimal: [kAlwaysSuggested] only.
+/// Something else is minimal: [kAlwaysSuggested] only. Market stall is
+/// minimal plus End-of-day close (a cash-heavy day that ends with a count).
 /// A preset only sets switches: it never touches data.
-///
-/// TODO(end-of-day): add endOfDay to foodTruck, cafe, restaurant and
-/// marketStall once that Feature exists.
 const Map<BusinessType, Set<Feature>> kPresets = {
   BusinessType.foodTruck: {
     ..._app,
     Feature.tips,
+    Feature.endOfDay,
     Feature.heldTickets,
     Feature.discounts,
     Feature.taxes,
@@ -50,6 +49,7 @@ const Map<BusinessType, Set<Feature>> kPresets = {
   BusinessType.cafe: {
     ..._app,
     Feature.tips,
+    Feature.endOfDay,
     Feature.heldTickets,
     Feature.discounts,
     Feature.taxes,
@@ -60,6 +60,7 @@ const Map<BusinessType, Set<Feature>> kPresets = {
   BusinessType.restaurant: {
     ..._app,
     Feature.tips,
+    Feature.endOfDay,
     Feature.tables,
     Feature.heldTickets,
     Feature.discounts,
@@ -79,7 +80,7 @@ const Map<BusinessType, Set<Feature>> kPresets = {
     Feature.csvImportExport,
     Feature.dashboardExtras,
   },
-  BusinessType.marketStall: kAlwaysSuggested,
+  BusinessType.marketStall: {...kAlwaysSuggested, Feature.endOfDay},
   BusinessType.services: {
     ..._app,
     Feature.tips,

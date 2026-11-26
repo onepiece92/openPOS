@@ -24,6 +24,9 @@ class _NoopPrinter implements ReceiptPrinter {
   @override
   Future<void> printTestPage(PrinterTarget target,
       {required String storeName, required int paperMm}) async {}
+  @override
+  Future<void> printTextSlip(PrinterTarget target, List<String> lines,
+      {required int paperMm}) async {}
 }
 
 void main() {

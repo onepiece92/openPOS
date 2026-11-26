@@ -1,0 +1,141 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'package:pos_app/core/database/app_database.dart';
+import 'package:pos_app/core/database/daos/shifts_dao.dart';
+import 'package:pos_app/core/providers/database_provider.dart';
+
+/// A gap longer than this is offered "Keep them separate".
+const Duration kLongGap = Duration(hours: 12);
+
+/// The note stored on an automatic gap close.
+const kGapCloseNote =
+    'Till was closed. Recorded automatically; cash was not counted.';
+
+/// Sales, refunds and voids made between the last close and now, while no
+/// shift was open. By the DAO's rule they land in the next shift opened.
+class GapInfo {
+  const GapInfo({
+    required this.from,
+    required this.to,
+    required this.sales,
+    required this.refunds,
+    required this.voids,
+  });
+
+  final DateTime from;
+  final DateTime to;
+  final int sales;
+  final int refunds;
+  final int voids;
+
+  bool get hasActivity => sales + refunds + voids > 0;
+
+  /// Over 12 hours, or the last close was on an earlier calendar day.
+  bool get isLong =>
+      to.difference(from) > kLongGap ||
+      from.year != to.year ||
+      from.month != to.month ||
+      from.day != to.day;
+
+  /// Offer to record the gap as its own day: it has activity and is long.
+  bool get canKeepSeparate => hasActivity && isLong;
+}
+
+/// The plain sentence shown when opening the till after a gap with
+/// activity, or null when there is nothing to say.
+String? gapMessage(GapInfo? gap) {
+  if (gap == null || !gap.hasActivity) return null;
+  final other = gap.refunds + gap.voids;
+  final total = gap.sales + other;
+  final parts = [
+    if (gap.sales > 0) gap.sales == 1 ? '1 sale' : '${gap.sales} sales',
+    if (other > 0) other == 1 ? '1 refund or void' : '$other refunds or voids',
+  ];
+  final was = total == 1 ? 'was' : 'were';
+  final they = total == 1 ? 'It is' : 'They are';
+  return '${parts.join(' and ')} $was made while the till was closed. '
+      '$they included in this day.';
+}
+
+/// Till-session operations on top of [ShiftsDao]: the clock clamp, the gap
+/// rule and the "keep them separate" close. No money math lives here.
+class ShiftService {
+  ShiftService(this.db) : _dao = db.shiftsDao;
+
+  final AppDatabase db;
+  final ShiftsDao _dao;
+
+  /// What happened since the last close, or null when no shift has ever
+  /// been closed (the first-ever shift starts at its own opening).
+  Future<GapInfo?> gapBeforeOpen({DateTime? now}) async {
+    final last = await _dao.lastClosedShift();
+    final from = last?.closedAt;
+    if (from == null) return null;
+    final to = _clamp(now ?? DateTime.now(), from);
+    final figures = await _dao.figuresForWindow(from, to);
+    return GapInfo(
+      from: from,
+      to: to,
+      sales: figures.sales.count,
+      refunds: figures.refunds.count,
+      voids: figures.voids.count,
+    );
+  }
+
+  /// Opens the till. If the clock is behind the previous close, `opened_at`
+  /// is moved up to that close so history never shows a day that opened
+  /// before the one before it ended.
+  Future<int> openTill({required double openingCash, DateTime? now}) async {
+    final last = await _dao.lastClosedShift();
+    return _dao.openShift(
+      openingCash: openingCash,
+      openedAt: _clamp(now ?? DateTime.now(), last?.closedAt),
+    );
+  }
+
+  /// Records the gap as its own closed day: a shift opened and closed at
+  /// [now] whose window is [last close, now), so the activity stays out of
+  /// the day about to open. Cash was not counted, so counted = expected
+  /// (Balanced) and the note says so. Throws [ShiftStateException] if a
+  /// shift is open or nothing has been closed yet.
+  Future<void> keepGapSeparate({
+    required String Function(ShiftClose close, String notes) summary,
+    DateTime? now,
+  }) =>
+      _dao.transaction(() async {
+        final last = await _dao.lastClosedShift();
+        if (last == null) {
+          throw const ShiftStateException('There is no earlier close');
+        }
+        final at = _clamp(now ?? DateTime.now(), last.closedAt);
+        final id = await _dao.openShift(
+            openingCash: last.countedCash ?? 0, openedAt: at);
+        final expected = (await _dao.previewClose(id, at: at)).expectedCash;
+        await _dao.closeShift(
+          id,
+          countedCash: expected,
+          at: at,
+          notes: kGapCloseNote,
+          summary: (c) => summary(c, kGapCloseNote),
+        );
+      });
+
+  /// The shop's tax name for the summary: the default tax rate, else the
+  /// first active one, else "Tax".
+  Future<String> taxName({int? defaultTaxId}) async {
+    if (defaultTaxId != null) {
+      final r = await db.taxDao.getById(defaultTaxId);
+      if (r != null && r.name.trim().isNotEmpty) return r.name.trim();
+    }
+    for (final r in await db.taxDao.getAll()) {
+      if (r.isActive && r.name.trim().isNotEmpty) return r.name.trim();
+    }
+    return 'Tax';
+  }
+
+  static DateTime _clamp(DateTime t, DateTime? floor) =>
+      floor != null && t.isBefore(floor) ? floor : t;
+}
+
+final shiftServiceProvider =
+    Provider<ShiftService>((ref) => ShiftService(ref.watch(databaseProvider)));

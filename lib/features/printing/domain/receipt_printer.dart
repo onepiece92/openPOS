@@ -131,6 +131,15 @@ abstract interface class ReceiptPrinter {
     required String storeName,
     required int paperMm,
   });
+
+  /// Prints [lines] of plain monospace text (an end-of-day summary, say) on
+  /// the same raster path as the test page. Never called automatically; a
+  /// user tap starts it. Throws on connect/transmit failure.
+  Future<void> printTextSlip(
+    PrinterTarget target,
+    List<String> lines, {
+    required int paperMm,
+  });
 }
 
 /// Bluetooth Low Energy ESC/POS driver.

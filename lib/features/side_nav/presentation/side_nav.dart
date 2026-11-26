@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:pos_app/core/providers/hive_provider.dart';
+import 'package:pos_app/features/shifts/shift_settings.dart';
 
 /// One drawer destination. [feature] set = shown only while it is on.
 class NavEntry {
@@ -24,6 +25,8 @@ const kNavEntries = <NavEntry>[
       Feature.customers),
   NavEntry('Sell', '/tables', 'Tables', Icons.table_restaurant_rounded,
       Feature.tables),
+  NavEntry('Sell', kCloseDayRoute, 'Close day', Icons.lock_clock_rounded,
+      Feature.endOfDay),
   NavEntry('Catalogue', '/products', 'Products', Icons.inventory_2_rounded),
   NavEntry('Catalogue', '/categories', 'Categories', Icons.category_rounded),
   NavEntry('Catalogue', '/inventory', 'Inventory', Icons.warehouse_rounded,

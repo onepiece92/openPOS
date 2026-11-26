@@ -121,15 +121,22 @@ Future<Set<int>> bundledFontCodePoints(String asset) {
 }
 
 Future<Set<int>>? _receiptCoverage;
+Set<int>? _receiptCoverageValue;
 
 /// Code points a receipt can draw in both regular and bold: JetBrains Mono
 /// plus the symbol fallback, per weight.
+///
+/// Once known, the set is handed out in a fresh future each call rather
+/// than the cached one, so a caller in another zone (each widget test runs
+/// in its own) never waits on a zone that has gone.
 Future<Set<int>> receiptFontCoverage() {
+  final known = _receiptCoverageValue;
+  if (known != null) return Future.value(known);
   final cached = _receiptCoverage;
   if (cached != null) return cached;
   final future = _computeReceiptCoverage();
   _receiptCoverage = future;
-  future.then<void>((_) {}, onError: (Object _) {
+  future.then<void>((v) => _receiptCoverageValue = v, onError: (Object _) {
     if (identical(_receiptCoverage, future)) _receiptCoverage = null;
   });
   return future;

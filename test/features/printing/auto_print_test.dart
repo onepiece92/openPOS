@@ -43,6 +43,15 @@ class FakeReceiptPrinter implements ReceiptPrinter {
   }) async {
     if (failWith != null) throw failWith!;
   }
+
+  @override
+  Future<void> printTextSlip(
+    PrinterTarget target,
+    List<String> lines, {
+    required int paperMm,
+  }) async {
+    if (failWith != null) throw failWith!;
+  }
 }
 
 void main() {

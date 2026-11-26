@@ -10,9 +10,6 @@ import 'package:flutter/foundation.dart' show immutable, listEquals;
 /// Order matters: it is the order of the Features screen, and a child is
 /// listed straight after its parent.
 ///
-/// TODO(end-of-day): add `endOfDay` here when that branch lands (make
-/// [defaultOn] false if upgrades must not get it) and add it to `kPresets`
-/// for foodTruck, cafe, restaurant and marketStall.
 enum Feature {
   customers('Customers', 'Keep a customer list and add a customer to a sale.'),
   loyalty('Loyalty points',
@@ -24,6 +21,9 @@ enum Feature {
   discounts('Discounts', 'Take an amount or a percentage off a sale.'),
   taxes('Taxes', 'Add tax to sales and keep a list of tax rates.'),
   tips('Tips', 'Add a tip at payment and track tips in reports.',
+      defaultOn: false),
+  endOfDay('End-of-day close',
+      'Count the cash drawer and close the day with a printed summary.',
       defaultOn: false),
   stockTracking('Stock tracking',
       'Count stock, take it off on each sale, and show low-stock badges.'),
@@ -137,6 +137,7 @@ class FeatureFlags {
   bool get discounts => isOn(Feature.discounts);
   bool get taxes => isOn(Feature.taxes);
   bool get tips => isOn(Feature.tips);
+  bool get endOfDay => isOn(Feature.endOfDay);
   bool get stockTracking => isOn(Feature.stockTracking);
   bool get bundles => isOn(Feature.bundles);
   bool get units => isOn(Feature.units);

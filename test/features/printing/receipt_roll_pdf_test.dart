@@ -1,8 +1,13 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pdf/pdf.dart';
 
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/utils/currency_formatter.dart';
+import 'package:pos_app/features/printing/data/spp_printer.dart';
+import 'package:pos_app/features/printing/data/star_printer.dart';
+import 'package:pos_app/features/printing/domain/receipt_printer.dart'
+    show PrinterTarget, kStarUnsupportedNote;
 import 'package:pos_app/features/printing/domain/receipt_roll_pdf.dart';
 import 'package:pos_app/features/printing/domain/render_receipt_image.dart';
 import 'package:pos_app/features/receipts/presentation/receipt_body.dart';
@@ -85,8 +90,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   final fmt = CurrencyFormatter(symbol: 'Rs ', locale: 'en_US');
 
-  test('80mm roll is one page exactly as wide as the printable area',
-      () async {
+  test('80mm roll is one page exactly as wide as the printable area', () async {
     final formats = await _pageFormats(_sampleData(), fmt, 576);
 
     expect(formats, hasLength(1), reason: 'a receipt is one continuous roll');
@@ -132,8 +136,7 @@ void main() {
 
     expect(
       copy.document.pdfPageList.pages.single.pageFormat.height,
-      greaterThan(
-          original.document.pdfPageList.pages.single.pageFormat.height),
+      greaterThan(original.document.pdfPageList.pages.single.pageFormat.height),
     );
   });
 
@@ -157,5 +160,48 @@ void main() {
     expect(escPosPrintWidthDots(80), 576);
     expect(escPosPrintWidthDots(58), 384);
     expect(escPosPrintWidthDots(999), 576, reason: 'falls back to 80mm');
+  });
+
+  group('text slip (end-of-day summary)', () {
+    final lines32 = [
+      for (var i = 0; i < 20; i++) "${'Row $i'.padRight(26)}12.00"
+    ];
+
+    test('lays out on the same roll geometry and grows with its lines',
+        () async {
+      final short = await buildTextSlipRollPdf(
+          lines: lines32.take(5).toList(), widthDots: 384);
+      final long = await buildTextSlipRollPdf(lines: lines32, widthDots: 384);
+      await short.save();
+      await long.save();
+      final a = short.document.pdfPageList.pages.single.pageFormat;
+      final b = long.document.pdfPageList.pages.single.pageFormat;
+      expect(a.width, closeTo(48 * PdfPageFormat.mm, 0.01));
+      expect(b.height, greaterThan(a.height));
+    });
+
+    test('48 columns on 80mm and blank lines render', () async {
+      final doc = await buildTextSlipRollPdf(
+          lines: ['=' * 48, '', 'x' * 48], widthDots: 576);
+      expect(await doc.save(), isNotEmpty);
+      expect(doc.document.pdfPageList.pages.single.pageFormat.width,
+          closeTo(72 * PdfPageFormat.mm, 0.01));
+    });
+
+    test('SPP and Star refuse an unsupported platform with a readable error',
+        () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      const target = PrinterTarget(address: 'AA', name: 'P');
+      await expectLater(
+          SppPrinter().printTextSlip(target, ['x'], paperMm: 58),
+          throwsA(isA<StateError>()
+              .having((e) => e.message, 'message',
+                  contains('not supported on this device'))));
+      await expectLater(
+          StarBluetoothPrinter().printTextSlip(target, ['x'], paperMm: 58),
+          throwsA(isA<StateError>().having(
+              (e) => e.message, 'message', kStarUnsupportedNote)));
+    });
   });
 }

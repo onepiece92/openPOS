@@ -85,6 +85,7 @@ void main() {
       BusinessType.foodTruck: {
         ...app,
         Feature.tips,
+        Feature.endOfDay,
         Feature.heldTickets,
         Feature.discounts,
         Feature.taxes,
@@ -93,6 +94,7 @@ void main() {
       BusinessType.cafe: {
         ...app,
         Feature.tips,
+        Feature.endOfDay,
         Feature.heldTickets,
         Feature.discounts,
         Feature.taxes,
@@ -103,6 +105,7 @@ void main() {
       BusinessType.restaurant: {
         ...app,
         Feature.tips,
+        Feature.endOfDay,
         Feature.tables,
         Feature.heldTickets,
         Feature.discounts,
@@ -122,7 +125,11 @@ void main() {
         Feature.csvImportExport,
         Feature.dashboardExtras,
       },
-      BusinessType.marketStall: {Feature.reviewReminder, Feature.usageCounting},
+      BusinessType.marketStall: {
+        Feature.reviewReminder,
+        Feature.usageCounting,
+        Feature.endOfDay,
+      },
       BusinessType.services: {
         ...app,
         Feature.tips,
@@ -191,18 +198,34 @@ void main() {
       }
     });
 
+    test('End-of-day close: on for food truck, cafe, restaurant and market '
+        'stall; off for the rest', () {
+      const on = {
+        BusinessType.foodTruck,
+        BusinessType.cafe,
+        BusinessType.restaurant,
+        BusinessType.marketStall,
+      };
+      for (final t in BusinessType.values) {
+        expect(kPresets[t]!.contains(Feature.endOfDay), on.contains(t),
+            reason: t.name);
+      }
+    });
+
     test(
         'skip with no choice writes the defaults (every feature on) and '
         'leaves loyalty alone', () async {
       final c = container();
       await c.read(onboardingNotifierProvider.notifier).skip();
       expect(box.get(kOnboardingCompleteKeyForTest), isTrue);
-      // Every feature that existed before Tips is on; Tips stays off.
+      // Every feature that existed before Tips is on; Tips and End-of-day
+      // close stay off.
       expect(stored()['tips'], isFalse);
+      expect(stored()['endOfDay'], isFalse);
       expect(
         {
           for (final e in stored().entries)
-            if (e.key != 'tips') e.value,
+            if (e.key != 'tips' && e.key != 'endOfDay') e.value,
         },
         {true},
       );

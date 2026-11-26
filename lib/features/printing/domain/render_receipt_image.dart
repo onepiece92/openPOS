@@ -56,6 +56,15 @@ Future<List<Uint8List>> renderTestPageImages({
   return _rasterise(await doc.save());
 }
 
+/// Renders plain text [lines] as PNG pages (see [buildTextSlipRollPdf]).
+Future<List<Uint8List>> renderTextSlipImages({
+  required List<String> lines,
+  required int widthDots,
+}) async {
+  final doc = await buildTextSlipRollPdf(lines: lines, widthDots: widthDots);
+  return _rasterise(await doc.save());
+}
+
 Future<List<Uint8List>> _rasterise(Uint8List pdf) async {
   final pages = <Uint8List>[];
   await for (final page in Printing.raster(pdf, dpi: kReceiptDpi)) {

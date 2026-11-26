@@ -56,8 +56,9 @@ void main() {
       await box.put(kLoyaltyEnabled, true);
       final flags = container().read(featureFlagsProvider);
       for (final f in Feature.values) {
-        // Tips is the one feature that is off until someone turns it on.
-        expect(flags.isOn(f), f != Feature.tips, reason: f.name);
+        // Tips and End-of-day close stay off until someone turns them on.
+        expect(flags.isOn(f), f != Feature.tips && f != Feature.endOfDay,
+            reason: f.name);
       }
       await box.put(kLoyaltyEnabled, false);
       expect(AppSettings.fromBox(box).features.loyalty, isFalse);

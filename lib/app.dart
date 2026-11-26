@@ -21,6 +21,9 @@ import 'package:pos_app/features/onboarding/presentation/onboarding_screen.dart'
 import 'package:pos_app/features/orders/presentation/order_detail_screen.dart';
 import 'package:pos_app/features/orders/presentation/orders_screen.dart';
 import 'package:pos_app/features/printing/presentation/printer_setup_screen.dart';
+import 'package:pos_app/features/shifts/presentation/close_day_screen.dart';
+import 'package:pos_app/features/shifts/presentation/close_history_screen.dart';
+import 'package:pos_app/features/shifts/shift_settings.dart';
 import 'package:pos_app/features/tables/presentation/tables_screen.dart';
 import 'package:pos_app/features/products/presentation/categories_screen.dart';
 import 'package:pos_app/features/products/presentation/product_form_screen.dart';
@@ -243,6 +246,28 @@ final routerProvider = Provider<GoRouter>((ref) {
                 orderId: int.parse(state.pathParameters['id']!),
               ),
             ),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: kCloseDayRoute,
+        pageBuilder: (_, state) => _slide(state, const CloseDayScreen()),
+        routes: [
+          GoRoute(
+            path: 'history',
+            pageBuilder: (_, state) =>
+                _slide(state, const CloseHistoryScreen()),
+            routes: [
+              GoRoute(
+                path: ':id',
+                pageBuilder: (_, state) => _slide(
+                  state,
+                  CloseDetailScreen(
+                    shiftId: int.tryParse(state.pathParameters['id'] ?? ''),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),

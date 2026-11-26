@@ -237,6 +237,40 @@ Future<pw.Document> buildTestPageRollPdf({
   return doc;
 }
 
+/// Plain monospace [lines] on a roll, like [buildTestPageRollPdf]. The font
+/// is sized so the longest line just fits the printable width (capped at the
+/// receipt size), so a 32- or 48-column summary never wraps or clips.
+Future<pw.Document> buildTextSlipRollPdf({
+  required List<String> lines,
+  required int widthDots,
+}) async {
+  final width = rollWidthMm(widthDots) * PdfPageFormat.mm;
+  // Same fonts as the receipt and test page: JetBrains Mono with the
+  // OpenPOS Symbols fallback (via the theme), so ₹ ৳ ₩ … draw, not a box.
+  final fonts = await loadReceiptPdfFonts();
+  final longest = lines.fold<int>(1, (m, l) => l.length > m ? l.length : m);
+  // JetBrains Mono advances 0.6 em per character.
+  final fit = width / (longest * 0.6);
+  final size = fit < 8.0 ? fit : 8.0;
+  final style = pw.TextStyle(font: fonts.regular, fontSize: size);
+
+  final doc = pw.Document(theme: fonts.theme);
+  doc.addPage(
+    pw.Page(
+      pageFormat: PdfPageFormat(width, double.infinity, marginAll: 0),
+      build: (context) => pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          for (final l in lines)
+            pw.Text(l.isEmpty ? ' ' : l, style: style, softWrap: false),
+          pw.SizedBox(height: 16),
+        ],
+      ),
+    ),
+  );
+  return doc;
+}
+
 /// Dots to millimetres at the 203 dpi (8 dots/mm) every receipt head uses.
 double rollWidthMm(int widthDots) => widthDots / 8;
 
