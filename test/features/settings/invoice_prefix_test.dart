@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:pos_app/core/providers/hive_provider.dart';
+import 'package:pos_app/core/utils/invoice_prefix.dart';
 import 'package:pos_app/features/settings/presentation/widgets/tax_section.dart';
 
 import '../../_support/temp_hive.dart';

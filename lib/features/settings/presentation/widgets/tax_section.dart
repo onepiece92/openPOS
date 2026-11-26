@@ -3,10 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:pos_app/core/utils/percent.dart';
 import 'package:pos_app/core/database/app_database.dart';
-import 'package:pos_app/core/database/tables/orders_table.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/shared/widgets/app_sheet.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
+import 'package:pos_app/core/utils/invoice_prefix.dart';
 
 // ── Tax ───────────────────────────────────────────────────────────────────────
 
@@ -23,18 +23,6 @@ class TaxSection extends ConsumerWidget {
 }
 
 // ── Invoices ──────────────────────────────────────────────────────────────────
-
-/// Why [prefix] can't be the invoice prefix, or null if it can. "IMP" marks
-/// CSV-imported orders (which never deducted stock, so a void or refund
-/// restocks nothing): a shop's own sales must not share it.
-/// One line shown when the shop's current prefix is already IMP.
-const kReservedPrefixHint =
-    'IMP is reserved for imported orders — choose another prefix for new sales';
-
-String? invoicePrefixError(String prefix) =>
-    prefix.trim().toUpperCase() == kImportedInvoicePrefix
-        ? '$kImportedInvoicePrefix is reserved for imported orders.'
-        : null;
 
 /// Invoice numbering: always on, under its own neutral header.
 class InvoiceSection extends ConsumerWidget {

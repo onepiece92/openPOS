@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import 'package:pos_app/core/providers/feature_flags.dart';
-import 'package:pos_app/features/settings/presentation/widgets/tax_section.dart'
+import 'package:pos_app/core/utils/invoice_prefix.dart'
     show invoicePrefixError;
 
 export 'package:pos_app/core/providers/feature_flags.dart';
