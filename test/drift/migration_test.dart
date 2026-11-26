@@ -8,7 +8,7 @@ import 'package:pos_app/core/database/app_database.dart';
 import 'generated/schema.dart';
 
 /// Upgrades a database created at every schema version that has shipped
-/// (v4 · v6 – v14) through our hand-written `onUpgrade` steps and
+/// (v4 · v6 – v15) through our hand-written `onUpgrade` steps and
 /// asserts the result is byte-for-byte what Drift expects for the current
 /// version — tables, columns, types, defaults, indexes.
 ///
@@ -20,7 +20,7 @@ void main() {
 
   setUpAll(() => verifier = SchemaVerifier(GeneratedHelper()));
 
-  const shipped = [4, 6, 7, 8, 9, 10, 11, 12, 13, 14];
+  const shipped = [4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
   for (final from in shipped) {
     test('upgrade v$from → v${AppDatabase.currentSchemaVersion} yields the expected schema',
@@ -231,6 +231,16 @@ void main() {
     'idx_expenses_date': 'expenses',
   };
 
+  const allIndexes = {
+    ...v15Indexes,
+    'idx_orders_invoice_no': 'orders',
+    'idx_shifts_closed_at': 'shifts',
+    'idx_shifts_one_open': 'shifts',
+    'idx_orders_voided_at': 'orders',
+    'idx_stock_adjustments_order_id': 'stock_adjustments',
+    'idx_returns_created_at': 'returns',
+  };
+
   Future<Map<String, String>> indexes(AppDatabase db) async => {
         for (final r in await db
             .customSelect("SELECT name, tbl_name FROM sqlite_master "
@@ -283,15 +293,184 @@ void main() {
 
     for (final t in tables) {
       final rows = await db.customSelect('SELECT * FROM $t ORDER BY id').get();
-      expect(rows.map((r) => r.data.values.join('|')).join('\n'), before[t],
+      // v16 appends tip_amount (default 0) to orders and returns,
+      // voided_at (NULL) to orders and order_id (NULL) to
+      // stock_adjustments; every column that existed at v14 must be
+      // untouched.
+      final v16Columns = {
+        'orders': ['tip_amount', 'voided_at', 'stock_linked'],
+        'returns': ['tip_amount'],
+        'stock_adjustments': ['order_id'],
+      }[t] ?? const <String>[];
+      expect(
+          rows
+              .map((r) => (Map.of(r.data)
+                    ..removeWhere((k, _) => v16Columns.contains(k)))
+                  .values
+                  .join('|'))
+              .join('\n'),
+          before[t],
           reason: '$t rows must be untouched');
     }
-    expect(await indexes(db), {...v15Indexes, 'idx_orders_invoice_no': 'orders'});
+    expect(await indexes(db), allIndexes);
   });
 
   test('a fresh install has the same indexes as an upgraded one', () async {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
-    expect(await indexes(db), {...v15Indexes, 'idx_orders_invoice_no': 'orders'});
+    expect(await indexes(db), allIndexes);
   });
+
+  // ── v16: tips, refunded tips, till sessions ──────────────────────────────
+
+  test('v15 → v16 adds tip columns at 0 and the shifts table, keeps rows',
+      () async {
+    final schema = await verifier.schemaAt(15);
+    final raw = schema.rawDatabase;
+    raw.execute(
+      'INSERT INTO orders (id, status, subtotal, tax_total, total, payment_method, invoice_no, created_at, updated_at) VALUES '
+      "(1, 'completed', 100, 13, 113, 'cash', 1, 1000, 1000), "
+      "(2, 'refunded', 50, 0, 50, 'card', 2, 2000, 2000)",
+    );
+    raw.execute(
+        'INSERT INTO returns (order_id, amount, created_at) VALUES (1, 13, 1500), (2, 50, 2500)');
+    raw.execute("INSERT INTO products (id, sku, name, price) VALUES (1, 'TEA', 'Tea', 5)");
+    raw.execute(
+        'INSERT INTO stock_adjustments (product_id, delta, reason_code, created_at) VALUES '
+        "(1, -1, 'sale', 1000), (1, 1, 'void', 2000), (1, 4, 'receive', 3000)");
+
+    final db = AppDatabase(schema.newConnection());
+    addTearDown(db.close);
+    await verifier.migrateAndValidate(db, AppDatabase.currentSchemaVersion);
+
+    final orders = await db
+        .customSelect(
+            'SELECT id, total, tip_amount, voided_at FROM orders ORDER BY id')
+        .get();
+    expect(
+        orders.map((r) => (
+              r.read<double>('total'),
+              r.read<double>('tip_amount'),
+              r.read<int?>('voided_at'),
+            )),
+        [(113.0, 0.0, null), (50.0, 0.0, null)]);
+    final returns = await db
+        .customSelect('SELECT amount, tip_amount FROM returns ORDER BY id')
+        .get();
+    expect(returns.map((r) => (r.read<double>('amount'), r.read<double>('tip_amount'))),
+        [(13.0, 0.0), (50.0, 0.0)]);
+    expect(await db.shiftsDao.currentShift(), isNull);
+    final adj = await db.inventoryDao.getAdjustmentsForProduct(1);
+    expect(adj, hasLength(3));
+    expect(adj.map((a) => a.orderId), everyElement(isNull),
+        reason: 'pre-v16 rows have no order link');
+    expect((await db.ordersDao.getById(1))!.stockLinked, isNull,
+        reason: 'pre-v16 orders are legacy');
+    expect(await db.inventoryDao.stockToRestock(1), isNull);
+    expect(await indexes(db), allIndexes);
+  });
+
+  // ── The upgrade is atomic ────────────────────────────────────────────────
+
+  /// Every statement of the v16 step, in order, by a fragment of its SQL.
+  const v16Statements = [
+    'ALTER TABLE "orders" ADD COLUMN "tip_amount"',
+    'ALTER TABLE "orders" ADD COLUMN "voided_at"',
+    'idx_orders_voided_at',
+    'ALTER TABLE "returns" ADD COLUMN "tip_amount"',
+    'CREATE TABLE IF NOT EXISTS "shifts"',
+    'idx_shifts_closed_at',
+    'idx_shifts_one_open',
+    'idx_returns_created_at',
+    'ALTER TABLE "stock_adjustments" ADD COLUMN "order_id"',
+    'idx_stock_adjustments_order_id',
+    'ALTER TABLE "orders" ADD COLUMN "stock_linked"',
+    'PRAGMA user_version',
+  ];
+
+  test('a clean v15 → v16 runs exactly the v16 statements listed', () async {
+    final schema = await verifier.schemaAt(15);
+    final db = _CutAfter(schema.newConnection(), v16Statements, failAt: -1);
+    addTearDown(db.close);
+    await db.customSelect('SELECT 1').get();
+    expect(db.seen, v16Statements);
+  });
+
+  for (var i = 0; i < v16Statements.length; i++) {
+    test('interrupted after v16 statement ${i + 1} '
+        '(${v16Statements[i]}): rolled back, the next launch upgrades',
+        () async {
+      final schema = await verifier.schemaAt(15);
+      final raw = schema.rawDatabase;
+      raw.execute(
+          "INSERT INTO orders (id, subtotal, total, payment_method) VALUES (1, 5, 5, 'cash')");
+
+      final crashed =
+          _CutAfter(schema.newConnection(), v16Statements, failAt: i);
+      await expectLater(
+          crashed.customSelect('SELECT 1').get(), throwsA(anything));
+      await crashed.close();
+
+      // Nothing of v16 stuck: still a v15 file.
+      expect(raw.select('PRAGMA user_version').single.values.single, 15);
+      List<Object?> cols(String t) =>
+          raw.select('PRAGMA table_info($t)').map((r) => r['name']).toList();
+      for (final c in ['tip_amount', 'voided_at', 'stock_linked']) {
+        expect(cols('orders'), isNot(contains(c)));
+      }
+      expect(cols('returns'), isNot(contains('tip_amount')));
+      expect(cols('stock_adjustments'), isNot(contains('order_id')));
+      expect(
+          raw.select("SELECT name FROM sqlite_master WHERE type = 'index' "
+              "AND name IN ('idx_stock_adjustments_order_id', "
+              "'idx_orders_voided_at', 'idx_returns_created_at')"),
+          isEmpty);
+      expect(raw.select("SELECT name FROM sqlite_master WHERE name = 'shifts'"),
+          isEmpty);
+
+      final db = AppDatabase(schema.newConnection());
+      addTearDown(db.close);
+      await verifier.migrateAndValidate(db, AppDatabase.currentSchemaVersion);
+      expect((await db.ordersDao.getById(1))!.tipAmount, 0);
+    });
+  }
+
+  test('a database from a newer app is refused, not re-stamped', () async {
+    final schema = await verifier.schemaAt(AppDatabase.currentSchemaVersion);
+    final raw = schema.rawDatabase
+      ..execute('PRAGMA user_version = ${AppDatabase.currentSchemaVersion + 1}');
+    final db = AppDatabase(schema.newConnection());
+    await expectLater(db.customSelect('SELECT 1').get(),
+        throwsA(isA<StateError>().having(
+            (e) => e.message, 'message', contains('newer than this app'))));
+    await db.close();
+    expect(raw.select('PRAGMA user_version').single.values.single,
+        AppDatabase.currentSchemaVersion + 1);
+  });
+}
+
+/// An [AppDatabase] whose statements each run, then it throws right after
+/// the [failAt]-th one that matches [watched] — a crash between two
+/// statements of a step. (A real power cut rolls back the same way:
+/// SQLite's journal undoes an uncommitted transaction on the next open.)
+/// Records what it saw. Migrator DDL goes through [customStatement].
+class _CutAfter extends AppDatabase {
+  _CutAfter(super.executor, this.watched, {required this.failAt});
+  final List<String> watched;
+  final int failAt;
+  final seen = <String>[];
+
+  @override
+  Future<void> customStatement(String statement, [List<dynamic>? args]) async {
+    await super.customStatement(statement, args);
+    for (final w in watched) {
+      if (statement.contains(w)) {
+        seen.add(w);
+        if (seen.length - 1 == failAt) {
+          throw StateError('simulated crash after: $statement');
+        }
+        break;
+      }
+    }
+  }
 }

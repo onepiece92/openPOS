@@ -159,7 +159,20 @@ class OrdersDao extends DatabaseAccessor<AppDatabase> with _$OrdersDaoMixin {
   Future<void> insertTaxLines(List<OrderTaxesCompanion> lines) =>
       batch((b) => b.insertAll(orderTaxes, lines));
 
-  Future<void> voidOrder(int id) => _setStatus(id, 'voided');
+  /// Marks [id] voided and stamps `voided_at` ([at], default now). The
+  /// drawer close finds voids by `voided_at` (idx_orders_voided_at); the
+  /// audit entry written by `voidOrder` in features/returns is a record
+  /// only, never read for money.
+  Future<void> voidOrder(int id, {DateTime? at}) {
+    final now = at ?? DateTime.now();
+    return (update(orders)..where((o) => o.id.equals(id))).write(
+      OrdersCompanion(
+        status: const Value('voided'),
+        voidedAt: Value(now),
+        updatedAt: Value(now),
+      ),
+    );
+  }
 
   Future<void> refundOrder(int id) => _setStatus(id, 'refunded');
 
@@ -397,15 +410,22 @@ class OrdersDao extends DatabaseAccessor<AppDatabase> with _$OrdersDaoMixin {
     return [for (final r in rows) r.read<String>('name')];
   }
 
+  /// `payment_method` as one bucket per method: trimmed, lower-case, blank
+  /// read as cash. The app always writes clean values; this folds rows from
+  /// older CSV imports ('Cash', ' cash', '').
+  static const methodSql =
+      "COALESCE(NULLIF(LOWER(TRIM(payment_method)), ''), 'cash')";
+
   /// Payment method breakdown for a period, net of refunds.
   /// Returns [{method, count, total}].
   Future<List<Map<String, dynamic>>> paymentBreakdownForPeriod(
       DateTime from, DateTime to) async {
     final rows = await customSelect(
-      'SELECT payment_method, COUNT(*) as count, SUM(net) as total '
+      'SELECT $methodSql AS payment_method, '
+      '  COUNT(*) as count, SUM(net) as total '
       'FROM $_netOrders '
       'WHERE created_at >= ? AND created_at <= ? '
-      'GROUP BY payment_method',
+      'GROUP BY 1',
       variables: [Variable(from), Variable(to)],
       readsFrom: {orders, returns},
     ).get();

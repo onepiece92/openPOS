@@ -10,6 +10,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:pos_app/core/database/app_database.dart';
+import 'package:pos_app/core/database/tables/orders_table.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/features/backup/data/csv_text.dart';
 import 'package:pos_app/features/backup/data/share_files.dart';
@@ -633,7 +634,7 @@ class BackupRepository {
   /// numbers are `prefix-number`, so these read `IMP-17` and can never be
   /// taken for the shop's own invoice `#17`. Invoice sequences run per
   /// prefix, so imports never advance a real one.
-  static const importedOrderPrefix = 'IMP';
+  static const importedOrderPrefix = kImportedInvoicePrefix;
 
   /// Number of orders added. See [importOrdersReport].
   Future<int> importOrders(String csvContent) async =>
@@ -717,7 +718,10 @@ class BackupRepository {
 
         // 3. Payment. The export writes 0 where nothing was recorded, so a
         // zero that cannot be a real cash payment is read back as "none".
-        final method = first.textOrNull('payment method') ?? 'cash';
+        // Lower-cased so 'Cash' and 'cash' are one method; blank reads as
+        // cash, as before.
+        final method =
+            first.textOrNull('payment method')?.toLowerCase() ?? 'cash';
         var tendered = first.numberOf('tendered');
         var change = first.numberOf('change');
         final nothingTendered = tendered == null ||

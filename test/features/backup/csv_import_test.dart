@@ -337,6 +337,27 @@ void main() {
     Future<void> seedTea() => db.productsDao
         .upsert(ProductsCompanion.insert(sku: 'TEA', name: 'Tea', price: 100));
 
+    test('imported orders carry no tip (schema v16 default)', () async {
+      await seedTea();
+      await repo.importOrders([ordersHeader, orderRow(7)].join('\r\n'));
+      final o = (await orders()).single;
+      expect(o.billNo, 'IMP-7');
+      expect((o.total, o.tipAmount), (200.0, 0.0));
+    });
+
+    test('the payment method is stored trimmed and lower-case, blank as cash',
+        () async {
+      await seedTea();
+      await repo.importOrders([
+        ordersHeader,
+        orderRow(1, method: ' Cash '),
+        orderRow(2, method: 'CARD', tendered: '0.0', change: '0.0'),
+        orderRow(3, method: ''),
+      ].join('\r\n'));
+      expect((await orders()).map((o) => o.paymentMethod),
+          ['cash', 'card', 'cash']);
+    });
+
     test('a second import of the same file adds nothing', () async {
       await seedTea();
       final csv = [ordersHeader, orderRow(7), orderRow(9, total: 100, qty: 1)]

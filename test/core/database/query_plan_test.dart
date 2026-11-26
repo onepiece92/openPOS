@@ -79,6 +79,7 @@ void main() {
               discountTotal: 0,
               discountIsPercent: false,
               total: 1,
+              tipAmount: 0,
               paymentMethod: 'cash',
               pointsRedeemed: 0,
               loyaltyDiscount: 0,
@@ -175,6 +176,43 @@ void main() {
     });
   });
 
+  group('drawer close', () {
+    test('sales in a window range over orders by date', () async {
+      final plan =
+          await planOf(() => db.shiftsDao.salesInWindow(from, to));
+      expectIndexed(plan, ['idx_orders_created_at']);
+    });
+
+    test('refunds in a window range over returns by date', () async {
+      final plan =
+          await planOf(() => db.shiftsDao.refundsInWindow(from, to));
+      expectIndexed(plan, ['idx_returns_created_at']);
+      expect(plan.join(' | '), contains('SEARCH o USING INTEGER PRIMARY KEY'));
+    });
+
+    test('voids are a range seek on the partial voided_at index', () async {
+      final plan = await planOf(() => db.shiftsDao.voidsInWindow(from, to));
+      expectIndexed(plan, ['idx_orders_voided_at', 'idx_returns_order_id']);
+      expect(
+          plan.join(' | '),
+          contains('SEARCH o USING INDEX idx_orders_voided_at '
+              '(voided_at>? AND voided_at<?)'));
+      expect(plan.join(' | '), isNot(contains('audit_log')));
+      expect(plan.where((s) => s.startsWith('SCAN')), isEmpty,
+          reason: 'no step reads a whole table: $plan');
+    });
+
+    test('the open shift and the closed list use idx_shifts_closed_at',
+        () async {
+      expectIndexed(await planOf(() => db.shiftsDao.currentShift()),
+          ['idx_shifts_closed_at']);
+      final closed = await planOf(() => db.shiftsDao.closedShifts());
+      expectIndexed(closed, ['idx_shifts_closed_at']);
+      expect(closed.join(' | '), isNot(contains('TEMP B-TREE')),
+          reason: 'the index delivers newest-first order: $closed');
+    });
+  });
+
   test('"most sold" counts read only the recent orders', () async {
     final plan = await planOf(
         () => db.ordersDao.productSalesCounts(since: DateTime(2026, 9, 1)));
@@ -207,6 +245,13 @@ void main() {
     expectIndexed(stock, ['idx_stock_adjustments_product_created']);
     expect(stock.join(' | '), isNot(contains('TEMP B-TREE')),
         reason: 'the index also delivers newest-first order');
+    final byOrder =
+        await planOf(() => db.inventoryDao.getAdjustmentsForOrder(1));
+    expectIndexed(byOrder, ['idx_stock_adjustments_order_id']);
+    expect(
+        byOrder.join(' | '),
+        contains('SEARCH stock_adjustments USING INDEX '
+            'idx_stock_adjustments_order_id (order_id=?)'));
   });
 
   test('connection pragmas: foreign keys on, temp space in memory, '

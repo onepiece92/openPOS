@@ -73,6 +73,42 @@ void main() {
         expect(await db.inventoryDao.getAdjustmentsForProduct(p), isEmpty);
       });
 
+      test('sale and $how adjustment rows carry the order id, bundles too',
+          () async {
+        final tea = await seedProduct(db, sku: 'TEA', stock: 50);
+        final bean = await seedProduct(db, sku: 'BEAN', stock: 50);
+        final box = await seedProduct(db, sku: 'BOX', stock: 0, composite: true);
+        await db.productsDao.replaceComponents(box, [
+          ProductComponentsCompanion.insert(
+              compositeProductId: box,
+              componentProductId: bean,
+              quantity: const Value(2)),
+        ]);
+        final other = await sell(db, audit, [line(tea)]);
+        final id = await sell(db, audit, [line(tea, qty: 2), line(box)]);
+        // A manual adjustment belongs to no order.
+        await db.inventoryDao.logAdjustment(StockAdjustmentsCompanion.insert(
+            productId: tea, delta: 5, reasonCode: 'receive'));
+
+        await reverse(how, id, 15);
+
+        final rows = await db.inventoryDao.getAdjustmentsForOrder(id);
+        expect(
+            rows.map((r) => (r.productId, r.delta, r.reasonCode)),
+            [
+              (tea, -2, 'sale'),
+              (bean, -2, 'sale'), // the bundle's component
+              (tea, 2, how == 'void' ? 'void' : 'return'),
+              (bean, 2, how == 'void' ? 'void' : 'return'),
+            ]);
+        expect((await db.inventoryDao.getAdjustmentsForOrder(other)).single.delta,
+            -1);
+        final manual = (await db.inventoryDao.getAdjustmentsForProduct(tea))
+            .where((r) => r.reasonCode == 'receive')
+            .single;
+        expect(manual.orderId, isNull);
+      });
+
       test('clears out-of-stock on a product that had sold out', () async {
         final p = await seedProduct(db, sku: 'A', stock: 2);
         final id = await sell(db, audit, [line(p, qty: 2)]);

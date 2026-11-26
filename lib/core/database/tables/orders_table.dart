@@ -3,6 +3,10 @@ import 'package:drift/drift.dart';
 import 'package:pos_app/core/database/tables/customers_table.dart';
 import 'package:pos_app/core/database/tables/tables_table.dart';
 
+/// Invoice prefix of orders that came from a CSV import (`IMP-17`). They
+/// are history, not till activity: the drawer close leaves them out.
+const kImportedInvoicePrefix = 'IMP';
+
 /// Completed (or held/voided) sales transactions.
 ///
 /// status:         'completed' | 'held' | 'voided' | 'refunded'
@@ -21,6 +25,10 @@ import 'package:pos_app/core/database/tables/tables_table.dart';
 @TableIndex(name: 'idx_orders_created_at', columns: {#createdAt})
 // Order search by customer name (and a customer's order history).
 @TableIndex(name: 'idx_orders_customer_id', columns: {#customerId})
+// Voids made in a period (the drawer close). Partial: only voided orders
+// are in it, so ringing up a sale (voided_at NULL) never writes to it.
+@TableIndex.sql('CREATE INDEX idx_orders_voided_at '
+    'ON orders (voided_at) WHERE voided_at IS NOT NULL')
 class Orders extends Table {
   IntColumn get id => integer().autoIncrement()();
   IntColumn get invoiceNo => integer().nullable()();
@@ -38,7 +46,14 @@ class Orders extends Table {
   RealColumn get discountValue => real().nullable()();
   BoolColumn get discountIsPercent =>
       boolean().withDefault(const Constant(false))();
+  /// What the customer owes for the goods: subtotal − discounts − loyalty
+  /// (+ exclusive tax). **Never includes [tipAmount]** — revenue, VAT,
+  /// refund limits and every report are computed from this column, and a
+  /// tip is not revenue.
   RealColumn get total => real()();
+  /// Tip collected on top of [total] (0 when none). Kept apart so it never
+  /// enters revenue or tax; the drawer close adds it to the cash expected.
+  RealColumn get tipAmount => real().withDefault(const Constant(0.0))();
   TextColumn get paymentMethod => text()();
   RealColumn get tenderedAmount =>
       real().nullable()(); // cash tendered
@@ -57,6 +72,19 @@ class Orders extends Table {
   IntColumn get printCount =>
       integer().withDefault(const Constant(0))();
   TextColumn get notes => text().nullable()();
+  /// When the order was voided (set by `OrdersDao.voidOrder`). NULL for
+  /// orders that are not voided, and for voids made before schema v16 —
+  /// those predate any till shift and the drawer close ignores them.
+  DateTimeColumn get voidedAt => dateTime().nullable()();
+  /// 1 when every stock movement of this sale is in stock_adjustments with
+  /// its order_id (set by placeOrder from schema v16 on, whether or not
+  /// anything was deducted). NULL = a legacy order (placed before v16,
+  /// imported, or demo data): its stock history can't be read from rows.
+  ///
+  /// An int, not a bool, on purpose: Drift gives booleans a CHECK, and
+  /// SQLite tests an added column's CHECK against every existing row, which
+  /// would make this ADD COLUMN O(orders) instead of O(1).
+  IntColumn get stockLinked => integer().nullable()();
   DateTimeColumn get createdAt =>
       dateTime().withDefault(currentDateAndTime)();
   DateTimeColumn get updatedAt =>
