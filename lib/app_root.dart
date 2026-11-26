@@ -12,6 +12,7 @@ import 'package:pos_app/core/database/close_on_exit.dart';
 import 'package:pos_app/core/restart_notice.dart';
 import 'package:pos_app/core/database/connection/native.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
+import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/features/backup/data/restore_merge_marker.dart';
 import 'package:pos_app/features/backup/data/snapshot_providers.dart';
 import 'package:pos_app/features/backup/data/snapshot_service.dart';
@@ -143,7 +144,11 @@ class AppRootState extends State<AppRoot> {
     final usage = _container.read(usageCounterProvider);
     await usage.ensureLoaded();
     await usage.flush();
-    final usageBefore = usageSnapshotBeforeRestore();
+    // The counting switch is this device's choice, not the backup's.
+    final usageBefore = usageSnapshotBeforeRestore(
+        countingOn: _container
+            .read(featureFlagsProvider)
+            .stored(Feature.usageCounting));
     // Resolve paths while Hive is still open (box.path needs an open box).
     final dbPath = (await databaseFile()).path;
     final hiveFiles = snapshotHiveBoxFiles();

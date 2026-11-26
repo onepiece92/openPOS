@@ -5,6 +5,7 @@ import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/features/cart/domain/cart_item.dart';
 import 'package:pos_app/features/cart/presentation/providers/cart_notifier.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
+import '../../_support/features.dart';
 
 /// The stock cap lives in the cart notifier, so every way of raising a
 /// quantity (tiles, cart "+" stepper, unit picker) is bound by it.
@@ -35,6 +36,7 @@ void main() {
 
   Future<ProviderContainer> containerWith(List<Product> products) async {
     final c = ProviderContainer(overrides: [
+      allFeaturesOn,
       productsStreamProvider.overrideWith((ref) => Stream.value(products)),
     ]);
     addTearDown(c.dispose);

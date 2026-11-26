@@ -11,7 +11,17 @@ import 'package:pos_app/features/products/domain/products_provider.dart';
 /// it is a favourite, and the currency format. A cart change elsewhere does
 /// not rebuild it, and its taps read the cart when they happen.
 class PosProductTile extends ConsumerWidget {
-  const PosProductTile({super.key, required this.product});
+  const PosProductTile({
+    super.key,
+    required this.product,
+    required this.units,
+    required this.stock,
+  });
+
+  /// Units and Stock tracking switches, watched ONCE by the product grid /
+  /// list and passed down, so a tile watches nothing more than before.
+  final bool units;
+  final bool stock;
 
   final Product product;
 
@@ -30,16 +40,20 @@ class PosProductTile extends ConsumerWidget {
     void onDecrement() => PosCartActions.of(context).step(product, -1);
     void onToggleFavorite() =>
         ref.read(favoritesProvider.notifier).toggle(product.id);
-    final onLongPress = product.secondaryUnit == null
+    // Units off: no second-unit picker. Stock tracking off: no caps or
+    // out-of-stock state.
+    final onLongPress = !units || product.secondaryUnit == null
         ? null
         : () => PosCartActions.of(context).pickUnit(context, product);
 
     final inCart = qtyInCart > 0;
     // is_out_of_stock flag OR negative qty (over-sold) → blocked.
     // 0 = unlimited — tappable.
-    final outOfStock = product.isOutOfStock || product.stockQuantity < 0;
+    final outOfStock =
+        stock && (product.isOutOfStock || product.stockQuantity < 0);
     // Tracked product already at its stock cap in the cart.
-    final atCap = !outOfStock &&
+    final atCap = stock &&
+        !outOfStock &&
         product.stockQuantity > 0 &&
         qtyInCart >= product.stockQuantity;
 

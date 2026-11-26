@@ -92,6 +92,7 @@ final _articles = <_Article>[
       ArticleSection(
         heading: 'Set Your Tax Rates',
         steps: [
+          'Taxes must be on (turn on Taxes in Features).',
           'The country you chose during setup gives you a starting tax name and rate. Change it to match your local tax.',
           'Open "Tax" from the sidebar to see your tax rates. Tap "+" to add one, or a rate\'s ⋮ menu to edit it or set it as the default.',
           'Choose the "Inclusion type" from the dropdown: Exclusive (added on top) or Inclusive (embedded in price).',
@@ -100,6 +101,26 @@ final _articles = <_Article>[
         ],
         tip:
             'Only products with "Apply tax" switched on are taxed at checkout.',
+      ),
+    ],
+  ),
+  const _Article(
+    category: 'Getting Started',
+    title: 'Turning features on or off',
+    description:
+        'Switch off the parts of the app your shop doesn\'t use.',
+    readTime: '1 min',
+    icon: Icons.toggle_on_outlined,
+    sections: [
+      ArticleSection(
+        heading: 'The Features Screen',
+        steps: [
+          'Open the sidebar and tap "Features" (under System).',
+          'Each feature has its own switch. A switched-off feature hides its buttons, fields and sidebar items.',
+          'Switching a feature off never deletes data. Switch it back on and your data is still there.',
+          'Some features need another one. While the parent is off, the feature shows "Needs <parent>" (for example, Tables needs Held tickets).',
+          'Turning Taxes off asks you to confirm first.',
+        ],
       ),
     ],
   ),
@@ -125,9 +146,9 @@ final _articles = <_Article>[
       ArticleSection(
         heading: 'Tax, Cost & Stock',
         steps: [
-          'Switch on "Apply tax" to include the product in tax calculations.',
-          'Enter a "Purchase price" to see cost of goods and profit in Reports.',
-          'In the "Inventory" section, switch on "Track stock" and enter the stock quantity.',
+          'Switch on "Apply tax" to include the product in tax calculations (turn on Taxes in Features).',
+          'Enter a "Purchase price" to see cost of goods and profit in Reports (turn on Cost and profit in Features).',
+          'In the "Inventory" section, switch on "Track stock" and enter the stock quantity (turn on Stock tracking in Features).',
           'The stock count automatically decreases with each sale.',
         ],
       ),
@@ -135,7 +156,7 @@ final _articles = <_Article>[
         heading: 'Units',
         steps: [
           'Every product has a main unit (e.g. pcs). Stock and price are per main unit.',
-          'To also sell in bulk, add a secondary unit (e.g. box, dozen) and its conversion.',
+          'To also sell in bulk, add a secondary unit (e.g. box, dozen) and its conversion (turn on Units in Features).',
         ],
         tip:
             'Switch on "Hide in POS" to keep a product off the POS screen while still using it as a bundle component.',
@@ -155,13 +176,13 @@ final _articles = <_Article>[
         steps: [
           'From the POS screen, browse the product catalog or use the search bar.',
           'Tap a product to add it to the cart. Tap again to increase quantity.',
-          'For a product with a second unit, long-press it and pick the unit.',
+          'For a product with a second unit, long-press it and pick the unit (turn on Units in Features).',
         ],
       ),
       ArticleSection(
         heading: 'Apply a Discount',
         steps: [
-          'Open the Cart screen and tap "+ Add Discount".',
+          'Open the Cart screen and tap "+ Add Discount" (turn on Discounts in Features).',
           'Choose "Flat amount" or "Percentage (%)", enter the value, and tap "Apply".',
           'The discount applies to the whole order.',
         ],
@@ -181,7 +202,7 @@ final _articles = <_Article>[
         heading: 'After the Sale',
         steps: [
           'A digital receipt is shown on screen after each sale.',
-          'If a printer is saved in Settings → Hardware, the receipt prints automatically.',
+          'If a printer is saved in Settings → Hardware, the receipt prints automatically (turn on Auto-print receipts in Features).',
           'The sale is recorded in your order history and reflected in reports immediately.',
         ],
         tip:
@@ -200,6 +221,7 @@ final _articles = <_Article>[
       ArticleSection(
         heading: 'Save a Ticket',
         steps: [
+          'Held tickets must be on (turn on Held tickets in Features).',
           'Add items to the cart as usual.',
           'Tap "Save" (pause icon) in the bottom bar.',
           'The cart is saved as a ticket, named after the customer or "Ticket N", and a fresh, empty cart is ready for the next customer.',
@@ -237,6 +259,7 @@ final _articles = <_Article>[
       ArticleSection(
         heading: 'Enable Stock Tracking',
         steps: [
+          'Stock tracking must be on (turn on Stock tracking in Features).',
           'Open any product and scroll to the "Inventory" section.',
           'Switch on "Track stock" and enter the stock quantity (e.g. 50 units).',
           'Save the product — stock tracking is now active for this item.',
@@ -279,7 +302,7 @@ final _articles = <_Article>[
       ArticleSection(
         heading: 'What Are Bundles?',
         steps: [
-          'A bundle is a single product made up of multiple component items.',
+          'A bundle is a single product made up of multiple component items (turn on Bundles in Features; it needs Stock tracking).',
           'Example: A "Breakfast Combo" might include 1× Coffee, 1× Sandwich, and 1× Juice.',
           'When the bundle is sold, stock is deducted from each component automatically.',
         ],
@@ -323,9 +346,10 @@ final _articles = <_Article>[
       ArticleSection(
         heading: 'Summary Cards',
         steps: [
-          'The cards show Revenue, Tax Collected (shown with your shop\'s tax name), Cost of Goods, Expenses, Net Profit and Orders.',
-          'Net profit is sales without tax, minus cost of goods and expenses.',
-          'Record expenses on the Expenses screen.',
+          'Revenue, Tax Collected (shown with your shop\'s tax name) and the number of Orders.',
+          'Cost of Goods and Net Profit (turn on Cost and profit in Features). Net profit is sales without tax, minus cost of goods and expenses.',
+          'Expenses (turn on Expenses in Features). Record expenses on the Expenses screen.',
+          'The Summary also shows the average order value.',
         ],
         tip:
             'Set a purchase price on your products so cost of goods and profit stay accurate.',
@@ -333,8 +357,9 @@ final _articles = <_Article>[
       ArticleSection(
         heading: 'Chart, Payment Mix & Top Products',
         steps: [
+          'Turn on Dashboard extras in Features to see these.',
           'The sales chart shows sales over the selected period.',
-          'The Summary shows the average order value, and the orders and amount paid by cash and by card.',
+          'The payment mix shows the orders and amount paid by cash and by card.',
           'Top products are ranked by units sold.',
         ],
       ),
@@ -342,7 +367,7 @@ final _articles = <_Article>[
         heading: 'Export Your Data',
         steps: [
           'Go to Settings → Backup & Restore.',
-          'Export products, customers, expenses or order history as CSV files.',
+          'Export products, customers, expenses or order history as CSV files (turn on CSV import and export in Features).',
           'Or back up everything into one .zip file.',
         ],
         tip:

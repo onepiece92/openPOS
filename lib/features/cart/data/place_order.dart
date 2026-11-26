@@ -8,6 +8,9 @@ import 'package:pos_app/features/cart/presentation/providers/cart_notifier.dart'
 
 /// Atomically commits a completed sale. Returns the new order ID.
 ///
+/// [trackStock] false (Stock tracking switched off) skips every stock
+/// deduction, bundles' components included.
+///
 /// All DB writes run inside a single transaction — if any step fails,
 /// nothing persists (no phantom orders, stock untouched, loyalty intact).
 /// Throws on any failure; caller is responsible for UI error handling.
@@ -20,6 +23,7 @@ Future<int> placeOrder(
   required String paymentMethod,
   required double tenderedAmount,
   String invoicePrefix = '',
+  bool trackStock = true,
 }) {
   return db.transaction(() async {
     // Read once: needed for the cost snapshot and again for stock below.
@@ -134,7 +138,9 @@ Future<int> placeOrder(
       );
     }
 
-    for (final item in cart) {
+    // Stock tracking off: nothing is deducted (the shop recounts when it
+    // turns tracking back on — see the Features screen).
+    for (final item in trackStock ? cart : const <CartItem>[]) {
       final product = products[item.productId];
       // Stock is tracked in main units — a secondary-unit line deducts
       // quantity × conversion (e.g. 2 dozen → 24 pcs).

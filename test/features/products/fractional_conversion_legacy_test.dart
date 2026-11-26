@@ -74,7 +74,7 @@ void main() {
     expect((await product(db, thirds)).stockQuantity, 10);
 
     for (final id in ids) {
-      await voidOrder(db, audit, orderId: id, reason: 'test');
+      await voidOrder(db, audit, trackStock: true, orderId: id, reason: 'test');
     }
     expect((await product(db, halves)).stockQuantity, 10);
   });

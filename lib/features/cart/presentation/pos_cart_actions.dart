@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:pos_app/core/database/app_database.dart' show Product;
+import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/features/cart/domain/pos_catalog_provider.dart';
 import 'package:pos_app/features/cart/domain/stock_cap.dart';
 import 'package:pos_app/features/cart/presentation/providers/cart_notifier.dart';
@@ -34,6 +35,7 @@ class PosCartActions {
   /// Cap cart qty at stock for tracked products. Unlimited (qty=0) passes;
   /// [desiredMainUnits] counts every line of the product (pcs + boxes).
   bool _allowQty(Product p, int desiredMainUnits) {
+    if (!_container.read(featureOnProvider(Feature.stockTracking))) return true;
     final cap = stockCapFor(p);
     if (cap == null || desiredMainUnits <= cap) return true;
     _messenger

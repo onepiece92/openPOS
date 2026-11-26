@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/theme/tokens.dart';
 import 'package:pos_app/core/utils/currency_formatter.dart';
@@ -29,6 +30,10 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
   final _scrollController = ScrollController();
   Timer? _debounce;
   String _query = '';
+
+  /// Customers off: names already looked up, kept across pages so a page
+  /// loading more orders never blanks the names already on screen.
+  final Map<int, String> _nameCache = {};
 
   @override
   void initState() {
@@ -70,8 +75,23 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
   Widget build(BuildContext context) {
     final history = ref.watch(orderHistoryProvider);
     final fmt = ref.watch(currencyFormatterProvider);
-    final customers = ref.watch(customersStreamProvider).valueOrNull ?? [];
-    final customerNames = {for (final c in customers) c.id: c.name};
+    // Customers off: the list is not watched, but orders still show their
+    // stored customer — names read once, only for ids not yet looked up.
+    final Map<int, String> customerNames;
+    if (ref.watch(featureOnProvider(Feature.customers))) {
+      final customers = ref.watch(customersStreamProvider).valueOrNull ?? [];
+      customerNames = {for (final c in customers) c.id: c.name};
+    } else {
+      final missing = [
+        for (final o in history.orders)
+          if (o.customerId case final id? when !_nameCache.containsKey(id)) id,
+      ];
+      final fresh = ref
+          .watch(customerNamesProvider(customerNamesKey(missing)))
+          .valueOrNull;
+      if (fresh != null) _nameCache.addAll(fresh);
+      customerNames = _nameCache;
+    }
 
     return Scaffold(
       drawer: const PosDrawer(),

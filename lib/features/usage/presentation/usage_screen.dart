@@ -7,6 +7,7 @@ import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/core/theme/tokens.dart';
 import 'package:pos_app/core/utils/share_origin.dart';
 import 'package:pos_app/features/backup/data/share_files.dart';
+import 'package:pos_app/features/onboarding/domain/business_type.dart';
 import 'package:pos_app/features/usage/data/usage_counter.dart';
 import 'package:pos_app/features/usage/data/usage_inputs.dart';
 import 'package:pos_app/features/usage/domain/usage_event.dart';
@@ -62,7 +63,12 @@ class _UsageScreenState extends ConsumerState<UsageScreen> {
         env: currentUsageEnvironment(
             currencyCode: ref.read(currencyCodeProvider)),
         shop: _shop,
+        businessType: _businessType,
       );
+
+  /// Parsed only through BusinessType.values (an unknown value is null).
+  BusinessType? get _businessType =>
+      parseBusinessType(ref.read(businessTypeNameProvider));
 
   Future<void> _send(String text, Future<UsageSendResult> Function() send,
       ScaffoldMessengerState messenger,
@@ -125,6 +131,7 @@ class _UsageScreenState extends ConsumerState<UsageScreen> {
     final text = _payload();
     final canSend = canSendUsageSummary(_selection, _message.text) && !_sending;
     final counts = _counter.counts;
+    final countingOn = ref.watch(featureOnProvider(Feature.usageCounting));
 
     Widget header(String s) => Padding(
           padding: const EdgeInsets.only(top: 20, bottom: 8),
@@ -200,6 +207,17 @@ class _UsageScreenState extends ConsumerState<UsageScreen> {
             title: const Text(
                 'Shop size ranges (products, orders in last 7 days, customers)'),
           ),
+          // Only when setup stored a business type; unticked by default.
+          if (_businessType != null)
+            CheckboxListTile(
+              key: const ValueKey('tick-business-type'),
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              value: _selection.businessType,
+              onChanged: (v) => setState(() =>
+                  _selection = _selection.withBusinessType(v ?? false)),
+              title: const Text('Business type'),
+            ),
           header(kUsagePreviewHeading),
           Container(
             width: double.infinity,
@@ -273,33 +291,41 @@ class _UsageScreenState extends ConsumerState<UsageScreen> {
             key: const ValueKey('stop-counting'),
             contentPadding: EdgeInsets.zero,
             title: const Text('Stop counting'),
-            value: !_counter.countingEnabled,
-            onChanged: !_counter.isLoaded
-                ? null
-                : (stop) async {
-                    await _counter.setCountingEnabled(!stop);
-                    _rebuild();
-                  },
+            // The same flag as Usage counting in Features.
+            value: !countingOn,
+            onChanged: (stop) => ref
+                .read(settingsProvider.notifier)
+                .setFeature(Feature.usageCounting, !stop),
           ),
-          for (final a in FeatureArea.values) ...[
-            Padding(
-              padding: const EdgeInsets.only(top: 8, bottom: 2),
-              child: Text(a.label,
-                  style: tt.labelLarge?.copyWith(fontWeight: FontWeight.w700)),
+          if (!countingOn)
+            Text(kUsageCountingOffNote,
+                key: const ValueKey('counting-off-note'),
+                style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+          // Off: the counts and Reset are hidden (the counts are kept).
+          if (countingOn)
+            for (final a in FeatureArea.values) ...[
+              Padding(
+                padding: const EdgeInsets.only(top: 8, bottom: 2),
+                child: Text(a.label,
+                    style:
+                        tt.labelLarge?.copyWith(fontWeight: FontWeight.w700)),
+              ),
+              for (final e in UsageEvent.of(a))
+                Text('${e.name}: ${counts[e]?.count ?? 0}',
+                    style: tt.bodySmall),
+            ],
+          if (countingOn) ...[
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                key: const ValueKey('reset-usage'),
+                icon: const Icon(Icons.restart_alt_rounded),
+                label: const Text('Reset counts'),
+                onPressed: _counter.isLoaded ? _confirmReset : null,
+              ),
             ),
-            for (final e in UsageEvent.of(a))
-              Text('${e.name}: ${counts[e]?.count ?? 0}', style: tt.bodySmall),
           ],
-          const SizedBox(height: 12),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
-              key: const ValueKey('reset-usage'),
-              icon: const Icon(Icons.restart_alt_rounded),
-              label: const Text('Reset counts'),
-              onPressed: _counter.isLoaded ? _confirmReset : null,
-            ),
-          ),
           const SizedBox(height: 24),
         ],
       ),

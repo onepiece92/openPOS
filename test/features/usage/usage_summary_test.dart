@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/widgets.dart' show StringCharacters;
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:pos_app/features/onboarding/domain/business_type.dart';
 import 'package:pos_app/features/usage/domain/usage_event.dart';
 import 'package:pos_app/features/usage/domain/usage_summary.dart';
 import 'package:pos_app/features/usage/usage_constants.dart';
@@ -271,6 +272,58 @@ Please add split payments.''');
       // exactly the no-message text.
       expect(parts.fixed.join('\n'), without);
       expectGrammar(withMsg);
+    });
+  });
+
+  group('business type line', () {
+    String withType(UsageSelection s, BusinessType? t) => buildUsageSummary(
+        selection: s,
+        message: '',
+        counts: counts,
+        env: env,
+        shop: shop,
+        businessType: t);
+
+    test('absent unless ticked', () {
+      final s = const UsageSelection().withShopSize(true);
+      expect(withType(s, BusinessType.cafe), isNot(contains('Business type')));
+      expect(withType(s.withBusinessType(true), BusinessType.cafe),
+          endsWith('Shop size: products 51-200, orders in last 7 days 11-50, '
+              'customers 1-10\nBusiness type: cafe or counter'));
+    });
+
+    test('absent when no type is stored', () {
+      final s = const UsageSelection().withBusinessType(true);
+      expect(withType(s, null), isNot(contains('Business type')));
+      expect(s.hasData, isTrue);
+    });
+
+    test('every label passes the grammar', () {
+      final s = const UsageSelection().withBusinessType(true);
+      for (final t in BusinessType.values) {
+        final text = withType(s, t);
+        expect(text, contains('Business type: ${t.usageLabel}'));
+        expectGrammar(text);
+      }
+    });
+
+    test('the fixed lowercase labels', () {
+      expect([for (final t in BusinessType.values) t.usageLabel], [
+        'food truck or stand',
+        'cafe or counter',
+        'restaurant with tables',
+        'retail shop',
+        'market stall or craft seller',
+        'services',
+        'something else',
+      ]);
+    });
+
+    test('a corrupted stored value gives no type, so no line', () {
+      for (final raw in ['', 'Cafe', 'cafe ', 'bar', 42, null, ['cafe']]) {
+        expect(parseBusinessType(raw), isNull, reason: '$raw');
+      }
+      expect(parseBusinessType('cafe'), BusinessType.cafe);
     });
   });
 }

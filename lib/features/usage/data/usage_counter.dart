@@ -5,6 +5,8 @@ import 'package:flutter/foundation.dart' show debugPrint, visibleForTesting;
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path/path.dart' as p;
 
+import 'package:pos_app/core/providers/feature_flags.dart';
+
 import 'package:pos_app/features/usage/domain/usage_event.dart';
 import 'package:pos_app/features/usage/domain/usage_summary.dart';
 import 'package:pos_app/features/usage/usage_constants.dart';
@@ -17,6 +19,11 @@ const kUsageBoxName = 'usage';
 // Box keys. Counters are `e.<UsageEvent.name>` → {'c': int, 'f': 'YYYY-MM',
 // 'l': 'YYYY-MM'}; nothing else is ever written under `e.`.
 const _eventPrefix = 'e.';
+/// Legacy "Stop counting" flag (bool) of installs from before Features.
+/// The switch itself is now the Usage counting feature (`features_v1` in
+/// the settings box: one source of truth for Features and "Stop
+/// counting"). [UsageCounter] moves an old value onto the switch on load
+/// and deletes the key; a restore merge deletes it from restored boxes.
 const kUsageCountingOnKey = 'counting_on'; // bool
 const kUsageDisclosureShownKey = 'disclosure_shown'; // bool
 const kUsageAskedVersionKey = 'ask_version'; // kAppVersionFull
@@ -37,16 +44,26 @@ String _keyOf(UsageEvent e) => '$_eventPrefix${e.name}';
 ///
 /// The box is opened by [ensureLoaded] (after the first frame, see
 /// `UsageHost`). Counts made before that are buffered in memory and added
-/// on load — or dropped, when the stored flag says counting is off, or
-/// when the box cannot be opened (the flag is then unknown, and nothing is
-/// counted until it is).
+/// on load — or dropped, when counting is off, or when the box cannot be
+/// opened (nothing is counted until it can).
+///
+/// On/off is the Usage counting feature switch: [countingOn] at creation,
+/// then [countingEnabled] as `usageCounterProvider` follows the switch.
 class UsageCounter {
   UsageCounter({
     Future<Box<dynamic>> Function()? openBox,
     DateTime Function()? clock,
     this.flushDelay = const Duration(seconds: 30),
+    bool countingOn = kUsageCountingDefaultOn,
+    this.onCarriedCountingChoice,
   })  : _openBox = openBox ?? _defaultOpen,
-        _clock = clock ?? DateTime.now;
+        _clock = clock ?? DateTime.now,
+        countingEnabled = countingOn;
+
+  /// Called on load with an older install's choice found under
+  /// [kUsageCountingOnKey], which the owner moves onto the Usage counting
+  /// switch.
+  final Future<void> Function(bool on)? onCarriedCountingChoice;
 
   /// Opens the box beside the `settings` box (same folder). When settings is
   /// not open, Hive is not in use (tests, an error screen): nothing is
@@ -69,13 +86,13 @@ class UsageCounter {
   Box<dynamic>? _box;
   Future<void>? _loading;
   Timer? _timer;
-  bool _enabled = kUsageCountingDefaultOn;
   bool _disposed = false;
 
   bool get isLoaded => _box != null;
 
-  /// Counting on/off. Before load this is the default.
-  bool get countingEnabled => _enabled;
+  /// Counting on/off: the Usage counting switch. Honoured by the very next
+  /// [record]. Set only by whoever owns the switch.
+  bool countingEnabled;
 
   /// True once opening the box has failed: the saved on/off flag is
   /// unknown, so nothing is counted (not even in memory).
@@ -89,7 +106,7 @@ class UsageCounter {
 
   /// Counts one [event]. See the class doc for the cost guarantees.
   void record(UsageEvent event) {
-    if (_disposed || _unavailable || !_enabled) return;
+    if (_disposed || _unavailable || !countingEnabled) return;
     final month = usageMonth(_clock());
     final c = _counts[event];
     _counts[event] = c == null
@@ -129,13 +146,29 @@ class UsageCounter {
     try {
       final box = await _openBox();
       if (_disposed) return;
-      final on = box.get(kUsageCountingOnKey);
-      _enabled = on is bool ? on : kUsageCountingDefaultOn;
+      final carried = box.get(kUsageCountingOnKey);
+      if (box.containsKey(kUsageCountingOnKey)) {
+        // A stored "off" is a privacy choice: the old key goes only once
+        // the switch is safely written. If that fails, it stays and is
+        // moved on the next load.
+        var moved = true;
+        if (carried is bool) {
+          countingEnabled = carried;
+          try {
+            await onCarriedCountingChoice?.call(carried);
+          } catch (e) {
+            moved = false;
+            debugPrint('usage: counting choice not moved yet ($e)');
+          }
+        }
+        if (moved) await box.delete(kUsageCountingOnKey);
+        if (_disposed) return;
+      }
       final buffered = Map.of(_counts);
       _counts
         ..clear()
         ..addAll(readUsageCounts(box));
-      if (_enabled) {
+      if (countingEnabled) {
         buffered.forEach((e, b) {
           final s = _counts[e];
           _counts[e] = s == null
@@ -183,14 +216,6 @@ class UsageCounter {
         state == AppLifecycleState.detached) {
       unawaited(flush());
     }
-  }
-
-  /// "Stop counting" switch. Honoured by the very next [record].
-  Future<void> setCountingEnabled(bool on) async {
-    _enabled = on;
-    try {
-      await _box?.put(kUsageCountingOnKey, on);
-    } catch (_) {/* best effort */}
   }
 
   /// Deletes every counter (the flags stay).
@@ -308,8 +333,10 @@ class UsageSnapshot {
 
 /// Merges [before] (this device, captured pre-restore) into the restored
 /// box: per event the higher count, the earlier first month and the later
-/// last month; the counting on/off flag, the disclosure-shown flag and the
-/// asked version and the review-unavailable-since stamp are this device's, as they were before the restore.
+/// last month; the disclosure-shown flag, the asked version and the
+/// review-unavailable-since stamp are this device's, as they were before the
+/// restore. A legacy counting flag from an older backup is dropped: the
+/// switch is in the settings box, put back by [mergeUsageAfterRestore].
 Future<void> mergeUsageBox(Box<dynamic> box, UsageSnapshot before) async {
   final after = readUsageCounts(box);
   final puts = <String, Object>{};
@@ -334,7 +361,7 @@ Future<void> mergeUsageBox(Box<dynamic> box, UsageSnapshot before) async {
     }
   }
 
-  await keep(kUsageCountingOnKey, before.countingOn);
+  await keep(kUsageCountingOnKey, null);
   await keep(kUsageDisclosureShownKey, before.disclosureShown);
   await keep(kUsageAskedVersionKey, before.askedVersion);
   await keep(kUsageReviewUnavailableSinceKey, before.reviewUnavailableSince);
@@ -343,10 +370,22 @@ Future<void> mergeUsageBox(Box<dynamic> box, UsageSnapshot before) async {
 /// Captured by `AppRoot.restoreFrom` before the files are swapped (after
 /// the counter was flushed). Null — never an exception — when the box is
 /// not open.
-UsageSnapshot? usageSnapshotBeforeRestore() {
+///
+/// [countingOn] is this device's Usage counting switch. The restore
+/// replaces the settings box, so [mergeUsageAfterRestore] writes it back
+/// there: a backup never turns counting on or off.
+UsageSnapshot? usageSnapshotBeforeRestore({bool? countingOn}) {
   try {
     if (!Hive.isBoxOpen(kUsageBoxName)) return null;
-    return UsageSnapshot.of(Hive.box<dynamic>(kUsageBoxName));
+    final s = UsageSnapshot.of(Hive.box<dynamic>(kUsageBoxName));
+    return countingOn == null
+        ? s
+        : UsageSnapshot(
+            counts: s.counts,
+            countingOn: countingOn,
+            disclosureShown: s.disclosureShown,
+            askedVersion: s.askedVersion,
+            reviewUnavailableSince: s.reviewUnavailableSince);
   } catch (_) {
     return null;
   }
@@ -357,7 +396,23 @@ UsageSnapshot? usageSnapshotBeforeRestore() {
 Future<void> mergeUsageAfterRestore(UsageSnapshot? before) async {
   if (before == null) return;
   try {
-    if (!Hive.isBoxOpen(kUsageBoxName)) return;
-    await mergeUsageBox(Hive.box<dynamic>(kUsageBoxName), before);
+    if (Hive.isBoxOpen(kUsageBoxName)) {
+      await mergeUsageBox(Hive.box<dynamic>(kUsageBoxName), before);
+    }
+    final on = before.countingOn;
+    if (on != null && Hive.isBoxOpen('settings')) {
+      await keepUsageCountingSwitch(Hive.box<dynamic>('settings'), on);
+    }
   } catch (_) {/* best effort */}
+}
+
+/// Writes [on] as the Usage counting switch into [settings]' features_v1,
+/// leaving every other switch as stored. Runs before the new container
+/// reads the settings box.
+Future<void> keepUsageCountingSwitch(Box<dynamic> settings, bool on) async {
+  final raw = settings.get(kFeaturesKey);
+  final map = raw is Map ? Map<String, Object?>.from(raw) : <String, Object?>{};
+  if (map[Feature.usageCounting.name] == on) return;
+  map[Feature.usageCounting.name] = on;
+  await settings.put(kFeaturesKey, map);
 }

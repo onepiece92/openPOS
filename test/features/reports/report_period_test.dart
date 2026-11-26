@@ -10,6 +10,7 @@ import 'package:pos_app/features/returns/domain/void_order.dart';
 
 import '../../_support/sales.dart';
 import '../../_support/test_db.dart';
+import '../../_support/features.dart';
 
 /// Preset report periods must include sales made a moment ago.
 void main() {
@@ -32,8 +33,7 @@ void main() {
           reason: 'the period must reach at least to "now"');
       expect(
           await db.ordersDao.totalRevenueForPeriod(period.from, period.to), 10);
-      expect(
-          await db.ordersDao.completedOrdersInPeriod(period.from, period.to),
+      expect(await db.ordersDao.completedOrdersInPeriod(period.from, period.to),
           hasLength(1));
     });
   }
@@ -48,7 +48,7 @@ void main() {
 
   test('report refreshes after a void and after a refund', () async {
     final c = ProviderContainer(
-        overrides: [databaseProvider.overrideWithValue(db)]);
+        overrides: [allFeaturesOn, databaseProvider.overrideWithValue(db)]);
     addTearDown(c.dispose);
     const period = ReportPeriod.today;
     ReportQuery query() =>
@@ -65,16 +65,16 @@ void main() {
     addTearDown(sub.close);
     expect(await revenue(), 30);
 
-    await processReturn(db, audit, orderId: b, amount: 5, restock: false);
+    await processReturn(db, audit, trackStock: true, orderId: b, amount: 5, restock: false);
     expect(await revenue(), 25);
 
-    await voidOrder(db, audit, orderId: a, reason: 't');
+    await voidOrder(db, audit, trackStock: true, orderId: a, reason: 't');
     expect(await revenue(), 15);
   });
 
   test('report picks up a sale placed after it was first loaded', () async {
     final c = ProviderContainer(
-        overrides: [databaseProvider.overrideWithValue(db)]);
+        overrides: [allFeaturesOn, databaseProvider.overrideWithValue(db)]);
     addTearDown(c.dispose);
     const period = ReportPeriod.today;
     ReportQuery query() =>

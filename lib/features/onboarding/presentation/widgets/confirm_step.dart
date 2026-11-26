@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:pos_app/core/utils/percent.dart';
 import 'package:pos_app/features/onboarding/domain/onboarding_state.dart';
 
+const kTaxesOffSummary = 'off — turn on in Features';
+
 class ConfirmStep extends StatelessWidget {
   const ConfirmStep({super.key, required this.state});
   final OnboardingState state;
@@ -48,7 +50,7 @@ class ConfirmStep extends StatelessWidget {
               _SummaryRow(
                 icon: Icons.storefront_rounded,
                 label: 'Business',
-                value: state.businessName,
+                value: state.businessName.isEmpty ? 'My Store' : state.businessName,
               ),
               _SummaryRow(
                 icon: Icons.location_on_rounded,
@@ -67,12 +69,22 @@ class ConfirmStep extends StatelessWidget {
                 label: 'Timezone',
                 value: state.country?.timezone ?? '—',
               ),
+              // Always the Taxes switch; the rate only while it is on.
               _SummaryRow(
-                icon: Icons.percent_rounded,
-                label: state.taxName.isNotEmpty ? state.taxName : 'Tax',
-                value: formatPercent(state.taxRate),
-                isLast: true,
+                icon: Icons.toggle_on_outlined,
+                label: 'Taxes',
+                value: state.taxesOn ? 'on' : kTaxesOffSummary,
+                isLast: !state.taxesOn,
               ),
+              if (state.taxesOn)
+                _SummaryRow(
+                  icon: Icons.percent_rounded,
+                  label: state.taxName.isNotEmpty ? state.taxName : 'Tax',
+                  value: state.taxRate > 0
+                      ? formatPercent(state.taxRate)
+                      : 'no rate yet',
+                  isLast: true,
+                ),
             ],
           ),
           const SizedBox(height: 16),

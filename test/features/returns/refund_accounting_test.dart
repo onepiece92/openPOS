@@ -28,7 +28,7 @@ void main() {
       sell(db, audit, [line(p, qty: 10, price: 10)], paymentMethod: method);
   Future<String> status(int o) async => (await db.ordersDao.getById(o))!.status;
   Future<void> refund(int o, double amount, {bool restock = false}) =>
-      processReturn(db, audit, orderId: o, amount: amount, restock: restock);
+      processReturn(db, audit, trackStock: true, orderId: o, amount: amount, restock: restock);
 
   group('status', () {
     test('partial refund keeps the order completed', () async {
@@ -85,16 +85,16 @@ void main() {
 
     test('a voided order cannot be refunded', () async {
       final o = await sale100();
-      await voidOrder(db, audit, orderId: o, reason: 't');
+      await voidOrder(db, audit, trackStock: true, orderId: o, reason: 't');
       await expectLater(refund(o, 10), throwsA(anything));
       expect(await db.select(db.returns).get(), isEmpty);
     });
 
     test('an order cannot be voided twice', () async {
       final o = await sale100();
-      await voidOrder(db, audit, orderId: o, reason: 't');
+      await voidOrder(db, audit, trackStock: true, orderId: o, reason: 't');
       await expectLater(
-          voidOrder(db, audit, orderId: o, reason: 't'), throwsStateError);
+          voidOrder(db, audit, trackStock: true, orderId: o, reason: 't'), throwsStateError);
       expect((await product(db, p)).stockQuantity, 100);
     });
 
@@ -102,7 +102,7 @@ void main() {
       final o = await sale100();
       await refund(o, 100, restock: true);
       await expectLater(
-          voidOrder(db, audit, orderId: o, reason: 't'), throwsStateError);
+          voidOrder(db, audit, trackStock: true, orderId: o, reason: 't'), throwsStateError);
       expect(await status(o), 'refunded');
       expect((await product(db, p)).stockQuantity, 100,
           reason: 'stock must not be restored a second time');
@@ -116,7 +116,7 @@ void main() {
       expect((await product(db, p)).stockQuantity, 100);
 
       await expectLater(refund(o, 30, restock: true), throwsA(anything));
-      await voidOrder(db, audit, orderId: o, reason: 't');
+      await voidOrder(db, audit, trackStock: true, orderId: o, reason: 't');
       expect((await product(db, p)).stockQuantity, 100);
     });
   });
@@ -142,7 +142,7 @@ void main() {
         () async {
       final a = await sale100();
       await refund(a, 30);
-      await voidOrder(db, audit, orderId: a, reason: 't');
+      await voidOrder(db, audit, trackStock: true, orderId: a, reason: 't');
       expect(await db.ordersDao.totalRevenueForPeriod(from, to), 0);
     });
 

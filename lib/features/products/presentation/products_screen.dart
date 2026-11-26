@@ -34,8 +34,12 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
     final productsAsync = ref.watch(productsStreamProvider);
     final categoriesAsync = ref.watch(categoriesStreamProvider);
     final fmt = ref.watch(currencyFormatterProvider);
-    final lowStockThreshold = ref.watch(lowStockThresholdProvider);
-    final f = ref.watch(productsFilterProvider);
+    // Stock tracking off: no stock badges and no out-of-stock filter.
+    final stock = ref.watch(featureOnProvider(Feature.stockTracking));
+    final taxes = ref.watch(featureOnProvider(Feature.taxes));
+    final lowStockThreshold = stock ? ref.watch(lowStockThresholdProvider) : 0;
+    final watched = ref.watch(productsFilterProvider);
+    final f = stock ? watched : watched.copyWith(outOfStockOnly: false);
     final filter = ref.read(productsFilterProvider.notifier);
     final cs = Theme.of(context).colorScheme;
 
@@ -89,44 +93,44 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                   contentPadding: EdgeInsets.zero,
                 ),
               ),
-              const PopupMenuItem(
-                value: 'tax',
-                child: ListTile(
-                  leading: Icon(Icons.percent_rounded),
-                  title: Text('Manage Tax Rates'),
-                  contentPadding: EdgeInsets.zero,
+              if (taxes)
+                const PopupMenuItem(
+                  value: 'tax',
+                  child: ListTile(
+                    leading: Icon(Icons.percent_rounded),
+                    title: Text('Manage Tax Rates'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
                 ),
-              ),
               const PopupMenuDivider(),
               PopupMenuItem(
                 value: 'sort',
                 child: ListTile(
                   leading: Icon(
-                    f.sortAZ
-                        ? Icons.sort_by_alpha_rounded
-                        : Icons.sort_rounded,
+                    f.sortAZ ? Icons.sort_by_alpha_rounded : Icons.sort_rounded,
                   ),
                   title: Text(f.sortAZ ? 'Sort: A → Z' : 'Sort: Z → A'),
                   contentPadding: EdgeInsets.zero,
                 ),
               ),
-              PopupMenuItem(
-                value: 'outofstock',
-                child: ListTile(
-                  leading: Icon(
-                    f.outOfStockOnly
-                        ? Icons.inventory_2_rounded
-                        : Icons.warning_amber_rounded,
-                    color: f.outOfStockOnly ? null : cs.error,
+              if (stock)
+                PopupMenuItem(
+                  value: 'outofstock',
+                  child: ListTile(
+                    leading: Icon(
+                      f.outOfStockOnly
+                          ? Icons.inventory_2_rounded
+                          : Icons.warning_amber_rounded,
+                      color: f.outOfStockOnly ? null : cs.error,
+                    ),
+                    title: Text(
+                      f.outOfStockOnly
+                          ? 'Show All Products'
+                          : 'Out of Stock Only',
+                    ),
+                    contentPadding: EdgeInsets.zero,
                   ),
-                  title: Text(
-                    f.outOfStockOnly
-                        ? 'Show All Products'
-                        : 'Out of Stock Only',
-                  ),
-                  contentPadding: EdgeInsets.zero,
                 ),
-              ),
             ],
           ),
         ],
@@ -148,8 +152,7 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
             Container(
               width: double.infinity,
               color: cs.errorContainer.withValues(alpha: 0.5),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
               child: Row(
                 children: [
                   Icon(Icons.warning_amber_rounded,
@@ -213,13 +216,12 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
                     categoryName: catMap[filtered[i].categoryId],
                     fmt: fmt,
                     lowStockThreshold: lowStockThreshold,
-                    onTap: () =>
-                        context.push('/products/${filtered[i].id}'),
+                    showStock: stock,
+                    onTap: () => context.push('/products/${filtered[i].id}'),
                   ),
                 );
               },
-              loading: () =>
-                  const Center(child: CircularProgressIndicator()),
+              loading: () => const Center(child: CircularProgressIndicator()),
               error: (e, _) => Center(child: Text('Error: $e')),
             ),
           ),
@@ -235,7 +237,6 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
 }
 
 // ── Category filter chips ─────────────────────────────────────────────────────
-
 
 class _CategoryChips extends StatelessWidget {
   const _CategoryChips({
@@ -298,8 +299,12 @@ class _ProductTile extends StatelessWidget {
     required this.fmt,
     required this.onTap,
     required this.lowStockThreshold,
+    required this.showStock,
     this.categoryName,
   });
+
+  /// Stock tracking is on: show the stock badge.
+  final bool showStock;
   final Product product;
 
   /// The shop's own setting — the same one the inventory screen uses.
@@ -318,8 +323,7 @@ class _ProductTile extends StatelessWidget {
 
     return ListTile(
       onTap: onTap,
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       leading: Container(
         width: 44,
         height: 44,
@@ -349,14 +353,12 @@ class _ProductTile extends StatelessWidget {
             ),
             const SizedBox(width: 6),
             Text('·',
-                style: tt.labelSmall
-                    ?.copyWith(color: cs.onSurfaceVariant)),
+                style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
             const SizedBox(width: 6),
           ],
           Text(
             'SKU: ${product.sku}',
-            style:
-                tt.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+            style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant),
           ),
         ],
       ),
@@ -374,14 +376,16 @@ class _ProductTile extends StatelessWidget {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              const SizedBox(height: 3),
-              _StockBadge(
-                qty: product.stockQuantity,
-                lowStock: lowStock,
-                outOfStock: outOfStock,
-                cs: cs,
-                tt: tt,
-              ),
+              if (showStock) ...[
+                const SizedBox(height: 3),
+                _StockBadge(
+                  qty: product.stockQuantity,
+                  lowStock: lowStock,
+                  outOfStock: outOfStock,
+                  cs: cs,
+                  tt: tt,
+                ),
+              ],
             ],
           ),
           const SizedBox(width: 6),
@@ -443,4 +447,3 @@ class _StockBadge extends StatelessWidget {
     );
   }
 }
-

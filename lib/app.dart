@@ -15,6 +15,7 @@ import 'package:pos_app/features/cart/presentation/home.dart';
 import 'package:pos_app/features/cart/presentation/payment_screen.dart';
 import 'package:pos_app/features/customers/presentation/customers_screen.dart';
 import 'package:pos_app/features/expenses/presentation/expenses_screen.dart';
+import 'package:pos_app/features/features/presentation/features_screen.dart';
 import 'package:pos_app/features/inventory/presentation/inventory_screen.dart';
 import 'package:pos_app/features/onboarding/presentation/onboarding_screen.dart';
 import 'package:pos_app/features/orders/presentation/order_detail_screen.dart';
@@ -28,6 +29,7 @@ import 'package:pos_app/features/receipts/presentation/receipt_screen.dart';
 import 'package:pos_app/features/reports/presentation/dashboard_screen.dart';
 import 'package:pos_app/features/settings/presentation/settings_screen.dart';
 import 'package:pos_app/features/settings/presentation/store_profile_edit_screen.dart';
+import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
 import 'package:pos_app/features/tax/presentation/tax_settings_screen.dart';
 import 'package:pos_app/features/usage/presentation/usage_host.dart';
 import 'package:pos_app/features/usage/presentation/usage_route_counter.dart';
@@ -145,18 +147,17 @@ final routerProvider = Provider<GoRouter>((ref) {
   // router (which would throw away the navigation stack).
   final refresh = _RouterRefresh();
   ref.listen(onboardingCompleteProvider, (_, __) => refresh.ping());
+  // A switched-off feature's screen must not stay open.
+  ref.listen(featureFlagsProvider, (_, __) => refresh.ping());
   ref.onDispose(refresh.dispose);
 
   final router = GoRouter(
     initialLocation: '/pos',
     refreshListenable: refresh,
-    redirect: (context, state) {
-      final isOnboarded = ref.read(onboardingCompleteProvider);
-      if (!isOnboarded && state.matchedLocation != '/onboarding') {
-        return '/onboarding';
-      }
-      return null;
-    },
+    redirect: (context, state) => appRedirect(
+        onboarded: ref.read(onboardingCompleteProvider),
+        flags: ref.read(featureFlagsProvider),
+        location: state.matchedLocation),
     routes: [
       GoRoute(
         path: '/onboarding',
@@ -250,6 +251,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         pageBuilder: (_, state) => _slide(state, const AuditLogScreen()),
       ),
       GoRoute(
+        path: '/features',
+        pageBuilder: (_, state) => _slide(state, const FeaturesScreen()),
+      ),
+      GoRoute(
         path: '/settings',
         pageBuilder: (_, state) => _slide(state, const SettingsScreen()),
         routes: [
@@ -292,6 +297,18 @@ final routerProvider = Provider<GoRouter>((ref) {
       attachUsageRouteCounter(router, ref.read(usageCounterProvider)));
   return router;
 });
+
+/// The app router's redirect: setup until onboarding is complete (it
+/// never replays after that — an upgrade only gets the drawer's intro
+/// line), then switched-off features' screens go to /pos.
+String? appRedirect({
+  required bool onboarded,
+  required FeatureFlags flags,
+  required String location,
+}) {
+  if (!onboarded && location != '/onboarding') return '/onboarding';
+  return featureRedirect(flags, location);
+}
 
 class _RouterRefresh extends ChangeNotifier {
   void ping() => notifyListeners();

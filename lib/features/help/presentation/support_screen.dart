@@ -25,14 +25,6 @@ class SupportScreen extends ConsumerWidget {
         children: [
           _SectionHeader('Contact', tt, cs),
           _SupportTile(
-            icon: Icons.email_outlined,
-            title: 'Email Support',
-            subtitle: 'support@rebuzzpos.com',
-            cs: cs,
-            tt: tt,
-            onTap: () => openSupportMailOrExplain(context),
-          ),
-          _SupportTile(
             icon: Icons.chat_rounded,
             title: 'WhatsApp Chat',
             subtitle: kSupportWhatsAppDisplay,
@@ -40,8 +32,18 @@ class SupportScreen extends ConsumerWidget {
             tt: tt,
             onTap: () => openSupportWhatsAppOrExplain(context),
           ),
+          _SupportTile(
+            icon: Icons.email_outlined,
+            title: 'Email Support',
+            subtitle: 'support@rebuzzpos.com',
+            cs: cs,
+            tt: tt,
+            onTap: () => openSupportMailOrExplain(context),
+          ),
           const SizedBox(height: 20),
           _SectionHeader('Resources', tt, cs),
+          // Replaces the old "Report a Bug" / "Request a Feature" rows.
+          // Always shown: feedback is welcome even with usage counting off.
           _SupportTile(
             key: const ValueKey('support-feedback-usage'),
             icon: Icons.forum_outlined,
@@ -62,24 +64,6 @@ class SupportScreen extends ConsumerWidget {
                   .read(reviewPrompterProvider)
                   .openStoreListing(appStoreId: kAppStoreId),
             ),
-          _SupportTile(
-            icon: Icons.bug_report_outlined,
-            title: 'Report a Bug',
-            subtitle: 'Let us know what went wrong',
-            cs: cs,
-            tt: tt,
-            onTap: () =>
-                openSupportMailOrExplain(context, subject: 'Open POS Bug'),
-          ),
-          _SupportTile(
-            icon: Icons.lightbulb_outline_rounded,
-            title: 'Request a Feature',
-            subtitle: 'Suggest improvements',
-            cs: cs,
-            tt: tt,
-            onTap: () => openSupportMailOrExplain(context,
-                subject: 'Open POS Feature Request'),
-          ),
           const SizedBox(height: 20),
           _SectionHeader('More from the team', tt, cs),
           _UpgradeCard(

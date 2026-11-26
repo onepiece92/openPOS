@@ -13,7 +13,7 @@ void main() {
     await tester.pumpWidget(const ProviderScope(
       child: MaterialApp(home: SupportScreen()),
     ));
-    expect(find.text('Report a Bug'), findsOneWidget);
+    expect(find.text('WhatsApp Chat'), findsOneWidget);
     expect(find.text('RebuzzPOS'), findsOneWidget);
     expect(find.text('Documentation'), findsNothing);
     expect(find.text('Ordering App'), findsNothing);

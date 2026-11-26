@@ -35,28 +35,28 @@ void main() {
 
   test('void returns redeemed points and removes earned points', () async {
     final (c, o) = await loyaltySale();
-    await voidOrder(db, audit, orderId: o, reason: 't');
+    await voidOrder(db, audit, trackStock: true, orderId: o, reason: 't');
     expect(await points(db, c), 100);
   });
 
   test('full refund returns redeemed points and removes earned points',
       () async {
     final (c, o) = await loyaltySale();
-    await processReturn(db, audit, orderId: o, amount: 70, restock: false);
+    await processReturn(db, audit, trackStock: true, orderId: o, amount: 70, restock: false);
     expect(await points(db, c), 100);
   });
 
   test('partial refund leaves loyalty alone', () async {
     final (c, o) = await loyaltySale();
-    await processReturn(db, audit, orderId: o, amount: 20, restock: false);
+    await processReturn(db, audit, trackStock: true, orderId: o, amount: 20, restock: false);
     expect(await points(db, c), 77);
   });
 
   test('partial refunds that add up to the total reverse loyalty once',
       () async {
     final (c, o) = await loyaltySale();
-    await processReturn(db, audit, orderId: o, amount: 20, restock: false);
-    await processReturn(db, audit, orderId: o, amount: 50, restock: false);
+    await processReturn(db, audit, trackStock: true, orderId: o, amount: 20, restock: false);
+    await processReturn(db, audit, trackStock: true, orderId: o, amount: 50, restock: false);
     expect(await points(db, c), 100);
   });
 
@@ -69,13 +69,13 @@ void main() {
     await db.customersDao.redeemLoyaltyPoints(c, 4);
     expect(await points(db, c), 1);
 
-    await voidOrder(db, audit, orderId: o, reason: 't');
+    await voidOrder(db, audit, trackStock: true, orderId: o, reason: 't');
     expect(await points(db, c), 0);
   });
 
   test('an order without a customer voids cleanly', () async {
     final o = await sell(db, audit, [line(p)]);
-    await voidOrder(db, audit, orderId: o, reason: 't');
+    await voidOrder(db, audit, trackStock: true, orderId: o, reason: 't');
     expect((await db.ordersDao.getById(o))!.status, 'voided');
   });
 }

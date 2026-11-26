@@ -5,6 +5,7 @@ import 'package:pos_app/core/database/app_database.dart' show Product;
 import 'package:pos_app/features/cart/domain/cart_item.dart';
 import 'package:pos_app/features/cart/presentation/providers/cart_notifier.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
+import '../../_support/features.dart';
 
 /// A line discount is a flat amount off the line. It can never be more than
 /// the line is worth before the discount (unit price × quantity), whatever
@@ -15,6 +16,7 @@ void main() {
 
   setUp(() {
     c = ProviderContainer(overrides: [
+      allFeaturesOn,
       productsStreamProvider
           .overrideWith((ref) => Stream.value(const <Product>[])),
     ]);

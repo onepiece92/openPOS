@@ -390,7 +390,7 @@ void main() {
     test('the app\'s own void (audit entry + voided_at) is found', () async {
       final o = await order(total: 25, when: DateTime.now()
           .subtract(const Duration(minutes: 5)));
-      await svc.voidOrder(db, AuditService(db), orderId: o, reason: 'test');
+      await svc.voidOrder(db, AuditService(db), trackStock: true, orderId: o, reason: 'test');
       final f = await dao.figuresForWindow(
           DateTime.now().subtract(const Duration(hours: 1)),
           DateTime.now().add(const Duration(hours: 1)));
@@ -416,7 +416,7 @@ void main() {
               .getSingle())
           .read<int>('c');
       expect(await indexed(), 0);
-      await svc.voidOrder(db, AuditService(db), orderId: o, reason: 'x');
+      await svc.voidOrder(db, AuditService(db), trackStock: true, orderId: o, reason: 'x');
       expect(await indexed(), 1);
     });
 

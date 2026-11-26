@@ -134,7 +134,10 @@ void main() {
       expect(review.lastPromptShownAt, DateTime(2026, 10, 1));
       final usage = Hive.box<dynamic>(kUsageBoxName);
       expect(readUsageCounts(usage)[UsageEvent.saleCompleted]!.count, 42);
-      expect(usage.get(kUsageCountingOnKey), isTrue);
+      // The device's counting choice goes back on the Usage counting switch.
+      final features = Hive.box<dynamic>('settings').get('features_v1');
+      expect((features as Map)['usageCounting'], isTrue);
+      expect(usage.containsKey(kUsageCountingOnKey), isFalse);
       expect(marker.existsSync(), isFalse);
 
       await tester.pump(const Duration(seconds: 5));

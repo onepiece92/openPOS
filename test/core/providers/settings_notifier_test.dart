@@ -36,10 +36,22 @@ void main() {
     expect(s.onboardingComplete, isFalse);
     expect(s.themeMode, ThemeMode.system);
     expect(s.lowStockThreshold, 5);
-    expect(s.currencySymbol, 'Rs');
+    expect(s.currencySymbol, r'$', reason: 'a new install: no Rs/NPR');
+    expect(s.currencyCode, 'USD');
     expect(s.printerPaperWidth, 80);
     expect(s.autoBackupEnabled, isTrue);
     expect(s.businessNameOrDefault, 'My Store');
+  });
+
+  test('an existing install keeps NPR: stored, or never stored but set up',
+      () async {
+    await box.put('onboarding_complete', true);
+    expect(AppSettings.fromBox(box).currencyCode, 'NPR');
+    expect(AppSettings.fromBox(box).currencySymbol, 'Rs');
+    await box.put(kCurrencyCode, 'NPR');
+    await box.put(kCurrencySymbol, 'Rs');
+    await box.put('onboarding_complete', false);
+    expect(AppSettings.fromBox(box).currencyCode, 'NPR');
   });
 
   test('setter updates state synchronously and persists to the box',

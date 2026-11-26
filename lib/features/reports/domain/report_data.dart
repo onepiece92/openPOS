@@ -1,8 +1,11 @@
 import 'package:drift/drift.dart' show TableUpdateQuery;
+import 'package:flutter/foundation.dart' show immutable;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
+import 'package:pos_app/core/providers/hive_provider.dart';
 
 /// Reporting periods, the (from, to, label) query they resolve to, and
 /// [reportProvider] — the one query that feeds the whole dashboard
@@ -183,9 +186,52 @@ String _hourLabel(int h) {
   return '${h - 12}pm';
 }
 
+/// Which optional parts of the dashboard are on. A part that is off is not
+/// shown AND its query is not run.
+@immutable
+class ReportSections {
+  const ReportSections({
+    required this.costProfit,
+    required this.expenses,
+    required this.extras,
+  });
+
+  static const all =
+      ReportSections(costProfit: true, expenses: true, extras: true);
+
+  factory ReportSections.of(FeatureFlags f) => ReportSections(
+        costProfit: f.costProfit,
+        expenses: f.expenses,
+        extras: f.dashboardExtras,
+      );
+
+  /// Cost of Goods, Net Profit and the missing-cost warning.
+  final bool costProfit;
+
+  /// The Expenses figure.
+  final bool expenses;
+
+  /// The bar chart, the payment mix and top products.
+  final bool extras;
+
+  @override
+  bool operator ==(Object other) =>
+      other is ReportSections &&
+      other.costProfit == costProfit &&
+      other.expenses == expenses &&
+      other.extras == extras;
+
+  @override
+  int get hashCode => Object.hash(costProfit, expenses, extras);
+}
+
+final reportSectionsProvider = Provider<ReportSections>((ref) =>
+    ref.watch(featureFlagsProvider.select(ReportSections.of)));
+
 final reportProvider =
     FutureProvider.family<ReportData, ReportQuery>((ref, query) async {
   final db = ref.watch(databaseProvider);
+  final sections = ref.watch(reportSectionsProvider);
   // The key no longer moves during the day, so recompute when a sale, void,
   // refund or expense lands instead of serving the first answer until midnight.
   final changes = db
@@ -199,24 +245,38 @@ final reportProvider =
       ]))
       .listen((_) => ref.invalidateSelf());
   ref.onDispose(changes.cancel);
+  return loadReport(db, query, sections);
+});
+
+/// The dashboard's numbers for [query]. Parts of [sections] that are off
+/// are not queried: their figures are zero / empty.
+Future<ReportData> loadReport(
+    AppDatabase db, ReportQuery query, ReportSections sections) async {
   final from = query.from;
   final to = query.to;
 
   final revenue = await db.ordersDao.totalRevenueForPeriod(from, to);
-  final expenses = await db.expensesDao.totalForPeriod(from, to);
+  final expenses =
+      sections.expenses ? await db.expensesDao.totalForPeriod(from, to) : 0.0;
 
   final periodOrders = await db.ordersDao.completedOrdersInPeriod(from, to);
 
   final vatCollected = await db.ordersDao.vatCollectedForPeriod(from, to);
-  final goods = await db.ordersDao.costOfGoodsForPeriod(from, to);
+  final goods = sections.costProfit
+      ? await db.ordersDao.costOfGoodsForPeriod(from, to)
+      : null;
 
-  final topRaw =
-      await db.ordersDao.topSellingProductsForPeriod(from, to, limit: 5);
-  final topProducts = [
-    for (final r in topRaw)
-      TopProduct(
-          productId: r.productId, name: r.name, qty: r.qty, sales: r.sales),
-  ];
+  final topProducts = !sections.extras
+      ? const <TopProduct>[]
+      : [
+          for (final r in await db.ordersDao
+              .topSellingProductsForPeriod(from, to, limit: 5))
+            TopProduct(
+                productId: r.productId,
+                name: r.name,
+                qty: r.qty,
+                sales: r.sales),
+        ];
 
   final taxLabel = resolveTaxLabel(
     namesOnOrders: await db.ordersDao.taxNamesForPeriod(from, to),
@@ -226,14 +286,15 @@ final reportProvider =
     ],
   );
 
-  final payRaw = await db.ordersDao.paymentBreakdownForPeriod(from, to);
-  final payBreakdown = payRaw
-      .map((r) => PayRow(
-            method: r['method'] as String,
-            count: r['count'] as int,
-            total: r['total'] as double,
-          ))
-      .toList();
+  final payBreakdown = !sections.extras
+      ? const <PayRow>[]
+      : (await db.ordersDao.paymentBreakdownForPeriod(from, to))
+          .map((r) => PayRow(
+                method: r['method'] as String,
+                count: r['count'] as int,
+                total: r['total'] as double,
+              ))
+          .toList();
 
   // ── Duration-aware chart data ────────────────────────────────────────────
   // Whole calendar days between the two dates (0 = the same day). Counted
@@ -247,7 +308,13 @@ final reportProvider =
   List<double> chartTotals;
   int chartHighlightIndex;
 
-  if (days < 1) {
+  if (!sections.extras) {
+    // No chart: nothing to bucket.
+    chartTitle = '';
+    chartDates = const [];
+    chartTotals = const [];
+    chartHighlightIndex = -1;
+  } else if (days < 1) {
     // ── Hourly (2-hour slots, full 24h) ──────────────────────────────────
     chartTitle = 'Hourly Sales';
     const slotCount = 12;
@@ -339,9 +406,9 @@ final reportProvider =
   return ReportData(
     revenue: revenue,
     vatCollected: vatCollected,
-    costOfGoods: goods.cost,
-    soldLines: goods.lines,
-    uncostedLines: goods.uncostedLines,
+    costOfGoods: goods?.cost ?? 0,
+    soldLines: goods?.lines ?? 0,
+    uncostedLines: goods?.uncostedLines ?? 0,
     expenses: expenses,
     orderCount: periodOrders.length,
     topProducts: topProducts,
@@ -352,4 +419,4 @@ final reportProvider =
     chartHighlightIndex: chartHighlightIndex,
     taxLabel: taxLabel,
   );
-});
+}

@@ -81,7 +81,7 @@ void main() {
     await db.customStatement(
       'UPDATE orders SET created_at = created_at - 3600, updated_at = updated_at - 3600',
     );
-    await voidOrder(db, audit, orderId: orderId, reason: 'wrong order');
+    await voidOrder(db, audit, trackStock: true, orderId: orderId, reason: 'wrong order');
 
     // Stock fully restored
     expect((await db.productsDao.getById(productId))!.stockQuantity, 10);
@@ -157,7 +157,7 @@ void main() {
     expect((await db.productsDao.getById(espressoId))!.stockQuantity, 98);
     expect((await db.productsDao.getById(milkId))!.stockQuantity, 48);
 
-    await voidOrder(db, audit, orderId: orderId, reason: 'kitchen mistake');
+    await voidOrder(db, audit, trackStock: true, orderId: orderId, reason: 'kitchen mistake');
 
     expect((await db.productsDao.getById(espressoId))!.stockQuantity, 100);
     expect((await db.productsDao.getById(milkId))!.stockQuantity, 50);
@@ -169,13 +169,13 @@ void main() {
     final productId = await seedProduct(sku: 'COFFEE', name: 'Coffee', stock: 10);
     final orderId = await placeSimple(productId, qty: 2);
 
-    await voidOrder(db, audit, orderId: orderId, reason: 'first void');
+    await voidOrder(db, audit, trackStock: true, orderId: orderId, reason: 'first void');
 
     // Snapshot state after first void
     final auditCountAfterFirst = (await db.select(db.auditLog).get()).length;
 
     expect(
-      () => voidOrder(db, audit, orderId: orderId, reason: 'second void'),
+      () => voidOrder(db, audit, trackStock: true, orderId: orderId, reason: 'second void'),
       throwsStateError,
     );
 
@@ -188,7 +188,7 @@ void main() {
 
   test('void on missing order throws and persists nothing', () async {
     expect(
-      () => voidOrder(db, audit, orderId: 9999, reason: 'ghost'),
+      () => voidOrder(db, audit, trackStock: true, orderId: 9999, reason: 'ghost'),
       throwsStateError,
     );
 

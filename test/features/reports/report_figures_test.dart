@@ -15,6 +15,7 @@ import 'package:pos_app/features/returns/domain/void_order.dart';
 
 import '../../_support/sales.dart';
 import '../../_support/test_db.dart';
+import '../../_support/features.dart';
 
 /// The dashboard's money figures and how they hang together:
 ///
@@ -31,7 +32,8 @@ void main() {
   setUp(() {
     db = openInMemoryDatabase();
     audit = AuditService(db);
-    c = ProviderContainer(overrides: [databaseProvider.overrideWithValue(db)]);
+    c = ProviderContainer(
+        overrides: [allFeaturesOn, databaseProvider.overrideWithValue(db)]);
   });
   tearDown(() async {
     c.dispose();
@@ -147,7 +149,7 @@ void main() {
     test('a partial refund scales revenue, VAT and cost by the share kept',
         () async {
       // 508.50 of 1017 refunded → exactly half of the sale is kept.
-      await processReturn(db, audit,
+      await processReturn(db, audit, trackStock: true,
           orderId: orderId, amount: 508.50, restock: false);
       final d = await report();
       expect(d.revenue, 508.50);
@@ -159,7 +161,7 @@ void main() {
     });
 
     test('a fully refunded order contributes nothing', () async {
-      await processReturn(db, audit,
+      await processReturn(db, audit, trackStock: true,
           orderId: orderId, amount: 1017, restock: false);
       final d = await report();
       expect(d.revenue, 0);
@@ -170,7 +172,7 @@ void main() {
     });
 
     test('a voided order contributes nothing', () async {
-      await voidOrder(db, audit, orderId: orderId, reason: 'test');
+      await voidOrder(db, audit, trackStock: true, orderId: orderId, reason: 'test');
       final d = await report();
       expect(d.revenue, 0);
       expect(d.vatCollected, 0);
@@ -223,7 +225,10 @@ void main() {
     final tea = await product('Tea', cost: 60);
     final rate = await vat();
     final id = await db.ordersDao.insertOrder(OrdersCompanion.insert(
-        subtotal: 100, taxTotal: const Value(18), total: 118, paymentMethod: 'cash'));
+        subtotal: 100,
+        taxTotal: const Value(18),
+        total: 118,
+        paymentMethod: 'cash'));
     await db.ordersDao.insertItems([
       OrderItemsCompanion.insert(
           orderId: id,
@@ -262,14 +267,14 @@ void main() {
   group('top products', () {
     test('one row per product: renames and secondary units do not split it',
         () async {
-      final eggs =
-          await product('Eggs', cost: 5, secondaryUnit: 'dozen', conversion: 12);
+      final eggs = await product('Eggs',
+          cost: 5, secondaryUnit: 'dozen', conversion: 12);
       await place([item(eggs, 'Eggs', 10, qty: 3)]);
       await place([
         item(eggs, 'Eggs', 110, qty: 2, unitLabel: 'dozen', unitsPerQty: 12)
       ]);
-      await db.productsDao
-          .updateProduct(eggs, const ProductsCompanion(name: Value('Farm eggs')));
+      await db.productsDao.updateProduct(
+          eggs, const ProductsCompanion(name: Value('Farm eggs')));
       await place([item(eggs, 'Farm eggs', 10, qty: 1)]);
 
       final top = (await report()).topProducts;
@@ -279,7 +284,8 @@ void main() {
       expect(top.single.sales, 30 + 220 + 10);
     });
 
-    test('the money column is sales ex-VAT after the order discount, and '
+    test(
+        'the money column is sales ex-VAT after the order discount, and '
         'adds up to the dashboard figure', () async {
       final a = await product('A', cost: 10);
       final b = await product('B', cost: 10);

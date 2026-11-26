@@ -84,8 +84,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     // Half a cent of slack: the field holds two decimals.
     if (_paymentMethod == 'cash' && _tendered < summary.total - 0.005) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Tendered amount is less than the total')),
+        const SnackBar(content: Text('Tendered amount is less than the total')),
       );
       return;
     }
@@ -100,10 +99,17 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     final session = ref.read(cartSessionProvider);
     final invoicePrefix = ref.read(invoicePrefixProvider);
     final cartNotifier = ref.read(cartProvider.notifier);
-    final heldOrders = ref.read(heldOrdersProvider.notifier);
-    final printer = ref.read(autoPrintServiceProvider);
+    // Only a sale resumed from a held ticket needs the held tickets.
+    final heldOrders = session.heldTicketId == null
+        ? null
+        : ref.read(heldOrdersProvider.notifier);
+    // Auto-print off: the print service is not even read.
+    final printer = ref.read(featureOnProvider(Feature.autoPrint))
+        ? ref.read(autoPrintServiceProvider)
+        : null;
     final messenger = ScaffoldMessenger.of(context);
     final usage = ref.read(usageCounterProvider);
+    final trackStock = ref.read(featureOnProvider(Feature.stockTracking));
 
     final int orderId;
     try {
@@ -116,6 +122,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         paymentMethod: _paymentMethod,
         tenderedAmount: _tendered,
         invoicePrefix: invoicePrefix,
+        trackStock: trackStock,
       );
     } catch (e) {
       _placing = false;
@@ -138,7 +145,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     // disk while it is edited — the sale is what retires it.
     final heldTicketId = session.heldTicketId;
     if (heldTicketId != null) {
-      heldOrders.delete(heldTicketId);
+      heldOrders?.delete(heldTicketId);
     }
     cartNotifier.clear();
 
@@ -149,11 +156,13 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     // screen: by the time the print finishes we have navigated to the
     // receipt, so the screen's own `mounted` must not gate the error.
     // `messenger.mounted` only guards against the whole app being torn down.
-    unawaited(printer.printOrder(orderId).then((err) {
-      if (err != null && messenger.mounted) {
-        messenger.showSnackBar(SnackBar(content: Text(err)));
-      }
-    }));
+    if (printer != null) {
+      unawaited(printer.printOrder(orderId).then((err) {
+        if (err != null && messenger.mounted) {
+          messenger.showSnackBar(SnackBar(content: Text(err)));
+        }
+      }));
+    }
 
     if (mounted) {
       setState(() => _placing = false);
@@ -170,8 +179,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     });
     final symbol = ref.watch(currencySymbolProvider);
     final fmt = ref.watch(currencyFormatterProvider);
-    final loyaltyEnabled = ref.watch(loyaltyEnabledProvider);
-    final customer = ref.watch(cartCustomerProvider);
+    final loyalty = ref.watch(featureOnProvider(Feature.loyalty));
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
     final change = (_tendered - summary.total).clamp(0.0, double.infinity);
@@ -215,8 +223,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
               keyboardType:
                   const TextInputType.numberWithOptions(decimal: true),
               inputFormatters: [
-                FilteringTextInputFormatter.allow(
-                    RegExp(r'^\d*\.?\d{0,2}')),
+                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
               ],
               decoration: InputDecoration(
                 labelText: 'Amount received from customer',
@@ -254,21 +261,18 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
               ),
             ],
           ],
-          if (loyaltyEnabled && customer != null) ...[
-            const SizedBox(height: 24),
-            _LoyaltySection(
-              customer: customer,
+          // Loyalty off (or Customers off): the cart's customer is never
+          // looked up here.
+          if (loyalty)
+            _LoyaltyGate(
               summary: summary,
               fmt: fmt,
               loyaltyCtrl: _loyaltyCtrl,
               onChanged: (pts) {
-                ref
-                    .read(cartSessionProvider.notifier)
-                    .setLoyaltyPoints(pts);
+                ref.read(cartSessionProvider.notifier).setLoyaltyPoints(pts);
                 setState(() {});
               },
             ),
-          ],
         ],
       ),
     );
@@ -352,6 +356,37 @@ class _PaymentChip extends StatelessWidget {
 
 // ─── Loyalty section ──────────────────────────────────────────────────────────
 
+/// Only built while Loyalty is on: the one widget here that watches the
+/// cart's customer.
+class _LoyaltyGate extends ConsumerWidget {
+  const _LoyaltyGate({
+    required this.summary,
+    required this.fmt,
+    required this.loyaltyCtrl,
+    required this.onChanged,
+  });
+  final CartSummary summary;
+  final CurrencyFormatter fmt;
+  final TextEditingController loyaltyCtrl;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final customer = ref.watch(cartCustomerProvider);
+    if (customer == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 24),
+      child: _LoyaltySection(
+        customer: customer,
+        summary: summary,
+        fmt: fmt,
+        loyaltyCtrl: loyaltyCtrl,
+        onChanged: onChanged,
+      ),
+    );
+  }
+}
+
 class _LoyaltySection extends StatelessWidget {
   const _LoyaltySection({
     required this.customer,
@@ -388,8 +423,7 @@ class _LoyaltySection extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Icon(Icons.stars_rounded,
-                  size: 20, color: cs.tertiary),
+              Icon(Icons.stars_rounded, size: 20, color: cs.tertiary),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -397,14 +431,14 @@ class _LoyaltySection extends StatelessWidget {
                   children: [
                     Text(
                       '${customer.name} has $available pts available',
-                      style: tt.bodyMedium
-                          ?.copyWith(fontWeight: FontWeight.w600),
+                      style:
+                          tt.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
                     ),
                     if (summary.pointsToEarn > 0)
                       Text(
                         'Will earn +${summary.pointsToEarn} pts from this sale',
-                        style: tt.bodySmall
-                            ?.copyWith(color: cs.onSurfaceVariant),
+                        style:
+                            tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                       ),
                   ],
                 ),

@@ -244,6 +244,10 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
     final repo = ref.read(backupRepositoryProvider);
+    // CSV rows follow CSV import and export; the customer and expense rows
+    // also follow those features. The full backup is always here.
+    final flags = ref.watch(featureFlagsProvider);
+    final csv = flags.csvImportExport;
 
     return Scaffold(
       appBar: AppBar(
@@ -282,109 +286,116 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
           _AutoBackupTile(onOpen: _showLocalSnapshots),
           const SizedBox(height: 20),
           _buildInfoCard(cs, tt),
-          const SizedBox(height: 24),
-          _SectionHeader('Products', cs, tt),
-          _BackupTile(
-            title: 'Export Products',
-            subtitle: 'Download your catalog as CSV',
-            icon: Icons.upload_rounded,
-            color: cs.primary,
-            onTap: _isExporting
-                ? null
-                : (origin) => _runExport(
-                    'Products', () => repo.exportProducts(shareOrigin: origin)),
-            isLoading: _isExporting,
-          ),
-          _BackupTile(
-            title: 'Import Products',
-            subtitle: 'Upload CSV to restore or update catalog',
-            icon: Icons.download_rounded,
-            color: cs.secondary,
-            onTap: _isImporting
-                ? null
-                : (_) => _confirmAndImport('Products', true),
-            isLoading: _isImporting,
-          ),
-          const SizedBox(height: 20),
-          _SectionHeader('Customers', cs, tt),
-          _BackupTile(
-            title: 'Export Customers',
-            subtitle: 'Download customer list as CSV',
-            icon: Icons.people_outline_rounded,
-            color: cs.primary,
-            onTap: _isExporting
-                ? null
-                : (origin) => _runExport(
-                    'Customers', () => repo.exportCustomers(shareOrigin: origin)),
-            isLoading: _isExporting,
-          ),
-          _BackupTile(
-            title: 'Import Customers',
-            subtitle: 'Upload CSV to restore customers',
-            icon: Icons.person_add_alt_1_rounded,
-            color: cs.secondary,
-            onTap: _isImporting
-                ? null
-                : (_) => _confirmAndImport('Customers', false),
-            isLoading: _isImporting,
-          ),
-          const SizedBox(height: 20),
-          _SectionHeader('Financials', cs, tt),
-          _BackupTile(
-            title: 'Export Expenses',
-            subtitle: 'Download business expenses as CSV',
-            icon: Icons.account_balance_wallet_outlined,
-            color: cs.primary,
-            onTap: _isExporting
-                ? null
-                : (origin) => _runExport(
-                    'Expenses', () => repo.exportExpenses(shareOrigin: origin)),
-            isLoading: _isExporting,
-          ),
-          _BackupTile(
-            title: 'Import Expenses',
-            subtitle: 'Upload CSV to restore expenses',
-            icon: Icons.receipt_long_rounded,
-            color: cs.secondary,
-            onTap: _isImporting
-                ? null
-                : (_) => _confirmAndImport('Expenses', false, isExpenses: true),
-            isLoading: _isImporting,
-          ),
-          const SizedBox(height: 20),
-          _SectionHeader('Sales & History', cs, tt),
-          _BackupTile(
-            title: 'Export Order History',
-            subtitle: 'Full database of orders and items',
-            icon: Icons.history_rounded,
-            color: cs.primary,
-            onTap: _isExporting
-                ? null
-                : (origin) => _runExport(
-                    'Order History', () => repo.exportOrders(shareOrigin: origin)),
-            isLoading: _isExporting,
-          ),
-          _BackupTile(
-            title: 'Import Order History',
-            subtitle: 'Reconstruct orders from CSV',
-            icon: Icons.upload_file_rounded,
-            color: cs.secondary,
-            onTap: _isImporting
-                ? null
-                : (_) => _confirmAndImport('Orders', false, isOrders: true),
-            isLoading: _isImporting,
-          ),
-          _BackupTile(
-            title: 'Export Sales Report',
-            subtitle: 'Concise summary for accounting',
-            icon: Icons.analytics_outlined,
-            color: cs.tertiary,
-            onTap: _isExporting
-                ? null
-                : (origin) => _runExport(
-                    'Sales Report', () => repo.exportSalesReport(shareOrigin: origin)),
-            isLoading: _isExporting,
-          ),
+          if (csv) ...[
+            const SizedBox(height: 24),
+            _SectionHeader('Products', cs, tt),
+            _BackupTile(
+              title: 'Export Products',
+              subtitle: 'Download your catalog as CSV',
+              icon: Icons.upload_rounded,
+              color: cs.primary,
+              onTap: _isExporting
+                  ? null
+                  : (origin) => _runExport('Products',
+                      () => repo.exportProducts(shareOrigin: origin)),
+              isLoading: _isExporting,
+            ),
+            _BackupTile(
+              title: 'Import Products',
+              subtitle: 'Upload CSV to restore or update catalog',
+              icon: Icons.download_rounded,
+              color: cs.secondary,
+              onTap: _isImporting
+                  ? null
+                  : (_) => _confirmAndImport('Products', true),
+              isLoading: _isImporting,
+            ),
+            if (flags.customers) ...[
+              const SizedBox(height: 20),
+              _SectionHeader('Customers', cs, tt),
+              _BackupTile(
+                title: 'Export Customers',
+                subtitle: 'Download customer list as CSV',
+                icon: Icons.people_outline_rounded,
+                color: cs.primary,
+                onTap: _isExporting
+                    ? null
+                    : (origin) => _runExport('Customers',
+                        () => repo.exportCustomers(shareOrigin: origin)),
+                isLoading: _isExporting,
+              ),
+              _BackupTile(
+                title: 'Import Customers',
+                subtitle: 'Upload CSV to restore customers',
+                icon: Icons.person_add_alt_1_rounded,
+                color: cs.secondary,
+                onTap: _isImporting
+                    ? null
+                    : (_) => _confirmAndImport('Customers', false),
+                isLoading: _isImporting,
+              ),
+            ],
+            if (flags.expenses) ...[
+              const SizedBox(height: 20),
+              _SectionHeader('Financials', cs, tt),
+              _BackupTile(
+                title: 'Export Expenses',
+                subtitle: 'Download business expenses as CSV',
+                icon: Icons.account_balance_wallet_outlined,
+                color: cs.primary,
+                onTap: _isExporting
+                    ? null
+                    : (origin) => _runExport('Expenses',
+                        () => repo.exportExpenses(shareOrigin: origin)),
+                isLoading: _isExporting,
+              ),
+              _BackupTile(
+                title: 'Import Expenses',
+                subtitle: 'Upload CSV to restore expenses',
+                icon: Icons.receipt_long_rounded,
+                color: cs.secondary,
+                onTap: _isImporting
+                    ? null
+                    : (_) =>
+                        _confirmAndImport('Expenses', false, isExpenses: true),
+                isLoading: _isImporting,
+              ),
+            ],
+            const SizedBox(height: 20),
+            _SectionHeader('Sales & History', cs, tt),
+            _BackupTile(
+              title: 'Export Order History',
+              subtitle: 'Full database of orders and items',
+              icon: Icons.history_rounded,
+              color: cs.primary,
+              onTap: _isExporting
+                  ? null
+                  : (origin) => _runExport('Order History',
+                      () => repo.exportOrders(shareOrigin: origin)),
+              isLoading: _isExporting,
+            ),
+            _BackupTile(
+              title: 'Import Order History',
+              subtitle: 'Reconstruct orders from CSV',
+              icon: Icons.upload_file_rounded,
+              color: cs.secondary,
+              onTap: _isImporting
+                  ? null
+                  : (_) => _confirmAndImport('Orders', false, isOrders: true),
+              isLoading: _isImporting,
+            ),
+            _BackupTile(
+              title: 'Export Sales Report',
+              subtitle: 'Concise summary for accounting',
+              icon: Icons.analytics_outlined,
+              color: cs.tertiary,
+              onTap: _isExporting
+                  ? null
+                  : (origin) => _runExport('Sales Report',
+                      () => repo.exportSalesReport(shareOrigin: origin)),
+              isLoading: _isExporting,
+            ),
+          ],
         ],
       ),
     );
@@ -536,9 +547,8 @@ class _AutoBackupTile extends ConsumerWidget {
     final tt = Theme.of(context).textTheme;
     final enabled = ref.watch(autoBackupEnabledProvider);
     final lastAt = ref.watch(autoBackupLastAtProvider);
-    final last = lastAt == null
-        ? 'never'
-        : DateFormat.MMMd().add_jm().format(lastAt);
+    final last =
+        lastAt == null ? 'never' : DateFormat.MMMd().add_jm().format(lastAt);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -556,8 +566,8 @@ class _AutoBackupTile extends ConsumerWidget {
                   color: cs.tertiary.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: Icon(Icons.history_toggle_off_rounded,
-                    color: cs.tertiary),
+                child:
+                    Icon(Icons.history_toggle_off_rounded, color: cs.tertiary),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -653,7 +663,8 @@ class _LocalSnapshotsSheet extends StatelessWidget {
               child: ListView.separated(
                 shrinkWrap: true,
                 itemCount: files.length,
-                separatorBuilder: (_, __) => const Divider(height: 1, indent: 72),
+                separatorBuilder: (_, __) =>
+                    const Divider(height: 1, indent: 72),
                 itemBuilder: (context, i) {
                   final f = files[i];
                   final stat = f.statSync();

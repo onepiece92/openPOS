@@ -37,4 +37,5 @@ final reviewControllerProvider = Provider<ReviewController>((ref) =>
       // the review check — see UsageAskController.
       afterCheck: (result) =>
           ref.read(usageAskControllerProvider).afterReviewCheck(result),
+      enabled: () => ref.read(featureOnProvider(Feature.reviewReminder)),
     ));

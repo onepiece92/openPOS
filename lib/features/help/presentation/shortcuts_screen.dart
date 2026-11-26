@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/core/theme/tokens.dart';
 import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
 
-class ShortcutsScreen extends StatelessWidget {
+class ShortcutsScreen extends ConsumerWidget {
   const ShortcutsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
+    // Destinations switched off in Features are not listed.
+    final flags = ref.watch(featureFlagsProvider);
 
     return Scaffold(
       drawer: const PosDrawer(),
@@ -26,14 +30,18 @@ class ShortcutsScreen extends StatelessWidget {
               tt: tt,
               cs: cs),
           _ShortcutRow(keys: const ['⌘', 'O'], label: 'Orders', tt: tt, cs: cs),
-          _ShortcutRow(
-              keys: const ['⌘', 'U'], label: 'Customers', tt: tt, cs: cs),
-          _ShortcutRow(
-              keys: const ['⌘', 'T'], label: 'Tables', tt: tt, cs: cs),
-          _ShortcutRow(
-              keys: const ['⌘', 'E'], label: 'Expenses', tt: tt, cs: cs),
-          _ShortcutRow(
-              keys: const ['⌘', 'I'], label: 'Inventory', tt: tt, cs: cs),
+          if (flags.customers)
+            _ShortcutRow(
+                keys: const ['⌘', 'U'], label: 'Customers', tt: tt, cs: cs),
+          if (flags.tables)
+            _ShortcutRow(
+                keys: const ['⌘', 'T'], label: 'Tables', tt: tt, cs: cs),
+          if (flags.expenses)
+            _ShortcutRow(
+                keys: const ['⌘', 'E'], label: 'Expenses', tt: tt, cs: cs),
+          if (flags.stockTracking)
+            _ShortcutRow(
+                keys: const ['⌘', 'I'], label: 'Inventory', tt: tt, cs: cs),
           _ShortcutRow(
               keys: const ['⌘', ','], label: 'Settings', tt: tt, cs: cs),
           const SizedBox(height: 20),
@@ -80,7 +88,9 @@ class ShortcutsScreen extends StatelessWidget {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Keyboard shortcuts work on Mac, and on iPad with a keyboard.',
+                    'Keyboard shortcuts work on Mac, and on iPad with a keyboard. '
+                    'A shortcut to a feature that is switched off in Features '
+                    'opens POS instead.',
                     style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                   ),
                 ),

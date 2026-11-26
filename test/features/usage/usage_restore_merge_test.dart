@@ -67,7 +67,9 @@ void main() {
         UsageEvent.reportViewed:
             const UsageCount(4, firstMonth: '2026-11', lastMonth: '2026-11'),
       });
-      expect(box.get(kUsageCountingOnKey), isTrue);
+      expect(box.containsKey(kUsageCountingOnKey), isFalse,
+          reason: "a backup's legacy flag is dropped; the switch is in "
+              'settings (mergeUsageAfterRestore)');
       expect(box.containsKey(kUsageDisclosureShownKey), isFalse);
       expect(box.get(kUsageAskedVersionKey), '1.1.0+10');
     });
@@ -89,10 +91,25 @@ void main() {
       expect(box.get(kUsageReviewUnavailableSinceKey), mine);
     });
 
+    test('the snapshot taken with the counting switch keeps every device flag',
+        () async {
+      final mine = DateTime.now().toIso8601String();
+      await box.putAll({
+        kUsageDisclosureShownKey: true,
+        kUsageAskedVersionKey: '1.1.0+10',
+        kUsageReviewUnavailableSinceKey: mine,
+      });
+      final s = usageSnapshotBeforeRestore(countingOn: false)!;
+      expect(s.countingOn, isFalse);
+      expect(s.disclosureShown, isTrue);
+      expect(s.askedVersion, '1.1.0+10');
+      expect(s.reviewUnavailableSince, mine);
+    });
+
     test('merging the box with its own snapshot changes nothing', () async {
       await box.putAll({
         'e.ticketHeld': {'c': 7, 'f': '2026-03', 'l': '2026-09'},
-        kUsageCountingOnKey: true,
+        kUsageDisclosureShownKey: true,
       });
       final before = UsageSnapshot.of(box);
       final snapshot = box.toMap();

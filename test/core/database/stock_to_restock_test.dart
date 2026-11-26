@@ -60,7 +60,7 @@ void main() {
   test('fully put back (a void) owes nothing', () async {
     final tea = await seedProduct(db, sku: 'TEA', stock: 10);
     final id = await sell(db, audit, [line(tea, qty: 3)]);
-    await voidOrder(db, audit, orderId: id, reason: 't');
+    await voidOrder(db, audit, trackStock: true, orderId: id, reason: 't');
     expect(await owed(id), isEmpty);
   });
 

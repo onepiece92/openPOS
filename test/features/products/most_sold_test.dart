@@ -64,9 +64,9 @@ void main() {
   test('voided and fully refunded sales do not count', () async {
     await sell(db, audit, [line(tea, qty: 1)]);
     final voided = await sell(db, audit, [line(tea, qty: 10)]);
-    await voidOrder(db, audit, orderId: voided, reason: 'test');
+    await voidOrder(db, audit, trackStock: true, orderId: voided, reason: 'test');
     final refunded = await sell(db, audit, [line(eggs, qty: 4)]);
-    await processReturn(db, audit,
+    await processReturn(db, audit, trackStock: true,
         orderId: refunded, amount: 20, restock: false);
 
     expect(await counts(), {tea: 1});

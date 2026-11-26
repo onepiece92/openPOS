@@ -115,6 +115,9 @@ class _UsageHostState extends ConsumerState<UsageHost> {
     if (restartNoticeShowing.value) return; // retried when it ends
     if (!_counter.isLoaded || _counter.disclosureShown) return;
     if (!ref.read(onboardingCompleteProvider)) return;
+    // Nothing is counted: nothing to disclose yet. Switching counting on
+    // later shows it then (the listener in build).
+    if (!ref.read(featureOnProvider(Feature.usageCounting))) return;
     final messenger = ScaffoldMessenger.maybeOf(context);
     if (messenger == null) return;
     _disclosing = true;
@@ -163,6 +166,15 @@ class _UsageHostState extends ConsumerState<UsageHost> {
     // Onboarding finishing is the other moment the disclosure may be due.
     ref.listen(onboardingCompleteProvider, (_, done) {
       if (done) _maybeDisclose();
+    });
+    // So is Usage counting being switched on later (in Features or Usage
+    // summary): disclosed then, not at the next launch. After the frame,
+    // like the restart notice, in case the switch flips mid-build.
+    ref.listen(featureOnProvider(Feature.usageCounting), (was, on) {
+      if (on && was == false) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => _maybeDisclose());
+        WidgetsBinding.instance.ensureVisualUpdate();
+      }
     });
     return widget.child;
   }

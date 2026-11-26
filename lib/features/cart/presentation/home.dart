@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/services/demo_data_service.dart';
 import 'package:pos_app/features/cart/presentation/providers/cart_notifier.dart';
@@ -83,6 +84,8 @@ class _CartScreenState extends ConsumerState<CartScreen> {
             },
             itemBuilder: (_) {
               final cartEmpty = ref.read(cartProvider).isEmpty;
+              final customersOn =
+                  ref.read(featureOnProvider(Feature.customers));
               return [
                 const PopupMenuItem(
                   value: 'products',
@@ -100,14 +103,15 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                     contentPadding: EdgeInsets.zero,
                   ),
                 ),
-                const PopupMenuItem(
-                  value: 'customers',
-                  child: ListTile(
-                    leading: Icon(Icons.people_outline_rounded),
-                    title: Text('Customers'),
-                    contentPadding: EdgeInsets.zero,
+                if (customersOn)
+                  const PopupMenuItem(
+                    value: 'customers',
+                    child: ListTile(
+                      leading: Icon(Icons.people_outline_rounded),
+                      title: Text('Customers'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
                   ),
-                ),
                 if (!cartEmpty) ...[
                   const PopupMenuDivider(),
                   const PopupMenuItem(
@@ -124,13 +128,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: const Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          HeldTicketsBar(),
-          CheckoutBar(),
-        ],
-      ),
+      bottomNavigationBar: const PosBottomBars(),
       body: CallbackShortcuts(
         bindings: {
           const SingleActivator(LogicalKeyboardKey.keyF, meta: true): () {
@@ -505,12 +503,15 @@ class _Chip extends StatelessWidget {
 
 // ─── POS product grid ─────────────────────────────────────────────────────────
 
-class _PosProductGrid extends StatelessWidget {
+class _PosProductGrid extends ConsumerWidget {
   const _PosProductGrid({required this.products});
   final List<Product> products;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Watched once here, not per tile.
+    final units = ref.watch(featureOnProvider(Feature.units));
+    final stock = ref.watch(featureOnProvider(Feature.stockTracking));
     return GridView.builder(
       padding: const EdgeInsets.fromLTRB(10, 6, 10, 10),
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
@@ -520,19 +521,23 @@ class _PosProductGrid extends StatelessWidget {
         childAspectRatio: 0.9,
       ),
       itemCount: products.length,
-      itemBuilder: (_, i) => GridProductTile(product: products[i]),
+      itemBuilder: (_, i) =>
+          GridProductTile(product: products[i], units: units, stock: stock),
     );
   }
 }
 
 // ─── POS product list ─────────────────────────────────────────────────────────
 
-class _PosProductList extends StatelessWidget {
+class _PosProductList extends ConsumerWidget {
   const _PosProductList({required this.products});
   final List<Product> products;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Watched once here, not per tile.
+    final units = ref.watch(featureOnProvider(Feature.units));
+    final stock = ref.watch(featureOnProvider(Feature.stockTracking));
     return ListView.separated(
       padding: const EdgeInsets.only(top: 4, bottom: 8),
       itemCount: products.length,
@@ -540,7 +545,8 @@ class _PosProductList extends StatelessWidget {
         productId: products[i].id,
         nextProductId: products[i + 1 < products.length ? i + 1 : i].id,
       ),
-      itemBuilder: (_, i) => PosProductTile(product: products[i]),
+      itemBuilder: (_, i) =>
+          PosProductTile(product: products[i], units: units, stock: stock),
     );
   }
 }
@@ -563,6 +569,24 @@ class _ListSeparator extends ConsumerWidget {
       endIndent: 16,
       color:
           Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.5),
+    );
+  }
+}
+
+/// The sell screen's bottom bars. The held-tickets bar (and the held
+/// tickets list it watches) is only built while Held tickets is on.
+class PosBottomBars extends ConsumerWidget {
+  const PosBottomBars({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final held = ref.watch(featureOnProvider(Feature.heldTickets));
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (held) const HeldTicketsBar(),
+        const CheckoutBar(),
+      ],
     );
   }
 }

@@ -42,6 +42,11 @@ const kOfflineFirstShortLine = 'Open POS works offline first.';
 /// popping back to a screen counts it again.
 const kUsageScreenCountsNote = 'Screen counts are times the screen was shown.';
 
+/// Under "Stop counting" while it is on.
+const kUsageCountingOffNote =
+    'Counting is off. Your earlier counts are kept. The same switch is Usage '
+    'counting in Features.';
+
 /// Question above the feature-area choices.
 const kFeedbackAreaQuestion = 'Which part of Open POS should we improve?';
 

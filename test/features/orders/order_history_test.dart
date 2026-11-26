@@ -12,6 +12,7 @@ import 'package:pos_app/features/returns/domain/void_order.dart';
 
 import '../../_support/sales.dart';
 import '../../_support/test_db.dart';
+import '../../_support/features.dart';
 
 /// Order history: every order is reachable by paging on created_at, search
 /// runs in SQL on bill number / prefix / customer name, and today's summary
@@ -67,8 +68,7 @@ void main() {
       Order? cursor;
       var pages = 0;
       while (true) {
-        final page =
-            await db.ordersDao.historyPage(before: cursor, limit: 50);
+        final page = await db.ordersDao.historyPage(before: cursor, limit: 50);
         if (page.isEmpty) break;
         pages++;
         seen.addAll(page.map((o) => o.id));
@@ -124,11 +124,10 @@ void main() {
       expect(await search('2082/83'), [new18, new17]);
     });
 
-    test('a legacy row without an invoice number is found by its id',
-        () async {
+    test('a legacy row without an invoice number is found by its id', () async {
       await order(invoiceNo: 900);
-      final legacy = await db.ordersDao.insertOrder(OrdersCompanion.insert(
-          subtotal: 5, total: 5, paymentMethod: 'cash'));
+      final legacy = await db.ordersDao.insertOrder(
+          OrdersCompanion.insert(subtotal: 5, total: 5, paymentMethod: 'cash'));
       expect(await search('$legacy'), [legacy]);
     });
 
@@ -188,6 +187,7 @@ void main() {
     /// state.
     Future<OrderHistoryNotifier> open({int pageSize = 3}) async {
       container = ProviderContainer(overrides: [
+        allFeaturesOn,
         databaseProvider.overrideWithValue(db),
         orderHistoryProvider.overrideWith(
             (ref) => OrderHistoryNotifier(db, pageSize: pageSize)),
@@ -200,8 +200,7 @@ void main() {
 
     OrderHistoryState state() => container.read(orderHistoryProvider);
 
-    test('loads one page, then older pages on demand until the end',
-        () async {
+    test('loads one page, then older pages on demand until the end', () async {
       final ids = [
         for (var i = 0; i < 7; i++) await order(invoiceNo: i + 1, daysAgo: i),
       ];
@@ -241,7 +240,8 @@ void main() {
       expect(state().hasMore, isTrue);
     });
 
-    test('a new sale and a void show up without reopening, and '
+    test(
+        'a new sale and a void show up without reopening, and '
         'the rows already scrolled to stay loaded', () async {
       final p = await seedProduct(db, sku: 'A', stock: 0, price: 10);
       for (var i = 0; i < 5; i++) {
@@ -258,12 +258,13 @@ void main() {
           reason: 'still the five rows the cashier had loaded');
       expect(state().hasMore, isTrue);
 
-      await voidOrder(db, audit, orderId: sale, reason: 'test');
+      await voidOrder(db, audit, trackStock: true, orderId: sale, reason: 'test');
       await pumpEventQueue();
       expect(state().orders.first.status, 'voided');
     });
 
-    test("today's summary is an aggregate over all of today, net of refunds, "
+    test(
+        "today's summary is an aggregate over all of today, net of refunds, "
         'equal to the dashboard revenue', () async {
       final p = await seedProduct(db, sku: 'A', stock: 0, price: 10);
       // More sales today than one page holds.
@@ -271,11 +272,11 @@ void main() {
         for (var i = 0; i < 6; i++)
           await sell(db, audit, [line(p, qty: 10, price: 10)]), // 100 each
       ];
-      await processReturn(db, audit,
+      await processReturn(db, audit, trackStock: true,
           orderId: sales[0], amount: 30, restock: false); // partly refunded
-      await processReturn(db, audit,
+      await processReturn(db, audit, trackStock: true,
           orderId: sales[1], amount: 100, restock: false); // fully refunded
-      await voidOrder(db, audit, orderId: sales[2], reason: 'test');
+      await voidOrder(db, audit, trackStock: true, orderId: sales[2], reason: 'test');
       await order(invoiceNo: 9000, total: 999, daysAgo: 30); // not today
 
       await open();
@@ -295,7 +296,7 @@ void main() {
 
     test('stops listening to the database once the screen closes', () async {
       container = ProviderContainer(
-          overrides: [databaseProvider.overrideWithValue(db)]);
+          overrides: [allFeaturesOn, databaseProvider.overrideWithValue(db)]);
       addTearDown(container.dispose);
       final screen = container.listen(orderHistoryProvider, (_, __) {});
       await pumpEventQueue();

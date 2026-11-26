@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/core/theme/app_theme.dart';
 import 'package:pos_app/features/cart/presentation/providers/cart_notifier.dart';
 import 'package:pos_app/features/cart/presentation/providers/held_orders_notifier.dart';
@@ -22,6 +23,9 @@ class CheckoutBar extends ConsumerWidget {
     final session = ref.watch(cartSessionProvider);
     final assignedCustomerId = session.customerId;
     final assignedTableId = session.tableId;
+    final held = ref.watch(featureOnProvider(Feature.heldTickets));
+    final customersOn = ref.watch(featureOnProvider(Feature.customers));
+    final tablesOn = ref.watch(featureOnProvider(Feature.tables));
 
     final bottomInset = MediaQuery.of(context).padding.bottom;
 
@@ -34,65 +38,74 @@ class CheckoutBar extends ConsumerWidget {
       child: Row(
         children: [
           // ── Save as ticket ─────────────────────────────────────────
-          SizedBox(
-            height: 56,
-            child: OutlinedButton.icon(
-              onPressed: () {
-                ref.read(heldOrdersProvider.notifier).holdCurrentCart();
-                ref.read(cartProvider.notifier).clear();
-              },
-              icon: const Icon(Icons.pause_circle_outline_rounded, size: 18),
-              label: const Text('Save'),
+          if (held) ...[
+            SizedBox(
+              key: const ValueKey('checkout-save'),
+              height: 56,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  ref.read(heldOrdersProvider.notifier).holdCurrentCart();
+                  ref.read(cartProvider.notifier).clear();
+                },
+                icon: const Icon(Icons.pause_circle_outline_rounded, size: 18),
+                label: const Text('Save'),
+              ),
             ),
-          ),
-          const SizedBox(width: 10),
+            const SizedBox(width: 10),
+          ],
           // ── Customer button ────────────────────────────────────────
-          SizedBox(
-            height: 56,
-            width: 56,
-            child: Tooltip(
-              message: assignedCustomerId != null
-                  ? 'Customer assigned'
-                  : 'Assign customer',
-              child: OutlinedButton(
-                onPressed: () => context.push('/customers'),
-                style: AppTheme.iconButtonStyle(
-                  cs,
-                  isActive: assignedCustomerId != null,
-                ),
-                child: Icon(
-                  assignedCustomerId != null
-                      ? Icons.person_rounded
-                      : Icons.person_outline_rounded,
-                  color: assignedCustomerId != null ? cs.primary : null,
+          if (customersOn) ...[
+            SizedBox(
+              key: const ValueKey('checkout-customer'),
+              height: 56,
+              width: 56,
+              child: Tooltip(
+                message: assignedCustomerId != null
+                    ? 'Customer assigned'
+                    : 'Assign customer',
+                child: OutlinedButton(
+                  onPressed: () => context.push('/customers'),
+                  style: AppTheme.iconButtonStyle(
+                    cs,
+                    isActive: assignedCustomerId != null,
+                  ),
+                  child: Icon(
+                    assignedCustomerId != null
+                        ? Icons.person_rounded
+                        : Icons.person_outline_rounded,
+                    color: assignedCustomerId != null ? cs.primary : null,
+                  ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(width: 10),
+            const SizedBox(width: 10),
+          ],
           // ── Table button ───────────────────────────────────────────
-          SizedBox(
-            height: 56,
-            width: 56,
-            child: Tooltip(
-              message:
-                  assignedTableId != null ? 'Table assigned' : 'Assign table',
-              child: OutlinedButton(
-                onPressed: () => context.push('/tables'),
-                style: AppTheme.iconButtonStyle(
-                  cs,
-                  isActive: assignedTableId != null,
-                ),
-                child: Icon(
-                  assignedTableId != null
-                      ? Icons.table_restaurant_rounded
-                      : Icons.table_restaurant_outlined,
-                  color: assignedTableId != null ? cs.primary : null,
+          if (tablesOn) ...[
+            SizedBox(
+              key: const ValueKey('checkout-table'),
+              height: 56,
+              width: 56,
+              child: Tooltip(
+                message:
+                    assignedTableId != null ? 'Table assigned' : 'Assign table',
+                child: OutlinedButton(
+                  onPressed: () => context.push('/tables'),
+                  style: AppTheme.iconButtonStyle(
+                    cs,
+                    isActive: assignedTableId != null,
+                  ),
+                  child: Icon(
+                    assignedTableId != null
+                        ? Icons.table_restaurant_rounded
+                        : Icons.table_restaurant_outlined,
+                    color: assignedTableId != null ? cs.primary : null,
+                  ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(width: 10),
+            const SizedBox(width: 10),
+          ],
           // ── Checkout CTA ───────────────────────────────────────────
           Expanded(
             child: SizedBox(

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
+import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/features/cart/data/ticket_sequence.dart';
 import 'package:pos_app/features/cart/domain/cart_item.dart';
 import 'package:pos_app/features/cart/presentation/providers/cart_notifier.dart';
@@ -124,8 +125,14 @@ class HeldOrdersNotifier extends Notifier<List<HeldOrder>> {
   HeldOrder holdCurrentCart() {
     final cart = ref.read(cartProvider);
     final session = ref.read(cartSessionProvider);
-    final customerName = ref.read(cartCustomerNameProvider);
     final existingId = session.heldTicketId;
+    // Customers off: the customer list is not read; a resumed ticket keeps
+    // the name it was saved with.
+    final customerName = ref.read(featureOnProvider(Feature.customers))
+        ? ref.read(cartCustomerNameProvider)
+        : (existingId == null
+            ? null
+            : state.where((t) => t.id == existingId).firstOrNull?.customerName);
     // The tax switch and the chosen rates decide the total, so they are
     // parked with the ticket.
     final taxRateIds = [...ref.read(selectedTaxRatesProvider)];

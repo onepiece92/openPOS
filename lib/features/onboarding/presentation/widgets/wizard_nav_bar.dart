@@ -4,6 +4,7 @@ class OnboardingNavBar extends StatelessWidget {
   const OnboardingNavBar({
     super.key,
     required this.step,
+    required this.isLast,
     required this.saving,
     required this.canNext,
     required this.onBack,
@@ -11,6 +12,7 @@ class OnboardingNavBar extends StatelessWidget {
   });
 
   final int step;
+  final bool isLast;
   final bool saving;
   final bool canNext;
   final VoidCallback onBack;
@@ -41,7 +43,7 @@ class OnboardingNavBar extends StatelessWidget {
                       height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : Text(step < 3 ? 'Continue' : 'Finish Setup'),
+                  : Text(isLast ? 'Finish Setup' : 'Continue'),
             ),
           ),
         ],

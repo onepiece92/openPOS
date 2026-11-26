@@ -8,6 +8,18 @@ final _events = UsageEvent.values.map((e) => e.name).join('|');
 const _bucket = r'(0|1-10|11-50|51-200|200\+)';
 const _month = r'\d{4}-\d{2}';
 
+/// The fixed business-type labels, written out (not taken from the enum) so
+/// a changed label fails here first.
+final _businessTypes = [
+  'food truck or stand',
+  'cafe or counter',
+  'restaurant with tables',
+  'retail shop',
+  'market stall or craft seller',
+  'services',
+  'something else',
+].map(RegExp.escape).join('|');
+
 /// Every line a usage summary may contain outside the message section.
 final kUsageLineGrammar = <RegExp>[
   RegExp('^${RegExp.escape(kUsageSummaryHeader)}\$'),
@@ -19,6 +31,7 @@ final kUsageLineGrammar = <RegExp>[
       r'currency ([A-Z]{3}|other)$'),
   RegExp('^Shop size: products $_bucket, orders in last 7 days $_bucket, '
       'customers $_bucket\$'),
+  RegExp('^Business type: ($_businessTypes)\$'),
 ];
 
 /// Splits [summary] into the fixed part and the shopkeeper's message (null

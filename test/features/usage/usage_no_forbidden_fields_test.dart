@@ -6,6 +6,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
+import 'package:pos_app/features/onboarding/domain/business_type.dart';
 import 'package:pos_app/features/usage/data/usage_counter.dart';
 import 'package:pos_app/features/usage/data/usage_inputs.dart';
 import 'package:pos_app/features/usage/domain/usage_event.dart';
@@ -128,6 +129,8 @@ void main() {
       await settings.put(k, '${sentinel}_$k');
     }
     await settings.put(kCurrencyCode, 'USD');
+    // Setup's business type: only ever its fixed label goes out.
+    await settings.put(kBusinessType, 'retail');
     return skipped;
   }
 
@@ -143,7 +146,10 @@ void main() {
     }
 
     // Exactly what UsageScreen does.
-    var selection = const UsageSelection().withAppInfo(true).withShopSize(true);
+    var selection = const UsageSelection()
+        .withAppInfo(true)
+        .withShopSize(true)
+        .withBusinessType(true);
     for (final a in FeatureArea.values) {
       selection = selection.togglePicked(a);
     }
@@ -155,9 +161,12 @@ void main() {
       env: currentUsageEnvironment(
           currencyCode: AppSettings.fromBox(settings).currencyCode),
       shop: shop,
+      businessType:
+          parseBusinessType(AppSettings.fromBox(settings).businessType),
     );
 
     expect(shop.products, 3);
+    expect(text, contains('Business type: retail shop'));
     expect(
         text,
         contains('Shop size: products 1-10, orders in last 7 days '

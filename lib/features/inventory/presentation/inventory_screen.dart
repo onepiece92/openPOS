@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:pos_app/features/features/presentation/features_screen.dart'
+    show StockRecountLine;
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/shared/widgets/app_empty_state.dart';
@@ -107,6 +109,8 @@ class _InventoryScreenState extends ConsumerState<InventoryScreen> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // "Stock wasn't tracked from …" after tracking is back on.
+              const StockRecountLine(),
               // ── Filter chips ─────────────────────────────────────────────
               InventoryFilterBar(
                 total: all.length,
