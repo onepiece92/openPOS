@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import 'package:pos_app/core/database/connection/native.dart';
+import 'package:pos_app/core/database/database_open_errors.dart';
 
 import 'package:pos_app/core/database/daos/audit_dao.dart';
 import 'package:pos_app/core/database/daos/customers_dao.dart';
@@ -101,10 +102,7 @@ class AppDatabase extends _$AppDatabase {
           // A database written by a newer app: refuse it instead of letting
           // Drift stamp it with our (lower) version.
           if (from > to) {
-            throw StateError(
-              'Database schema v$from is newer than this app (v$to). '
-              'Update the app.',
-            );
+            throw DatabaseTooNewError(from, to);
           }
           // Drift (2.28) neither wraps onUpgrade in a transaction nor writes
           // user_version until it returns, so a crash mid-upgrade used to

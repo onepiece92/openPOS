@@ -9,6 +9,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:pos_app/app.dart';
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/database/close_on_exit.dart';
+import 'package:pos_app/core/database/database_open_errors.dart';
 import 'package:pos_app/core/restart_notice.dart';
 import 'package:pos_app/core/database/connection/native.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
@@ -29,10 +30,16 @@ import 'package:pos_app/startup.dart' show startReviewClock;
 class AppRoot extends StatefulWidget {
   const AppRoot({
     super.key,
+    this.container,
     this.startupNotice,
     this.startupFatal,
+    this.startupDbError,
     this.recoverForRetry,
   });
+
+  /// The container the startup DB check ran on (so its connection is
+  /// reused); a fresh one when null.
+  final ProviderContainer? container;
 
   /// Toast for the first frame, e.g. after startup restore recovery.
   final String? startupNotice;
@@ -40,6 +47,10 @@ class AppRoot extends StatefulWidget {
   /// Start on the error screen with nothing opened (startup recovery
   /// failed); "Try again" reruns recovery before opening the stores.
   final String? startupFatal;
+
+  /// The startup `SELECT 1` failed: start on the error screen with a plain
+  /// message (see [describeDatabaseOpenFailure]).
+  final Object? startupDbError;
 
   /// Recovery used by "Try again"; defaults to
   /// [recoverInterruptedRestoreAtStartup]. Null result = still failing.
@@ -54,10 +65,17 @@ class AppRoot extends StatefulWidget {
 }
 
 class AppRootState extends State<AppRoot> {
-  ProviderContainer _container = ProviderContainer();
+  late ProviderContainer _container;
   bool _restoring = false;
   String? _notice; // one-shot toast shown after a restart
   String? _fatal; // set when no data could be reopened after a restore
+  // Error-screen heading and whether it offers "Try again"; set together
+  // with [_fatal].
+  String _fatalTitle = kRestoreFailedTitle;
+  bool _fatalCanRetry = true;
+  // The error screen is showing a database-open failure (not a restore):
+  // a failed retry keeps the plain wording.
+  bool _dbOpenFailure = false;
 
   /// How long after the first frame the daily auto-backup waits, so its
   /// `VACUUM INTO` + zip don't compete with startup work.
@@ -73,13 +91,26 @@ class AppRootState extends State<AppRoot> {
   @override
   void initState() {
     super.initState();
+    _container = widget.container ?? ProviderContainer();
     _notice = widget.startupNotice;
     _fatal = widget.startupFatal;
+    final dbError = widget.startupDbError;
+    if (_fatal == null && dbError != null) _showDbOpenFailure(dbError);
     _exitGuard = DatabaseExitGuard(_closeDatabaseForExit);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _autoBackupTimer = Timer(autoBackupDelay, _startAutoBackup);
     });
+  }
+
+  /// Puts the plain database-open message on the error screen (callers
+  /// wrap it in setState where needed).
+  void _showDbOpenFailure(Object error) {
+    final f = describeDatabaseOpenFailure(error);
+    _fatal = f.message;
+    _fatalTitle = f.title;
+    _fatalCanRetry = f.canRetry;
+    _dbOpenFailure = true;
   }
 
   /// Fires once, [autoBackupDelay] after the first frame. Skipped when the
@@ -198,8 +229,7 @@ class AppRootState extends State<AppRoot> {
         // 3. Verify + swap off the UI isolate, reopen, roll back on failure.
         try {
           await const SnapshotService().restoreWithRollback(
-            swap: () =>
-                _swapInIsolate(zipPath, dbPath, hiveFiles, photosPath),
+            swap: () => _swapInIsolate(zipPath, dbPath, hiveFiles, photosPath),
             // The first reopen verifies the restored data while its journal
             // is still uncommitted; restoreWithRollback itself refuses to
             // reopen the old data while a journal is pending.
@@ -210,7 +240,8 @@ class AppRootState extends State<AppRoot> {
           notice = 'Backup restored';
           await mergeReviewStateAfterRestore(reviewBefore); // never throws
           await mergeUsageAfterRestore(usageBefore); // never throws
-          _container.read(usageCounterProvider)
+          _container
+              .read(usageCounterProvider)
               .record(UsageEvent.backupRestored);
         } on RestoreFatalException catch (e) {
           error = e;
@@ -238,6 +269,9 @@ class AppRootState extends State<AppRoot> {
         setState(() {
           _restoring = false;
           _fatal = fatal;
+          _fatalTitle = kRestoreFailedTitle;
+          _fatalCanRetry = true;
+          _dbOpenFailure = false;
           _notice = fatal == null ? notice : null;
         });
       } else {
@@ -302,6 +336,7 @@ class AppRootState extends State<AppRoot> {
     setState(() => _restoring = true);
     String? fatal;
     String? notice;
+    Object? dbError;
     try {
       try {
         await _releaseStores();
@@ -326,13 +361,20 @@ class AppRootState extends State<AppRoot> {
         _container.read(usageCounterProvider).record(UsageEvent.backupRestored);
       }
     } catch (e) {
+      dbError = e;
       fatal = 'Still unable to open the app data: $e';
     } finally {
       if (mounted) {
         setState(() {
           _restoring = false;
           _fatal = fatal;
-          if (fatal == null) _notice = notice;
+          if (fatal == null) {
+            _notice = notice;
+            _dbOpenFailure = false;
+          } else if (dbError != null &&
+              (_dbOpenFailure || isDatabaseTooNew(dbError))) {
+            _showDbOpenFailure(dbError);
+          }
         });
         // This launch's auto-backup was skipped while on the error screen.
         if (fatal == null && _autoBackupTimer == null) {
@@ -346,7 +388,11 @@ class AppRootState extends State<AppRoot> {
   Widget build(BuildContext context) {
     if (_restoring) return const _RestoringSplash();
     if (_fatal != null) {
-      return _RestoreFailedScreen(message: _fatal!, onRetry: _retryOpen);
+      return _RestoreFailedScreen(
+        title: _fatalTitle,
+        message: _fatal!,
+        onRetry: _fatalCanRetry ? _retryOpen : null,
+      );
     }
     return UncontrolledProviderScope(
       // New key per container → subtree is rebuilt from scratch on restart.
@@ -362,6 +408,22 @@ class AppRootState extends State<AppRoot> {
     );
   }
 }
+
+/// Error-screen heading for a failed restore or startup recovery.
+const kRestoreFailedTitle = 'Restore failed';
+
+/// What the error screen says when the database would not open.
+({
+  String title,
+  String message,
+  bool canRetry
+}) describeDatabaseOpenFailure(Object error) => isDatabaseTooNew(error)
+    ? (title: kDataTooNewTitle, message: kDataTooNewMessage, canRetry: false)
+    : (
+        title: kDataOpenFailedTitle,
+        message: kDataOpenFailedMessage,
+        canRetry: true,
+      );
 
 class _RestoringSplash extends StatelessWidget {
   const _RestoringSplash();
@@ -385,9 +447,16 @@ class _RestoringSplash extends StatelessWidget {
 }
 
 class _RestoreFailedScreen extends StatelessWidget {
-  const _RestoreFailedScreen({required this.message, required this.onRetry});
+  const _RestoreFailedScreen({
+    required this.title,
+    required this.message,
+    required this.onRetry,
+  });
+  final String title;
   final String message;
-  final VoidCallback onRetry;
+
+  /// Null hides "Try again" (the data is from a newer app).
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) => MaterialApp(
@@ -400,21 +469,25 @@ class _RestoreFailedScreen extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                    const Icon(Icons.error_outline,
+                        size: 48, color: Colors.red),
                     const SizedBox(height: 16),
-                    const Text(
-                      'Restore failed',
-                      style:
-                          TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+                    Text(
+                      title,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                          fontSize: 20, fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(height: 12),
                     Text(message, textAlign: TextAlign.center),
                     const SizedBox(height: 24),
-                    FilledButton(
-                      onPressed: onRetry,
-                      child: const Text('Try again'),
-                    ),
-                    const SizedBox(height: 8),
+                    if (onRetry != null) ...[
+                      FilledButton(
+                        onPressed: onRetry,
+                        child: const Text('Try again'),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
                     Builder(
                       builder: (context) => TextButton.icon(
                         onPressed: () => openSupportWhatsAppOrExplain(context),
