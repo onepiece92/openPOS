@@ -294,23 +294,33 @@ class _PrinterSetupScreenState extends ConsumerState<PrinterSetupScreen> {
                   const SizedBox(height: 12),
                   SegmentedButton<PrinterDriver>(
                     showSelectedIcon: false,
-                    segments: const [
-                      ButtonSegment(
+                    segments: [
+                      const ButtonSegment(
                         value: PrinterDriver.escPos,
                         label: Text('Bluetooth LE'),
                       ),
-                      ButtonSegment(
-                        value: PrinterDriver.spp,
-                        label: Text('Classic'),
-                      ),
-                      ButtonSegment(
-                        value: PrinterDriver.star,
-                        label: Text('Star'),
-                      ),
+                      if (classicBluetoothDriversAvailable) ...const [
+                        ButtonSegment(
+                          value: PrinterDriver.spp,
+                          label: Text('Classic'),
+                        ),
+                        ButtonSegment(
+                          value: PrinterDriver.star,
+                          label: Text('Star'),
+                        ),
+                      ],
                     ],
                     selected: {_driver},
                     onSelectionChanged: (s) => _switchDriver(s.first),
                   ),
+                  if (!classicBluetoothDriversAvailable) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      kStarAndroidOnlyNote,
+                      style:
+                          tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                    ),
+                  ],
                 ],
               ),
             ),

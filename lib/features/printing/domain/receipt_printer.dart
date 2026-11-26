@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:pos_app/core/providers/hive_provider.dart';
@@ -6,6 +8,17 @@ import 'package:pos_app/features/printing/data/spp_printer.dart';
 import 'package:pos_app/features/printing/data/star_printer.dart';
 import 'package:pos_app/features/printing/data/thermal_plugin_printer.dart';
 import 'package:pos_app/features/receipts/presentation/receipt_body.dart';
+
+/// Shown wherever Star / Classic printing is unavailable.
+const kStarAndroidOnlyNote = 'Star printers are available on Android.';
+
+/// Whether the classic-Bluetooth drivers ([PrinterDriver.spp] and
+/// [PrinterDriver.star]) can be offered. False on iOS and macOS: Apple only
+/// allows classic Bluetooth to MFi accessories, and the app ships without
+/// the Star SDK there.
+bool get classicBluetoothDriversAvailable =>
+    defaultTargetPlatform != TargetPlatform.iOS &&
+    defaultTargetPlatform != TargetPlatform.macOS;
 
 /// How a discovered printer is reachable.
 enum PrinterTransport { ble, bluetoothClassic, usb, network }
@@ -24,6 +37,7 @@ enum PrinterDriver {
   spp('spp'),
 
   /// Star TSP100III over classic Bluetooth, via Star's StarXpand SDK.
+  /// Android only.
   star('star');
 
   const PrinterDriver(this.key);
@@ -31,8 +45,14 @@ enum PrinterDriver {
   /// Value persisted in settings — see [printerDriverProvider].
   final String key;
 
-  static PrinterDriver fromKey(String? key) =>
-      values.firstWhere((d) => d.key == key, orElse: () => escPos);
+  /// On iOS and macOS a saved 'spp' or 'star' (say, from a backup made on
+  /// Android) maps to [escPos], so nothing preselects a driver that isn't
+  /// there.
+  static PrinterDriver fromKey(String? key) {
+    final driver = values.firstWhere((d) => d.key == key, orElse: () => escPos);
+    if (driver != escPos && !classicBluetoothDriversAvailable) return escPos;
+    return driver;
+  }
 }
 
 /// A printer found during a scan, in app terms — no plugin types leak out.

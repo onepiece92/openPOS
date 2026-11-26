@@ -45,15 +45,6 @@
       }
     },
     {
-      "identity" : "starxpand-sdk-ios",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/star-micronics/StarXpand-SDK-iOS",
-      "state" : {
-        "revision" : "b995fb40acfcd33aaeef7bb72423e90ad6e025ac",
-        "version" : "2.14.0"
-      }
-    },
-    {
       "identity" : "swiftygif",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/kirualex/SwiftyGif.git",

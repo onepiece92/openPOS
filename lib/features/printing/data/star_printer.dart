@@ -15,7 +15,10 @@ import 'package:pos_app/features/printing/domain/render_receipt_image.dart';
 /// so the receipt is rasterised here and printed as an image. That is also
 /// why this driver renders instead of taking ESC/POS bytes.
 ///
-/// Implemented on Android and iOS; both talk to the same channel.
+/// Android only. On iOS and macOS the channel isn't registered: every entry
+/// point checks [_isSupported] first, and a [MissingPluginException] is
+/// still caught as a backstop, so the user only ever sees
+/// [kStarAndroidOnlyNote].
 class StarBluetoothPrinter implements ReceiptPrinter {
   static const _methods = MethodChannel('pos_app/star_printer');
   static const _discovery = EventChannel('pos_app/star_printer/devices');
@@ -56,13 +59,21 @@ class StarBluetoothPrinter implements ReceiptPrinter {
       },
       onError: _devices.addError,
     );
-    await _methods.invokeMethod<void>('startDiscovery');
+    try {
+      await _methods.invokeMethod<void>('startDiscovery');
+    } on MissingPluginException {
+      throw StateError(kStarAndroidOnlyNote);
+    }
   }
 
   @override
   Future<void> stopScan() async {
     if (!_isSupported) return;
-    await _methods.invokeMethod<void>('stopDiscovery');
+    try {
+      await _methods.invokeMethod<void>('stopDiscovery');
+    } on MissingPluginException {
+      // Nothing to stop without the channel.
+    }
   }
 
   @override
@@ -103,18 +114,19 @@ class StarBluetoothPrinter implements ReceiptPrinter {
         'images': images,
         'width': starPrintWidthDots(paperMm),
       });
+    } on MissingPluginException {
+      throw StateError(kStarAndroidOnlyNote);
     } on PlatformException catch (e) {
       throw StateError(friendlyPrinterError(e, printerName: target.name));
     }
   }
 
-  bool get _isSupported =>
-      defaultTargetPlatform == TargetPlatform.android ||
-      defaultTargetPlatform == TargetPlatform.iOS;
+  /// The Star channel exists only in the Android build.
+  static bool get isSupported => defaultTargetPlatform == TargetPlatform.android;
+
+  bool get _isSupported => isSupported;
 
   void _requireSupportedPlatform() {
-    if (!_isSupported) {
-      throw StateError('Star printers are supported on Android and iOS only');
-    }
+    if (!_isSupported) throw StateError(kStarAndroidOnlyNote);
   }
 }
