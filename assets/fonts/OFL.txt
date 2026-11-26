@@ -1,8 +1,10 @@
-OpenPOSSymbols-Regular.ttf and OpenPOSSymbols-Bold.ttf are subsets of Noto Sans,
-Noto Sans Bengali and Noto Sans Thai, merged and renamed "OpenPOS Symbols".
+OpenPOSSymbols-Regular.ttf and OpenPOSSymbols-Bold.ttf are subsets of Noto Sans
+v2.015, Noto Sans Bengali v3.011 and Noto Sans Thai v2.002, merged and renamed
+"OpenPOS Symbols", with vertical metrics set to match JetBrains Mono. They are
+built by tool/fonts/build_symbols_subset.py.
 
 Copyright 2022 The Noto Project Authors (https://github.com/notofonts/latin-greek-cyrillic)
-Copyright 2022 The Noto Project Authors (https://github.com/notofonts/bengali)
+Copyright 2025 The Noto Project Authors (https://github.com/notofonts/bengali)
 Copyright 2022 The Noto Project Authors (https://github.com/notofonts/thai)
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.

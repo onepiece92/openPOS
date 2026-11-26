@@ -11,7 +11,9 @@ const jetBrainsMonoBold = 'assets/fonts/JetBrainsMono-Bold.ttf';
 const jetBrainsMonoItalic = 'assets/fonts/JetBrainsMono-Italic.ttf';
 
 /// Subset Noto (OFL, assets/fonts/OFL.txt) for the currency symbols JetBrains
-/// Mono lacks: ৳ ₵ ₹ ₩ ₦ ₱ ฿, plus digits and punctuation.
+/// Mono lacks: ৳ ₵ ₹ ₨ ₩ ₦ ₱ ฿, plus digits and punctuation, with JetBrains
+/// Mono's vertical metrics. Rebuilt by tool/fonts/build_symbols_subset.py
+/// (dev only; never run at build or run time).
 const openPosSymbolsRegular = 'assets/fonts/OpenPOSSymbols-Regular.ttf';
 const openPosSymbolsBold = 'assets/fonts/OpenPOSSymbols-Bold.ttf';
 
@@ -71,8 +73,8 @@ Future<pw.Font> bundledPdfFont(String asset) async =>
 /// [theme] puts the symbol fallback on every style; bold styles add
 /// [boldFallback] in front so a bold total keeps a bold ₹.
 class ReceiptPdfFonts {
-  ReceiptPdfFonts._(this.regular, this.bold, this.italic, this.symbols,
-      this.symbolsBold);
+  ReceiptPdfFonts._(
+      this.regular, this.bold, this.italic, this.symbols, this.symbolsBold);
 
   final pw.Font regular;
   final pw.Font bold;
@@ -104,21 +106,13 @@ Future<ReceiptPdfFonts> loadReceiptPdfFonts({bool italic = false}) async {
 
 // ─── Coverage ────────────────────────────────────────────────────────────────
 
-final Map<String, Future<Set<int>>> _codePoints = {};
-
-/// The code points the bundled font at [asset] has a glyph for — its cmap,
-/// parsed once (the same table the pdf package checks per character).
-Future<Set<int>> bundledFontCodePoints(String asset) {
-  final cached = _codePoints[asset];
-  if (cached != null) return cached;
-  final future = bundledFontData(asset)
-      .then((data) => TtfParser(data).charToGlyphIndexMap.keys.toSet());
-  _codePoints[asset] = future;
-  future.then<void>((_) {}, onError: (Object _) {
-    if (identical(_codePoints[asset], future)) _codePoints.remove(asset);
-  });
-  return future;
-}
+/// The code points the bundled font at [asset] has a glyph for: its cmap
+/// (the same table the pdf package checks per character).
+///
+/// Not cached: only [receiptFontCoverage] needs these, and it keeps just
+/// the merged set, so the per-font sets are dropped once it is built.
+Future<Set<int>> bundledFontCodePoints(String asset) async =>
+    TtfParser(await bundledFontData(asset)).charToGlyphIndexMap.keys.toSet();
 
 Future<Set<int>>? _receiptCoverage;
 Set<int>? _receiptCoverageValue;
@@ -136,7 +130,11 @@ Future<Set<int>> receiptFontCoverage() {
   if (cached != null) return cached;
   final future = _computeReceiptCoverage();
   _receiptCoverage = future;
-  future.then<void>((v) => _receiptCoverageValue = v, onError: (Object _) {
+  future.then<void>((v) {
+    _receiptCoverageValue = v;
+    // The value is kept; the future can go.
+    if (identical(_receiptCoverage, future)) _receiptCoverage = null;
+  }, onError: (Object _) {
     if (identical(_receiptCoverage, future)) _receiptCoverage = null;
   });
   return future;
@@ -146,28 +144,40 @@ Future<Set<int>> _computeReceiptCoverage() async {
   // Sequential awaits, not Future.wait: flutter_test serves assets as
   // SynchronousFuture, and Future.wait returned empty there.
   final regular = (await bundledFontCodePoints(jetBrainsMonoRegular))
-      .union(await bundledFontCodePoints(openPosSymbolsRegular));
+    ..addAll(await bundledFontCodePoints(openPosSymbolsRegular));
   final bold = (await bundledFontCodePoints(jetBrainsMonoBold))
-      .union(await bundledFontCodePoints(openPosSymbolsBold));
-  return regular.intersection(bold);
+    ..addAll(await bundledFontCodePoints(openPosSymbolsBold));
+  // Only the merged set is kept, copied to fit what it holds; the
+  // per-font sets go with this frame.
+  return Set<int>.of(regular..retainAll(bold));
 }
+
+/// Printed for a symbol the receipt fonts can't draw when there is no
+/// currency code to print instead (only a hand-edited or foreign backup
+/// gets there): the generic currency sign, which JetBrains Mono has in
+/// both weights, so it never draws a box.
+const kUncoveredCurrencyMarker = '¤'; // ¤
 
 /// The currency symbol a receipt prints for [symbol].
 ///
 /// The symbol is free text a shop types. If any character in it has no glyph
 /// in the bundled fonts the PDF would draw a box, so the ISO [currencyCode]
-/// is printed instead ("TRY 113.00"). Stored settings are never changed, and
-/// on screen the symbol is shown as typed (the OS can fill in there).
-Future<String> receiptCurrencySymbol(String symbol, String? currencyCode) async {
-  final code = currencyCode?.trim() ?? '';
-  if (code.isEmpty) return symbol;
+/// is printed instead ("TRY 113.00"), or [kUncoveredCurrencyMarker] when the
+/// code is blank ("¤ 113.00"). Stored settings are never changed, and on
+/// screen the symbol is shown as typed (the OS can fill in there).
+Future<String> receiptCurrencySymbol(
+    String symbol, String? currencyCode) async {
   final covered = await receiptFontCoverage();
-  final drawable = symbol.runes.every((r) => _isSpace(r) || covered.contains(r));
-  return drawable ? symbol : code;
+  final drawable =
+      symbol.runes.every((r) => _isSpace(r) || covered.contains(r));
+  if (drawable) return symbol;
+  final code = currencyCode?.trim() ?? '';
+  return code.isEmpty ? kUncoveredCurrencyMarker : code;
 }
 
 /// [fmt] with its symbol swapped for one the receipt fonts can draw.
-Future<CurrencyFormatter> receiptCurrencyFormatter(CurrencyFormatter fmt) async {
+Future<CurrencyFormatter> receiptCurrencyFormatter(
+    CurrencyFormatter fmt) async {
   final trimmed = fmt.symbol.trim();
   final printable = await receiptCurrencySymbol(trimmed, fmt.currencyCode);
   if (printable == trimmed) return fmt;

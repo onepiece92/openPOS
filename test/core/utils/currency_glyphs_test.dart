@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pdf/pdf.dart' show TtfParser;
 import 'package:pdf/widgets.dart' as pw;
 
 import 'package:pos_app/core/database/app_database.dart';
@@ -15,10 +16,11 @@ import 'package:pos_app/core/utils/currency_formatter.dart';
 import 'package:pos_app/features/printing/domain/receipt_roll_pdf.dart';
 import 'package:pos_app/features/receipts/presentation/receipt_body.dart';
 import 'package:pos_app/features/receipts/presentation/receipt_pdf_service.dart';
+import 'package:pos_app/features/settings/domain/currencies.dart';
 import 'package:pos_app/features/shifts/domain/shift_summary.dart';
 import 'package:pos_app/features/shifts/presentation/shift_summary_panel.dart';
 
-/// JetBrains Mono has no ৳ ₵ ₹ ₩ ₦ ₱ ฿, and the pdf package has no system
+/// JetBrains Mono has no ৳ ₵ ₹ ₨ ₩ ₦ ₱ ฿, and the pdf package has no system
 /// fallback: without the bundled OpenPOS Symbols fallback every receipt for
 /// those shops drew a box where the currency symbol goes.
 
@@ -121,6 +123,8 @@ void main() {
     'KRW': '₩',
     'NGN': '₦',
     'PHP': '₱',
+    'PKR': '₨',
+    'LKR': '₨',
     'THB': '฿',
     'USD': r'$',
     'EUR': '€',
@@ -203,8 +207,8 @@ void main() {
             endsWith('TRY 1,234.50'));
         // The longest line is the paper width, so the slip's font is the
         // same size as for a summary that needed no swap.
-        expect(lines.map((l) => l.length).reduce((a, b) => a > b ? a : b),
-            cols);
+        expect(
+            lines.map((l) => l.length).reduce((a, b) => a > b ? a : b), cols);
       });
     }
 
@@ -214,12 +218,17 @@ void main() {
           shopName: 'Shop', taxName: 'VAT', fmt: _fmt('₹', 'INR'));
       expect(frozenSummarySymbol(text), '₹');
       // ₹ is drawable: printed as stored even if the shop now uses TRY.
-      expect(await summaryPrintLines(text, currencyCode: 'TRY'),
-          text.split('\n'));
+      expect(
+          await summaryPrintLines(text, currencyCode: 'TRY'), text.split('\n'));
       final lira = buildShiftSummary(close(),
           shopName: 'Shop', taxName: 'VAT', fmt: _fmt('₺', 'TRY'));
-      expect(await summaryPrintLines(lira, currencyCode: ''),
-          lira.split('\n'));
+      // No code to fall back on: the neutral marker, padded the same way.
+      final marked = await summaryPrintLines(lira, currencyCode: '');
+      expect(marked.join('\n'), isNot(contains('₺')));
+      expect(marked.firstWhere((l) => l.startsWith('Opening cash')),
+          endsWith('¤ 100.00'));
+      expect(
+          marked.map((l) => l.length), lira.split('\n').map((l) => l.length));
       expect(await summaryPrintLines('x\ny', currencyCode: 'TRY'), ['x', 'y']);
       expect(frozenSummaryColumns(lira), 32);
     });
@@ -228,8 +237,8 @@ void main() {
   test('every symbol in country_defaults.json has a glyph in the bundled fonts',
       () async {
     final countries = (jsonDecode(
-            File('assets/locales/country_defaults.json').readAsStringSync())
-        as List)
+                File('assets/locales/country_defaults.json').readAsStringSync())
+            as List)
         .cast<Map<String, dynamic>>();
     final covered = await receiptFontCoverage();
     final missing = <String>[];
@@ -240,18 +249,64 @@ void main() {
           missing.add('${c['code']} "$symbol" U+${r.toRadixString(16)}');
         }
       }
-      expect(await receiptCurrencySymbol(symbol, c['currency'] as String),
-          symbol);
+      expect(
+          await receiptCurrencySymbol(symbol, c['currency'] as String), symbol);
     }
     expect(missing, isEmpty);
   });
 
+  test('every symbol in the Settings currency picker prints as itself',
+      () async {
+    final covered = await receiptFontCoverage();
+    final missing = <String>[];
+    for (final c in kPopularCurrencies) {
+      for (final r in c.symbol.runes) {
+        if (r != 0x20 && !covered.contains(r)) {
+          missing.add('${c.code} "${c.symbol}" U+${r.toRadixString(16)}');
+        }
+      }
+      // PKR and LKR used to print "PKR 113.00": ₨ was missing.
+      final fmt = _fmt(c.symbol, c.code);
+      expect((await receiptCurrencyFormatter(fmt)).format(113), fmt.format(113),
+          reason: c.code);
+    }
+    expect(missing, isEmpty);
+  });
+
+  test('the symbol fallback has JetBrains Mono\'s vertical metrics', () async {
+    // A taller fallback made every line with ₹ (or any fallback glyph) taller
+    // than the same line with \$: about 4.5 mm more per roll receipt.
+    for (final (mono, symbols) in [
+      (jetBrainsMonoRegular, openPosSymbolsRegular),
+      (jetBrainsMonoBold, openPosSymbolsBold),
+    ]) {
+      final m = TtfParser(await bundledFontData(mono));
+      final s = TtfParser(await bundledFontData(symbols));
+      expect(s.unitsPerEm, m.unitsPerEm, reason: symbols);
+      expect(s.ascent, m.ascent, reason: symbols);
+      expect(s.descent, m.descent, reason: symbols);
+    }
+  });
+
+  test('a roll receipt with ₹ or ₨ is as tall as one with \$', () async {
+    Future<double> height(String symbol, String code) async {
+      final doc = await buildReceiptRollPdf(_data(), _fmt(symbol, code),
+          widthDots: 576);
+      await doc.save();
+      return doc.document.pdfPageList.pages.single.pageFormat.height;
+    }
+
+    final dollar = await height(r'$', 'USD');
+    expect(await height('₹', 'INR'), dollar);
+    expect(await height('₨', 'PKR'), dollar);
+  });
+
   group('a symbol the fonts cannot draw prints the currency code', () {
-    // ₺ ₾ ₨ and emoji are in none of the bundled fonts.
+    // ₺ ₾ ₸ and emoji are in none of the bundled fonts.
     for (final (symbol, code) in [
       ('₺', 'TRY'),
       ('₾', 'GEL'),
-      ('Rs₨', 'PKR'),
+      ('₸', 'KZT'),
       ('\u{1F4B0}', 'XXX'),
     ]) {
       test(symbol, () async {
@@ -270,17 +325,31 @@ void main() {
       });
     }
 
-    test('without a code the symbol is kept', () async {
-      expect(await receiptCurrencySymbol('₺', null), '₺');
-      expect(await receiptCurrencySymbol('₺', ''), '₺');
-    });
-
-    test('the probe sees a box when nothing covers the symbol', () async {
-      // Guards the capture itself: an uncovered glyph is reported.
+    test('without a code a neutral ¤ is printed, never a box', () async {
+      // Only a hand-edited or foreign backup has a symbol and no code.
+      final covered = await receiptFontCoverage();
+      expect(kUncoveredCurrencyMarker.runes.every(covered.contains), isTrue);
+      for (final code in [null, '', '  ']) {
+        expect(await receiptCurrencySymbol('₺', code), '¤');
+        expect(await receiptCurrencySymbol('Rs', code), 'Rs');
+      }
       final fmt = CurrencyFormatter(symbol: '₺ ', locale: 'en_US');
+      expect((await receiptCurrencyFormatter(fmt)).format(113), '¤ 113.00');
+      expect(fmt.symbol, '₺ ');
+      expect(await _missingGlyphWarnings(() => buildReceiptPdf(_data(), fmt)),
+          isEmpty);
       expect(
           await _missingGlyphWarnings(
               () => buildReceiptRollPdf(_data(), fmt, widthDots: 576)),
+          isEmpty);
+    });
+
+    test('the probe sees a box when nothing covers the symbol', () async {
+      // Guards the capture itself: an uncovered glyph is reported. A text
+      // slip draws its lines as given (the swap happens before it).
+      expect(
+          await _missingGlyphWarnings(() =>
+              buildTextSlipRollPdf(lines: ['Cash  ₺ 5.00'], widthDots: 384)),
           isNotEmpty);
     });
   });

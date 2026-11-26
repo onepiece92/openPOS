@@ -40,7 +40,7 @@ abstract final class AppFonts {
   static const String mono = 'JetBrainsMono';
 
   /// Subset Noto glyphs (OFL) for the currency symbols JetBrains Mono lacks:
-  /// ৳ ₵ ₹ ₩ ₦ ₱ ฿. Bundled, so no shop depends on what the OS happens to
+  /// ৳ ₵ ₹ ₨ ₩ ₦ ₱ ฿. Bundled, so no shop depends on what the OS happens to
   /// have; Flutter loads it only when a glyph is first missing.
   static const String symbols = 'OpenPOSSymbols';
 
