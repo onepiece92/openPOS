@@ -46,8 +46,8 @@ class InventoryDao extends DatabaseAccessor<AppDatabase>
   /// be trusted to be complete, so the caller keeps restocking by lines.
   /// Throws [StateError] if the order does not exist.
   ///
-  /// Not wired into void/refund yet. One primary-key read plus a seek on
-  /// idx_stock_adjustments_order_id.
+  /// Read by void / refund inside their transaction (see RestockPlan).
+  /// One primary-key read plus a seek on idx_stock_adjustments_order_id.
   Future<Map<int, int>?> stockToRestock(int orderId) async {
     final order = await (select(orders)..where((o) => o.id.equals(orderId)))
         .getSingleOrNull();
