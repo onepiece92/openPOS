@@ -1,3 +1,5 @@
+import 'dart:io';
+
 /// Thrown by the migration when the file on disk was written by a newer
 /// app (its schema version is above ours). A [StateError] so existing
 /// handlers still see it as one.
@@ -27,3 +29,27 @@ const kDataOpenFailedMessage = "Open POS couldn't open its data.";
 bool isDatabaseTooNew(Object error) =>
     error is DatabaseTooNewError ||
     error.toString().contains('is newer than this app');
+
+/// The database file is missing or empty although onboarding was finished:
+/// the shop's data is gone from where it should be (deleted, a failed
+/// copy, storage trouble). Opening would silently create an empty database
+/// under the old settings, so the app goes to the error screen instead
+/// ("Open POS couldn't open its data.", Try again and WhatsApp).
+class DatabaseMissingError extends StateError {
+  DatabaseMissingError(String path)
+      : super('The database file is missing or empty: $path');
+}
+
+/// Throws [DatabaseMissingError] when [onboardingComplete] and [file] is
+/// missing or 0 bytes. Run before the open: one exists check and, when it
+/// exists, one length — no SQLite involved. A genuinely fresh install
+/// (onboarding not complete) passes and Drift creates the database.
+Future<void> assertDatabaseFilePresent({
+  required bool onboardingComplete,
+  required File file,
+}) async {
+  if (!onboardingComplete) return;
+  if (!await file.exists() || await file.length() == 0) {
+    throw DatabaseMissingError(file.path);
+  }
+}

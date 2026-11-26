@@ -25,7 +25,8 @@ import 'package:pos_app/features/settings/data/factory_reset.dart';
 import 'package:pos_app/features/usage/data/usage_counter.dart';
 import 'package:pos_app/features/usage/domain/usage_event.dart';
 import 'package:pos_app/features/usage/usage_providers.dart';
-import 'package:pos_app/startup.dart' show StartupResult, startReviewClock;
+import 'package:pos_app/startup.dart'
+    show StartupResult, checkDatabaseFileBeforeOpen, startReviewClock;
 
 /// Owns the Riverpod container so the whole app can be hot-restarted —
 /// needed to restore a backup: close DB + Hive, swap files on disk, then
@@ -386,6 +387,7 @@ class AppRootState extends State<AppRoot> {
     for (final name in kSnapshotHiveBoxes) {
       await Hive.openBox<dynamic>(name);
     }
+    await checkDatabaseFileBeforeOpen();
     final c = ProviderContainer();
     _container = c;
     await c.read(databaseProvider).customSelect('SELECT 1').get();

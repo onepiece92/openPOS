@@ -17,7 +17,10 @@ export 'package:pos_app/core/providers/feature_flags.dart';
 
 // ── Box keys ─────────────────────────────────────────────────────────────────
 
-const _kOnboardingComplete = 'onboarding_complete';
+/// Public for the launch check that refuses to recreate a missing database
+/// under a finished onboarding (see `checkDatabaseFileBeforeOpen`).
+const kOnboardingCompleteKey = 'onboarding_complete';
+const _kOnboardingComplete = kOnboardingCompleteKey;
 const _kThemeMode = 'theme_mode'; // 'dark' | 'light' | 'system'
 const _kDefaultTaxId = 'default_tax_id';
 const _kLowStockThreshold = 'low_stock_threshold';

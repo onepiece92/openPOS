@@ -1,5 +1,9 @@
 import 'package:hive_flutter/hive_flutter.dart';
 
+import 'package:pos_app/core/database/connection/native.dart';
+import 'package:pos_app/core/database/database_open_errors.dart';
+import 'package:pos_app/core/providers/hive_provider.dart'
+    show kOnboardingCompleteKey;
 import 'package:pos_app/features/backup/data/restore_merge_marker.dart';
 import 'package:pos_app/features/backup/data/snapshot_providers.dart';
 import 'package:pos_app/features/backup/data/snapshot_service.dart';
@@ -95,3 +99,15 @@ Future<void> openStartupStores() async {
 Future<void> startReviewClock() =>
     ReviewStateStore(Hive.box<dynamic>('settings'))
         .ensureFirstLaunch(DateTime.now());
+
+/// Run just before the database's first open (launch, Try again, the
+/// reopen after a restore): a missing or 0-byte database file while
+/// onboarding is complete is refused with [DatabaseMissingError] — the
+/// error screen — instead of Drift quietly creating an empty database
+/// under the old settings. Needs the settings box open; costs one exists
+/// check and one length.
+Future<void> checkDatabaseFileBeforeOpen() async => assertDatabaseFilePresent(
+      onboardingComplete:
+          Hive.box<dynamic>('settings').get(kOnboardingCompleteKey) == true,
+      file: await databaseFile(),
+    );

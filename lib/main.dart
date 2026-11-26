@@ -21,8 +21,10 @@ void main() {
   // too ("Something went wrong", with Try again).
   final container = ProviderContainer();
   final startup = startUp(
-    checkDatabase: () =>
-        container.read(databaseProvider).customSelect('SELECT 1').get(),
+    checkDatabase: () async {
+      await checkDatabaseFileBeforeOpen();
+      await container.read(databaseProvider).customSelect('SELECT 1').get();
+    },
     finishFactoryReset: () => finishPendingFactoryResetOnLaunch(
         () => container.read(databaseProvider).eraseAllData()),
   ).catchError((Object e) => StartupResult(dbError: e));
