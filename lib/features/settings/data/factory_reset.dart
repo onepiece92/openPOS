@@ -33,6 +33,12 @@ const kFactoryResetBackupsKept =
     'include receipt photos. You can restore one from '
     'Settings › Backup & Restore.';
 
+/// Second sentence when a backup will be taken just before the erase (the
+/// shop has data, see [preResetBackupNeededProvider]): it replaces the two
+/// variants above, which would otherwise promise less than happens.
+const kFactoryResetWillBackUp =
+    "A backup will be saved first; it doesn't include receipt photos.";
+
 /// Second sentence when there is none.
 const kFactoryResetNoBackups =
     'There are no automatic backups on this device, so this cannot be '
@@ -45,12 +51,20 @@ const kLatestBackupLabel = 'Latest automatic backup: ';
 String latestBackupLine(DateTime? latest) => '$kLatestBackupLabel'
     '${latest == null ? 'none' : DateFormat.yMMMd().add_jm().format(latest)}';
 
-/// The dialog's text. [latestBackup] — the newest file in `backups/auto`,
-/// null when there is none — is read when it opens.
-String factoryResetConfirmText({required DateTime? latestBackup}) =>
-    '$kFactoryResetBody\n\n'
-    '${latestBackup != null ? kFactoryResetBackupsKept : kFactoryResetNoBackups}'
-    '\n\n${latestBackupLine(latestBackup)}';
+/// The dialog's text, read when it opens: [latestBackup] is the newest file
+/// in `backups/auto` (null when there is none), [willBackUp] whether a
+/// backup is taken before the erase.
+String factoryResetConfirmText({
+  required DateTime? latestBackup,
+  bool willBackUp = false,
+}) {
+  final second = willBackUp
+      ? kFactoryResetWillBackUp
+      : latestBackup != null
+          ? kFactoryResetBackupsKept
+          : kFactoryResetNoBackups;
+  return '$kFactoryResetBody\n\n$second\n\n${latestBackupLine(latestBackup)}';
+}
 
 /// Shown while the one backup taken just before the erase is written.
 const kSavingBackupFirst = 'Saving a backup first…';
@@ -58,14 +72,23 @@ const kSavingBackupFirst = 'Saving a backup first…';
 /// Asked when that backup failed; the user may still cancel.
 const kBackupFirstFailed = "Couldn't save a backup first. Erase anyway?";
 
+/// Whether the shop has anything a pre-reset backup would keep:
+/// [hasShopData] (one query) or a held ticket (Hive keys).
+final preResetBackupNeededProvider = Provider<Future<bool> Function()>(
+  (ref) => () async =>
+      hasHeldTickets(ref.read(heldOrdersBoxProvider)) ||
+      await hasShopData(ref.read(databaseProvider)),
+);
+
 /// Takes ONE automatic backup (no receipt photos, like every automatic
 /// backup) just before a factory reset, so the erased shop can be restored
 /// from Settings › Backup & Restore. Returns null without writing anything
-/// when the shop has no data of the user's (one query); throws when the
-/// backup could not be saved. The cost is paid only at reset.
+/// when [preResetBackupNeededProvider] says there is nothing to keep;
+/// throws when the backup could not be saved. The cost is paid only at
+/// reset.
 final preResetBackupProvider = Provider<Future<File?> Function()>(
   (ref) => () async {
-    if (!await hasUserData(ref.read(databaseProvider))) return null;
+    if (!await ref.read(preResetBackupNeededProvider)()) return null;
     final dir = await autoBackupDir();
     final zip = await ref
         .read(snapshotCoordinatorProvider)
@@ -261,7 +284,7 @@ Future<PendingFactoryReset> finishPendingFactoryResetOnLaunch(
         AppDatabase Function() db) =>
     finishPendingFactoryReset(
       settings: Hive.box<dynamic>('settings'),
-      databaseHasUserData: () => hasUserData(db()),
+      databaseHasUserData: () => hasShopData(db()),
       eraseDatabase: () => db().eraseAllDataAndCompact(),
       heldOrders: Hive.box<dynamic>('held_orders'),
       usage: usageBoxForReset,

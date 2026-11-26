@@ -43,16 +43,21 @@ class DangerSection extends ConsumerWidget {
   /// shop has data; if that fails the user is asked again.
   Future<void> _confirmReset(BuildContext context, WidgetRef ref) async {
     DateTime? latest;
+    var willBackUp = false;
     try {
       final files =
           await const SnapshotService().listLocal(await autoBackupDir());
       if (files.isNotEmpty) latest = await files.first.lastModified();
     } catch (_) {/* unreadable: say there are none, the safe side */}
+    try {
+      willBackUp = await ref.read(preResetBackupNeededProvider)();
+    } catch (_) {/* then the text promises no backup */}
     if (!context.mounted) return;
     final confirmed = await _ask(
       context,
       title: kFactoryResetTitle,
-      text: factoryResetConfirmText(latestBackup: latest),
+      text:
+          factoryResetConfirmText(latestBackup: latest, willBackUp: willBackUp),
     );
     if (!confirmed || !context.mounted) return;
 

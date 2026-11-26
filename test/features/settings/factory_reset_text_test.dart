@@ -11,6 +11,8 @@ import 'package:path/path.dart' as p;
 
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
+import 'package:pos_app/features/cart/data/ticket_sequence.dart'
+    show kTicketSeqKey;
 import 'package:pos_app/features/backup/data/snapshot_providers.dart';
 import 'package:pos_app/features/backup/data/snapshot_service.dart';
 import 'package:pos_app/features/settings/data/factory_reset.dart';
@@ -120,6 +122,8 @@ void main() {
       expect(kFactoryResetNoBackups,
           'There are no automatic backups on this device, so this cannot be undone.');
       expect(kFactoryResetConfirmButton, 'Erase everything');
+      expect(kFactoryResetWillBackUp,
+          "A backup will be saved first; it doesn't include receipt photos.");
     });
   });
 
@@ -140,9 +144,11 @@ void main() {
 
     /// Pumps the section with a fake pre-reset backup ([backup] runs it).
     Future<void> pump(WidgetTester tester, List<String> log,
-        {Future<File?> Function()? backup}) async {
+        {Future<File?> Function()? backup, bool shopHasData = false}) async {
       await tester.pumpWidget(ProviderScope(
         overrides: [
+          preResetBackupNeededProvider
+              .overrideWithValue(() async => shopHasData),
           preResetBackupProvider.overrideWithValue(() async {
             log.add('backup');
             return backup == null ? null : await backup();
@@ -187,6 +193,22 @@ void main() {
       expect(find.textContaining(kFactoryResetNoBackups), findsNothing);
       expect(find.textContaining('Latest automatic backup: Nov 1, 2026'),
           findsOneWidget);
+    });
+
+    testWidgets(
+        'a shop with data and no backups: promises the backup it takes, '
+        'never "cannot be undone"', (tester) async {
+      await pump(tester, [], shopHasData: true);
+      await openDialog(tester);
+      expect(find.textContaining(kFactoryResetWillBackUp), findsOneWidget);
+      expect(
+          find.textContaining(
+              "A backup will be saved first; it doesn't include receipt photos."),
+          findsOneWidget);
+      expect(find.textContaining(kFactoryResetNoBackups), findsNothing);
+      expect(find.textContaining(kFactoryResetBackupsKept), findsNothing);
+      expect(
+          find.textContaining('Latest automatic backup: none'), findsOneWidget);
     });
 
     testWidgets('with none: says it cannot be undone, latest none',
@@ -235,6 +257,57 @@ void main() {
           findsOneWidget);
       await tapAndSettle(tester, 'Erase everything');
       expect(log, ['backup', 'backup', 'erase']);
+    });
+  });
+
+  group('what counts as shop data for a reset', () {
+    late AppDatabase db;
+    setUp(() => db = AppDatabase(NativeDatabase.memory()));
+    tearDown(() => db.close());
+
+    test('a fresh database (seeded expense categories only) has none',
+        () async {
+      expect(await hasShopData(db), isFalse);
+    });
+
+    for (final (name, insert) in <(String, Future<void> Function(AppDatabase))>[
+      (
+        'a restaurant table',
+        (d) => d.into(d.tables).insert(TablesCompanion.insert(name: 'T1'))
+      ),
+      (
+        'a tax rate',
+        (d) => d.taxDao
+            .upsertRate(TaxRatesCompanion.insert(name: 'VAT', rate: 0.13))
+            .then((_) {})
+      ),
+      (
+        'a category',
+        (d) => d
+            .into(d.categories)
+            .insert(CategoriesCompanion.insert(name: 'Drinks'))
+      ),
+      ('a product', (d) => seedProduct(d, sku: 'A')),
+      ('a customer', (d) => seedCustomer(d)),
+    ]) {
+      test('$name counts', () async {
+        await insert(db);
+        expect(await hasShopData(db), isTrue);
+      });
+    }
+
+    test('a held ticket counts; the ticket counter alone does not', () async {
+      final dir = Directory.systemTemp.createTempSync('pos_held_');
+      addTearDown(() async {
+        await Hive.close();
+        dir.deleteSync(recursive: true);
+      });
+      Hive.init(dir.path);
+      final held = await Hive.openBox<dynamic>('held_orders');
+      await held.put(kTicketSeqKey, 4);
+      expect(hasHeldTickets(held), isFalse);
+      await held.put('t1', '{}');
+      expect(hasHeldTickets(held), isTrue);
     });
   });
 

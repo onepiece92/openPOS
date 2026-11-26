@@ -15,6 +15,8 @@ import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/features/backup/data/share_files.dart';
 import 'package:pos_app/features/backup/data/snapshot_service.dart';
+import 'package:pos_app/features/cart/data/ticket_sequence.dart'
+    show kTicketSeqKey;
 import 'package:pos_app/features/settings/data/factory_reset.dart'
     show kFactoryResetPendingKey;
 import 'package:pos_app/features/usage/data/usage_counter.dart';
@@ -279,6 +281,34 @@ Future<bool> hasUserData(AppDatabase db) async {
       .getSingle();
   return row.read<int>('has_data') != 0;
 }
+
+/// Wider than [hasUserData], for a factory reset: anything the user set up
+/// or recorded — products, orders, customers, expenses, restaurant tables,
+/// tax rates or product categories (the reseeded default expense
+/// categories do not count). Decides the pre-reset backup and whether a
+/// pending reset may finish on its own (it may not while this is true).
+/// One query. Held tickets live in Hive: see [hasHeldTickets].
+///
+/// [hasUserData] stays narrower on purpose: it gates the daily automatic
+/// backup, which must not start pushing the pre-reset backups out just
+/// because onboarding created a tax rate.
+Future<bool> hasShopData(AppDatabase db) async {
+  final row = await db
+      .customSelect('SELECT EXISTS(SELECT 1 FROM products) '
+          'OR EXISTS(SELECT 1 FROM orders) '
+          'OR EXISTS(SELECT 1 FROM customers) '
+          'OR EXISTS(SELECT 1 FROM expenses) '
+          'OR EXISTS(SELECT 1 FROM tables) '
+          'OR EXISTS(SELECT 1 FROM tax_rates) '
+          'OR EXISTS(SELECT 1 FROM categories) AS has_data')
+      .getSingle();
+  return row.read<int>('has_data') != 0;
+}
+
+/// Whether [heldOrders] holds a held ticket (its ticket counter is not
+/// one). Reads keys only.
+bool hasHeldTickets(Box<dynamic> heldOrders) =>
+    heldOrders.keys.any((k) => k != kTicketSeqKey);
 
 /// Last auto-backup failure, or null after a success. Top-level (not a
 /// provider) so it survives the container swap done by a restore.
