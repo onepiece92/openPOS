@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How to Keep Selling When the Card Reader Loses Signal | Open POS</title>
+<meta name="description" content="Card reader lost signal at a market or event? Set a cash float, learn your reader&#x27;s offline mode, log card sales by hand and reconcile at day&#x27;s end.">
+<link rel="canonical" href="https://onepiece92.github.io/openPOS/card-reader-loses-signal/">
+<meta name="theme-color" content="#0B1220">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Open POS">
+<meta property="og:title" content="How to Keep Selling When the Card Reader Loses Signal | Open POS">
+<meta property="og:description" content="Card reader lost signal at a market or event? Set a cash float, learn your reader&#x27;s offline mode, log card sales by hand and reconcile at day&#x27;s end.">
+<meta property="og:url" content="https://onepiece92.github.io/openPOS/card-reader-loses-signal/">
+<meta property="og:image" content="https://onepiece92.github.io/openPOS/og.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="Open POS: A POS app that never sends your data anywhere.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="How to Keep Selling When the Card Reader Loses Signal | Open POS">
+<meta name="twitter:description" content="Card reader lost signal at a market or event? Set a cash float, learn your reader&#x27;s offline mode, log card sales by hand and reconcile at day&#x27;s end.">
+<meta name="twitter:image" content="https://onepiece92.github.io/openPOS/og.png">
+<meta name="twitter:image:alt" content="Open POS: A POS app that never sends your data anywhere.">
+
+<link rel="icon" href="../assets/logo-82.png" type="image/png" sizes="82x82">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon.png" sizes="180x180">
+<link rel="preload" href="../assets/JetBrainsMono-Regular.latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/JetBrainsMono-Bold.latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../assets/site.css">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://onepiece92.github.io/openPOS/#org",
+      "name": "Brand Builder",
+      "url": "https://brandbuilder.com.np",
+      "sameAs": [
+        "https://brandbuilder.com.np"
+      ]
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://onepiece92.github.io/openPOS/#website",
+      "url": "https://onepiece92.github.io/openPOS/",
+      "name": "Open POS",
+      "alternateName": [
+        "Open POS : Offline",
+        "openPOS"
+      ],
+      "publisher": {
+        "@id": "https://onepiece92.github.io/openPOS/#org"
+      },
+      "inLanguage": "en"
+    },
+    {
+      "@type": "MobileApplication",
+      "@id": "https://onepiece92.github.io/openPOS/#app",
+      "name": "Open POS",
+      "alternateName": [
+        "Open POS : Offline",
+        "openPOS"
+      ],
+      "description": "Free, offline POS and cash register app that works without internet, for small shops, cafes, restaurants, food trucks and farmers markets, on Android and iPhone/iPad. No account, no subscription, no ads. The app never sends your data anywhere.",
+      "url": "https://onepiece92.github.io/openPOS/",
+      "downloadUrl": "https://play.google.com/store/apps/details?id=com.brandbuilder.openpos",
+      "installUrl": "https://play.google.com/store/apps/details?id=com.brandbuilder.openpos",
+      "image": "https://onepiece92.github.io/openPOS/og.png",
+      "operatingSystem": "Android, iOS",
+      "applicationCategory": "BusinessApplication",
+      "license": "https://opensource.org/licenses/MIT",
+      "isAccessibleForFree": true,
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "publisher": {
+        "@id": "https://onepiece92.github.io/openPOS/#org"
+      },
+      "sameAs": [
+        "https://play.google.com/store/apps/details?id=com.brandbuilder.openpos",
+        "https://apps.apple.com/app/open-pos-offline/id6761003751",
+        "https://github.com/onepiece92/openPOS"
+      ]
+    },
+    {
+      "@type": "Article",
+      "@id": "https://onepiece92.github.io/openPOS/card-reader-loses-signal/#article",
+      "headline": "How to Keep Selling When the Card Reader Loses Signal",
+      "description": "Card reader lost signal at a market or event? Set a cash float, learn your reader's offline mode, log card sales by hand and reconcile at day's end.",
+      "url": "https://onepiece92.github.io/openPOS/card-reader-loses-signal/",
+      "mainEntityOfPage": {
+        "@id": "https://onepiece92.github.io/openPOS/card-reader-loses-signal/#webpage"
+      },
+      "image": "https://onepiece92.github.io/openPOS/og.png",
+      "author": {
+        "@id": "https://onepiece92.github.io/openPOS/#org"
+      },
+      "publisher": {
+        "@id": "https://onepiece92.github.io/openPOS/#org"
+      },
+      "isPartOf": {
+        "@id": "https://onepiece92.github.io/openPOS/#website"
+      },
+      "about": {
+        "@id": "https://onepiece92.github.io/openPOS/#app"
+      },
+      "inLanguage": "en",
+      "datePublished": "2026-11-26",
+      "dateModified": "2026-11-26"
+    },
+    {
+      "@type": "FAQPage",
+      "@id": "https://onepiece92.github.io/openPOS/card-reader-loses-signal/#webpage",
+      "url": "https://onepiece92.github.io/openPOS/card-reader-loses-signal/",
+      "name": "How to Keep Selling When the Card Reader Loses Signal | Open POS",
+      "isPartOf": {
+        "@id": "https://onepiece92.github.io/openPOS/#website"
+      },
+      "about": {
+        "@id": "https://onepiece92.github.io/openPOS/#app"
+      },
+      "publisher": {
+        "@id": "https://onepiece92.github.io/openPOS/#org"
+      },
+      "inLanguage": "en",
+      "dateModified": "2026-11-26",
+      "breadcrumb": {
+        "@id": "https://onepiece92.github.io/openPOS/card-reader-loses-signal/#breadcrumb"
+      },
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Can I take card payments if the reader has no signal at all?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "It depends on your provider. Some readers can store payments and send them later, with limits and risks. Check your provider's current terms. If you are unsure, plan for cash during outages."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Will Open POS take a card payment for me?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. Open POS records card sales that you take on your own reader. The reader needs its own connection. Open POS itself works without internet, so cash sales and your sales record keep working."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How much cash float should I bring?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Enough to make change for your typical price points through your busiest hour. Count it before opening and write the total down, since you will subtract it at close."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What if the reader's total does not match mine?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Check queued, failed and cancelled payments first. Then check for sales you forgot to log. Note the gap and its cause and compare again at the next event."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Should I post a sign when the reader is down?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "A small sign saying \"Cash only right now\" saves awkward conversations and shortens the line."
+          }
+        }
+      ]
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://onepiece92.github.io/openPOS/card-reader-loses-signal/#breadcrumb",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Open POS",
+          "item": "https://onepiece92.github.io/openPOS/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Card reader loses signal",
+          "item": "https://onepiece92.github.io/openPOS/card-reader-loses-signal/"
+        }
+      ]
+    }
+  ]
+}
+</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="bar">
+  <div class="wrap">
+    <a class="brand" href="../" aria-label="Open POS home">
+      <span class="brand-mark"><img src="../assets/logo-82.webp" srcset="../assets/logo-164.webp 2x" alt="" width="82" height="82"></span>
+      <span><span class="o">Open</span> <span class="p">POS</span></span>
+    </a>
+    <nav aria-label="Sections">
+      <a href="../#features">Features</a>
+      <a href="../#privacy">Privacy</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+  <section class="hero sub-hero" aria-labelledby="hero-title">
+    <div class="wrap">
+      <div>
+        <p class="crumbs"><a href="../">Open POS</a> / Card reader loses signal</p>
+        <p class="eyebrow">Guide for market and event sellers</p>
+        <h1 id="hero-title">How to Keep Selling When the Card Reader Loses Signal</h1>
+        <p class="sub">Every market seller has had the moment. The line is six people deep, the reader shows a spinning wheel, and nobody is sure whether the last payment went through. Weak signal is normal at fairgrounds, parking lots, festivals and rural stalls, so the fix is a plan you make before you open, not a scramble in the middle of a rush.</p>
+        <p class="sub">This guide covers the practical steps: a cash float, what offline card modes generally do, how to write card sales down, and how to reconcile at the end of the day.</p>
+        <div class="play-row">
+          <a class="play" href="https://play.google.com/store/apps/details?id=com.brandbuilder.openpos&amp;referrer=utm_source%3Dgithub_pages%26utm_medium%3Dsite%26utm_campaign%3Dcard-reader-loses-signal">
+            <img src="../assets/google-play-badge.png" alt="Get Open POS on Google Play" width="216" height="84">
+          </a>
+          <a class="appstore" href="https://apps.apple.com/app/open-pos-offline/id6761003751?ct=site_card-reader-loses-signal">
+            <img src="../assets/app-store-badge.svg" alt="Download Open POS on the App Store" width="168" height="56">
+          </a>
+          <p class="play-note">Free, for good.<br>No ads, no in-app purchases.</p>
+        </div>
+        <p class="tm">Google Play and the Google Play logo are trademarks of Google LLC. Apple and the Apple logo are trademarks of Apple Inc., registered in the U.S. and other countries. App Store is a service mark of Apple Inc.</p>
+        <p class="version-note">The current store versions date from May 2026. The features on this page describe the upcoming release, which also fixes known issues.</p>
+      </div>
+
+      <div class="receipt-wrap" aria-hidden="true">
+        <div class="receipt">
+          <p class="head">OPEN POS</p>
+          <p class="small">card reader down, cash still works</p>
+          <hr>
+          <dl>
+            <div class="row"><dt>Signal</dt><span class="dots"></span><dd>none</dd></div>
+            <div class="row"><dt>Card reader</dt><span class="dots"></span><dd>offline</dd></div>
+            <div class="row"><dt>Order</dt><span class="dots"></span><dd>$12.50</dd></div>
+            <div class="row"><dt>Cash given</dt><span class="dots"></span><dd>$20.00</dd></div>
+            <div class="row"><dt>Change</dt><span class="dots"></span><dd>$7.50</dd></div>
+          </dl>
+          <hr>
+          <dl>
+            <div class="row total"><dt>TOTAL</dt><span class="dots"></span><dd>FREE</dd></div>
+          </dl>
+          <p class="thanks">works with no signal<br>thank you, come again</p>
+        </div>
+        <p class="receipt-caption">Illustration</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="why-card-readers-lose-signal-at-events" aria-labelledby="why-card-readers-lose-signal-at-events-title">
+    <div class="wrap">
+      <h2 id="why-card-readers-lose-signal-at-events-title">Why card readers lose signal at events</h2>
+      <div class="prose">
+        <p>Most card readers need a connection to approve a payment. Some use your phone's data, some use Wi-Fi, and some use both. At a crowded event, thousands of phones share the same few cell towers, so a reader that worked fine at home can stall. Metal trucks, tents and basements make it worse.</p>
+        <p>The point to take from this: the reader's connection is separate from your register. If you keep your sales record in something that also needs the internet, one outage stops both. Keeping them separate means a dead reader costs you card payments only, not your whole day.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="step-1-build-a-cash-float-before-you-open" aria-labelledby="step-1-build-a-cash-float-before-you-open-title">
+    <div class="wrap">
+      <h2 id="step-1-build-a-cash-float-before-you-open-title">Step 1: Build a cash float before you open</h2>
+      <div class="prose">
+        <p>A float is the cash you bring so you can make change. Without it, a signal drop can turn into a lost cash sale too, because you cannot break a $20.</p>
+        <ul>
+          <li>Bring more small bills than you think you need. Singles, fives and a few tens go fastest.</li>
+          <li>Bring coins if your prices are not round numbers.</li>
+          <li>Count the float, write the total on paper and keep it separate from sales. This is your starting number for the end-of-day count.</li>
+          <li>Keep a small reserve out of sight, so a busy first hour does not leave you short.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="step-2-learn-your-reader-s-offline-mode-in-general-terms" aria-labelledby="step-2-learn-your-reader-s-offline-mode-in-general-terms-title">
+    <div class="wrap">
+      <h2 id="step-2-learn-your-reader-s-offline-mode-in-general-terms-title">Step 2: Learn your reader's offline mode (in general terms)</h2>
+      <div class="prose">
+        <p>Many card readers and payment apps offer some kind of offline mode. The details differ by provider, so this is a general picture and not a promise about any product:</p>
+        <ul>
+          <li><strong>Store and forward.</strong> The reader stores the payment and sends it when the connection returns. The approval happens later, not at the counter.</li>
+          <li><strong>Limits.</strong> Providers commonly cap the size or number of offline payments, and some limit offline mode to certain plans or reader types.</li>
+          <li><strong>Risk.</strong> If a stored payment is declined later, the seller may carry that loss. Stored payments can also expire if they are not uploaded in time, or be lost if the app is closed or removed.</li>
+        </ul>
+        <p>Because these terms vary and change, <strong>check your provider's help pages before the event</strong>, not during it. Look for three answers: is offline mode on by default, what are the limits, and how long do I have to reconnect. Turn it on in advance if it needs switching on, and test it once at home in airplane mode.</p>
+        <p>Also decide your own rule. Some sellers accept offline card payments only below a certain amount. Others go cash-only when the reader drops. Either is fine, as long as everyone working the stall knows the rule.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="step-3-write-down-every-card-sale-you-take" aria-labelledby="step-3-write-down-every-card-sale-you-take-title">
+    <div class="wrap">
+      <h2 id="step-3-write-down-every-card-sale-you-take-title">Step 3: Write down every card sale you take</h2>
+      <div class="prose">
+        <p>If the reader works offline or reconnects later, you still want your own record of what happened. A record you control is the only way to tell later whether a payment is missing.</p>
+        <p>For each card sale, note:</p>
+        <ul>
+          <li>the time,</li>
+          <li>the items or a short description,</li>
+          <li>the amount,</li>
+          <li>and whether the reader approved it, queued it, or failed.</li>
+        </ul>
+        <p>A paper notebook works. So does a sales app. The goal is a list you can compare to the reader's own report afterward. If the reader says it took $412 in card payments and your list says $437, you know to look for a $25 sale that never went through.</p>
+        <p>Write down declines and cancelled attempts too. They explain gaps later.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="step-4-keep-the-register-running-with-no-connection" aria-labelledby="step-4-keep-the-register-running-with-no-connection-title">
+    <div class="wrap">
+      <h2 id="step-4-keep-the-register-running-with-no-connection-title">Step 4: Keep the register running with no connection</h2>
+      <div class="prose">
+        <p>Your sales record should not depend on the same signal as your reader. A register that needs no internet keeps ringing up cash sales, calculating change and tracking the day's total even when the reader is down.</p>
+        <p>One way to do this is an app that works fully offline. <a href="../">Open POS</a> is a free app that works without internet. You pick items, enter the amount the customer hands over, and it shows the change. For card sales, you take the payment on your own reader and then record the sale as paid by card. Open POS does not process cards, and your reader needs its own connection. There is no account, subscription or ads, and it is MIT licensed. Devices do not sync with each other, so if two people sell on two phones, you will add the totals at the end.</p>
+        <p>Whatever tool you choose, the principle is the same: the record of your sales should survive a dead signal.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="step-5-reconcile-at-the-end-of-the-day" aria-labelledby="step-5-reconcile-at-the-end-of-the-day-title">
+    <div class="wrap">
+      <h2 id="step-5-reconcile-at-the-end-of-the-day-title">Step 5: Reconcile at the end of the day</h2>
+      <div class="prose">
+        <p>Reconciling means checking that three numbers agree: what you sold, what you collected in cash, and what the card reader says it took.</p>
+        <ol>
+          <li><strong>Count the cash drawer.</strong> Subtract the starting float you wrote down. The remainder is cash sales.</li>
+          <li><strong>Total your card list.</strong> Add every card sale you recorded.</li>
+          <li><strong>Compare with the reader.</strong> Open the reader's day report and compare its card total to yours.</li>
+          <li><strong>Compare with your sales total.</strong> Cash plus card should equal total sales for the day.</li>
+          <li><strong>Investigate gaps.</strong> Check queued or failed payments first, then look for cash given back in error.</li>
+        </ol>
+        <p>Small differences happen. Write down the difference and the likely cause so you can spot a pattern. A gap that repeats every market usually points to one habit, such as making change from the wrong pocket.</p>
+        <p>Over the next day or two, check the reader's account for queued payments that finally uploaded. Keep your notes until the bank deposit matches.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" id="a-short-checklist-for-your-next-event" aria-labelledby="a-short-checklist-for-your-next-event-title">
+    <div class="wrap">
+      <h2 id="a-short-checklist-for-your-next-event-title">A short checklist for your next event</h2>
+      <div class="prose">
+        <ul>
+          <li>Float counted and written down.</li>
+          <li>Offline mode read up on and tested at home.</li>
+          <li>A rule for what you accept when the reader is down.</li>
+          <li>A way to log card sales that does not need signal.</li>
+          <li>Time set aside to reconcile before you pack up.</li>
+        </ul>
+        <p>If you also need a routine for closing out, see our <a href="../end-of-day-close-market-vendors/">end-of-day close checklist for market vendors</a>, and for gear suggestions by selling style, our guide to <a href="../food-trucks-farmers-markets/">food trucks and farmers markets</a>.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="block guides" id="guides" aria-labelledby="guides-title">
+    <div class="wrap">
+      <h2 id="guides-title">More guides</h2>
+      <ul class="guide-links">
+        <li><a href="../food-trucks-farmers-markets/">POS for food trucks and farmers markets</a></li>
+        <li><a href="../end-of-day-close-market-vendors/">End-of-day close checklist for market vendors</a></li>
+        <li><a href="../pos-for-craft-fairs-pop-ups/">POS for craft fairs and pop-up shops</a></li>
+        <li><a href="../">Open POS home</a></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="block" id="faq" aria-labelledby="faq-title">
+    <div class="wrap">
+      <h2 id="faq-title">Questions about card readers and signal</h2>
+      <div class="faq">
+        <details>
+          <summary>Can I take card payments if the reader has no signal at all?</summary>
+          <div class="a"><p>It depends on your provider. Some readers can store payments and send them later, with limits and risks. Check your provider's current terms. If you are unsure, plan for cash during outages.</p></div>
+        </details>
+        <details>
+          <summary>Will Open POS take a card payment for me?</summary>
+          <div class="a"><p>No. Open POS records card sales that you take on your own reader. The reader needs its own connection. Open POS itself works without internet, so cash sales and your sales record keep working.</p></div>
+        </details>
+        <details>
+          <summary>How much cash float should I bring?</summary>
+          <div class="a"><p>Enough to make change for your typical price points through your busiest hour. Count it before opening and write the total down, since you will subtract it at close.</p></div>
+        </details>
+        <details>
+          <summary>What if the reader's total does not match mine?</summary>
+          <div class="a"><p>Check queued, failed and cancelled payments first. Then check for sales you forgot to log. Note the gap and its cause and compare again at the next event.</p></div>
+        </details>
+        <details>
+          <summary>Should I post a sign when the reader is down?</summary>
+          <div class="a"><p>A small sign saying "Cash only right now" saves awkward conversations and shortens the line.</p></div>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <section class="block closing" aria-labelledby="closing-title">
+    <div class="wrap">
+      <h2 id="closing-title">Keep a record that works with no signal.</h2>
+      <p>A free, offline POS that keeps recording cash sales when your reader is down. No account and no monthly fee needed.</p>
+      <div class="play-row">
+          <a class="play" href="https://play.google.com/store/apps/details?id=com.brandbuilder.openpos&amp;referrer=utm_source%3Dgithub_pages%26utm_medium%3Dsite%26utm_campaign%3Dcard-reader-loses-signal">
+            <img src="../assets/google-play-badge.png" alt="Get Open POS on Google Play" width="216" height="84">
+          </a>
+          <a class="appstore" href="https://apps.apple.com/app/open-pos-offline/id6761003751?ct=site_card-reader-loses-signal">
+            <img src="../assets/app-store-badge.svg" alt="Download Open POS on the App Store" width="168" height="56">
+          </a>
+          <p class="play-note">Questions first? <a href="https://wa.me/9779802850777">Message us on WhatsApp</a> or email <a href="mailto:mail@brandbuilder.com.np">mail@brandbuilder.com.np</a>. Ideas welcome: Open POS is an offline-first POS, so features that work without internet, and a simple text-based design, always come first.</p>
+        </div>
+      <p class="tm">Google Play and the Google Play logo are trademarks of Google LLC. Apple and the Apple logo are trademarks of Apple Inc., registered in the U.S. and other countries. App Store is a service mark of Apple Inc.</p>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div>
+      <a class="brand" href="../" aria-label="Open POS home">
+        <span class="brand-mark"><img src="../assets/logo-82.webp" srcset="../assets/logo-164.webp 2x" alt="" width="82" height="82" loading="lazy"></span>
+        <span><span class="o">Open</span> <span class="p">POS</span></span>
+      </a>
+      <p class="fine">Free, offline point of sale. MIT licensed. This site has no cookies, no analytics and no trackers.</p>
+      <p class="fine updated">Updated <time datetime="2026-11-26">November 2026</time></p>
+    </div>
+    <div class="foot-links">
+    <span class="label" id="guides-label">Guides</span>
+    <ul aria-labelledby="guides-label">
+      <li><a href="../cash-register-no-subscription/">Cash register app with no subscription</a></li>
+      <li><a href="../food-trucks-farmers-markets/">POS for food trucks and farmers markets</a></li>
+      <li><a href="../loyverse-alternative/">Loyverse alternative with no account</a></li>
+      <li><a href="../pos-for-craft-fairs-pop-ups/">POS for craft fairs and pop-up shops</a></li>
+      <li><a href="../square-alternative-free-offline/">Free Square alternative, offline</a></li>
+      <li><a href="../card-reader-loses-signal/">How to keep selling when the card reader loses signal</a></li>
+      <li><a href="../cash-register-vs-pos-app/">Cash register vs POS app for a small shop</a></li>
+      <li><a href="../end-of-day-close-market-vendors/">End-of-day close checklist for market vendors</a></li>
+    </ul>
+    <ul>
+      <li><a href="../">Home</a></li>
+      <li><a href="https://github.com/onepiece92/openPOS">GitHub</a></li>
+      <li><a href="../privacy.html">Privacy policy</a></li>
+      <li><a href="https://github.com/onepiece92/openPOS/blob/main/LICENSE">MIT license</a></li>
+      <li><a href="../assets/OFL.txt">Font license</a></li>
+      <li><a href="https://wa.me/9779802850777">WhatsApp support</a></li>
+      <li><a href="mailto:mail@brandbuilder.com.np">Email support</a></li>
+    </ul>
+    </div>
+  </div>
+</footer>
+<a class="wa-fab" href="https://wa.me/9779802850777?text=Hi%2C%20I%20have%20a%20question%20about%20Open%20POS." aria-label="Chat with us on WhatsApp">
+  <svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true" focusable="false"><path fill="currentColor" d="M16.04 3C9 3 3.3 8.7 3.3 15.73c0 2.25.6 4.45 1.72 6.38L3.2 28.8l6.86-1.8a12.7 12.7 0 0 0 5.98 1.52h.01c7.03 0 12.74-5.7 12.74-12.74 0-3.4-1.33-6.6-3.73-9A12.66 12.66 0 0 0 16.04 3Zm0 23.37h-.01c-1.9 0-3.77-.51-5.4-1.48l-.39-.23-4.07 1.07 1.09-3.97-.25-.41a10.56 10.56 0 0 1-1.62-5.62c0-5.84 4.76-10.6 10.61-10.6 2.83 0 5.49 1.1 7.5 3.11a10.53 10.53 0 0 1 3.1 7.5c0 5.85-4.76 10.63-10.56 10.63Zm5.82-7.95c-.32-.16-1.88-.93-2.17-1.03-.29-.11-.5-.16-.71.16-.21.32-.82 1.03-1 1.24-.19.21-.37.24-.69.08-.32-.16-1.35-.5-2.56-1.58-.95-.85-1.59-1.9-1.77-2.21-.19-.32-.02-.49.14-.65.14-.14.32-.37.48-.56.16-.18.21-.32.32-.53.1-.21.05-.4-.03-.56-.08-.16-.71-1.71-.98-2.34-.26-.62-.52-.53-.71-.54h-.61c-.21 0-.56.08-.85.4-.29.32-1.11 1.09-1.11 2.65 0 1.56 1.14 3.07 1.3 3.28.16.21 2.24 3.42 5.43 4.8.76.33 1.35.52 1.81.67.76.24 1.45.21 2 .13.61-.09 1.88-.77 2.14-1.51.27-.74.27-1.38.19-1.51-.08-.13-.29-.21-.61-.37Z"/></svg>
+  <span>Chat on WhatsApp</span>
+</a>
+</body>
+</html>

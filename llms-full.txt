@@ -134,6 +134,10 @@ If you sell over a counter or from a stand and want a simple cash register app t
 - POS for food trucks and farmers markets
 - Loyverse alternative with no account
 - POS for craft fairs and pop-up shops
+- Free Square alternative, offline
+- How to keep selling when the card reader loses signal
+- Cash register vs POS app for a small shop
+- End-of-day close checklist for market vendors
 
 ## Questions shop owners ask
 
@@ -544,7 +548,7 @@ Open POS imports products from a CSV file. There is no direct Loyverse importer,
 
 ### Can several phones share the same sales, like a cloud POS?
 
-No. Each phone or tablet is its own register, with its own data. That is what keeps everything offline. If you need several devices in sync, a cloud POS such as Loyverse, or our own separate product RebuzzPOS, is a better fit.
+No. Each phone or tablet is its own register, with its own data. That is what keeps everything offline. If you need several devices in sync, a cloud POS such as Loyverse is a better fit, as is the same team's separate online POS, RebuzzPOS; you never need it to use Open POS.
 
 ### Is Open POS on iPhone and Android?
 
@@ -561,7 +565,7 @@ Google Play and the Google Play logo are trademarks of Google LLC. Apple and the
 
 ---
 
-Page: Free POS for Craft Fairs, Flea Markets and Pop-Ups | Open POS
+Page: Free POS for Craft Fairs, Flea Markets & Pop-Ups | Open POS
 URL: https://onepiece92.github.io/openPOS/pos-for-craft-fairs-pop-ups/
 
 Open POS / Craft fairs and pop-ups
@@ -683,6 +687,585 @@ It is free, with no subscription, no ads and no in-app purchases. There is no ac
 ## Open the register in two minutes.
 
 A free, offline POS for craft fairs, pop-up shops and market stalls. No signal, no account and no monthly fee needed.
+
+Questions first? Message us on WhatsApp or email mail@brandbuilder.com.np. Ideas welcome: Open POS is an offline-first POS, so features that work without internet, and a simple text-based design, always come first.
+
+Google Play and the Google Play logo are trademarks of Google LLC. Apple and the Apple logo are trademarks of Apple Inc., registered in the U.S. and other countries. App Store is a service mark of Apple Inc.
+
+---
+
+Page: Free Square Alternative That Works Offline, No Account | Open POS
+URL: https://onepiece92.github.io/openPOS/square-alternative-free-offline/
+
+Open POS / Square alternative
+
+Free Square alternative for Android and iPhone
+
+# A free Square alternative that works offline, with no account
+
+Open POS is a free, offline POS app with no sign-up, no subscription and no ads. It is open source. It is not a card processor, so it suits you best if you take mostly cash or use your own reader.
+
+Free, for good.
+No ads, no in-app purchases.
+
+Google Play and the Google Play logo are trademarks of Google LLC. Apple and the Apple logo are trademarks of Apple Inc., registered in the U.S. and other countries. App Store is a service mark of Apple Inc.
+
+The current store versions date from May 2026. The features on this page describe the upcoming release, which also fixes known issues.
+
+## Square and Open POS, side by side
+
+Square is a POS with its own card processing and card readers. You sign up for a Square account. It also offers online store tools. For many shops that is exactly right.
+
+Open POS is a different kind of tool. There is no account and no server at all. Sales are stored on the device, and the app never sends them anywhere. The whole app is free and open source under the MIT license. It does not process cards.
+
+| Open POS | Square
+
+Account | None. Install and start. | Sign-up for a Square account
+
+Cost | Free, for good. No subscription, no ads. | A free plan ($0/mo per location) and paid plans from $49/mo per location (Plus; Premium is $149/mo). Card processing fees apply.
+
+Card payments | Not processed. You record card sales taken on your own reader, which needs its own connection. | Square's own processing, with fees (2.6% + 15¢ per in-person payment on the free plan), and Square's own card readers
+
+With no internet | The whole app works the same, always | Square's help article says offline payments let you accept cash and card payments from most major card brands, and that they must be uploaded within 72 hours (24 hours is recommended). You set a per-transaction maximum, some payment types are not available offline, and you are responsible for declined or expired offline payments. Some readers can take offline payments for only 24 hours at a time.
+
+Online store | No | Square offers online store tools
+
+Source code | Open source (MIT) | Square's terms say Square owns all rights in its services and prohibit reverse engineering
+
+Square details checked November 26, 2026 on squareup.com.
+
+## Which one fits your shop
+
+### Open POS fits if
+
+you run one counter or one stall, mostly take cash or already have a card reader, and want no account, no subscription and no ads. It works the same with or without a signal.
+
+### Square fits if
+
+you want built-in card processing or an online store. Open POS does not do those things.
+
+### Switching over
+
+Install Open POS, pick your country and currency, and import your products from a CSV file. You may need to match the column names to the Open POS import format first.
+
+### What you get in Open POS
+
+A product grid with categories and favorites, cash sales with change, whole-order discounts, held tickets, tables, customers, expenses, and reports for today, this week or this month. Tax can be on or off per product. PDF receipts can be saved or shared, or copied as text. Data can be exported to CSV. Bluetooth receipt printing is coming.
+
+### Limits to know first
+
+One device is one register. There are no staff logins, and devices do not sync with each other. Card sales are recorded, not processed.
+
+### Privacy you can check
+
+The app's own code makes no network calls: no analytics, no ads, no crash reporting and no cloud services. The source code is public on GitHub. From the next release onwards, the Android build also has no internet permission, so the operating system itself blocks any connection. How to check it.
+
+## More guides
+
+- Cash register app with no subscription
+- POS for food trucks and farmers markets
+- Loyverse alternative with no account
+- POS for craft fairs and pop-up shops
+- Open POS home
+
+## Questions about switching
+
+### Is Open POS affiliated with Square?
+
+No. Square is a trademark of Block, Inc. Open POS is an independent, open-source app and is not affiliated with or endorsed by Square or Block, Inc. We name Square here only to compare the two.
+
+### Can Open POS take card payments?
+
+No. Open POS does not process cards. You can record card sales taken on your own card reader, but the reader needs its own connection and its own account with its processor. If built-in card processing is what you need, Square, which has its own card processing, may be a better fit.
+
+### Do I need an account to use Open POS?
+
+No. There is no sign-up, no email and no password. Install the app and start selling.
+
+### Does Open POS work with no internet?
+
+Yes. Everything in the app works with no signal, every time: the product grid, cash sales with change, held tickets, tables, customers, expenses and reports.
+
+### Can several phones share the same sales?
+
+No. Each phone or tablet is its own register, with its own data, and devices do not sync. There are also no staff logins. If you need several devices in sync, the same team makes RebuzzPOS, a separate online POS; you never need it to use Open POS.
+
+### Can I move my products over from Square?
+
+Open POS imports products from a CSV file. There is no direct Square importer, so you may need to export your items from Square and rename the columns in a spreadsheet to match the Open POS import format.
+
+### Is Open POS on iPhone and Android?
+
+Yes. It is on Google Play for Android and on the App Store for iPhone and iPad.
+
+## Open the register in two minutes.
+
+A free, offline POS for Android and iPhone. No account, no subscription, no ads.
+
+Questions first? Message us on WhatsApp or email mail@brandbuilder.com.np. Ideas welcome: Open POS is an offline-first POS, so features that work without internet, and a simple text-based design, always come first.
+
+Google Play and the Google Play logo are trademarks of Google LLC. Apple and the Apple logo are trademarks of Apple Inc., registered in the U.S. and other countries. App Store is a service mark of Apple Inc.
+
+Square is a trademark of Block, Inc.; Open POS is not affiliated with, endorsed by or sponsored by Square or Block, Inc. Square is named only to compare the two products.
+
+---
+
+Page: How to Keep Selling When the Card Reader Loses Signal | Open POS
+URL: https://onepiece92.github.io/openPOS/card-reader-loses-signal/
+
+Open POS / Card reader loses signal
+
+Guide for market and event sellers
+
+# How to Keep Selling When the Card Reader Loses Signal
+
+Every market seller has had the moment. The line is six people deep, the reader shows a spinning wheel, and nobody is sure whether the last payment went through. Weak signal is normal at fairgrounds, parking lots, festivals and rural stalls, so the fix is a plan you make before you open, not a scramble in the middle of a rush.
+
+This guide covers the practical steps: a cash float, what offline card modes generally do, how to write card sales down, and how to reconcile at the end of the day.
+
+Free, for good.
+No ads, no in-app purchases.
+
+Google Play and the Google Play logo are trademarks of Google LLC. Apple and the Apple logo are trademarks of Apple Inc., registered in the U.S. and other countries. App Store is a service mark of Apple Inc.
+
+The current store versions date from May 2026. The features on this page describe the upcoming release, which also fixes known issues.
+
+## Why card readers lose signal at events
+
+Most card readers need a connection to approve a payment. Some use your phone's data, some use Wi-Fi, and some use both. At a crowded event, thousands of phones share the same few cell towers, so a reader that worked fine at home can stall. Metal trucks, tents and basements make it worse.
+
+The point to take from this: the reader's connection is separate from your register. If you keep your sales record in something that also needs the internet, one outage stops both. Keeping them separate means a dead reader costs you card payments only, not your whole day.
+
+## Step 1: Build a cash float before you open
+
+A float is the cash you bring so you can make change. Without it, a signal drop can turn into a lost cash sale too, because you cannot break a $20.
+
+- Bring more small bills than you think you need. Singles, fives and a few tens go fastest.
+- Bring coins if your prices are not round numbers.
+- Count the float, write the total on paper and keep it separate from sales. This is your starting number for the end-of-day count.
+- Keep a small reserve out of sight, so a busy first hour does not leave you short.
+
+## Step 2: Learn your reader's offline mode (in general terms)
+
+Many card readers and payment apps offer some kind of offline mode. The details differ by provider, so this is a general picture and not a promise about any product:
+
+- Store and forward. The reader stores the payment and sends it when the connection returns. The approval happens later, not at the counter.
+- Limits. Providers commonly cap the size or number of offline payments, and some limit offline mode to certain plans or reader types.
+- Risk. If a stored payment is declined later, the seller may carry that loss. Stored payments can also expire if they are not uploaded in time, or be lost if the app is closed or removed.
+
+Because these terms vary and change, check your provider's help pages before the event, not during it. Look for three answers: is offline mode on by default, what are the limits, and how long do I have to reconnect. Turn it on in advance if it needs switching on, and test it once at home in airplane mode.
+
+Also decide your own rule. Some sellers accept offline card payments only below a certain amount. Others go cash-only when the reader drops. Either is fine, as long as everyone working the stall knows the rule.
+
+## Step 3: Write down every card sale you take
+
+If the reader works offline or reconnects later, you still want your own record of what happened. A record you control is the only way to tell later whether a payment is missing.
+
+For each card sale, note:
+
+- the time,
+- the items or a short description,
+- the amount,
+- and whether the reader approved it, queued it, or failed.
+
+A paper notebook works. So does a sales app. The goal is a list you can compare to the reader's own report afterward. If the reader says it took $412 in card payments and your list says $437, you know to look for a $25 sale that never went through.
+
+Write down declines and cancelled attempts too. They explain gaps later.
+
+## Step 4: Keep the register running with no connection
+
+Your sales record should not depend on the same signal as your reader. A register that needs no internet keeps ringing up cash sales, calculating change and tracking the day's total even when the reader is down.
+
+One way to do this is an app that works fully offline. Open POS is a free app that works without internet. You pick items, enter the amount the customer hands over, and it shows the change. For card sales, you take the payment on your own reader and then record the sale as paid by card. Open POS does not process cards, and your reader needs its own connection. There is no account, subscription or ads, and it is MIT licensed. Devices do not sync with each other, so if two people sell on two phones, you will add the totals at the end.
+
+Whatever tool you choose, the principle is the same: the record of your sales should survive a dead signal.
+
+## Step 5: Reconcile at the end of the day
+
+Reconciling means checking that three numbers agree: what you sold, what you collected in cash, and what the card reader says it took.
+
+1. Count the cash drawer. Subtract the starting float you wrote down. The remainder is cash sales.
+2. Total your card list. Add every card sale you recorded.
+3. Compare with the reader. Open the reader's day report and compare its card total to yours.
+4. Compare with your sales total. Cash plus card should equal total sales for the day.
+5. Investigate gaps. Check queued or failed payments first, then look for cash given back in error.
+
+Small differences happen. Write down the difference and the likely cause so you can spot a pattern. A gap that repeats every market usually points to one habit, such as making change from the wrong pocket.
+
+Over the next day or two, check the reader's account for queued payments that finally uploaded. Keep your notes until the bank deposit matches.
+
+## A short checklist for your next event
+
+- Float counted and written down.
+- Offline mode read up on and tested at home.
+- A rule for what you accept when the reader is down.
+- A way to log card sales that does not need signal.
+- Time set aside to reconcile before you pack up.
+
+If you also need a routine for closing out, see our end-of-day close checklist for market vendors, and for gear suggestions by selling style, our guide to food trucks and farmers markets.
+
+## More guides
+
+- POS for food trucks and farmers markets
+- End-of-day close checklist for market vendors
+- POS for craft fairs and pop-up shops
+- Open POS home
+
+## Questions about card readers and signal
+
+### Can I take card payments if the reader has no signal at all?
+
+It depends on your provider. Some readers can store payments and send them later, with limits and risks. Check your provider's current terms. If you are unsure, plan for cash during outages.
+
+### Will Open POS take a card payment for me?
+
+No. Open POS records card sales that you take on your own reader. The reader needs its own connection. Open POS itself works without internet, so cash sales and your sales record keep working.
+
+### How much cash float should I bring?
+
+Enough to make change for your typical price points through your busiest hour. Count it before opening and write the total down, since you will subtract it at close.
+
+### What if the reader's total does not match mine?
+
+Check queued, failed and cancelled payments first. Then check for sales you forgot to log. Note the gap and its cause and compare again at the next event.
+
+### Should I post a sign when the reader is down?
+
+A small sign saying "Cash only right now" saves awkward conversations and shortens the line.
+
+## Keep a record that works with no signal.
+
+A free, offline POS that keeps recording cash sales when your reader is down. No account and no monthly fee needed.
+
+Questions first? Message us on WhatsApp or email mail@brandbuilder.com.np. Ideas welcome: Open POS is an offline-first POS, so features that work without internet, and a simple text-based design, always come first.
+
+Google Play and the Google Play logo are trademarks of Google LLC. Apple and the Apple logo are trademarks of Apple Inc., registered in the U.S. and other countries. App Store is a service mark of Apple Inc.
+
+
+---
+
+Page: Cash Register vs POS App for a Small Shop: What You Actually Need | Open POS
+URL: https://onepiece92.github.io/openPOS/cash-register-vs-pos-app/
+
+Open POS / Cash register vs POS app
+
+Guide for small shops, stalls and cafes
+
+# Cash Register vs POS App for a Small Shop: What You Actually Need
+
+When you open a small shop, stall or cafe, someone will tell you to get "a proper POS system". Someone else will tell you a plain cash register is all you need. Both are right for some sellers and wrong for others. The useful question is not which is better. It is what you need to know at the end of each day.
+
+Free, for good.
+No ads, no in-app purchases.
+
+Google Play and the Google Play logo are trademarks of Google LLC. Apple and the Apple logo are trademarks of Apple Inc., registered in the U.S. and other countries. App Store is a service mark of Apple Inc.
+
+The current store versions date from May 2026. The features on this page describe the upcoming release, which also fixes known issues.
+
+## What a cash register does
+
+A traditional cash register is a machine with a drawer. You key in a price, press a department button, take the money and give change. It prints a receipt, keeps a running total and can print a daily summary.
+
+Strengths:
+
+- Simple to learn. A new helper can use it in minutes.
+- No phone, no login, no updates.
+- Works in a power cut if it has a battery.
+
+Limits:
+
+- Records are shallow. Many registers store totals by department, not by item.
+- Adding or changing prices means working through the keypad.
+- Getting data out usually means paper tape or typing numbers into a spreadsheet.
+- Card payments are handled by a separate device.
+
+If you sell a handful of items at round prices, that can be enough.
+
+## What a POS app does
+
+A POS app turns a phone or tablet into the register. You tap items from a grid, apply tax and a discount if needed, take payment and the app stores the sale.
+
+Strengths:
+
+- Itemized records. You can see which products sold.
+- Easy price and product changes.
+- Reports for a day, week or month without adding up paper.
+- Data export to a spreadsheet.
+
+Limits:
+
+- It depends on a phone or tablet. A dead battery stops sales.
+- Some apps need an account, an internet connection or a monthly fee.
+- A new helper may need a short walkthrough.
+
+## The questions that decide it
+
+Skip the feature lists. Answer these instead.
+
+1. Do I need to know what sold, or only how much? If "$640 today" is all you need, a register is fine. If you want to know that the lemon bars outsold the brownies two to one, you need item-level records.
+
+2. How many products do I have? Under 20 and rarely changing, a register works. A rotating menu or growing catalog is easier in an app.
+
+3. Do I charge sales tax on some items and not others? A register can handle this with tax keys, but it takes setup. Apps typically let you mark each product as taxed or not. Check with a tax advisor about which rates apply to what you sell.
+
+4. Will I need records for taxes or bookkeeping? Itemized, exportable records save hours at tax time. A register's paper tape does not.
+
+5. Do I run tabs or hold orders? If a customer orders, walks off and returns, or a table orders in rounds, you need a way to keep open orders. Basic registers do not.
+
+6. Where do I sell, and is there signal? At a market or event with poor coverage, a POS app that needs the internet is a risk. A register is not affected. An app that works fully offline removes that risk.
+
+7. What can I spend monthly? Monthly fees add up. Check the full cost of any app you consider, including fees tied to card processing, export and extra devices. Terms vary by provider, so check each provider's current pricing.
+
+## The cost angle
+
+A register is a one-time purchase. A POS app can be free, one-time or a subscription. The price on the front page is not always the full cost, so read what is included. Look at:
+
+- whether exporting your own data costs extra,
+- whether you need an account to use it,
+- whether it works when the internet is down,
+- and whether features sit behind an upgrade.
+
+You can use a card reader with either option. The reader is its own purchase and has its own fees, so compare those separately.
+
+## A middle path: a free offline app
+
+If you want item-level records without a subscription or connection, a free offline app sits between the two. Open POS is one example. It works without internet, with no account, subscription or ads, and it is MIT licensed. In it you can:
+
+- take cash payments with change calculated from the amount handed over,
+- record card sales taken on your own reader (the reader needs its own connection, and Open POS does not process cards),
+- hold tickets and manage tables,
+- keep a customer list,
+- track expenses,
+- apply a whole-order discount,
+- turn tax on or off per product,
+- see reports for today, this week or this month,
+- and export your sales to CSV.
+
+Open POS is built for a single device. Devices do not sync with each other, so if you need several terminals sharing one catalog, an app built for that is a better fit. The team behind Open POS also makes RebuzzPOS, a separate online POS for businesses that need sync across devices. Open POS exchanges no data with it, and you never need it to use Open POS.
+
+## Which should you pick?
+
+Choose a cash register if:
+
+- you sell a few items at fixed prices,
+- you have one person at the counter,
+- you do not need itemized records,
+- and you keep your own books by hand.
+
+Choose a POS app if:
+
+- your menu or catalog changes,
+- you want item-level reports and exports,
+- you hold orders or run tables,
+- or you track expenses next to sales.
+
+Use both if you like the drawer and the receipt tape, but also want a digital record. Many sellers keep the drawer and ring sales in an app.
+
+## A simple way to test
+
+Run a trial week. Keep your register as usual and ring the same sales in a free app. At the end of the week, compare totals and notice which record answered more questions. If the app showed you something the tape could not, that tells you what you need.
+
+For more on running without a monthly fee, see our guide on a cash register app with no subscription. If you sell at events, our end-of-day close checklist for market vendors shows what to record before you pack up.
+
+## More guides
+
+- Cash register app with no subscription
+- End-of-day close checklist for market vendors
+- Loyverse alternative with no account
+- Free Square alternative, offline
+- Open POS home
+
+## Questions about registers and POS apps
+
+### Is a cash register enough for a small shop?
+
+Yes, if you sell a few items, do not need itemized records and keep your own books. It stops being enough when you need item-level sales, reports or exports.
+
+### Do I need internet to use a POS app?
+
+Not always. Many apps need a connection or an account, and some include an offline mode that syncs later. Open POS works fully without internet. Check how any app you consider behaves with no signal.
+
+### Can I use a POS app and a card reader together?
+
+Yes. Take the card payment on the reader, then record the sale in the app. Each needs to be set up on its own, and the reader needs its own connection.
+
+### Are free POS apps really free?
+
+It depends on the app. Some charge for card processing, exports or extra features. Read what is included. Open POS is free, with no subscription, account or ads.
+
+### Can I switch later?
+
+Yes. Keep your records exportable. A CSV export lets you move your sales history into a spreadsheet or another tool.
+
+## Try it for a trial week.
+
+A free, offline POS to ring up the same sales as your register. No account and no monthly fee needed.
+
+Questions first? Message us on WhatsApp or email mail@brandbuilder.com.np. Ideas welcome: Open POS is an offline-first POS, so features that work without internet, and a simple text-based design, always come first.
+
+Google Play and the Google Play logo are trademarks of Google LLC. Apple and the Apple logo are trademarks of Apple Inc., registered in the U.S. and other countries. App Store is a service mark of Apple Inc.
+
+
+---
+
+Page: End-of-Day Sales Close for Market Vendors: A Simple Checklist | Open POS
+URL: https://onepiece92.github.io/openPOS/end-of-day-close-market-vendors/
+
+Open POS / End-of-day close for market vendors
+
+Checklist for farmers markets, craft fairs and pop-ups
+
+# End-of-Day Sales Close for Market Vendors: A Simple Checklist
+
+The market is over, your feet hurt and the truck needs loading. It is tempting to throw the cash box in a bag and deal with it tomorrow. Do the close now instead. It takes 10 to 15 minutes, it catches mistakes while you still remember the day, and it gives you clean records when tax time comes.
+
+Here is a simple routine that works for farmers markets, craft fairs, flea markets and pop-ups.
+
+Free, for good.
+No ads, no in-app purchases.
+
+Google Play and the Google Play logo are trademarks of Google LLC. Apple and the Apple logo are trademarks of Apple Inc., registered in the U.S. and other countries. App Store is a service mark of Apple Inc.
+
+The current store versions date from May 2026. The features on this page describe the upcoming release, which also fixes known issues.
+
+## Before you start: set up the close
+
+Pick a spot out of the crowd, ideally with a flat surface and good light. Have these ready:
+
+- your starting float amount (written down this morning),
+- your sales record (app, notebook or tape),
+- the card reader's day report, if you take cards,
+- a pen and a notepad or your phone's calculator,
+- an envelope or bag for deposits.
+
+## Step 1: Count the cash
+
+1. Take the cash drawer out of public view.
+2. Sort bills by value, all facing the same way.
+3. Count each pile and write down the total per denomination.
+4. Add coins last.
+5. Write the grand total.
+
+Now subtract your starting float. The result is your cash sales for the day. If the number looks odd, count again before you do anything else.
+
+Then separate the next float. Set aside the amount you will start with next time, and put the rest in your deposit envelope. Counting the float out now saves you from guessing tomorrow morning.
+
+## Step 2: Match your totals
+
+You are checking that two or three sources tell the same story.
+
+- Your sales record. Get the day's total, and if you can, split it by payment type: cash and card.
+- Cash count. Cash sales from Step 1 should equal the cash portion of your record.
+- Card reader report. Its card total should equal the card portion of your record.
+
+If you use an app, open its report for today. In Open POS, for example, the Reports screen shows the sales total, expenses and average order value for today, this week or this month. If you take card payments, you take them on your own reader and record them in the app as paid by card, so you compare the app's card portion with the reader's report.
+
+The matching test is: cash counted minus float, plus card total, equals total sales. If it does, you are done with this step.
+
+### If the totals do not match
+
+Small gaps are normal. Work through them in this order:
+
+1. Recount the cash.
+2. Look for sales you forgot to record, such as a quick sale during a rush.
+3. Look for card payments that failed or are still queued on the reader.
+4. Check for change given incorrectly, or a bill taken from the drawer for a personal purchase.
+5. Write the leftover difference and a guess at the cause. Do not force the books to balance by changing numbers.
+
+Patterns matter more than any single gap. If you are short every Saturday, look at what changes on Saturdays.
+
+## Step 3: Record your expenses
+
+Expenses are easy to lose, and they matter, since they reduce what you owe in tax and show whether a market is worth the trip. Record today's costs before you leave:
+
+- booth or stall fee,
+- ingredients or stock bought for this event,
+- packaging, bags and signs,
+- fuel or parking,
+- card reader fees you already know about,
+- any helper paid in cash.
+
+For each, note the date, what it was, the amount and the payment method. Keep the receipt. A quick photo of it on your phone and the paper in an envelope covers you twice.
+
+In Open POS you can enter expenses next to your sales, so the same screen helps you see revenue and expenses for the day. A spreadsheet or notebook works as well. What matters is doing it the same day.
+
+## Step 4: Export or copy your records
+
+A record you cannot get out is risky. Before you pack up:
+
+- Export your sales for the day or week. In Open POS, sales reports export to CSV, which opens in any spreadsheet (the file covers all sales; filter by date in the spreadsheet).
+- If you use a notebook, take a photo of each page.
+- Save the card reader's day report, either as a screenshot or a download from the provider.
+- Put copies somewhere other than the device you sold on. Save a copy somewhere safe, such as a USB drive or your computer.
+
+Open POS works without internet, and so does its export, so you can do it at the stall or once you are home. The app does not send anything on its own. Because devices do not sync with each other, if two phones took sales, export from both and combine them.
+
+## Step 5: Secure the money
+
+- Put the deposit in a sealed envelope with the date and amount on it.
+- Do not leave it in the vehicle overnight if you can avoid it.
+- Deposit it at the bank as soon as you can, and keep the deposit slip with the day's records.
+
+## Step 6: Restock and reset
+
+While the day is fresh, write down what sold out, what did not sell and what you wish you had brought. This is the most valuable note of the day, and it takes two minutes. It tells you what to prepare next time.
+
+Then reset for tomorrow: float set aside, charged phone, reader charged, receipt paper or bags topped up.
+
+## The one-page checklist
+
+Copy this onto a card and keep it in the cash box.
+
+- [ ] Count cash by denomination
+- [ ] Subtract starting float = cash sales
+- [ ] Set aside next float
+- [ ] Get total sales from your record
+- [ ] Compare card total to reader report
+- [ ] Cash + card = total sales?
+- [ ] Note any difference and likely cause
+- [ ] Record all expenses with receipts
+- [ ] Export or photograph your records
+- [ ] Seal and secure the deposit
+- [ ] Note what sold out and what did not
+
+## Keeping it quick
+
+The routine gets faster once you make it a habit. Two things help most. First, record each sale as it happens, so you are not reconstructing the day at the end. Second, count the float at the start and write it down, so the end count is one subtraction.
+
+If you are choosing tools for events, our guide to POS for craft fairs and pop-ups covers setup. For what to do when your card reader drops, read how to keep selling when the card reader loses signal.
+
+## More guides
+
+- POS for craft fairs and pop-up shops
+- How to keep selling when the card reader loses signal
+- POS for food trucks and farmers markets
+- Open POS home
+
+## Questions about closing the day
+
+### How long should an end-of-day close take?
+
+Usually 10 to 15 minutes once you have a routine. The first few times may take longer.
+
+### Do I need to count cash if most of my sales are card?
+
+Yes. Even a small cash drawer should be counted, since small gaps are the easiest to miss and fix early.
+
+### What should I keep, and for how long?
+
+Keep sales records, expense receipts and deposit slips. How long depends on your local tax rules, so ask your tax advisor.
+
+### Can I use Open POS for this close?
+
+For the records side, yes. Open POS has no cash-count, float or close screen, so you count the drawer by hand. It records cash and card sales, tracks expenses, shows reports for today, this week or this month and exports sales to CSV. It works without internet. Card payments are taken on your own reader, which needs its own connection.
+
+### What if I run the stall with a helper on another phone?
+
+Devices do not sync. Export from each phone at close and combine the totals in a spreadsheet.
+
+## End the day with a sales report.
+
+A free, offline POS with reports for today, expenses and CSV export. No account and no monthly fee needed.
 
 Questions first? Message us on WhatsApp or email mail@brandbuilder.com.np. Ideas welcome: Open POS is an offline-first POS, so features that work without internet, and a simple text-based design, always come first.
 

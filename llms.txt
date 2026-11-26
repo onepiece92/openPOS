@@ -23,6 +23,10 @@ Key facts, as stated on this site:
 - [Offline POS for food trucks, farmers markets and pop-ups](https://onepiece92.github.io/openPOS/food-trucks-farmers-markets/): selling with no signal, cash with change, sales tax
 - [Loyverse alternative with no account](https://onepiece92.github.io/openPOS/loyverse-alternative/): side-by-side comparison with Loyverse POS
 - [POS for craft fairs, pop-up shops and market stalls](https://onepiece92.github.io/openPOS/pos-for-craft-fairs-pop-ups/): selling at a booth with weak signal, cash with change, after-show totals
+- [Free Square alternative that works offline](https://onepiece92.github.io/openPOS/square-alternative-free-offline/): when Open POS is a fit instead of Square, when Square is better, and the limits
+- [How to keep selling when the card reader loses signal](https://onepiece92.github.io/openPOS/card-reader-loses-signal/): what to do when a card reader loses signal: cash float, offline modes, logging card sales, end-of-day reconciliation
+- [Cash register vs POS app for a small shop](https://onepiece92.github.io/openPOS/cash-register-vs-pos-app/): cash register or POS app for a small shop: the questions that decide it, cost, records and tax
+- [End-of-day sales close for market vendors](https://onepiece92.github.io/openPOS/end-of-day-close-market-vendors/): a 10 to 15 minute end-of-day close for market vendors: count cash, match totals, expenses, export
 - [Privacy policy](https://onepiece92.github.io/openPOS/privacy.html): what the app stores, where, and the permissions it uses
 
 ## Get the app
