@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path/path.dart' as p;
 
+import 'package:pos_app/core/providers/hive_provider.dart' show kAutoBackupLastAt;
 import 'package:pos_app/features/cart/data/ticket_sequence.dart';
 import 'package:pos_app/features/usage/data/usage_counter.dart';
 
@@ -11,6 +12,11 @@ const kFactoryResetConfirmText =
     'This permanently deletes all products, orders, customers, expenses, '
     'held tickets, tables, receipt photos and settings. '
     'Automatic backups are kept.';
+
+/// Settings keys a factory reset keeps: automatic-backup bookkeeping. The
+/// backups kept on the device are how a regretted reset is undone, so the
+/// reset must not bring the next automatic backup (of empty data) forward.
+const kSettingsKeptByReset = [kAutoBackupLastAt];
 
 /// Shown on the reset's splash while the data is erased.
 const kFactoryResetProgress = 'Resetting…';
@@ -25,7 +31,7 @@ const kFactoryResetIncompleteNotice =
 
 /// The Hive and file half of a factory reset (the database half is
 /// `AppDatabase.eraseAllData`). Clears:
-/// * [settings] (so onboarding shows again);
+/// * [settings] (so onboarding shows again), except [kSettingsKeptByReset];
 /// * every held ticket in [heldOrders], keeping its ticket counter so
 ///   numbers never repeat;
 /// * [usage] — counts and flags, so the first-run usage notice shows again;
@@ -41,7 +47,14 @@ Future<void> eraseLocalStores({
 }) async {
   await clearHeldTicketsKeepingCounter(heldOrders);
   await usage.clear();
+  // The last automatic backup's time survives, so the reset does not make
+  // an automatic backup due at once (see kSettingsKeptByReset).
+  final kept = {
+    for (final k in kSettingsKeptByReset)
+      if (settings.containsKey(k)) k: settings.get(k),
+  };
   await settings.clear();
+  if (kept.isNotEmpty) await settings.putAll(kept);
   if (receipts.existsSync()) await receipts.delete(recursive: true);
 }
 

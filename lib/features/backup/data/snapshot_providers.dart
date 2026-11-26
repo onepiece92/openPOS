@@ -213,6 +213,11 @@ class SnapshotCoordinator {
           t.difference(last) < kAutoBackupInterval) {
         return null;
       }
+      // Nothing of the user's to keep (a fresh install, or just after a
+      // factory reset): an empty backup would only push older ones out of
+      // the kept set. One query, only when a backup is due; it stays due,
+      // so it runs once there is data. "Back up everything" is unaffected.
+      if (!await hasUserData(_ref.read(databaseProvider))) return null;
 
       final dir = await autoBackupDir();
       // Owner decision: automatic backups never carry receipt photos.
@@ -227,6 +232,18 @@ class SnapshotCoordinator {
       return null;
     }
   }
+}
+
+/// Whether the database holds anything of the user's: a product, order,
+/// customer or expense. One query of four EXISTS probes.
+Future<bool> hasUserData(AppDatabase db) async {
+  final row = await db
+      .customSelect('SELECT EXISTS(SELECT 1 FROM products) '
+          'OR EXISTS(SELECT 1 FROM orders) '
+          'OR EXISTS(SELECT 1 FROM customers) '
+          'OR EXISTS(SELECT 1 FROM expenses) AS has_data')
+      .getSingle();
+  return row.read<int>('has_data') != 0;
 }
 
 /// Last auto-backup failure, or null after a success. Top-level (not a
