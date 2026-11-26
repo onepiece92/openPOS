@@ -10,9 +10,9 @@ import 'package:pos_app/features/returns/domain/void_order.dart';
 import '../../_support/sales.dart';
 import '../../_support/test_db.dart';
 
-/// Interim rule while stock_adjustments has no order id: with Stock
-/// tracking switched off NOW, a void or a refund puts nothing back (a sale
-/// made while it was off deducted nothing). With it on, unchanged.
+/// A sale made while Stock tracking was off deducted nothing, so its void
+/// or refund puts nothing back (its own rows owe nothing). With tracking on,
+/// what the sale took comes back.
 void main() {
   late AppDatabase db;
   late AuditService audit;
