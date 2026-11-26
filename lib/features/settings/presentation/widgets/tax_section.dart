@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:pos_app/core/utils/percent.dart';
 import 'package:pos_app/core/database/app_database.dart';
+import 'package:pos_app/core/database/tables/orders_table.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/shared/widgets/app_sheet.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
@@ -22,6 +23,14 @@ class TaxSection extends ConsumerWidget {
 }
 
 // ── Invoices ──────────────────────────────────────────────────────────────────
+
+/// Why [prefix] can't be the invoice prefix, or null if it can. "IMP" marks
+/// CSV-imported orders (which never deducted stock, so a void or refund
+/// restocks nothing): a shop's own sales must not share it.
+String? invoicePrefixError(String prefix) =>
+    prefix.trim().toUpperCase() == kImportedInvoicePrefix
+        ? '$kImportedInvoicePrefix is reserved for imported orders.'
+        : null;
 
 /// Invoice numbering: always on, under its own neutral header.
 class InvoiceSection extends ConsumerWidget {
@@ -52,45 +61,52 @@ class InvoiceSection extends ConsumerWidget {
     final ctrl = TextEditingController(text: current);
     final saved = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Invoice prefix'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: ctrl,
-              autofocus: true,
-              decoration: const InputDecoration(
-                labelText: 'Prefix',
-                hintText: 'e.g. 2082/83',
-                border: OutlineInputBorder(),
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setState) {
+        final error = invoicePrefixError(ctrl.text);
+        return AlertDialog(
+          title: const Text('Invoice prefix'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: ctrl,
+                autofocus: true,
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  labelText: 'Prefix',
+                  hintText: 'e.g. 2082/83',
+                  border: const OutlineInputBorder(),
+                  errorText: error,
+                ),
               ),
+              const SizedBox(height: 12),
+              Text(
+                'Bills are numbered without gaps inside a prefix. Setting a new '
+                'prefix (e.g. at fiscal-year start) restarts numbering at 1; '
+                'existing bills keep their numbers.',
+                style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(ctx).colorScheme.onSurfaceVariant),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
             ),
-            const SizedBox(height: 12),
-            Text(
-              'Bills are numbered without gaps inside a prefix. Setting a new '
-              'prefix (e.g. at fiscal-year start) restarts numbering at 1; '
-              'existing bills keep their numbers.',
-              style: Theme.of(ctx)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: Theme.of(ctx).colorScheme.onSurfaceVariant),
+            FilledButton(
+              onPressed: error == null
+                  ? () => Navigator.pop(ctx, ctrl.text.trim())
+                  : null,
+              child: const Text('Save'),
             ),
           ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-            child: const Text('Save'),
-          ),
-        ],
-      ),
+        );
+      }),
     );
-    if (saved != null && saved != current) {
+    if (saved != null &&
+        saved != current &&
+        invoicePrefixError(saved) == null) {
       await ref.read(settingsProvider.notifier).setInvoicePrefix(saved);
     }
   }
