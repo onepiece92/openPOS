@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
+import 'package:pos_app/features/onboarding/data/country_repository.dart';
 import 'package:pos_app/features/onboarding/domain/business_type.dart';
+import 'package:pos_app/features/onboarding/domain/locale_country.dart';
 import 'package:pos_app/features/onboarding/domain/country_default.dart';
 import 'package:pos_app/features/onboarding/domain/onboarding_state.dart';
 
@@ -93,16 +95,16 @@ class OnboardingNotifier extends Notifier<OnboardingState> {
     if (all || _passed(OnboardingStep.name) || state.businessName.isNotEmpty) {
       await settings.setStoreProfile(name: state.businessName);
     }
-    if (all || (_passed(OnboardingStep.country) && state.country != null)) {
-      await settings.setCurrency(
-        symbol: state.country?.symbol ?? '\$',
-        code: state.country?.currency ?? 'USD',
-      );
-      await settings.setLocale(
-        countryCode: state.country?.code ?? 'US',
-        timezone: state.country?.timezone ?? 'UTC',
-      );
-    }
+    // The country (and with it the currency) is always saved: the one
+    // chosen, or — skipped or left blank — the device region's, so Skip
+    // and a blank Finish give the same result.
+    final country = (_passed(OnboardingStep.country) || all
+            ? state.country
+            : null) ??
+        await _regionCountry();
+    await settings.setCurrency(symbol: country.symbol, code: country.currency);
+    await settings.setLocale(
+        countryCode: country.code, timezone: country.timezone);
 
     // The default tax rate, only when one was given: a blank (0) rate
     // creates no "Tax 0%" (rate stored as decimal: 13% → 0.13).
@@ -117,6 +119,19 @@ class OnboardingNotifier extends Notifier<OnboardingState> {
       );
       await settings.setDefaultTaxId(taxId);
     }
+  }
+
+  /// The device region's country from the bundled country data, or the
+  /// US when the locale gives nothing usable. The region is read here, at
+  /// setup only.
+  Future<CountryDefault> _regionCountry() async {
+    List<CountryDefault> countries;
+    try {
+      countries = await CountryRepository.load();
+    } catch (_) {
+      countries = const [];
+    }
+    return countryForRegion(countries, ref.read(deviceRegionProvider));
   }
 
   Future<void> finish() async {

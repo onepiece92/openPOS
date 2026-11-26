@@ -101,8 +101,8 @@ class AppSettings {
     this.businessPhone = '',
     this.businessAddress = '',
     this.businessPan = '',
-    this.currencySymbol = 'Rs',
-    this.currencyCode = 'NPR',
+    this.currencySymbol = r'$',
+    this.currencyCode = 'USD',
     this.countryCode = '',
     this.invoicePrefix = '',
     this.timezone = '',
@@ -186,6 +186,7 @@ class AppSettings {
     final rawFeatures = box.get(kFeaturesKey);
     final rawStockOff = box.get(kStockOffSince);
     final loyalty = get(kLoyaltyEnabled, false);
+    final legacy = get(_kOnboardingComplete, false);
 
     return AppSettings(
       onboardingComplete: get(_kOnboardingComplete, false),
@@ -204,8 +205,11 @@ class AppSettings {
       businessPhone: get(kBusinessPhone, ''),
       businessAddress: get(kBusinessAddress, ''),
       businessPan: get(kBusinessPan, ''),
-      currencySymbol: get(kCurrencySymbol, 'Rs'),
-      currencyCode: get(kCurrencyCode, 'NPR'),
+      // No currency stored: an existing install (setup done in an older
+      // build, whose Skip saved none) keeps its Rs/NPR; a new install shows
+      // $/USD only until setup saves the device region's currency.
+      currencySymbol: get(kCurrencySymbol, legacy ? 'Rs' : r'$'),
+      currencyCode: get(kCurrencyCode, legacy ? 'NPR' : 'USD'),
       countryCode: get(kCountryCode, ''),
       invoicePrefix: get(kInvoicePrefix, ''),
       timezone: get(kTimezone, ''),

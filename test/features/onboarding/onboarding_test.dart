@@ -10,6 +10,7 @@ import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/features/onboarding/domain/business_type.dart';
 import 'package:pos_app/features/onboarding/domain/country_default.dart';
+import 'package:pos_app/features/onboarding/domain/locale_country.dart';
 import 'package:pos_app/features/onboarding/domain/onboarding_state.dart';
 import 'package:pos_app/features/onboarding/presentation/onboarding_notifier.dart';
 import 'package:pos_app/features/onboarding/presentation/onboarding_screen.dart';
@@ -20,6 +21,7 @@ import '../../_support/temp_hive.dart';
 import '../../_support/test_db.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized(); // rootBundle: country data
   late Box<dynamic> box;
   late AppDatabase db;
 
@@ -29,10 +31,11 @@ void main() {
     addTearDown(db.close);
   });
 
-  ProviderContainer container() {
+  ProviderContainer container({String? region}) {
     final c = ProviderContainer(overrides: [
       settingsBoxProvider.overrideWithValue(box),
       databaseProvider.overrideWithValue(db),
+      deviceRegionProvider.overrideWithValue(region),
     ]);
     addTearDown(c.dispose);
     return c;
@@ -236,9 +239,9 @@ void main() {
           reason: 'the tax step was not passed');
     });
 
-    test('skip before the country step leaves currency as it was', () async {
-      final c = container();
-      final before = c.read(settingsProvider).currencyCode;
+    test('skip before the country step uses the device region, not a '
+        'country the shopkeeper never confirmed', () async {
+      final c = container(region: 'GB');
       final n = c.read(onboardingNotifierProvider.notifier)
         ..setCountry(const CountryDefault(
             code: 'KE',
@@ -250,7 +253,31 @@ void main() {
             taxRate: 16))
         ..next();
       await n.skip();
-      expect(c.read(settingsProvider).currencyCode, before);
+      expect(c.read(settingsProvider).currencyCode, 'GBP');
+    });
+
+    group('device region defaults', () {
+      for (final (region, code, currency, symbol) in [
+        ('GB', 'GB', 'GBP', '£'),
+        (null, 'US', 'USD', r'$'),
+        ('ZZ', 'US', 'USD', r'$'), // not in the country data
+      ]) {
+        test('region $region: skip and a blank finish both give '
+            '$currency/$code', () async {
+          final skipped = container(region: region);
+          await skipped.read(onboardingNotifierProvider.notifier).skip();
+          final s1 = skipped.read(settingsProvider);
+          expect((s1.currencyCode, s1.currencySymbol, s1.countryCode),
+              (currency, symbol, code));
+
+          await box.clear();
+          final finished = container(region: region);
+          await finished.read(onboardingNotifierProvider.notifier).finish();
+          final s2 = finished.read(settingsProvider);
+          expect((s2.currencyCode, s2.currencySymbol, s2.countryCode),
+              (currency, symbol, code));
+        });
+      }
     });
 
     test('a fresh install skipping at step 1 gets the neutral intro', () async {
@@ -287,11 +314,12 @@ void main() {
   });
 
   group('screen', () {
-    Future<GoRouter> pump(WidgetTester tester) async {
+    late ProviderContainer c;
+    Future<GoRouter> pump(WidgetTester tester, {String? region}) async {
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = const Size(900, 1800);
       addTearDown(tester.view.reset);
-      final c = container();
+      c = container(region: region);
       final router = GoRouter(initialLocation: '/onboarding', routes: [
         GoRoute(
             path: '/onboarding',
@@ -304,6 +332,17 @@ void main() {
       await tester.pumpAndSettle();
       return router;
     }
+
+    testWidgets("the country step pre-selects the device region's country, "
+        'not Nepal', (tester) async {
+      await pump(tester, region: 'KE');
+      expect(c.read(onboardingNotifierProvider).country?.code, 'KE');
+    });
+
+    testWidgets('no usable region: the US is pre-selected', (tester) async {
+      await pump(tester);
+      expect(c.read(onboardingNotifierProvider).country?.code, 'US');
+    });
 
     testWidgets('the header counts every step', (tester) async {
       await pump(tester);

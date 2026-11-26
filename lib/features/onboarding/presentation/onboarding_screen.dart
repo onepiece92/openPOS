@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:pos_app/core/utils/percent.dart';
 import 'package:pos_app/features/onboarding/data/country_repository.dart';
 import 'package:pos_app/features/onboarding/domain/country_default.dart';
+import 'package:pos_app/features/onboarding/domain/locale_country.dart';
 import 'package:pos_app/features/onboarding/domain/onboarding_state.dart';
 import 'package:pos_app/features/onboarding/presentation/onboarding_notifier.dart';
 import 'package:pos_app/features/onboarding/presentation/widgets/business_name_step.dart';
@@ -59,13 +60,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   Future<void> _loadCountries() async {
     final countries = await CountryRepository.load();
     if (!mounted) return;
-    final nepal = countries.firstWhere(
-      (c) => c.code == 'NP',
-      orElse: () => countries.first,
-    );
-    ref.read(onboardingNotifierProvider.notifier).setCountry(nepal);
-    _taxNameCtrl.text = nepal.taxName;
-    _taxRateCtrl.text = formatPercentNumber(nepal.taxRate);
+    // Pre-select the device region's country (the US when the locale has
+    // none, or it isn't in the data).
+    final initial =
+        countryForRegion(countries, ref.read(deviceRegionProvider));
+    ref.read(onboardingNotifierProvider.notifier).setCountry(initial);
+    _taxNameCtrl.text = initial.taxName;
+    _taxRateCtrl.text = formatPercentNumber(initial.taxRate);
     setState(() {
       _countries = countries;
       _filtered = countries;
