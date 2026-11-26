@@ -2,21 +2,21 @@ import 'package:flutter/material.dart';
 
 import 'package:pos_app/core/utils/percent.dart';
 import 'package:pos_app/features/onboarding/domain/country_default.dart';
-import 'package:pos_app/features/onboarding/domain/locale_country.dart';
 import 'package:pos_app/features/onboarding/domain/onboarding_state.dart';
 
 const kTaxesOffSummary = 'off — turn on in Features';
 
-/// The Currency row: the picked country's, else what Finish saves when
-/// nothing was picked and the region wasn't matched (USD).
-String currencySummary(CountryDefault? country) {
-  final c = country ?? kUnmatchedCountry;
-  return '${c.currency} (${c.symbol})';
-}
+/// The Currency row: the country Finish will save; a dash while it is
+/// still being worked out.
+String currencySummary(CountryDefault? country) =>
+    country == null ? '—' : '${country.currency} (${country.symbol})';
 
 class ConfirmStep extends StatelessWidget {
-  const ConfirmStep({super.key, required this.state});
+  const ConfirmStep({super.key, required this.state, this.resolvedCountry});
   final OnboardingState state;
+
+  /// What Finish will save (see `setupCountryProvider`); null while loading.
+  final CountryDefault? resolvedCountry;
 
   @override
   Widget build(BuildContext context) {
@@ -59,7 +59,9 @@ class ConfirmStep extends StatelessWidget {
               _SummaryRow(
                 icon: Icons.storefront_rounded,
                 label: 'Business',
-                value: state.businessName.isEmpty ? 'My Store' : state.businessName,
+                value: state.businessName.isEmpty
+                    ? 'My Store'
+                    : state.businessName,
               ),
               _SummaryRow(
                 icon: Icons.location_on_rounded,
@@ -69,9 +71,7 @@ class ConfirmStep extends StatelessWidget {
               _SummaryRow(
                 icon: Icons.currency_exchange_rounded,
                 label: 'Currency',
-                // Nothing picked and the region not matched: Finish saves
-                // kUnmatchedCountry's currency, so say so here.
-                value: currencySummary(state.country),
+                value: currencySummary(resolvedCountry),
               ),
               _SummaryRow(
                 icon: Icons.schedule_rounded,

@@ -354,10 +354,25 @@ void main() {
     });
 
     group('Confirm: Currency', () {
-      test('nothing picked, region not matched: USD (\$), as Finish saves', () {
-        expect(currencySummary(null), r'USD ($)');
-        expect(currencySummary(null),
-            '${kUnmatchedCountry.currency} (${kUnmatchedCountry.symbol})');
+      test('nothing picked, region not matched: USD (\$), as Finish saves',
+          () async {
+        final c = container(region: 'ZZ');
+        final resolved = await c.read(setupCountryProvider.future);
+        expect(currencySummary(resolved), r'USD ($)');
+      });
+      test('country list not loaded yet: Confirm shows what Finish saves',
+          () async {
+        final c = container(region: 'KE');
+        // The Country step's list hasn't loaded: nothing on screen yet.
+        expect(c.read(onboardingNotifierProvider).country, isNull);
+        final resolved = await c.read(setupCountryProvider.future);
+        expect(currencySummary(resolved), 'KES (KSh)');
+        await c.read(onboardingNotifierProvider.notifier).finish();
+        expect(c.read(settingsProvider).currencyCode, resolved.currency);
+        expect(c.read(settingsProvider).currencySymbol, resolved.symbol);
+      });
+      test('a dash only while still working it out', () {
+        expect(currencySummary(null), '—');
       });
       test('a picked country shows its own currency', () {
         expect(
@@ -371,10 +386,13 @@ void main() {
                 taxRate: 16)),
             'KES (KSh)');
       });
-      testWidgets('the Confirm step shows USD (\$), not a dash',
+      testWidgets('the Confirm step shows the resolved currency',
           (tester) async {
         await tester.pumpWidget(const MaterialApp(
-            home: Scaffold(body: ConfirmStep(state: OnboardingState()))));
+            home: Scaffold(
+                body: ConfirmStep(
+                    state: OnboardingState(),
+                    resolvedCountry: kUnmatchedCountry))));
         expect(find.text(r'USD ($)'), findsOneWidget);
       });
     });

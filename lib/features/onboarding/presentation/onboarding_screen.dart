@@ -64,8 +64,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     // Pre-select the device region's country (the US when the locale has
     // no region). A region that isn't in the data: nothing pre-selected,
     // and the step asks the shopkeeper to pick.
-    final initial =
-        countryForRegion(countries, ref.read(deviceRegionProvider));
+    final initial = countryForRegion(countries, ref.read(deviceRegionProvider));
     if (initial != null) {
       ref.read(onboardingNotifierProvider.notifier).setCountry(initial);
       _taxNameCtrl.text = initial.taxName;
@@ -216,7 +215,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                           rateController: _taxRateCtrl,
                           currencySymbol: state.country?.symbol ?? '\$',
                         ),
-                      OnboardingStep.confirm => ConfirmStep(state: state),
+                      OnboardingStep.confirm => ConfirmStep(
+                          state: state,
+                          resolvedCountry:
+                              ref.watch(setupCountryProvider).valueOrNull,
+                        ),
                     },
                 ],
               ),

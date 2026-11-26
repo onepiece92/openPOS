@@ -100,7 +100,7 @@ class OnboardingNotifier extends Notifier<OnboardingState> {
     // screen (picked, or pre-selected from the device region), else the
     // region's — so Skip and a blank Finish give the same result. A region
     // that isn't in the data: USD, no country, no timezone.
-    final country = state.country ?? await _regionCountry();
+    final country = await resolveSetupCountry(ref, state.country);
     await settings.setCurrency(symbol: country.symbol, code: country.currency);
     await settings.setLocale(
         countryCode: country.code, timezone: country.timezone);
@@ -120,20 +120,6 @@ class OnboardingNotifier extends Notifier<OnboardingState> {
       );
       await settings.setDefaultTaxId(taxId);
     }
-  }
-
-  /// The device region's country from the bundled country data: the US
-  /// when the locale has no region, [kUnmatchedCountry] when its region is
-  /// not in the data. The region is read here, at setup only.
-  Future<CountryDefault> _regionCountry() async {
-    List<CountryDefault> countries;
-    try {
-      countries = await CountryRepository.load();
-    } catch (_) {
-      countries = const [];
-    }
-    return countryForRegion(countries, ref.read(deviceRegionProvider)) ??
-        kUnmatchedCountry;
   }
 
   Future<void> finish() async {
@@ -172,3 +158,27 @@ final onboardingNotifierProvider =
     NotifierProvider<OnboardingNotifier, OnboardingState>(
   OnboardingNotifier.new,
 );
+
+/// The country setup saves (and Confirm shows): the one [picked] on screen,
+/// else the device region's from the bundled data (the US when the locale
+/// has no region), else [kUnmatchedCountry] (USD, no country). Loads the
+/// country data itself, so it is right even before the Country step's own
+/// list has loaded. The region is read here, at setup only.
+Future<CountryDefault> resolveSetupCountry(
+    Ref ref, CountryDefault? picked) async {
+  if (picked != null) return picked;
+  List<CountryDefault> countries;
+  try {
+    countries = await CountryRepository.load();
+  } catch (_) {
+    countries = const [];
+  }
+  return countryForRegion(countries, ref.read(deviceRegionProvider)) ??
+      kUnmatchedCountry;
+}
+
+/// What Finish will save as the country: Confirm reads this, so it never
+/// disagrees with [OnboardingNotifier.finish].
+final setupCountryProvider = FutureProvider.autoDispose<CountryDefault>((ref) =>
+    resolveSetupCountry(
+        ref, ref.watch(onboardingNotifierProvider.select((s) => s.country))));
