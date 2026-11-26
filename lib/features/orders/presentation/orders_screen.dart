@@ -31,6 +31,10 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
   Timer? _debounce;
   String _query = '';
 
+  /// Customers off: names already looked up, kept across pages so a page
+  /// loading more orders never blanks the names already on screen.
+  final Map<int, String> _nameCache = {};
+
   @override
   void initState() {
     super.initState();
@@ -72,17 +76,21 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
     final history = ref.watch(orderHistoryProvider);
     final fmt = ref.watch(currencyFormatterProvider);
     // Customers off: the list is not watched, but orders still show their
-    // stored customer (read once, just for the ids on screen).
+    // stored customer — names read once, only for ids not yet looked up.
     final Map<int, String> customerNames;
     if (ref.watch(featureOnProvider(Feature.customers))) {
       final customers = ref.watch(customersStreamProvider).valueOrNull ?? [];
       customerNames = {for (final c in customers) c.id: c.name};
     } else {
-      customerNames = ref
-              .watch(customerNamesProvider(customerNamesKey(
-                  history.orders.map((o) => o.customerId))))
-              .valueOrNull ??
-          const {};
+      final missing = [
+        for (final o in history.orders)
+          if (o.customerId case final id? when !_nameCache.containsKey(id)) id,
+      ];
+      final fresh = ref
+          .watch(customerNamesProvider(customerNamesKey(missing)))
+          .valueOrNull;
+      if (fresh != null) _nameCache.addAll(fresh);
+      customerNames = _nameCache;
     }
 
     return Scaffold(
