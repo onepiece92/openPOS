@@ -104,7 +104,10 @@ void main() {
         Feature.csvImportExport,
         Feature.dashboardExtras,
       },
-      BusinessType.marketStall: {},
+      BusinessType.marketStall: {
+        Feature.reviewReminder,
+        Feature.usageCounting
+      },
       BusinessType.services: {
         ...app,
         Feature.customers,
@@ -112,7 +115,7 @@ void main() {
         Feature.taxes,
         Feature.expenses,
       },
-      BusinessType.other: {},
+      BusinessType.other: {Feature.reviewReminder, Feature.usageCounting},
     };
 
     for (final t in BusinessType.values) {
@@ -140,19 +143,33 @@ void main() {
   });
 
   group('writing features_v1', () {
-    test('Start minimal turns every optional feature off', () async {
+    test('Start minimal turns every optional feature off but Review reminder '
+        'and Usage counting; Auto-print off', () async {
       await box.put(kLoyaltyEnabled, true);
       final c = container();
       final n = c.read(onboardingNotifierProvider.notifier)
         ..setBusinessType(BusinessType.retail)
         ..startMinimal();
-      expect(n.shownSwitches.values, everyElement(isFalse));
       await n.skip();
       final flags = c.read(featureFlagsProvider);
       for (final f in Feature.values) {
-        expect(flags.isOn(f), isFalse, reason: f.name);
+        expect(flags.isOn(f),
+            f == Feature.reviewReminder || f == Feature.usageCounting,
+            reason: f.name);
       }
+      expect(flags.autoPrint, isFalse);
       expect(box.get(kLoyaltyEnabled), isFalse);
+    });
+
+    test('Review reminder and Usage counting are on in every preset; '
+        'Auto-print off only in the minimal ones', () {
+      for (final t in BusinessType.values) {
+        expect(kPresets[t], containsAll(kAlwaysSuggested), reason: t.name);
+        final minimal =
+            t == BusinessType.marketStall || t == BusinessType.other;
+        expect(kPresets[t]!.contains(Feature.autoPrint), !minimal,
+            reason: t.name);
+      }
     });
 
     test('skip with no choice writes the defaults (every feature on) and '

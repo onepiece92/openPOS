@@ -25,10 +25,15 @@ enum BusinessType {
 BusinessType? parseBusinessType(Object? raw) =>
     raw is String ? BusinessType.values.asNameMap()[raw] : null;
 
-/// Features every preset turns on.
-const _app = {Feature.autoPrint, Feature.reviewReminder, Feature.usageCounting};
+/// On in EVERY preset, the minimal ones and "Start minimal" included
+/// (owner decision).
+const kAlwaysSuggested = {Feature.reviewReminder, Feature.usageCounting};
+
+/// The non-minimal presets also print automatically.
+const _app = {...kAlwaysSuggested, Feature.autoPrint};
 
 /// What setup suggests for each business type. Anything not listed is off.
+/// Market stall and Something else are minimal: [kAlwaysSuggested] only.
 /// A preset only sets switches: it never touches data.
 ///
 /// TODO(tips, end-of-day): once those Feature values exist, add tips to
@@ -72,7 +77,7 @@ const Map<BusinessType, Set<Feature>> kPresets = {
     Feature.csvImportExport,
     Feature.dashboardExtras,
   },
-  BusinessType.marketStall: {},
+  BusinessType.marketStall: kAlwaysSuggested,
   BusinessType.services: {
     ..._app,
     Feature.customers,
@@ -80,7 +85,7 @@ const Map<BusinessType, Set<Feature>> kPresets = {
     Feature.taxes,
     Feature.expenses,
   },
-  BusinessType.other: {},
+  BusinessType.other: kAlwaysSuggested,
 };
 
 /// Every switch as [type]'s preset sets it.

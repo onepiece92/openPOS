@@ -42,9 +42,11 @@ class OnboardingNotifier extends Notifier<OnboardingState> {
   void setSwitch(Feature f, bool on) =>
       state = state.copyWith(switches: {...shownSwitches, f: on});
 
-  /// "Start minimal": every optional feature off.
-  void startMinimal() => state =
-      state.copyWith(switches: {for (final f in Feature.values) f: false});
+  /// "Start minimal": every optional feature off except Review reminder
+  /// and Usage counting (on in every preset); Auto-print off.
+  void startMinimal() => state = state.copyWith(switches: {
+        for (final f in Feature.values) f: kAlwaysSuggested.contains(f),
+      });
 
   void next() => state = state.copyWith(step: state.step + 1);
   void back() => state = state.copyWith(step: state.step - 1);
