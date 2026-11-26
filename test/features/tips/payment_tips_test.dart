@@ -180,4 +180,84 @@ void main() {
     await settle(tester);
     expect((await theOrder(tester)).tipAmount, 0);
   });
+
+  Future<void> customTip(WidgetTester tester, String v) async {
+    await tester.tap(find.text('Custom'));
+    await tester.pump();
+    await tester.enterText(find.widgetWithText(TextField, 'Tip amount'), v);
+    await tester.pump();
+  }
+
+  testWidgets('a tip bigger than the sale asks first; Change tip charges nothing',
+      (tester) async {
+    await pumpScreen(tester, on: true);
+    await customTip(tester, '150');
+    await tester.tap(confirm());
+    await tester.pump();
+    expect(find.textContaining('Tip is larger than the sale'), findsOneWidget);
+    expect(find.textContaining('150.00 on'), findsOneWidget);
+    expect(find.textContaining('Keep it?'), findsOneWidget);
+    await tester.tap(find.text('Change tip'));
+    await settle(tester);
+    expect(await tester.runAsync(() => db.select(db.orders).get()), isEmpty);
+  });
+
+  testWidgets('Keep tip places the order with that tip', (tester) async {
+    await pumpScreen(tester, on: true);
+    await customTip(tester, '150');
+    await tester.tap(confirm());
+    await tester.pump();
+    await tester.tap(find.text('Keep tip'));
+    await settle(tester);
+    expect((await theOrder(tester)).tipAmount, 150);
+  });
+
+  testWidgets('a tip up to the sale total asks nothing', (tester) async {
+    await pumpScreen(tester, on: true);
+    await customTip(tester, '100');
+    await tester.tap(confirm());
+    await settle(tester);
+    expect(find.textContaining('Keep it?'), findsNothing);
+    expect((await theOrder(tester)).tipAmount, 100);
+  });
+
+  testWidgets('a mistyped tip far past the cap is refused by placeOrder',
+      (tester) async {
+    await pumpScreen(tester, on: true);
+    await tester.tap(find.text('Card'));
+    await tester.pump();
+    await customTip(tester, '99999999');
+    await tester.tap(confirm());
+    await tester.pump();
+    await tester.tap(find.text('Keep tip'));
+    await settle(tester);
+    expect(find.textContaining('Tip is too large'), findsOneWidget);
+    expect(await tester.runAsync(() => db.select(db.orders).get()), isEmpty);
+  });
+
+  testWidgets('nothing to tip on: chips are disabled with the reason',
+      (tester) async {
+    await pumpScreen(tester, on: true);
+    c.read(cartProvider.notifier).clear();
+    c.read(cartProvider.notifier).restoreItem(CartItem(
+        productId: productId,
+        name: 'Free',
+        unitPrice: 0,
+        quantity: 1,
+        isTaxable: false));
+    await tester.pump();
+    expect(find.text('Nothing to tip on: use a custom amount.'),
+        findsOneWidget);
+    final chip = tester.widget<ChoiceChip>(
+        find.widgetWithText(ChoiceChip, '15%'));
+    expect(chip.onSelected, isNull);
+    // Custom still works.
+    await customTip(tester, '5');
+    expect(find.textContaining('Total with tip'), findsOneWidget);
+  });
+
+  testWidgets('with a base, the reason line is not shown', (tester) async {
+    await pumpScreen(tester, on: true);
+    expect(find.text('Nothing to tip on: use a custom amount.'), findsNothing);
+  });
 }

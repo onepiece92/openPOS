@@ -42,5 +42,20 @@ double tipBaseOf(CartSummary s, {bool postTax = false}) => tipBase(
 double tipForPercent(double base, double percent) =>
     roundMoney(base * percent / 100);
 
+/// A tip may be at most this many times the sale total. A tip of 10x the
+/// sale is already a typo (1500 for 15); real tips are a small fraction.
+const kTipMaxFactor = 10;
+
+/// The most a tip may be on an order with no total (a free or fully
+/// discounted sale): 1,000 in the shop's currency, a generous tip on a free
+/// order that still stops a stray extra digit.
+const kTipMaxOnFreeOrder = 1000.0;
+
+/// The largest tip [placeOrder] accepts for a sale of [total].
+double maxTipFor(double total) {
+  final cap = total > 0 ? total * kTipMaxFactor : kTipMaxOnFreeOrder;
+  return roundMoney(cap < kMaxMoneyAmount ? cap : kMaxMoneyAmount);
+}
+
 /// What the customer pays in all: the sale plus the tip.
 double paidWithTip(double total, double tip) => roundMoney(total + tip);

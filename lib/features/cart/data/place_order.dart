@@ -5,6 +5,7 @@ import 'package:pos_app/core/services/audit_service.dart';
 import 'package:pos_app/core/utils/money.dart';
 import 'package:pos_app/features/cart/domain/cart_item.dart';
 import 'package:pos_app/features/cart/presentation/providers/cart_notifier.dart';
+import 'package:pos_app/features/tips/tip_math.dart';
 
 /// Atomically commits a completed sale. Returns the new order ID.
 ///
@@ -28,6 +29,16 @@ Future<int> placeOrder(
 }) {
   // Never negative; the tip is kept apart from the sale (`total` is tip-free).
   final tip = tipAmount > 0 ? roundMoney(tipAmount) : 0.0;
+  // Second guard behind the payment screen's confirmation: a tip far beyond
+  // the sale is a typo, so it is refused before anything is written.
+  final maxTip = maxTipFor(summary.total);
+  if (tip > maxTip) {
+    return Future.error(ArgumentError.value(
+        tipAmount,
+        'tipAmount',
+        'Tip is too large for this sale (at most '
+            '${maxTip.toStringAsFixed(2)})'));
+  }
   return db.transaction(() async {
     // Read once: needed for the cost snapshot and again for stock below.
     final products = <int, Product?>{};
@@ -175,6 +186,7 @@ Future<int> placeOrder(
       id,
       total: summary.total,
       paymentMethod: paymentMethod,
+      tip: tip,
     );
 
     return id;

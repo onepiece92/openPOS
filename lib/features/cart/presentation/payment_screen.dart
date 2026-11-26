@@ -82,8 +82,10 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   }
 
   /// The tip for [summary] under the current choice; 0 when tips are off.
-  double _tipFor(CartSummary summary, TipsSettings tips) {
+  double _tipFor(CartSummary summary) {
+    // Tips off: the settings are not even read.
     if (!ref.read(tipsEnabledProvider)) return 0;
+    final tips = ref.read(tipsSettingsProvider);
     if (_customTip) {
       final v = double.tryParse(_customTipCtrl.text) ?? 0.0;
       return roundMoney(v.clamp(0.0, kMaxMoneyAmount));
@@ -97,7 +99,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   void _followDue() {
     if (_tenderedEdited) return;
     final summary = ref.read(cartSummaryProvider);
-    final tip = _tipFor(summary, ref.read(tipsSettingsProvider));
+    final tip = _tipFor(summary);
     _tenderedCtrl.text = exactAmountText(paidWithTip(summary.total, tip));
   }
 
@@ -111,7 +113,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     final cart = ref.read(cartProvider);
     if (cart.isEmpty) return;
 
-    final tip = _tipFor(summary, ref.read(tipsSettingsProvider));
+    final tip = _tipFor(summary);
     final due = paidWithTip(summary.total, tip);
 
     // Half a cent of slack: the field holds two decimals.
@@ -123,6 +125,28 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                 : 'Tendered amount is less than the total')),
       );
       return;
+    }
+
+    // A tip bigger than the sale is most likely a typo: ask first.
+    if (tip > summary.total + 0.005) {
+      final fmt = ref.read(currencyFormatterProvider);
+      final keep = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Large tip'),
+          content: Text('Tip is larger than the sale: ${fmt.format(tip)} on '
+              '${fmt.format(summary.total)}. Keep it?'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Change tip')),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Keep tip')),
+          ],
+        ),
+      );
+      if (keep != true || !mounted) return;
     }
 
     setState(() => _placing = true);
@@ -214,9 +238,13 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     ref.listen(cartSummaryProvider.select((s) => s.total), (prev, next) {
       _followDue();
     });
-    final tips = ref.watch(tipsSettingsProvider);
     final tipsOn = ref.watch(tipsEnabledProvider);
-    final tip = _tipFor(summary, tips);
+    // Tips off: the tips settings are not watched at all.
+    final tips =
+        tipsOn ? ref.watch(tipsSettingsProvider) : const TipsSettings();
+    final tip = _tipFor(summary);
+    // Nothing to take a percentage of (loyalty covered the goods, say).
+    final noBase = tipBaseOf(summary, postTax: tips.postTax) <= 0;
     final due = paidWithTip(summary.total, tip);
     final symbol = ref.watch(currencySymbolProvider);
     final fmt = ref.watch(currencyFormatterProvider);
@@ -259,13 +287,15 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                   ChoiceChip(
                     label: Text(tipPercentLabel(pct)),
                     selected: !_customTip && _tipPercent == pct,
-                    onSelected: (_) {
-                      setState(() {
-                        _tipPercent = pct;
-                        _customTip = false;
-                      });
-                      _followDue();
-                    },
+                    onSelected: noBase
+                        ? null
+                        : (_) {
+                            setState(() {
+                              _tipPercent = pct;
+                              _customTip = false;
+                            });
+                            _followDue();
+                          },
                   ),
                 ChoiceChip(
                   label: const Text('Custom'),
@@ -280,6 +310,11 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                 ),
               ],
             ),
+            if (noBase) ...[
+              const SizedBox(height: 8),
+              Text('Nothing to tip on: use a custom amount.',
+                  key: const ValueKey('tip-no-base'), style: tt.bodySmall),
+            ],
             if (_customTip) ...[
               const SizedBox(height: 12),
               TextField(

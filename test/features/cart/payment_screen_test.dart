@@ -32,10 +32,12 @@ class _GatedAudit extends AuditService {
     int orderId, {
     required double total,
     required String paymentMethod,
+    double tip = 0,
   }) async {
     await gate.future;
     return super
-        .orderPlaced(orderId, total: total, paymentMethod: paymentMethod);
+        .orderPlaced(orderId,
+            total: total, paymentMethod: paymentMethod, tip: tip);
   }
 }
 
