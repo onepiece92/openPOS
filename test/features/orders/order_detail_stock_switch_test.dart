@@ -174,7 +174,7 @@ void main() {
     testWidgets('a void says what it put back', (tester) async {
       await pump(tester, stock: true, order: linkedSale());
       await confirmVoid(tester);
-      expect(snack(tester), 'Order voided. 3 items put back in stock.');
+      expect(snack(tester), 'Order voided. 3 units put back in stock.');
     });
 
     testWidgets('stock restocked underneath: the void says none went back',
@@ -219,9 +219,9 @@ void main() {
 
   test('restockedText', () {
     expect(restockedText(const RestockResult(products: 1, units: 1)),
-        '1 item put back in stock.');
+        '1 unit put back in stock.');
     expect(restockedText(const RestockResult(products: 2, units: 5)),
-        '5 items put back in stock.');
+        '5 units put back in stock.');
     expect(restockedText(RestockResult.nothing), 'No stock to put back.');
   });
 

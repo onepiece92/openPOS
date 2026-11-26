@@ -38,13 +38,13 @@ String voidDialogText({required bool restocks, required bool points}) {
       '${restocks ? ' Composite components are restocked automatically.' : ''}';
 }
 
-/// "3 items put back in stock." / "No stock to put back." — what a void or
+/// "3 units put back in stock." / "No stock to put back." — what a void or
 /// refund actually restocked, as its transaction found it.
 @visibleForTesting
 String restockedText(RestockResult r, {String none = 'No stock to put back.'}) =>
     !r.any
         ? none
-        : '${r.units} ${r.units == 1 ? 'item' : 'items'} put back in stock.';
+        : '${r.units} ${r.units == 1 ? 'unit' : 'units'} put back in stock.';
 
 // ─── Data bundle ──────────────────────────────────────────────────────────────
 
