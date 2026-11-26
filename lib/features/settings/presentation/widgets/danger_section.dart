@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
-import 'package:pos_app/core/providers/database_provider.dart';
-import 'package:pos_app/core/providers/hive_provider.dart';
+import 'package:pos_app/app_root.dart';
+import 'package:pos_app/features/settings/data/factory_reset.dart';
 
 // ── Danger Zone ───────────────────────────────────────────────────────────────
 
@@ -35,10 +34,7 @@ class DangerSection extends ConsumerWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Factory Reset?'),
-        content: const Text(
-          'This will permanently delete ALL products, orders, customers, '
-          'expenses, and settings. This cannot be undone.',
-        ),
+        content: const Text(kFactoryResetConfirmText),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
@@ -60,43 +56,8 @@ class DangerSection extends ConsumerWidget {
     );
   }
 
-  Future<void> _doReset(BuildContext context, WidgetRef ref) async {
-    final db = ref.read(databaseProvider);
-    final box = ref.read(settingsBoxProvider);
-
-    try {
-      await db.transaction(() async {
-        await db.delete(db.stockAdjustments).go();
-        await db.delete(db.orderTaxOverrides).go();
-        await db.delete(db.orderTaxes).go();
-        await db.delete(db.orderItems).go();
-        await db.delete(db.returns).go();
-        await db.delete(db.orders).go();
-        await db.delete(db.expenses).go();
-        await db.delete(db.productTaxes).go();
-        await db.delete(db.productComponents).go();
-        await db.delete(db.products).go();
-        await db.delete(db.customers).go();
-        await db.delete(db.categories).go();
-        await db.delete(db.taxGroupMembers).go();
-        await db.delete(db.taxGroups).go();
-        await db.delete(db.taxRates).go();
-        await db.delete(db.expenseCategories).go();
-        await db.delete(db.auditLog).go();
-        await db.delete(db.shifts).go();
-      });
-
-      await box.clear();
-      // State + router redirect update synchronously from the emptied box.
-      ref.read(settingsProvider.notifier).reload();
-
-      if (context.mounted) context.go('/onboarding');
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Reset failed: $e')),
-        );
-      }
-    }
-  }
+  /// Runs as an app restart (see `AppRootState.factoryReset`), so the app
+  /// comes back like a first run with no state carried over.
+  Future<void> _doReset(BuildContext context, WidgetRef ref) =>
+      AppRoot.of(context).factoryReset();
 }

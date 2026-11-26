@@ -63,6 +63,15 @@ class TicketSequence {
   }
 }
 
+/// Deletes every held ticket in [box] but keeps (and first pins down) the
+/// ticket counter, so numbers handed out after a factory reset never repeat
+/// old ones.
+Future<void> clearHeldTicketsKeepingCounter(Box<dynamic> box) async {
+  final seq = TicketSequence(box)._highWaterMark;
+  await box.deleteAll(box.keys.where((k) => k != kTicketSeqKey).toList());
+  if (seq > 0) await box.put(kTicketSeqKey, seq);
+}
+
 final ticketSequenceProvider = Provider<TicketSequence>(
   (ref) => TicketSequence(ref.watch(heldOrdersBoxProvider)),
 );

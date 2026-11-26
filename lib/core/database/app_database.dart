@@ -328,6 +328,39 @@ class AppDatabase extends _$AppDatabase {
         );
       });
 
+  /// Factory reset: deletes every row, then seeds the same defaults as a
+  /// fresh install, in one transaction (all or nothing). Children before
+  /// parents so no foreign key is ever left dangling: stock adjustments,
+  /// order taxes/overrides/items and returns before orders; orders before
+  /// the customers and restaurant tables they point at; product links
+  /// before products; categories before tax rates.
+  Future<void> eraseAllData() => transaction(() async {
+        for (final t in <TableInfo<Table, Object?>>[
+          stockAdjustments,
+          orderTaxOverrides,
+          orderTaxes,
+          orderItems,
+          returns,
+          orders,
+          tables,
+          expenses,
+          productTaxes,
+          productComponents,
+          products,
+          customers,
+          categories,
+          taxGroupMembers,
+          taxGroups,
+          taxRates,
+          expenseCategories,
+          auditLog,
+          shifts,
+        ]) {
+          await delete(t).go();
+        }
+        await _seedDefaultData();
+      });
+
   /// Seeds essential data on a fresh install.
   /// Wrapped in a check so it's idempotent — safe to call multiple times.
   Future<void> _seedDefaultData() async {

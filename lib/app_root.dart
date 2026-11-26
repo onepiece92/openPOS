@@ -19,6 +19,7 @@ import 'package:pos_app/features/backup/data/snapshot_providers.dart';
 import 'package:pos_app/features/backup/data/snapshot_service.dart';
 import 'package:pos_app/features/help/support_contact.dart';
 import 'package:pos_app/features/review/data/review_state_store.dart';
+import 'package:pos_app/features/settings/data/factory_reset.dart';
 import 'package:pos_app/features/usage/data/usage_counter.dart';
 import 'package:pos_app/features/usage/domain/usage_event.dart';
 import 'package:pos_app/features/usage/usage_providers.dart';
@@ -67,6 +68,7 @@ class AppRoot extends StatefulWidget {
 class AppRootState extends State<AppRoot> {
   late ProviderContainer _container;
   bool _restoring = false;
+  String _splashMessage = kRestoringSplashText;
   String? _notice; // one-shot toast shown after a restart
   String? _fatal; // set when no data could be reopened after a restore
   // Error-screen heading and whether it offers "Try again"; set together
@@ -87,6 +89,9 @@ class AppRootState extends State<AppRoot> {
 
   @visibleForTesting
   bool get autoBackupScheduledForTest => _autoBackupTimer != null;
+
+  @visibleForTesting
+  ProviderContainer get containerForTest => _container;
 
   @override
   void initState() {
@@ -197,6 +202,7 @@ class AppRootState extends State<AppRoot> {
     // 1. Unmount the app tree so no widget can issue queries mid-swap.
     setState(() {
       _restoring = true;
+      _splashMessage = kRestoringSplashText;
       _fatal = null;
     });
 
@@ -332,8 +338,74 @@ class AppRootState extends State<AppRoot> {
     await c.read(databaseProvider).customSelect('SELECT 1').get();
   }
 
+  /// Factory reset, as a restart: unmounts the app, erases the database
+  /// (one transaction) and then the Hive boxes and receipt photos (see
+  /// [eraseLocalStores]), and brings the app back on a fresh container — so
+  /// no provider, SnackBar or usage counter carries state across, and the
+  /// app comes up like a first run (onboarding, then the usage notice
+  /// once). Automatic backups are kept.
+  ///
+  /// When the database cannot be erased nothing has changed: the app comes
+  /// back on its data with [kFactoryResetFailedNotice].
+  Future<void> factoryReset() async {
+    if (_restoring || _fatal != null) return;
+    _autoBackupTimer?.cancel();
+    _autoBackupTimer = null;
+    setState(() {
+      _restoring = true;
+      _splashMessage = kFactoryResetProgress;
+    });
+    String? notice;
+    try {
+      final inFlight = _autoBackupRun;
+      if (inFlight != null) await inFlight;
+      await WidgetsBinding.instance.endOfFrame;
+      final old = _container;
+      try {
+        await old.read(databaseProvider).eraseAllData();
+      } catch (_) {
+        notice = kFactoryResetFailedNotice;
+        return;
+      }
+      // Write pending usage counts now, so tearing the container down
+      // cannot write them back after the usage box is cleared.
+      if (old.exists(usageCounterProvider)) {
+        await old.read(usageCounterProvider).flush();
+      }
+      try {
+        await old.read(databaseProvider).close();
+      } finally {
+        old.dispose();
+        _container = ProviderContainer();
+      }
+      try {
+        await eraseLocalStores(
+          settings: Hive.box<dynamic>('settings'),
+          heldOrders: Hive.box<dynamic>('held_orders'),
+          usage: await usageBoxForReset(),
+          receipts: await receiptsDir(),
+        );
+        await startReviewClock(); // a fresh install's clock
+      } catch (_) {
+        notice = kFactoryResetIncompleteNotice;
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _restoring = false;
+          _notice = notice;
+        });
+      } else {
+        _restoring = false;
+      }
+    }
+  }
+
   Future<void> _retryOpen() async {
-    setState(() => _restoring = true);
+    setState(() {
+      _restoring = true;
+      _splashMessage = kRestoringSplashText;
+    });
     String? fatal;
     String? notice;
     Object? dbError;
@@ -386,7 +458,7 @@ class AppRootState extends State<AppRoot> {
 
   @override
   Widget build(BuildContext context) {
-    if (_restoring) return const _RestoringSplash();
+    if (_restoring) return _RestoringSplash(message: _splashMessage);
     if (_fatal != null) {
       return _RestoreFailedScreen(
         title: _fatalTitle,
@@ -409,6 +481,9 @@ class AppRootState extends State<AppRoot> {
   }
 }
 
+/// The splash shown while a backup is restored.
+const kRestoringSplashText = 'Restoring backup…';
+
 /// Error-screen heading for a failed restore or startup recovery.
 const kRestoreFailedTitle = 'Restore failed';
 
@@ -426,19 +501,20 @@ const kRestoreFailedTitle = 'Restore failed';
       );
 
 class _RestoringSplash extends StatelessWidget {
-  const _RestoringSplash();
+  const _RestoringSplash({required this.message});
+  final String message;
 
   @override
-  Widget build(BuildContext context) => const MaterialApp(
+  Widget build(BuildContext context) => MaterialApp(
         debugShowCheckedModeBanner: false,
         home: Scaffold(
           body: Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                CircularProgressIndicator(),
-                SizedBox(height: 16),
-                Text('Restoring backup…'),
+                const CircularProgressIndicator(),
+                const SizedBox(height: 16),
+                Text(message),
               ],
             ),
           ),
