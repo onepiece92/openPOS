@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/features/cart/presentation/providers/cart_notifier.dart';
 import 'package:pos_app/features/cart/presentation/providers/held_orders_notifier.dart';
@@ -17,6 +18,11 @@ const kTaxesOffBody =
     'them. Your tax rates and default rate are kept, so they come back when '
     'you turn Taxes on again.';
 
+/// Switching End-of-day close off while a day is open.
+const kEndOfDayOpenBody =
+    'A day is open. It stays open and you can close it after turning this '
+    'back on.';
+
 String _tickets(int n) => n == 1 ? '1 saved ticket' : '$n saved tickets';
 
 /// What switching [f] off would hide that is in use right now, as the
@@ -24,8 +30,12 @@ String _tickets(int n) => n == 1 ? '1 saved ticket' : '$n saved tickets';
 /// [heldTickets]: active held tickets; [tableTickets]: tickets (held or
 /// the open cart) with a table; [cartCustomer]: the open cart has one.
 String? hideConfirmBody(Feature f,
-    {int heldTickets = 0, int tableTickets = 0, bool cartCustomer = false}) {
+    {int heldTickets = 0,
+    int tableTickets = 0,
+    bool cartCustomer = false,
+    bool dayOpen = false}) {
   return switch (f) {
+    Feature.endOfDay when dayOpen => kEndOfDayOpenBody,
     Feature.taxes => kTaxesOffBody,
     Feature.heldTickets when heldTickets > 0 =>
       '${_tickets(heldTickets)} will be hidden until you turn this back on. '
@@ -72,7 +82,7 @@ class _FeaturesScreenState extends ConsumerState<FeaturesScreen> {
   /// Asks first when switching [f] off would hide live data (or, for
   /// Taxes, change the next sales). Reads the held tickets and the open
   /// cart only at that moment, and never creates a cart session.
-  String? _confirmBody(Feature f) {
+  String? _confirmBody(Feature f, {bool dayOpen = false}) {
     final flags = ref.read(featureFlagsProvider);
     final session =
         ref.exists(cartSessionProvider) ? ref.read(cartSessionProvider) : null;
@@ -91,12 +101,21 @@ class _FeaturesScreenState extends ConsumerState<FeaturesScreen> {
         tableTickets: f == Feature.tables && flags.tables ? withTable : 0,
         cartCustomer: f == Feature.customers &&
             flags.customers &&
-            session?.customerId != null);
+            session?.customerId != null,
+        dayOpen: dayOpen);
   }
 
+  /// Whether a till day is open, read only when End-of-day close is being
+  /// switched off (one indexed lookup).
+  Future<bool> _dayOpen(Feature f) async =>
+      f == Feature.endOfDay &&
+      ref.read(featureFlagsProvider).endOfDay &&
+      await ref.read(databaseProvider).shiftsDao.currentShift() != null;
+
   Future<void> _set(Feature f, bool on) async {
-    final body = on ? null : _confirmBody(f);
+    final body = on ? null : _confirmBody(f, dayOpen: await _dayOpen(f));
     if (body != null) {
+      if (!mounted) return;
       final ok = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(

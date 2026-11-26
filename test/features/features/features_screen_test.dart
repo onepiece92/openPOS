@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import 'package:pos_app/core/database/app_database.dart';
+import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/core/services/audit_service.dart';
 import 'package:pos_app/features/cart/data/place_order.dart';
@@ -24,20 +25,22 @@ void main() {
   setUp(() async =>
       settings = await openTempSettingsBox(more: ['held_orders']));
 
-  ProviderContainer container() {
+  ProviderContainer container({AppDatabase? db}) {
     final c = ProviderContainer(overrides: [
       settingsBoxProvider.overrideWithValue(settings),
       heldOrdersBoxProvider.overrideWithValue(Hive.box('held_orders')),
+      if (db != null) databaseProvider.overrideWithValue(db),
     ]);
     addTearDown(c.dispose);
     return c;
   }
 
-  Future<ProviderContainer> pump(WidgetTester tester) async {
+  Future<ProviderContainer> pump(WidgetTester tester,
+      {AppDatabase? db}) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(900, 2600);
     addTearDown(tester.view.reset);
-    final c = container();
+    final c = container(db: db);
     final router = GoRouter(
         routes: [GoRoute(path: '/', builder: (_, __) => const FeaturesScreen())]);
     addTearDown(router.dispose);
@@ -127,6 +130,41 @@ void main() {
       await tester.pumpAndSettle();
       expect(c.read(featureFlagsProvider).heldTickets, isFalse);
       expect(c.read(heldOrdersProvider), hasLength(2), reason: 'kept');
+    });
+
+    testWidgets('End-of-day close with a day open asks; the day stays open',
+        (tester) async {
+      final db = openInMemoryDatabase();
+      addTearDown(db.close);
+      await settings.put(kFeaturesKey, {'endOfDay': true});
+      final shift = await db.shiftsDao.openShift(openingCash: 0);
+      final c = await pump(tester, db: db);
+      await turnOff(tester, Feature.endOfDay);
+      expect(find.text('Turn off End-of-day close?'), findsOneWidget);
+      expect(find.text(kEndOfDayOpenBody), findsOneWidget);
+      expect(kEndOfDayOpenBody,
+          'A day is open. It stays open and you can close it after turning '
+          'this back on.');
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(c.read(featureFlagsProvider).endOfDay, isTrue);
+
+      await turnOff(tester, Feature.endOfDay);
+      await tester.tap(find.byKey(const ValueKey('feature-off-confirm')));
+      await tester.pumpAndSettle();
+      expect(c.read(featureFlagsProvider).endOfDay, isFalse);
+      expect((await db.shiftsDao.currentShift())!.id, shift, reason: 'kept');
+    });
+
+    testWidgets('End-of-day close with no day open: off at once',
+        (tester) async {
+      final db = openInMemoryDatabase();
+      addTearDown(db.close);
+      await settings.put(kFeaturesKey, {'endOfDay': true});
+      final c = await pump(tester, db: db);
+      await turnOff(tester, Feature.endOfDay);
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(c.read(featureFlagsProvider).endOfDay, isFalse);
     });
 
     testWidgets('Held tickets with none parked: off at once', (tester) async {
