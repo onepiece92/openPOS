@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import 'package:pos_app/core/providers/feature_flags.dart';
+import 'package:pos_app/features/settings/presentation/widgets/tax_section.dart'
+    show invoicePrefixError;
 
 export 'package:pos_app/core/providers/feature_flags.dart';
 
@@ -418,8 +420,14 @@ class SettingsNotifier extends Notifier<AppSettings> {
         state.copyWith(currencySymbol: symbol, currencyCode: code),
         {kCurrencySymbol: symbol, kCurrencyCode: code},
       );
-  Future<void> setInvoicePrefix(String v) =>
-      _write(state.copyWith(invoicePrefix: v.trim()), {kInvoicePrefix: v.trim()});
+  /// Throws [ArgumentError] for the reserved imported-orders prefix (any
+  /// case, after trimming): the settings dialog blocks it too.
+  Future<void> setInvoicePrefix(String v) async {
+    final error = invoicePrefixError(v);
+    if (error != null) throw ArgumentError.value(v, 'prefix', error);
+    await _write(
+        state.copyWith(invoicePrefix: v.trim()), {kInvoicePrefix: v.trim()});
+  }
   Future<void> setLocale({required String countryCode, required String timezone}) =>
       _write(
         state.copyWith(countryCode: countryCode, timezone: timezone),

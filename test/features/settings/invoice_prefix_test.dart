@@ -45,4 +45,38 @@ void main() {
     await tester.pumpAndSettle();
     expect(container.read(invoicePrefixProvider), 'SHOP');
   });
+
+  test('setInvoicePrefix itself rejects IMP and writes nothing', () async {
+    final box = await openTempSettingsBox();
+    final container =
+        ProviderContainer(overrides: [settingsBoxProvider.overrideWithValue(box)]);
+    addTearDown(container.dispose);
+    final n = container.read(settingsProvider.notifier);
+    for (final p in ['IMP', 'imp', ' Imp ']) {
+      await expectLater(n.setInvoicePrefix(p), throwsArgumentError);
+    }
+    expect(container.read(invoicePrefixProvider), isNot('IMP'));
+    await n.setInvoicePrefix(' SHOP ');
+    expect(container.read(invoicePrefixProvider), 'SHOP');
+  });
+
+  testWidgets('a shop already on IMP sees the hint and can Cancel',
+      (tester) async {
+    final settings = await tester.runAsync(openTempSettingsBox);
+    await tester.runAsync(() => settings!.put(kInvoicePrefix, 'IMP'));
+    final container = ProviderContainer(
+        overrides: [settingsBoxProvider.overrideWithValue(settings!)]);
+    addTearDown(container.dispose);
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: const MaterialApp(home: Scaffold(body: InvoiceSection())),
+    ));
+    await tester.tap(find.text('Invoice Prefix'));
+    await tester.pumpAndSettle();
+    expect(find.text(kReservedPrefixHint), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(container.read(invoicePrefixProvider), 'IMP');
+  });
 }

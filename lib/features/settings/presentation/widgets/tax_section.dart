@@ -27,6 +27,10 @@ class TaxSection extends ConsumerWidget {
 /// Why [prefix] can't be the invoice prefix, or null if it can. "IMP" marks
 /// CSV-imported orders (which never deducted stock, so a void or refund
 /// restocks nothing): a shop's own sales must not share it.
+/// One line shown when the shop's current prefix is already IMP.
+const kReservedPrefixHint =
+    'IMP is reserved for imported orders — choose another prefix for new sales';
+
 String? invoicePrefixError(String prefix) =>
     prefix.trim().toUpperCase() == kImportedInvoicePrefix
         ? '$kImportedInvoicePrefix is reserved for imported orders.'
@@ -79,6 +83,14 @@ class InvoiceSection extends ConsumerWidget {
                   errorText: error,
                 ),
               ),
+              if (invoicePrefixError(current) != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  kReservedPrefixHint,
+                  style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(ctx).colorScheme.error),
+                ),
+              ],
               const SizedBox(height: 12),
               Text(
                 'Bills are numbered without gaps inside a prefix. Setting a new '
