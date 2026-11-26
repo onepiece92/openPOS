@@ -78,7 +78,7 @@ void main() {
     // Stock should be 7 after sale of 3
     expect((await db.productsDao.getById(productId))!.stockQuantity, 7);
 
-    final returnId = await processReturn(
+    final result = await processReturn(
       db,
       audit, trackStock: true,
       orderId: orderId,
@@ -87,7 +87,8 @@ void main() {
       reason: 'damaged',
     );
 
-    expect(returnId, greaterThan(0));
+    expect(result.returnId, greaterThan(0));
+    expect(result.restocked.units, 3);
 
     // Stock back to 10
     expect((await db.productsDao.getById(productId))!.stockQuantity, 10);

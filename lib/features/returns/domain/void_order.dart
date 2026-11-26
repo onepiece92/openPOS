@@ -6,16 +6,18 @@ import 'package:pos_app/features/returns/domain/reverse_sale.dart';
 ///
 /// Puts back what the sale still owes the shelf (see [RestockPlan]: a
 /// stock-linked order from its own adjustment rows, a CSV import nothing,
-/// another legacy order its lines while [trackStock] is on), reverses the order's loyalty points, flips the order status
-/// to `'voided'`, and writes one audit-log entry. All inside a single
-/// transaction.
+/// another legacy order its lines while [trackStock] is on), reverses the
+/// order's loyalty points, flips the order status to `'voided'`, and writes
+/// one audit-log entry. All inside a single transaction. Returns what was
+/// actually put back, read inside it (it may differ from what the screen
+/// showed when it opened).
 ///
 /// No manager PIN gate yet — the UI uses a typed-VOID confirmation
 /// for now. PIN enforcement is a Phase 7 security pass.
 ///
 /// Throws if the order doesn't exist or is not `completed` (already voided,
 /// fully refunded, or still held).
-Future<void> voidOrder(
+Future<RestockResult> voidOrder(
   AppDatabase db,
   AuditService audit, {
   required int orderId,
@@ -34,11 +36,13 @@ Future<void> voidOrder(
 
     // Read inside the transaction: a concurrent refund can't restock twice.
     final plan = await readRestockPlan(db, order, trackStock: trackStock);
-    await applyRestock(db, order, plan, reasonCode: 'void', note: 'Void Order');
+    final restocked = await applyRestock(db, order, plan,
+        reasonCode: 'void', note: 'Void Order');
     await reverseLoyalty(db, order);
 
     await db.ordersDao.voidOrder(orderId);
 
     await audit.orderVoided(orderId, reason: reason);
+    return restocked;
   });
 }

@@ -5,6 +5,7 @@ import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/database/tables/orders_table.dart';
 import 'package:pos_app/core/services/audit_service.dart';
 import 'package:pos_app/features/returns/domain/process_return.dart';
+import 'package:pos_app/features/returns/domain/reverse_sale.dart';
 import 'package:pos_app/features/returns/domain/void_order.dart';
 
 import '../../_support/sales.dart';
@@ -29,9 +30,9 @@ void main() {
       (await db.inventoryDao.getAdjustmentsForOrder(orderId))
           .where((a) => a.reasonCode == reason)
           .toList();
-  Future<void> voidIt(int id, {bool trackStock = true}) =>
+  Future<RestockResult> voidIt(int id, {bool trackStock = true}) =>
       voidOrder(db, audit, orderId: id, reason: 't', trackStock: trackStock);
-  Future<int> refund(int id, double amount,
+  Future<RefundResult> refund(int id, double amount,
           {bool restock = true, bool trackStock = true}) =>
       processReturn(db, audit,
           orderId: id,
@@ -93,9 +94,10 @@ void main() {
       expect((await rowsOf(id, 'sale')).single.delta, -3,
           reason: 'placeOrder caps the deduction at what was there');
 
-      await voidIt(id);
+      final r = await voidIt(id);
 
       expect(await stockOf(p), 3, reason: 'not 5: only 3 left the shelf');
+      expect((r.products, r.units), (1, 3));
       expect((await rowsOf(id, 'void')).single.delta, 3);
     });
 
@@ -120,10 +122,12 @@ void main() {
       await refund(id, 5);
       expect(await stockOf(p), 10);
 
-      await expectLater(refund(id, 5), throwsStateError);
-      await refund(id, 5, restock: false);
+      final second = await refund(id, 5);
+      expect(second.restocked.any, isFalse, reason: 'nothing left owed');
       expect(await stockOf(p), 10);
       expect((await rowsOf(id, 'return')).single.delta, 4);
+      expect((await db.select(db.returns).get()).map((r) => r.restock),
+          [true, false]);
     });
 
     test('a refund without restock leaves it all owed to a later void',
@@ -242,6 +246,54 @@ void main() {
       await voidIt(id);
       expect(await stockOf(p), 10);
     });
+  });
+
+  group('legacy IMP order the till placed (audit order/place): by lines', () {
+    Future<int> placedImp(int p) async {
+      final id = await legacyOrder(p, prefix: kImportedInvoicePrefix);
+      await audit.orderPlaced(id, total: 15, paymentMethod: 'cash');
+      return id;
+    }
+
+    for (final track in [true, false]) {
+      test('void, tracking ${track ? 'on' : 'off'}', () async {
+        final p = await seedProduct(db, sku: 'P', stock: 7);
+        final id = await placedImp(p);
+        final r = await voidIt(id, trackStock: track);
+        expect(await stockOf(p), track ? 10 : 7);
+        expect(r.units, track ? 3 : 0);
+      });
+
+      test('refund with restock, tracking ${track ? 'on' : 'off'}', () async {
+        final p = await seedProduct(db, sku: 'P', stock: 7);
+        final id = await placedImp(p);
+        await refund(id, 15, trackStock: track);
+        expect(await stockOf(p), track ? 10 : 7);
+      });
+    }
+
+    test('a place entry far from the order time does not count', () async {
+      final p = await seedProduct(db, sku: 'P', stock: 7);
+      final id = await legacyOrder(p, prefix: kImportedInvoicePrefix);
+      await db.auditDao.log(AuditLogCompanion.insert(
+          entityType: 'order',
+          entityId: Value(id),
+          action: 'place',
+          createdAt: Value(DateTime.now().subtract(const Duration(days: 30)))));
+      await voidIt(id);
+      expect(await stockOf(p), 7, reason: 'still an import');
+    });
+  });
+
+  group('legacy order with a lowercase "imp" prefix: the normal rule', () {
+    for (final track in [true, false]) {
+      test('void, tracking ${track ? 'on' : 'off'}', () async {
+        final p = await seedProduct(db, sku: 'P', stock: 7);
+        final id = await legacyOrder(p, prefix: 'imp');
+        await voidIt(id, trackStock: track);
+        expect(await stockOf(p), track ? 10 : 7);
+      });
+    }
   });
 
   group('legacy CSV import (IMP): never restocked', () {

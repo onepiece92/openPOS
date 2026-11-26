@@ -37,6 +37,14 @@ String voidDialogText({required bool restocks, required bool points}) {
       '${restocks ? ' Composite components are restocked automatically.' : ''}';
 }
 
+/// "3 items put back in stock." / "No stock to put back." — what a void or
+/// refund actually restocked, as its transaction found it.
+@visibleForTesting
+String restockedText(RestockResult r, {String none = 'No stock to put back.'}) =>
+    !r.any
+        ? none
+        : '${r.units} ${r.units == 1 ? 'item' : 'items'} put back in stock.';
+
 // ─── Data bundle ──────────────────────────────────────────────────────────────
 
 class _DetailData {
@@ -44,18 +52,17 @@ class _DetailData {
     required this.receipt,
     required this.order,
     required this.refundable,
-    required this.restocked,
-    required this.owed,
+    required this.restockFacts,
   });
   final ReceiptBodyData receipt;
   final Order order; // kept for status / action bar
   final double refundable; // order total less refunds so far
-  final bool restocked; // an earlier refund already put the items back
-  final Map<int, int>? owed; // stockToRestock: null for a legacy order
+  final RestockFacts restockFacts; // as void / refund read them
 
-  /// What a void or refund would restock, by the same rule they apply.
-  RestockPlan restockPlan({required bool trackStock}) => planRestock(order,
-      owed: owed, trackStock: trackStock, restocked: restocked);
+  /// What a void or refund would restock, by the same rule they apply. Only
+  /// a guide: their transaction reads it afresh, and its result is shown.
+  RestockPlan restockPlan({required bool trackStock}) =>
+      planRestock(restockFacts, trackStock: trackStock);
 
   bool get isPartlyRefunded =>
       order.status == 'completed' && refundable < order.total;
@@ -88,8 +95,7 @@ final _orderDetailProvider =
     ),
     order: order,
     refundable: await refundableAmount(db, order),
-    restocked: await db.ordersDao.hasRestockedReturn(orderId),
-    owed: await db.inventoryDao.stockToRestock(orderId),
+    restockFacts: await readRestockFacts(db, order),
   );
 });
 
@@ -323,28 +329,25 @@ class _DetailBody extends StatelessWidget {
     final usage = ref.read(usageCounterProvider);
     final reason = reasonCtrl.text.trim();
 
-    final ok = await withErrorSnackbar(
+    final restocked = await withErrorSnackbar(
       context,
-      () async {
-        await void_svc.voidOrder(
-          db,
-          audit,
-          orderId: orderId,
-          reason: reason.isEmpty ? '(no reason given)' : reason,
-          trackStock: trackStock,
-        );
-        return true;
-      },
+      () => void_svc.voidOrder(
+        db,
+        audit,
+        orderId: orderId,
+        reason: reason.isEmpty ? '(no reason given)' : reason,
+        trackStock: trackStock,
+      ),
       failurePrefix: 'Void failed',
     );
-    if (ok != true) return;
+    if (restocked == null) return;
     usage.record(UsageEvent.orderVoided);
 
     if (context.mounted) {
       ref.invalidate(_orderDetailProvider(orderId));
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Order voided')),
-      );
+      // What the transaction did, not what the dialog expected.
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Order voided. ${restockedText(restocked)}')));
       Navigator.pop(context);
     }
   }
@@ -359,10 +362,8 @@ class _DetailBody extends StatelessWidget {
     final reasonCtrl = TextEditingController();
     bool restock = false;
     final trackStock = ref.read(featureOnProvider(Feature.stockTracking));
-    // "Restock items" only when the refund would put something back, and
-    // once per order (processReturn refuses a second restocking refund).
-    final canRestock =
-        !data.restocked && data.restockPlan(trackStock: trackStock).any;
+    // "Restock items" only when the refund would put something back.
+    final canRestock = data.restockPlan(trackStock: trackStock).any;
 
     // Mirrors processReturn's rules so the cashier sees the problem before
     // confirming rather than as a failure afterwards.
@@ -449,32 +450,31 @@ class _DetailBody extends StatelessWidget {
     final audit = ref.read(auditServiceProvider);
     final usage = ref.read(usageCounterProvider);
 
-    final ok = await withErrorSnackbar(
+    final result = await withErrorSnackbar(
       context,
-      () async {
-        await processReturn(
-          db,
-          audit,
-          orderId: orderId,
-          amount: amount,
-          restock: restock,
-          reason: reason,
-          trackStock: trackStock,
-        );
-        return true;
-      },
+      () => processReturn(
+        db,
+        audit,
+        orderId: orderId,
+        amount: amount,
+        restock: restock,
+        reason: reason,
+        trackStock: trackStock,
+      ),
       failurePrefix: 'Refund failed',
     );
-    if (ok != true) return;
+    if (result == null) return;
     usage.record(UsageEvent.refundIssued);
 
     if (context.mounted) {
       ref.invalidate(_orderDetailProvider(orderId));
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text(
-                'Refund of ${fmt.format(amount)} recorded')),
-      );
+      // With "Restock items" ticked, say what the transaction put back.
+      final stock = restock
+          ? ' ${restockedText(result.restocked, none: 'No stock was put back.')}'
+          : '';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content:
+              Text('Refund of ${fmt.format(amount)} recorded.$stock')));
       Navigator.pop(context);
     }
   }

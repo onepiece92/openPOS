@@ -127,6 +127,17 @@ void main() {
           ['idx_returns_order_id']);
     });
 
+    test('a legacy IMP order\'s place entry: a created_at range seek',
+        () async {
+      // audit_log has no entity index (no schema change for one); the
+      // lookup is bounded by the order's time instead of scanning.
+      final plan = await planOf(
+          () => db.auditDao.hasOrderPlaced(1, DateTime(2026, 1, 1)));
+      expect(plan.join(' | '),
+          contains('SEARCH audit_log USING INDEX idx_audit_log_created_at'));
+      expectIndexed(plan, ['idx_audit_log_created_at']);
+    });
+
     test('the next invoice number', () async {
       expectIndexed(await planOf(() => db.ordersDao.nextInvoiceNo()),
           ['idx_orders_invoice_no']);

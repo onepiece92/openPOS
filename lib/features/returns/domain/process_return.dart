@@ -24,13 +24,15 @@ import 'package:pos_app/features/returns/domain/reverse_sale.dart';
 /// order gets exactly what its own adjustment rows still owe (never more,
 /// so a sale capped by low stock restores only what it took, and a later
 /// refund or void finds nothing left); a CSV import gets nothing; another
-/// legacy order gets its lines while [trackStock] is on. Only one refund per
-/// order may restock.
-/// The Returns row records whether anything was to be restocked.
+/// legacy order gets its lines while [trackStock] is on, once. If nothing is
+/// owed by the time the transaction runs (another refund restocked it, say)
+/// the refund still goes through, without restocking. The Returns row and
+/// the audit entry record whether anything was actually put back, and so
+/// does the [RefundResult].
 ///
 /// Throws if the order doesn't exist, is voided, has nothing left to refund,
 /// or the amount is invalid. Caller handles UI error display.
-Future<int> processReturn(
+Future<RefundResult> processReturn(
   AppDatabase db,
   AuditService audit, {
   required int orderId,
@@ -62,28 +64,22 @@ Future<int> processReturn(
       throw ArgumentError.value(amount, 'amount',
           'Refund amount exceeds the $refundable still refundable');
     }
-    // One restocking refund per order, as before.
-    if (restock && await db.ordersDao.hasRestockedReturn(orderId)) {
-      throw StateError(
-          'Order #$orderId was already restocked by an earlier refund');
-    }
-    // Read inside the transaction: a concurrent void can't restock twice.
-    final plan = restock
-        ? await readRestockPlan(db, order, trackStock: trackStock)
-        : RestockPlan.none;
-    final restocking = plan.any;
+    // Read inside the transaction: a concurrent void or refund can't
+    // restock twice.
+    final restocked = restock
+        ? await applyRestock(
+            db, order, await readRestockPlan(db, order, trackStock: trackStock),
+            reasonCode: 'return', note: 'Refund for Order')
+        : RestockResult.nothing;
 
     final returnId = await db.ordersDao.insertReturn(
       ReturnsCompanion.insert(
         orderId: orderId,
         amount: refund,
-        restock: Value(restocking),
+        restock: Value(restocked.any),
         reason: Value(reason),
       ),
     );
-
-    await applyRestock(db, order, plan,
-        reasonCode: 'return', note: 'Refund for Order');
 
     if (refund >= refundable) {
       await db.ordersDao.refundOrder(orderId);
@@ -93,12 +89,20 @@ Future<int> processReturn(
     await audit.orderRefunded(
       orderId,
       amount: refund,
-      restocked: restocking,
+      restocked: restocked.any,
       reason: reason,
     );
 
-    return returnId;
+    return RefundResult(returnId: returnId, restocked: restocked);
   });
+}
+
+/// The outcome of [processReturn]: the Returns row and the stock it
+/// actually put back.
+class RefundResult {
+  const RefundResult({required this.returnId, required this.restocked});
+  final int returnId;
+  final RestockResult restocked;
 }
 
 /// What can still be refunded on [order]: its total less earlier refunds.

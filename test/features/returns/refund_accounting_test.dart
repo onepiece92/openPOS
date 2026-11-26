@@ -115,7 +115,10 @@ void main() {
       await refund(o, 30, restock: true);
       expect((await product(db, p)).stockQuantity, 100);
 
-      await expectLater(refund(o, 30, restock: true), throwsA(anything));
+      // Nothing owed any more: the refund goes through, restocking nothing.
+      await refund(o, 30, restock: true);
+      expect((await product(db, p)).stockQuantity, 100);
+      expect((await db.select(db.returns).get()).last.restock, isFalse);
       await voidOrder(db, audit, trackStock: true, orderId: o, reason: 't');
       expect((await product(db, p)).stockQuantity, 100);
     });

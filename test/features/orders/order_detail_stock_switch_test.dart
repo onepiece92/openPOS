@@ -9,6 +9,8 @@ import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/core/services/audit_service.dart';
 import 'package:pos_app/features/orders/presentation/order_detail_screen.dart';
+import 'package:pos_app/features/returns/domain/process_return.dart';
+import 'package:pos_app/features/returns/domain/reverse_sale.dart';
 
 import '../../_support/sales.dart';
 import '../../_support/temp_hive.dart';
@@ -25,6 +27,16 @@ void main() {
     db = openInMemoryDatabase();
     addTearDown(db.close);
   });
+
+  late int orderId;
+
+  /// Lets real database futures finish between frames.
+  Future<void> settle(WidgetTester tester) async {
+    for (var i = 0; i < 5; i++) {
+      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+  }
 
   /// [order] creates the order shown; by default a legacy one (no
   /// stock_linked), with [points] earned.
@@ -51,12 +63,17 @@ void main() {
         databaseProvider.overrideWithValue(db),
         settingsBoxProvider.overrideWithValue(settings),
       ],
-      child: MaterialApp(home: OrderDetailScreen(orderId: id!)),
+      // Pushed over a home route, as in the app, so a void can pop it.
+      child: MaterialApp(
+        initialRoute: '/order',
+        routes: {
+          '/': (_) => const Scaffold(),
+          '/order': (_) => OrderDetailScreen(orderId: id!),
+        },
+      ),
     ));
-    for (var i = 0; i < 5; i++) {
-      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
-      await tester.pump(const Duration(milliseconds: 50));
-    }
+    await settle(tester);
+    orderId = id!;
   }
 
   Future<void> open(WidgetTester tester, String button) async {
@@ -107,6 +124,105 @@ void main() {
       await open(tester, 'Void');
       expect(voidText(tester), 'This marks the order as voided.');
     });
+  });
+
+  /// A legacy order with the IMP prefix that the till did place: it has the
+  /// `order` / `place` audit entry a CSV import never writes.
+  Future<int> placedImp() async {
+    final id = await db.ordersDao.insertOrder(OrdersCompanion.insert(
+        subtotal: 10,
+        total: 10,
+        paymentMethod: 'cash',
+        invoicePrefix: const Value(kImportedInvoicePrefix)));
+    await AuditService(db).orderPlaced(id, total: 10, paymentMethod: 'cash');
+    return id;
+  }
+
+  group('legacy IMP order the till placed: the legacy rule', () {
+    testWidgets('"Restock items" offered while tracking is on',
+        (tester) async {
+      await pump(tester, stock: true, order: placedImp);
+      expect(await restockOffered(tester), isTrue);
+    });
+
+    testWidgets('not while tracking is off', (tester) async {
+      await pump(tester, stock: false, order: placedImp);
+      expect(await restockOffered(tester), isFalse);
+    });
+
+    testWidgets('the void text includes the stock, tracking on',
+        (tester) async {
+      await pump(tester, stock: true, order: placedImp);
+      await open(tester, 'Void');
+      expect(voidText(tester), voidDialogText(restocks: true, points: false));
+    });
+  });
+
+  group('the transaction, not the loaded screen, decides', () {
+    Future<void> confirmVoid(WidgetTester tester) async {
+      await open(tester, 'Void');
+      await tester.tap(find.widgetWithText(FilledButton, 'Void').last);
+      await settle(tester);
+      await tester.pumpAndSettle();
+    }
+
+    String snack(WidgetTester tester) => tester
+        .widget<Text>(find.descendant(
+            of: find.byType(SnackBar), matching: find.byType(Text)))
+        .data!;
+
+    testWidgets('a void says what it put back', (tester) async {
+      await pump(tester, stock: true, order: linkedSale());
+      await confirmVoid(tester);
+      expect(snack(tester), 'Order voided. 3 items put back in stock.');
+    });
+
+    testWidgets('stock restocked underneath: the void says none went back',
+        (tester) async {
+      await pump(tester, stock: true, order: linkedSale());
+      // Another refund restocks it after the screen loaded.
+      await tester.runAsync(() => processReturn(db, AuditService(db),
+          orderId: orderId, amount: 5, restock: true, trackStock: true));
+      await open(tester, 'Void');
+      expect(voidText(tester), voidDialogText(restocks: true, points: false),
+          reason: 'the screen still shows what it loaded');
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      await confirmVoid(tester);
+      expect(snack(tester), 'Order voided. No stock to put back.');
+      expect((await tester.runAsync(() => db.ordersDao.getById(orderId)))!
+          .status, 'voided');
+    });
+
+    testWidgets('a restocking refund that finds nothing owed still records',
+        (tester) async {
+      await pump(tester, stock: true, order: linkedSale());
+      await tester.runAsync(() => processReturn(db, AuditService(db),
+          orderId: orderId, amount: 5, restock: true, trackStock: true));
+      await open(tester, 'Refund');
+      await tester.enterText(
+          find.widgetWithText(TextField, 'Refund amount'), '5');
+      await tester.tap(find.byKey(const ValueKey('refund-restock')));
+      await tester.pump();
+      await tester.tap(find.widgetWithText(FilledButton, 'Refund').last);
+      await settle(tester);
+      await tester.pumpAndSettle();
+      expect(snack(tester),
+          matches(RegExp(r'^Refund of .*5\.00 recorded\. '
+              r'No stock was put back\.$')));
+      final returns =
+          await tester.runAsync(() => db.select(db.returns).get());
+      expect(returns!.map((r) => r.restock), [true, false]);
+    });
+  });
+
+  test('restockedText', () {
+    expect(restockedText(const RestockResult(products: 1, units: 1)),
+        '1 item put back in stock.');
+    expect(restockedText(const RestockResult(products: 2, units: 5)),
+        '5 items put back in stock.');
+    expect(restockedText(RestockResult.nothing), 'No stock to put back.');
   });
 
   group('legacy CSV import (IMP): never', () {
