@@ -192,6 +192,12 @@ void main() {
       final plan =
           await planOf(() => db.shiftsDao.salesInWindow(from, to));
       expectIndexed(plan, ['idx_orders_created_at']);
+      // The import test (prefix IMP and no stock_linked) is a filter on
+      // the rows the range seek found, never a scan of its own.
+      expect(
+          plan.join(' | '),
+          contains('SEARCH o USING INDEX idx_orders_created_at '
+              '(created_at>? AND created_at<?)'));
     });
 
     test('refunds in a window range over returns by date', () async {
@@ -199,6 +205,10 @@ void main() {
           await planOf(() => db.shiftsDao.refundsInWindow(from, to));
       expectIndexed(plan, ['idx_returns_created_at']);
       expect(plan.join(' | '), contains('SEARCH o USING INTEGER PRIMARY KEY'));
+      expect(
+          plan.join(' | '),
+          contains('SEARCH r USING INDEX idx_returns_created_at '
+              '(created_at>? AND created_at<?)'));
     });
 
     test('voids are a range seek on the partial voided_at index', () async {

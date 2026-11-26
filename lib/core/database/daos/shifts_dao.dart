@@ -200,9 +200,11 @@ DateTime _latest(Iterable<DateTime> ts) =>
 ///  voided in a later shift shows up as money out in that later shift.
 ///  Voids made before schema v16 have no `voided_at`; they predate every
 ///  shift and are ignored.
-///  * Imported orders (invoice prefix `IMP`) are history, not till
-///    activity, and are left out of everything here — with their refunds and
-///    voids.
+///  * Imported orders are history, not till activity, and are left out of
+///    everything here — with their refunds and voids. An import is an
+///    order with invoice prefix `IMP` AND no `stock_linked` (see
+///    [_notImported]); a shop whose own prefix is IMP still has its sales
+///    counted.
 @DriftAccessor(tables: [Shifts, Orders, Returns])
 class ShiftsDao extends DatabaseAccessor<AppDatabase> with _$ShiftsDaoMixin {
   ShiftsDao(super.db);
@@ -353,7 +355,21 @@ class ShiftsDao extends DatabaseAccessor<AppDatabase> with _$ShiftsDaoMixin {
 
   // ── Window aggregates ──────────────────────────────────────────────────
 
-  static const _notImported = "o.invoice_prefix != '$kImportedInvoicePrefix'";
+  /// Leaves out true imports only: prefix `IMP` and `stock_linked` NULL.
+  /// Every sale placed from v16 on has stock_linked = 1 (whatever its
+  /// prefix, so a shop that chose "IMP" as its own invoice prefix is still
+  /// counted) and an import never has it, while legacy non-import orders
+  /// (NULL, any other prefix) stay counted.
+  ///
+  /// A legacy (pre-v16) shop sale under an IMP prefix is indistinguishable
+  /// here from an import without reading audit_log for its `order`/`place`
+  /// entry; it is left out of the drawer on purpose. Such a sale predates
+  /// every shift anyway, so only its later refund or void could ever land
+  /// in a window. The predicate costs nothing extra: it is checked on rows
+  /// the index range already found.
+  static const _notImported =
+      "NOT (o.invoice_prefix = '$kImportedInvoicePrefix' "
+      'AND o.stock_linked IS NULL)';
   /// Same bucketing as [OrdersDao.methodSql], on alias `o`.
   static const _method =
       "COALESCE(NULLIF(LOWER(TRIM(o.payment_method)), ''), 'cash')";

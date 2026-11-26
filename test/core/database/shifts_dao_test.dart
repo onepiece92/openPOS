@@ -33,9 +33,11 @@ void main() {
     double tip = 0,
     double tax = 0,
     String prefix = '',
+    int? stockLinked,
     DateTime? when,
   }) =>
       db.ordersDao.insertOrder(OrdersCompanion.insert(
+        stockLinked: Value(stockLinked),
         subtotal: total - tax,
         taxTotal: Value(tax),
         total: total,
@@ -358,6 +360,52 @@ void main() {
           (590.0, 160.0 + 210.0, 220.0));
       expect((f.tipsCollected, f.tipsReturned, f.netTips),
           (46.0, 12.0 + 13.0, 21.0));
+    });
+
+    group('imports: prefix IMP and no stock_linked', () {
+      final from = at(8);
+      final to = at(20);
+
+      test("a shop's own v16 sales under the IMP prefix are counted, with "
+          'their refunds and voids', () async {
+        final a = await order(total: 40, tip: 4, prefix: 'IMP', stockLinked: 1);
+        await refund(a, 10);
+        final b = await order(total: 25, prefix: 'IMP', stockLinked: 1);
+        await voidAt(b, at(14));
+        final f = await dao.figuresForWindow(from, to);
+        expect(f.cashSales, 65);
+        expect(f.cashTips, 4);
+        expect(f.cashRefunds, 10);
+        expect(f.cashVoids, 25);
+        expect(f.netSales, 30);
+      });
+
+      test('true imports stay out: sales, refunds and voids', () async {
+        final a = await order(total: 300, prefix: 'IMP');
+        await refund(a, 10);
+        final b = await order(total: 200, prefix: 'IMP');
+        await voidAt(b, at(14));
+        final f = await dao.figuresForWindow(from, to);
+        expect(f.sales.byMethod, isEmpty);
+        expect(f.refunds.byMethod, isEmpty);
+        expect(f.voids.byMethod, isEmpty);
+      });
+
+      test('legacy non-import refunds and voids in a shift stay counted',
+          () async {
+        // Placed before v16 (stock_linked NULL), any non-IMP prefix.
+        final old = DateTime(2026, 6, 1);
+        final a = await order(total: 50, when: old);
+        final b = await order(total: 30, prefix: 'INV', when: old);
+        final id = await dao.openShift(openingCash: 100, openedAt: at(8));
+        await refund(a, 15);
+        await voidAt(b, at(15));
+        final c = await close(id, counted: 55, when: at(20));
+        expect(c.figures.cashRefunds, 15);
+        expect(c.figures.cashVoids, 30);
+        expect(c.expectedCash, 55);
+        expect(c.overShortCents, 0);
+      });
     });
 
     test('refunded 20 then voided in one shift nets to zero', () async {
