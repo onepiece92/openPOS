@@ -401,14 +401,34 @@ class _HeldTicketsSheetState extends ConsumerState<_HeldTicketsSheet>
     }
   }
 
+  /// True while a ticket's check query runs: a second tap is ignored.
+  static bool _loading = false;
+
   Future<void> _loadTicket(NavigatorState nav, GoRouter router, WidgetRef ref,
       HeldOrder held) async {
+    if (_loading) return;
+    _loading = true;
+    try {
+      await _loadTicketNow(nav, router, ref, held);
+    } finally {
+      _loading = false;
+    }
+  }
+
+  Future<void> _loadTicketNow(NavigatorState nav, GoRouter router,
+      WidgetRef ref, HeldOrder held) async {
     final messenger = ScaffoldMessenger.maybeOf(nav.context);
     // Products, the customer or the table may be gone since the ticket was
     // parked (deleted, a factory reset, a backup restore): drop them first.
     final check =
         await ref.read(heldOrdersProvider.notifier).checkForResume(held);
     if (!nav.mounted) return;
+    if (check.emptied) {
+      // Every product is gone: the ticket was removed, nothing to load.
+      final msg = check.message;
+      if (msg != null) messenger?.showSnackBar(SnackBar(content: Text(msg)));
+      return;
+    }
     final ticket = check.ticket;
     final notifier = ref.read(cartProvider.notifier);
     // clearItems, not clear: clear() would open a fresh session and burn a new

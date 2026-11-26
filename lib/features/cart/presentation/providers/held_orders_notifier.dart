@@ -174,7 +174,8 @@ class HeldOrdersNotifier extends Notifier<List<HeldOrder>> {
   /// Checks [ticket] against the database before it is resumed, in one
   /// query (primary-key lookups only): lines whose product is gone or was
   /// deleted are dropped, and a customer or table that no longer exists is
-  /// cleared. A changed ticket is saved back, so it is cleaned only once.
+  /// cleared; a tax rate that no longer exists is cleared. A ticket left with
+  /// no lines is deleted. A changed ticket is saved back, so it is cleaned only once.
   /// When the database cannot be read the ticket is returned unchanged
   /// (payment still refuses dead ids, see `placeOrder`).
   Future<ResumeCheck> checkForResume(HeldOrder ticket) async {
@@ -195,6 +196,12 @@ class HeldOrdersNotifier extends Notifier<List<HeldOrder>> {
       parts.add("SELECT 't' AS k, id FROM tables WHERE id = ?");
       args.add(Variable<int>(ticket.tableId!));
     }
+    final rateIds = ticket.taxRateIds ?? const <int>[];
+    if (rateIds.isNotEmpty) {
+      parts.add("SELECT 'x' AS k, id FROM tax_rates WHERE is_active = 1 "
+          'AND id IN (${List.filled(rateIds.length, '?').join(', ')})');
+      args.addAll(rateIds.map(Variable<int>.new));
+    }
     if (parts.isEmpty) return ResumeCheck(ticket);
     final List<QueryRow> rows;
     try {
@@ -206,11 +213,14 @@ class HeldOrdersNotifier extends Notifier<List<HeldOrder>> {
       return ResumeCheck(ticket);
     }
     final live = <int>{};
+    final liveRates = <int>{};
     var customer = false, table = false;
     for (final r in rows) {
       switch (r.read<String>('k')) {
         case 'p':
           live.add(r.read<int>('id'));
+        case 'x':
+          liveRates.add(r.read<int>('id'));
         case 'c':
           customer = true;
         case 't':
@@ -218,8 +228,14 @@ class HeldOrdersNotifier extends Notifier<List<HeldOrder>> {
       }
     }
     final check = checkHeldOrder(ticket,
-        liveProductIds: live, customerExists: customer, tableExists: table);
-    if (check.changed && _box.containsKey(ticket.id)) {
+        liveProductIds: live,
+        customerExists: customer,
+        tableExists: table,
+        liveTaxRateIds: liveRates);
+    if (check.emptied) {
+      // Nothing left to sell: drop the ticket instead of keeping it empty.
+      delete(ticket.id);
+    } else if (check.changed && _box.containsKey(ticket.id)) {
       // Like every write here: the box updates in memory at once.
       unawaited(_box.put(ticket.id, jsonEncode(check.ticket.toJson())));
       state = _loadAll();

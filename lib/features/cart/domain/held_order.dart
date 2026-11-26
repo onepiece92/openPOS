@@ -137,7 +137,10 @@ String _legacyNumber(Map<String, dynamic> json) {
 
 /// A held ticket checked against the database before it is resumed.
 class ResumeCheck {
-  const ResumeCheck(this.ticket, {this.removedLines = 0, this.changed = false});
+  const ResumeCheck(this.ticket,
+      {this.removedLines = 0,
+      this.changed = false,
+      this.taxRateRemoved = false});
 
   /// The ticket to resume: lines for products that no longer exist are
   /// dropped, and a customer or table that no longer exists is cleared.
@@ -149,9 +152,25 @@ class ResumeCheck {
   /// Whether anything was dropped or cleared.
   final bool changed;
 
-  /// What to tell the cashier, or null when no line was removed.
-  String? get message => removedLinesMessage(removedLines);
+  /// Whether the ticket's tax rate no longer exists (it was cleared).
+  final bool taxRateRemoved;
+
+  /// Every line was dropped: there is nothing left to resume, so the ticket
+  /// is removed from the held list rather than loaded as an empty cart.
+  bool get emptied => removedLines > 0 && ticket.items.isEmpty;
+
+  /// What to tell the cashier, or null when nothing was removed.
+  String? get message {
+    final parts = [
+      removedLinesMessage(removedLines),
+      if (taxRateRemoved) kTicketTaxRemovedMessage,
+    ].whereType<String>();
+    return parts.isEmpty ? null : parts.join('\n');
+  }
 }
+
+const kTicketTaxRemovedMessage =
+    'The tax on this ticket no longer exists and was removed.';
 
 /// "1 item no longer exists and was removed" / "N items no longer exist and
 /// were removed"; null for none.
@@ -170,13 +189,21 @@ ResumeCheck checkHeldOrder(
   required Set<int> liveProductIds,
   required bool customerExists,
   required bool tableExists,
+  Set<int>? liveTaxRateIds,
 }) {
   final items =
       ticket.items.where((i) => liveProductIds.contains(i.productId)).toList();
   final removed = ticket.items.length - items.length;
   final dropCustomer = ticket.customerId != null && !customerExists;
   final dropTable = ticket.tableId != null && !tableExists;
-  if (removed == 0 && !dropCustomer && !dropTable) return ResumeCheck(ticket);
+  // Null live set = not checked. A rate that is gone or switched off.
+  final rates = ticket.taxRateIds;
+  final dropTax = liveTaxRateIds != null &&
+      rates != null &&
+      rates.any((id) => !liveTaxRateIds.contains(id));
+  if (removed == 0 && !dropCustomer && !dropTable && !dropTax) {
+    return ResumeCheck(ticket);
+  }
   return ResumeCheck(
     HeldOrder(
       id: ticket.id,
@@ -190,11 +217,13 @@ ResumeCheck checkHeldOrder(
       orderDiscount: ticket.orderDiscount,
       orderDiscountIsPercent: ticket.orderDiscountIsPercent,
       taxEnabled: ticket.taxEnabled,
-      taxRateIds: ticket.taxRateIds,
+      // Empty = "none selected", not null (null means the default rate).
+      taxRateIds: dropTax ? <int>[] : ticket.taxRateIds,
       archivedAt: ticket.archivedAt,
     ),
     removedLines: removed,
     changed: true,
+    taxRateRemoved: dropTax,
   );
 }
 
