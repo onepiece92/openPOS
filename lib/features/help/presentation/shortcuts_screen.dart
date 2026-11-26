@@ -161,7 +161,7 @@ class _KeyChip extends StatelessWidget {
           key_,
           style: tt.labelMedium?.copyWith(
             fontWeight: FontWeight.w700,
-            fontFamily: AppFonts.mono,
+            fontFamily: AppFonts.mono, fontFamilyFallback: AppFonts.monoFallback,
           ),
         ),
       );

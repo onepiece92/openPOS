@@ -90,7 +90,7 @@ class DashboardBody extends StatelessWidget {
                         fontWeight: FontWeight.bold,
                         color: cs.primary,
                         fontSize: 15,
-                        fontFamily: AppFonts.mono),
+                        fontFamily: AppFonts.mono, fontFamilyFallback: AppFonts.monoFallback),
                   ),
                 ),
                 if (data.payBreakdown.isNotEmpty) ...[
@@ -112,7 +112,7 @@ class DashboardBody extends StatelessWidget {
                           style: TextStyle(
                               fontWeight: FontWeight.w600,
                               color: cs.secondary,
-                              fontFamily: AppFonts.mono),
+                              fontFamily: AppFonts.mono, fontFamilyFallback: AppFonts.monoFallback),
                         ),
                       )),
                 ],
@@ -179,7 +179,7 @@ class DashboardBody extends StatelessWidget {
                                 style: TextStyle(
                                     fontSize: 12,
                                     color: cs.onSurfaceVariant,
-                                    fontFamily: AppFonts.mono),
+                                    fontFamily: AppFonts.mono, fontFamilyFallback: AppFonts.monoFallback),
                               ),
                               const SizedBox(width: 8),
                               Text(
@@ -187,7 +187,7 @@ class DashboardBody extends StatelessWidget {
                                 style: TextStyle(
                                     fontWeight: FontWeight.w600,
                                     color: cs.primary,
-                                    fontFamily: AppFonts.mono),
+                                    fontFamily: AppFonts.mono, fontFamilyFallback: AppFonts.monoFallback),
                               ),
                             ],
                           ),

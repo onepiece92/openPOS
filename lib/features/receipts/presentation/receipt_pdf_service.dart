@@ -18,22 +18,26 @@ import 'package:pos_app/features/orders/domain/order_number.dart';
 // ─── PDF builder ──────────────────────────────────────────────────────────────
 
 Future<pw.Document> buildReceiptPdf(
-    ReceiptBodyData data, CurrencyFormatter fmt) async {
-  final doc = pw.Document();
+    ReceiptBodyData data, CurrencyFormatter shopFmt) async {
+  // Bundled, offline: JetBrains Mono plus the currency-symbol fallback.
+  final fonts = await loadReceiptPdfFonts(italic: true);
+  // A typed symbol the fonts can't draw prints as its currency code.
+  final fmt = await receiptCurrencyFormatter(shopFmt);
+  final doc = pw.Document(theme: fonts.theme);
   final dateFmt = DateFormat('MM/dd/yyyy hh:mm:ss a');
   final symbolLabel = fmt.symbol.trim();
 
-  // Load JetBrains Mono for PDF (bundled, offline)
-  final font = await bundledPdfFont(jetBrainsMonoRegular);
-  final fontBold = await bundledPdfFont(jetBrainsMonoBold);
-  final fontItalic = await bundledPdfFont(jetBrainsMonoItalic);
+  final font = fonts.regular;
+  final fontBold = fonts.bold;
+  final fontItalic = fonts.italic!;
+  final boldFallback = fonts.boldFallback;
 
   // Styles
   final baseStyle = pw.TextStyle(fontSize: 10, font: font);
-  final boldStyle = pw.TextStyle(fontSize: 10, font: fontBold, fontWeight: pw.FontWeight.bold);
-  final headerStyle = pw.TextStyle(fontSize: 11, font: fontBold, fontWeight: pw.FontWeight.bold);
+  final boldStyle = pw.TextStyle(fontSize: 10, font: fontBold, fontWeight: pw.FontWeight.bold, fontFallback: boldFallback);
+  final headerStyle = pw.TextStyle(fontSize: 11, font: fontBold, fontWeight: pw.FontWeight.bold, fontFallback: boldFallback);
   final smallStyle = pw.TextStyle(fontSize: 9, font: font, color: PdfColors.grey600);
-  final titleStyle = pw.TextStyle(fontSize: 14, font: fontBold, fontWeight: pw.FontWeight.bold);
+  final titleStyle = pw.TextStyle(fontSize: 14, font: fontBold, fontWeight: pw.FontWeight.bold, fontFallback: boldFallback);
 
   final order = data.order;
   final customerName = data.customer?.name ?? 'Walk-in';
@@ -98,11 +102,12 @@ Future<pw.Document> buildReceiptPdf(
                         fontSize: 9,
                         font: fontBold,
                         fontWeight: pw.FontWeight.bold,
+                        fontFallback: boldFallback,
                         decoration: pw.TextDecoration.underline)),
               ),
-              _headerCell('Qty', fontBold),
-              _headerCell('Rate ($symbolLabel)', fontBold),
-              _headerCell('Amt ($symbolLabel)', fontBold),
+              _headerCell('Qty', fontBold, boldFallback),
+              _headerCell('Rate ($symbolLabel)', fontBold, boldFallback),
+              _headerCell('Amt ($symbolLabel)', fontBold, boldFallback),
             ],
           ),
           pw.SizedBox(height: 2),
@@ -224,7 +229,8 @@ typedef SharePdf = Future<bool> Function({
 
 // ─── Private helpers ──────────────────────────────────────────────────────────
 
-pw.Widget _headerCell(String text, pw.Font font) => pw.SizedBox(
+pw.Widget _headerCell(String text, pw.Font font, List<pw.Font> fallback) =>
+    pw.SizedBox(
       width: 64,
       child: pw.Text(
         text,
@@ -233,6 +239,7 @@ pw.Widget _headerCell(String text, pw.Font font) => pw.SizedBox(
             fontSize: 9,
             font: font,
             fontWeight: pw.FontWeight.bold,
+            fontFallback: fallback,
             decoration: pw.TextDecoration.underline),
       ),
     );

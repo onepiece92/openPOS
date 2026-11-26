@@ -257,7 +257,7 @@ class _TotalBar extends StatelessWidget {
               fontWeight: FontWeight.bold,
               color: cs.error,
               fontSize: 15,
-              fontFamily: AppFonts.mono,
+              fontFamily: AppFonts.mono, fontFamilyFallback: AppFonts.monoFallback,
             ),
           ),
         ],
@@ -322,7 +322,7 @@ class _ExpenseTile extends StatelessWidget {
         style: tt.bodyMedium?.copyWith(
           fontWeight: FontWeight.bold,
           color: cs.error,
-          fontFamily: AppFonts.mono,
+          fontFamily: AppFonts.mono, fontFamilyFallback: AppFonts.monoFallback,
         ),
       ),
     );

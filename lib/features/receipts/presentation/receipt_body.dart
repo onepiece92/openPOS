@@ -41,13 +41,13 @@ class ReceiptBody extends StatelessWidget {
     final customerName = data.customer?.name ?? 'Walk-in';
     final symbolLabel = fmt.symbol.trim();
 
-    const bodyStyle = TextStyle(fontSize: 13.5, height: 1.5, fontFamily: AppFonts.mono);
+    const bodyStyle = TextStyle(fontSize: 13.5, height: 1.5, fontFamily: AppFonts.mono, fontFamilyFallback: AppFonts.monoFallback);
     const labelStyle = TextStyle(
-        fontSize: 13.5, height: 1.5, color: Color(0xFF666666), fontFamily: AppFonts.mono);
+        fontSize: 13.5, height: 1.5, color: Color(0xFF666666), fontFamily: AppFonts.mono, fontFamilyFallback: AppFonts.monoFallback);
     const boldStyle = TextStyle(
-        fontSize: 13.5, height: 1.5, fontWeight: FontWeight.w700, fontFamily: AppFonts.mono);
+        fontSize: 13.5, height: 1.5, fontWeight: FontWeight.w700, fontFamily: AppFonts.mono, fontFamilyFallback: AppFonts.monoFallback);
     const headerStyle = TextStyle(
-        fontSize: 14, fontWeight: FontWeight.w700, height: 1.6, fontFamily: AppFonts.mono);
+        fontSize: 14, fontWeight: FontWeight.w700, height: 1.6, fontFamily: AppFonts.mono, fontFamilyFallback: AppFonts.monoFallback);
 
     final divider = Divider(height: 20, thickness: 0.8, color: cs.outlineVariant);
 
@@ -276,7 +276,7 @@ class _HeaderCell extends StatelessWidget {
         text,
         textAlign: TextAlign.right,
         style: TextStyle(
-          fontFamily: AppFonts.mono,
+          fontFamily: AppFonts.mono, fontFamilyFallback: AppFonts.monoFallback,
           fontSize: 13,
           fontWeight: FontWeight.w600,
           decoration: TextDecoration.underline,
@@ -299,7 +299,7 @@ class _DataCell extends StatelessWidget {
       child: Text(
         text,
         textAlign: TextAlign.right,
-        style: TextStyle(fontFamily: AppFonts.mono, fontSize: 13.5, color: cs.onSurface),
+        style: TextStyle(fontFamily: AppFonts.mono, fontFamilyFallback: AppFonts.monoFallback, fontSize: 13.5, color: cs.onSurface),
       ),
     );
   }

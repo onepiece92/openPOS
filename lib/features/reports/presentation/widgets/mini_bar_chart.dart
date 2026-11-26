@@ -54,7 +54,7 @@ class MiniBarChart extends StatelessWidget {
                                 fontSize: 9,
                                 fontWeight: FontWeight.bold,
                                 color: cs.primary,
-                                fontFamily: AppFonts.mono,
+                                fontFamily: AppFonts.mono, fontFamilyFallback: AppFonts.monoFallback,
                               ),
                             ),
                           ),

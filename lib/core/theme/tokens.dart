@@ -38,4 +38,12 @@ abstract final class AppOpacity {
 abstract final class AppFonts {
   /// JetBrains Mono — monospaced, good for numbers + receipts.
   static const String mono = 'JetBrainsMono';
+
+  /// Subset Noto glyphs (OFL) for the currency symbols JetBrains Mono lacks:
+  /// ৳ ₵ ₹ ₩ ₦ ₱ ฿. Bundled, so no shop depends on what the OS happens to
+  /// have; Flutter loads it only when a glyph is first missing.
+  static const String symbols = 'OpenPOSSymbols';
+
+  /// Pass as `fontFamilyFallback` wherever [mono] is set by hand.
+  static const List<String> monoFallback = [symbols];
 }

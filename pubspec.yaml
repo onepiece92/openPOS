@@ -107,3 +107,10 @@ flutter:
         - asset: assets/fonts/JetBrainsMono-BoldItalic.ttf
           weight: 700
           style: italic
+    # Subset Noto (OFL, see assets/fonts/OFL.txt): currency symbols
+    # JetBrains Mono lacks. Fallback only; loaded when first needed.
+    - family: OpenPOSSymbols
+      fonts:
+        - asset: assets/fonts/OpenPOSSymbols-Regular.ttf
+        - asset: assets/fonts/OpenPOSSymbols-Bold.ttf
+          weight: 700

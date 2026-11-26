@@ -60,7 +60,9 @@ final productSalesCountProvider =
 /// concatenation so the symbol, grouping, and decimal count stay consistent.
 final currencyFormatterProvider = Provider<CurrencyFormatter>((ref) {
   final symbol = ref.watch(currencySymbolProvider);
-  return CurrencyFormatter(symbol: '$symbol ', locale: 'en_US');
+  final code = ref.watch(currencyCodeProvider);
+  return CurrencyFormatter(
+      symbol: '$symbol ', locale: 'en_US', currencyCode: code);
 });
 
 // ── Products screen filter state ──────────────────────────────────────────────

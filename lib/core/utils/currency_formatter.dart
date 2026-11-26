@@ -7,6 +7,7 @@ class CurrencyFormatter {
     required this.symbol,
     required this.locale,
     this.decimalDigits = 2,
+    this.currencyCode,
   }) : _fmt = NumberFormat.currency(
           locale: locale,
           symbol: symbol,
@@ -17,6 +18,10 @@ class CurrencyFormatter {
   final String symbol;
   final String locale;
   final int decimalDigits;
+
+  /// ISO 4217 code (e.g. "INR"). Receipts print it in place of a symbol the
+  /// bundled fonts can't draw; see `receiptCurrencyFormatter`.
+  final String? currencyCode;
   final NumberFormat _fmt;
 
   /// Built once: [formatPlain] runs per list tile and per receipt line.

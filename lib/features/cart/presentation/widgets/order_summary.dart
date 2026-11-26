@@ -80,7 +80,7 @@ class OrderSummary extends ConsumerWidget {
                       decoration: session.taxEnabled
                           ? null
                           : TextDecoration.lineThrough,
-                      fontFamily: AppFonts.mono,
+                      fontFamily: AppFonts.mono, fontFamilyFallback: AppFonts.monoFallback,
                     ),
                   ),
                   const SizedBox(width: 4),

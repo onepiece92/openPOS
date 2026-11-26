@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
+import 'package:pos_app/core/theme/tokens.dart';
 import 'package:pos_app/core/utils/share_origin.dart';
 import 'package:pos_app/features/backup/data/share_files.dart';
 import 'package:pos_app/features/usage/data/usage_counter.dart';
@@ -209,7 +210,9 @@ class _UsageScreenState extends ConsumerState<UsageScreen> {
             ),
             child: Text(text,
                 key: const ValueKey('usage-preview'),
-                style: const TextStyle(fontFamily: 'JetBrainsMono')),
+                style: const TextStyle(
+                    fontFamily: AppFonts.mono,
+                    fontFamilyFallback: AppFonts.monoFallback)),
           ),
           const SizedBox(height: 12),
           Row(

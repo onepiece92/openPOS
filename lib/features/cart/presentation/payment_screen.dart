@@ -246,7 +246,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                       style: tt.headlineSmall?.copyWith(
                         color: cs.onSecondaryContainer,
                         fontWeight: FontWeight.bold,
-                        fontFamily: AppFonts.mono,
+                        fontFamily: AppFonts.mono, fontFamilyFallback: AppFonts.monoFallback,
                       ),
                     ),
                   ],

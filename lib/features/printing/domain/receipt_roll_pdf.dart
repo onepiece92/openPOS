@@ -21,22 +21,27 @@ import 'package:pos_app/features/receipts/presentation/receipt_body.dart';
 /// so the caller decides and the page is built to match exactly.
 Future<pw.Document> buildReceiptRollPdf(
   ReceiptBodyData data,
-  CurrencyFormatter fmt, {
+  CurrencyFormatter shopFmt, {
   required int widthDots,
   bool isCopy = false,
 }) async {
   final width = rollWidthMm(widthDots) * PdfPageFormat.mm;
   final narrow = widthDots < 500;
 
-  final font = await bundledPdfFont(jetBrainsMonoRegular);
-  final fontBold = await bundledPdfFont(jetBrainsMonoBold);
+  final fonts = await loadReceiptPdfFonts();
+  // A typed symbol the fonts can't draw prints as its currency code.
+  final fmt = await receiptCurrencyFormatter(shopFmt);
 
   // Sized so a full line of monospace text just fits the roll: ~42 chars on
   // 80mm, ~30 on 58mm.
   final base = narrow ? 7.0 : 8.0;
-  final body = pw.TextStyle(font: font, fontSize: base);
-  final bold = pw.TextStyle(font: fontBold, fontSize: base);
-  final title = pw.TextStyle(font: fontBold, fontSize: base * 1.75);
+  final body = pw.TextStyle(font: fonts.regular, fontSize: base);
+  final bold = pw.TextStyle(
+      font: fonts.bold, fontSize: base, fontFallback: fonts.boldFallback);
+  final title = pw.TextStyle(
+      font: fonts.bold,
+      fontSize: base * 1.75,
+      fontFallback: fonts.boldFallback);
 
   final order = data.order;
   final dateFmt = DateFormat('MM/dd/yyyy hh:mm a');
@@ -60,7 +65,7 @@ Future<pw.Document> buildReceiptRollPdf(
         ),
       );
 
-  final doc = pw.Document();
+  final doc = pw.Document(theme: fonts.theme);
   doc.addPage(
     pw.Page(
       pageFormat: PdfPageFormat(
@@ -190,13 +195,15 @@ Future<pw.Document> buildTestPageRollPdf({
   final width = rollWidthMm(widthDots) * PdfPageFormat.mm;
   final base = widthDots < 500 ? 7.0 : 8.0;
 
-  final font = await bundledPdfFont(jetBrainsMonoRegular);
-  final fontBold = await bundledPdfFont(jetBrainsMonoBold);
+  final fonts = await loadReceiptPdfFonts();
 
-  final body = pw.TextStyle(font: font, fontSize: base);
-  final title = pw.TextStyle(font: fontBold, fontSize: base * 1.75);
+  final body = pw.TextStyle(font: fonts.regular, fontSize: base);
+  final title = pw.TextStyle(
+      font: fonts.bold,
+      fontSize: base * 1.75,
+      fontFallback: fonts.boldFallback);
 
-  final doc = pw.Document();
+  final doc = pw.Document(theme: fonts.theme);
   doc.addPage(
     pw.Page(
       pageFormat: PdfPageFormat(width, double.infinity, marginAll: 0),

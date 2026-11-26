@@ -206,44 +206,53 @@ abstract final class AppTheme {
 
   // ── Text theme ────────────────────────────────────────────────────────────
 
-  static const _fontFamily = 'JetBrainsMono';
+  static const _fontFamily = AppFonts.mono;
+  static const _fontFallback = AppFonts.monoFallback;
 
   static TextTheme _textTheme(Brightness brightness) {
     final base = brightness == Brightness.dark
         ? ThemeData.dark().textTheme
         : ThemeData.light().textTheme;
-    return base.apply(fontFamily: _fontFamily).copyWith(
+    return base
+        .apply(fontFamily: _fontFamily, fontFamilyFallback: _fontFallback)
+        .copyWith(
       displayLarge: const TextStyle(
         fontFamily: _fontFamily,
+        fontFamilyFallback: _fontFallback,
         fontSize: 57,
         fontWeight: FontWeight.w300,
         letterSpacing: -1.0,
       ),
       headlineLarge: const TextStyle(
         fontFamily: _fontFamily,
+        fontFamilyFallback: _fontFallback,
         fontSize: 32,
         fontWeight: FontWeight.w700,
         letterSpacing: -0.5,
       ),
       titleLarge: const TextStyle(
         fontFamily: _fontFamily,
+        fontFamilyFallback: _fontFallback,
         fontSize: 22,
         fontWeight: FontWeight.w700,
         letterSpacing: -0.3,
       ),
       titleMedium: const TextStyle(
         fontFamily: _fontFamily,
+        fontFamilyFallback: _fontFallback,
         fontSize: 16,
         fontWeight: FontWeight.w600,
         letterSpacing: -0.1,
       ),
       titleSmall: const TextStyle(
         fontFamily: _fontFamily,
+        fontFamilyFallback: _fontFallback,
         fontSize: 14,
         fontWeight: FontWeight.w600,
       ),
       labelLarge: const TextStyle(
         fontFamily: _fontFamily,
+        fontFamilyFallback: _fontFallback,
         fontSize: 14,
         fontWeight: FontWeight.w700,
         letterSpacing: 0.1,
@@ -260,6 +269,7 @@ abstract final class AppTheme {
       useMaterial3: true,
       colorScheme: scheme,
       textTheme: tt,
+      fontFamilyFallback: _fontFallback,
       scaffoldBackgroundColor: Colors.transparent,
 
       // ── AppBar ─────────────────────────────────────────────────────────

@@ -32,17 +32,17 @@ class SummaryRow extends StatelessWidget {
           tt.titleMedium?.copyWith(
               fontWeight: FontWeight.bold,
               color: cs.primary,
-              fontFamily: AppFonts.mono),
+              fontFamily: AppFonts.mono, fontFamilyFallback: AppFonts.monoFallback),
         ),
       SummaryEmphasis.muted => (
           tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
           tt.bodyMedium?.copyWith(
-              color: cs.onSurfaceVariant, fontFamily: AppFonts.mono),
+              color: cs.onSurfaceVariant, fontFamily: AppFonts.mono, fontFamilyFallback: AppFonts.monoFallback),
         ),
       SummaryEmphasis.normal => (
           tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
           tt.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w600, fontFamily: AppFonts.mono),
+              fontWeight: FontWeight.w600, fontFamily: AppFonts.mono, fontFamilyFallback: AppFonts.monoFallback),
         ),
     };
 

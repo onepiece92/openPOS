@@ -303,7 +303,7 @@ class _StatCell extends StatelessWidget {
           const SizedBox(height: 4),
           Text(value,
               style: tt.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w800, fontFamily: AppFonts.mono)),
+                  fontWeight: FontWeight.w800, fontFamily: AppFonts.mono, fontFamilyFallback: AppFonts.monoFallback)),
           Text(label,
               style: tt.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
         ],
@@ -423,14 +423,14 @@ class _OrderCard extends StatelessWidget {
                     fmt.format(order.total),
                     style: tt.titleSmall?.copyWith(
                         fontWeight: FontWeight.w800,
-                        fontFamily: AppFonts.mono),
+                        fontFamily: AppFonts.mono, fontFamilyFallback: AppFonts.monoFallback),
                   ),
                   if (order.discountTotal > 0)
                     Text(
                       '−${fmt.format(order.discountTotal)} off',
                       style: tt.labelSmall?.copyWith(
                           color: cs.onSurfaceVariant,
-                          fontFamily: AppFonts.mono),
+                          fontFamily: AppFonts.mono, fontFamilyFallback: AppFonts.monoFallback),
                     ),
                 ],
               ),
