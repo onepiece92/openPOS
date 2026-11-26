@@ -259,7 +259,7 @@ Many POS apps are free to download and then charge somewhere else. The common pa
 - caps on items or sales per day on the free plan;
 - card-processing lock-in, where the app is free because you have to take cards through the vendor.
 
-None of these apply to Open POS. Open POS itself has no paid tier; a separate product, RebuzzPOS, exists for businesses that need cloud sync. Nothing in Open POS is locked behind a payment.
+None of these apply to Open POS. Open POS itself has no paid tier; a separate product, RebuzzPOS, exists for businesses that need sync across devices. Nothing in Open POS is locked behind a payment.
 
 ## What you get for free
 
@@ -490,7 +490,7 @@ Loyverse POS is a popular point of sale with a free core app. It is a cloud syst
 
 Open POS takes a different approach. There is no account and no server at all. Sales are stored on the device, and the app never sends them anywhere. The whole app is free and open source under the MIT license.
 
-Loyverse details are from loyverse.com, checked on 25 November 2026. Check their site for current details.
+Loyverse details are from loyverse.com, checked on 26 November 2026. Check their site for current details.
 
 | Open POS | Loyverse POS
 
@@ -504,7 +504,7 @@ Several stores or devices | No. One device, one register. | Yes
 
 Staff logins | No | Paid add-on ($5 per employee per month)
 
-Paid options | None | Optional paid add-ons
+Paid options | None | Optional paid add-ons (employee management, unlimited sales history, advanced inventory)
 
 Source code | Open source (MIT) | No public source code that we could find
 
