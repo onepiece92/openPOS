@@ -365,6 +365,73 @@ void main() {
       expect(await db.select(db.taxRates).get(), isEmpty);
     });
 
+    group('late country load', () {
+      const ke = CountryDefault(
+          code: 'KE',
+          name: 'Kenya',
+          currency: 'KES',
+          symbol: 'KSh',
+          timezone: 'Africa/Nairobi',
+          taxName: 'VAT',
+          taxRate: 16);
+      test('a list that loads after the Tax step changes nothing', () {
+        final c = container(region: 'KE');
+        final n = c.read(onboardingNotifierProvider.notifier)
+          ..setTaxName('GST')
+          ..setTaxRate(5);
+        for (var i = 0; i <= OnboardingStep.tax.index; i++) {
+          n.next();
+        }
+        expect(n.preselectCountry(ke), isFalse);
+        final s = c.read(onboardingNotifierProvider);
+        expect(s.country, isNull);
+        expect(s.taxName, 'GST');
+        expect(s.taxRate, 5);
+      });
+      test('a picked country or an edited tax is kept', () {
+        final c = container(region: 'KE');
+        final n = c.read(onboardingNotifierProvider.notifier)..setTaxRate(7);
+        expect(n.preselectCountry(ke), isFalse);
+        expect(c.read(onboardingNotifierProvider).taxRate, 7);
+        final c2 = container(region: 'KE');
+        final n2 = c2.read(onboardingNotifierProvider.notifier)
+          ..setCountry(kUnmatchedCountry);
+        expect(n2.preselectCountry(ke), isFalse);
+      });
+      test('an untouched setup still pre-selects', () {
+        final c = container(region: 'KE');
+        final n = c.read(onboardingNotifierProvider.notifier);
+        expect(n.preselectCountry(ke), isTrue);
+        expect(c.read(onboardingNotifierProvider).taxRate, 16);
+      });
+      test('Finish saves the snapshot, not a country set mid-save',
+          () async {
+        final c = container(region: 'US');
+        final n = c.read(onboardingNotifierProvider.notifier)
+          ..setTaxName('GST')
+          ..setTaxRate(5);
+        for (var i = 0; i <= OnboardingStep.tax.index; i++) {
+          n.next();
+        }
+        final done = n.skip();
+        n.setCountry(ke); // lands while _saveProfile awaits: taxRate -> 16
+        await done;
+        final rates = await db.select(db.taxRates).get();
+        expect(rates, hasLength(1));
+        expect(rates.single.name, 'GST');
+        expect(rates.single.rate, closeTo(0.05, 1e-9));
+      });
+      testWidgets('Confirm shows the resolved country and timezone',
+          (tester) async {
+        await tester.pumpWidget(const MaterialApp(
+            home: Scaffold(
+                body: ConfirmStep(
+                    state: OnboardingState(), resolvedCountry: ke))));
+        expect(find.text('Kenya'), findsOneWidget);
+        expect(find.text('Africa/Nairobi'), findsOneWidget);
+      });
+    });
+
     group('Confirm: Currency', () {
       test('nothing picked, region not matched: USD (\$), as Finish saves',
           () async {

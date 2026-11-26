@@ -24,6 +24,21 @@ class OnboardingNotifier extends Notifier<OnboardingState> {
         taxRate: country.taxRate,
       );
 
+  /// Pre-selects [country] (the device region's) when the Country list
+  /// finishes loading. Returns false, changing nothing, once the
+  /// shopkeeper picked a country, edited the tax, or got past the Tax step.
+  bool preselectCountry(CountryDefault country) {
+    final s = state;
+    if (s.country != null ||
+        s.taxName.isNotEmpty ||
+        s.taxRate != 0 ||
+        s.passed(OnboardingStep.tax)) {
+      return false;
+    }
+    setCountry(country);
+    return true;
+  }
+
   void setTaxName(String value) =>
       state = state.copyWith(taxName: value.trim());
   void setTaxRate(double value) => state = state.copyWith(taxRate: value);
@@ -88,32 +103,36 @@ class OnboardingNotifier extends Notifier<OnboardingState> {
   /// already passed, so a skip keeps the name, country and currency the
   /// shopkeeper entered — and nothing they never saw.
   Future<void> _saveProfile({required bool all}) async {
+    // Everything below saves from this snapshot: a country list that loads
+    // late (or any other change) while we await must not alter what the
+    // Confirm step showed.
+    final s = state;
     final db = ref.read(databaseProvider);
     final settings = ref.read(settingsProvider.notifier);
 
     // A blank name stays blank: businessNameOrDefault prints "My Store"
     // until one is set.
-    if (all || _passed(OnboardingStep.name) || state.businessName.isNotEmpty) {
-      await settings.setStoreProfile(name: state.businessName);
+    if (all || _passed(OnboardingStep.name) || s.businessName.isNotEmpty) {
+      await settings.setStoreProfile(name: s.businessName);
     }
     // The country (and with it the currency) is always saved: the one on
     // screen (picked, or pre-selected from the device region), else the
     // region's — so Skip and a blank Finish give the same result. A region
     // that isn't in the data: USD, no country, no timezone.
-    final country = await resolveSetupCountry(ref, state.country);
+    final country = await resolveSetupCountry(ref, s.country);
     await settings.setCurrency(symbol: country.symbol, code: country.currency);
     await settings.setLocale(
         countryCode: country.code, timezone: country.timezone);
 
     // A tax rate only with Taxes on and a rate > 0 given on the Tax step:
     // a blank (0) rate creates no "Tax 0%" (stored as decimal: 13% → 0.13).
-    if (state.taxesOn &&
+    if (s.taxesOn &&
         (all || _passed(OnboardingStep.tax)) &&
-        state.taxRate > 0) {
+        s.taxRate > 0) {
       final taxId = await db.taxDao.upsertRate(
         TaxRatesCompanion.insert(
-          name: state.taxName.isNotEmpty ? state.taxName : 'Tax',
-          rate: state.taxRate / 100.0,
+          name: s.taxName.isNotEmpty ? s.taxName : 'Tax',
+          rate: s.taxRate / 100.0,
           inclusionType: const Value('exclusive'),
           roundingMode: const Value('half_up'),
         ),

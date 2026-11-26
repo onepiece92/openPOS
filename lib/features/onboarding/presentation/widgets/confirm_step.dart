@@ -11,6 +11,9 @@ const kTaxesOffSummary = 'off — turn on in Features';
 String currencySummary(CountryDefault? country) =>
     country == null ? '—' : '${country.currency} (${country.symbol})';
 
+/// A dash for a missing or empty value (no country, or an unmatched region).
+String _orDash(String? v) => v == null || v.isEmpty ? '—' : v;
+
 class ConfirmStep extends StatelessWidget {
   const ConfirmStep({super.key, required this.state, this.resolvedCountry});
   final OnboardingState state;
@@ -66,7 +69,7 @@ class ConfirmStep extends StatelessWidget {
               _SummaryRow(
                 icon: Icons.location_on_rounded,
                 label: 'Country',
-                value: state.country?.name ?? '—',
+                value: _orDash(resolvedCountry?.name),
               ),
               _SummaryRow(
                 icon: Icons.currency_exchange_rounded,
@@ -76,7 +79,7 @@ class ConfirmStep extends StatelessWidget {
               _SummaryRow(
                 icon: Icons.schedule_rounded,
                 label: 'Timezone',
-                value: state.country?.timezone ?? '—',
+                value: _orDash(resolvedCountry?.timezone),
               ),
               // Always the Taxes switch; the rate only while it is on.
               _SummaryRow(

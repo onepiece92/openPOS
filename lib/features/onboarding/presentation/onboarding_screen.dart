@@ -65,11 +65,15 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     // no region). A region that isn't in the data: nothing pre-selected,
     // and the step asks the shopkeeper to pick.
     final initial = countryForRegion(countries, ref.read(deviceRegionProvider));
+    // A late load never overwrites a country or tax already chosen.
     if (initial != null) {
-      ref.read(onboardingNotifierProvider.notifier).setCountry(initial);
-      _taxNameCtrl.text = initial.taxName;
-      _taxRateCtrl.text = formatPercentNumber(initial.taxRate);
-    } else {
+      if (ref
+          .read(onboardingNotifierProvider.notifier)
+          .preselectCountry(initial)) {
+        _taxNameCtrl.text = initial.taxName;
+        _taxRateCtrl.text = formatPercentNumber(initial.taxRate);
+      }
+    } else if (ref.read(onboardingNotifierProvider).taxName.isEmpty) {
       _taxNameCtrl.text = kUnmatchedCountry.taxName;
     }
     setState(() {
