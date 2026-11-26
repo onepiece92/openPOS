@@ -182,9 +182,11 @@ DateTime _latest(Iterable<DateTime> ts) =>
 /// therefore lands in exactly one window — one made in the same second as
 /// a close belongs to the next shift. If the clock is set back, `closed_at`
 /// is clamped to no earlier than the window start (and `opened_at`), so
-/// windows never overlap; activity stamped before the start (by a clock
-/// that went backwards) falls in an already closed window and is not
-/// counted again.
+/// windows never overlap and nothing is counted twice. Activity stamped
+/// before the window start (by a clock that went backwards) falls in an
+/// already closed window, whose figures were frozen at its close, or
+/// before the first shift ever: either way it is never counted in any
+/// close. The close screen warns when the clock is behind.
 ///
 /// **Money in / out — one rule: sales gross by order time, money out by
 /// event time.**

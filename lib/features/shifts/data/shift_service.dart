@@ -77,6 +77,41 @@ class OpeningSuggestion {
       fromUncounted ? kOpeningFromUncountedNote : kOpeningFromCountedNote;
 }
 
+/// Shown on the close screen when the device clock is behind the window
+/// start: what it records now falls before the window and is never counted.
+const kClockBehindNote =
+    "This device's clock is earlier than the last close. Sales recorded "
+    "with the earlier time aren't in this day.";
+
+/// The open-form line when a day has been closed before.
+const kTillClosedNote = 'No day is open. You can keep selling; sales made '
+    'while the till is closed are counted in the next day you open.';
+
+/// The open-form line before the first day ever: there is no earlier close
+/// for the window to start from, so it starts at the opening.
+const kFirstDayNote =
+    "This is your first day. Sales made before you open it aren't included.";
+
+/// [kClockBehindNote] when [now] is before [windowStart], else null.
+String? clockBehindNote(DateTime now, DateTime? windowStart) =>
+    windowStart != null && now.isBefore(windowStart) ? kClockBehindNote : null;
+
+/// "This day has been open for N days." once the window passes 24 hours,
+/// in hours while under 2 days; null before that.
+String? longOpenNote(DateTime windowStart, DateTime now) {
+  final d = now.difference(windowStart);
+  if (d <= const Duration(hours: 24)) return null;
+  final String n;
+  if (d < const Duration(days: 2)) {
+    final h = d.inHours;
+    n = h == 1 ? '1 hour' : '$h hours';
+  } else {
+    final days = d.inDays;
+    n = days == 1 ? '1 day' : '$days days';
+  }
+  return 'This day has been open for $n.';
+}
+
 /// Till-session operations on top of [ShiftsDao]: the clock clamp, the gap
 /// rule and the "keep them separate" close. No money math lives here.
 class ShiftService {

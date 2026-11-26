@@ -263,7 +263,7 @@ final _articles = <_Article>[
           'End-of-day close must be on (turn on End-of-day close in Features).',
           'Open "Close day" from the sidebar.',
           'Enter the opening cash and tap "Open". It is filled in from the last close: the cash counted then, or, if that day was not counted, the cash expected then.',
-          'Selling never waits for this. Sales made while no day is open are counted in the next day you open.',
+          'Selling never waits for this. Once a day has been closed, sales made while no day is open are counted in the next day you open. On your first day, sales made before you open it are not included.',
         ],
       ),
       ArticleSection(

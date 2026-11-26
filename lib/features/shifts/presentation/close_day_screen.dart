@@ -67,6 +67,9 @@ class _CloseDayScreenState extends ConsumerState<CloseDayScreen> {
   /// Where the suggested opening cash came from (counted or not).
   String? _openingNote;
 
+  /// When the figures were last read, for the clock and long-open notes.
+  DateTime _loadedAt = DateTime.now();
+
   @override
   void initState() {
     super.initState();
@@ -105,6 +108,7 @@ class _CloseDayScreenState extends ConsumerState<CloseDayScreen> {
         _shift = shift;
         _figures = figures;
         _gap = gap;
+        _loadedAt = DateTime.now();
         _loading = false;
       });
     } catch (e) {
@@ -297,8 +301,11 @@ class _CloseDayScreenState extends ConsumerState<CloseDayScreen> {
     return [
       Text('Open the till', style: tt.titleLarge),
       const SizedBox(height: 4),
-      const Text('No day is open. You can keep selling; sales made while the '
-          'till is closed are counted in the next day you open.'),
+      // No earlier close (gapBeforeOpen is null): the first day ever, whose
+      // window starts at its own opening.
+      Text(_gap == null ? kFirstDayNote : kTillClosedNote,
+          key: const ValueKey('open-note')),
+      ..._clockNote(_gap?.from),
       const SizedBox(height: 16),
       if (msg != null) ...[
         Card(
@@ -337,6 +344,21 @@ class _CloseDayScreenState extends ConsumerState<CloseDayScreen> {
     ];
   }
 
+  List<Widget> _clockNote(DateTime? windowStart) {
+    final note = clockBehindNote(_loadedAt, windowStart);
+    if (note == null) return const [];
+    final tt = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    return [
+      Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: Text(note,
+            key: const ValueKey('clock-behind-note'),
+            style: tt.bodyMedium?.copyWith(color: cs.error)),
+      ),
+    ];
+  }
+
   // ── Shift open ───────────────────────────────────────────────────────────
 
   List<Widget> _openDay() {
@@ -371,6 +393,12 @@ class _CloseDayScreenState extends ConsumerState<CloseDayScreen> {
       Text('Open since ${summaryTime(shift.openedAt)}', style: tt.titleLarge),
       Text('Pull down to refresh the figures.',
           style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+      if (longOpenNote(f.from, _loadedAt) case final long?)
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(long, key: const ValueKey('long-open-note')),
+        ),
+      ..._clockNote(f.from),
       const SizedBox(height: 16),
       row('Net sales', fmt.format(f.netSales),
           key: const ValueKey('net-sales')),

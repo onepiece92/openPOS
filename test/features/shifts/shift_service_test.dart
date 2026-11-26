@@ -232,12 +232,69 @@ void main() {
       expect((await db.shiftsDao.currentShift())!.openedAt, at(18));
     });
 
+    test('a sale stamped before the last close (clock back while a day is '
+        'open) is in neither day, never counted', () async {
+      final id = await svc.openTill(openingCash: 0, now: at(9));
+      await sale(10, at(10));
+      await closeAt(id, at(17), counted: 10);
+      final id2 = await svc.openTill(openingCash: 10, now: at(18));
+      // The clock is moved back to 16:00 and a sale is made.
+      await sale(7, at(16));
+      final first = (await db.shiftsDao.closedShifts()).single;
+      expect(first.cashSales, 10); // frozen at its close
+      final c = await db.shiftsDao.closeShift(id2,
+          countedCash: 10, at: at(16, 30), summary: (c) => summaryOf(c));
+      // Clamped to its opening: an empty window, nothing double-counted.
+      expect(c.figures.to, at(18));
+      expect(c.figures.sales.count, 0);
+      expect(c.expectedCash, 10);
+      expect(clockBehindNote(at(16, 30), at(17)), kClockBehindNote);
+    });
+
+    test('a sale stamped before the first day ever opened is in no day',
+        () async {
+      await sale(9, at(8));
+      final id = await svc.openTill(openingCash: 0, now: at(9));
+      await sale(4, at(10));
+      final c = await db.shiftsDao.closeShift(id,
+          countedCash: 4, at: at(17), summary: (c) => summaryOf(c));
+      expect(c.figures.from, at(9));
+      expect(c.figures.cashSales, 4);
+    });
+
+    test('the clock note shows only when now is before the window start', () {
+      expect(clockBehindNote(at(16), at(17)), kClockBehindNote);
+      expect(clockBehindNote(at(17), at(17)), isNull);
+      expect(clockBehindNote(at(18), at(17)), isNull);
+      expect(clockBehindNote(at(16), null), isNull);
+    });
+
     test('the gap window never runs backwards', () async {
       final id = await svc.openTill(openingCash: 0, now: at(9));
       await closeAt(id, at(17));
       final gap = (await svc.gapBeforeOpen(now: at(15)))!;
       expect(gap.to, at(17));
       expect(gap.hasActivity, isFalse);
+    });
+  });
+
+  group('long-open note', () {
+    final start = DateTime(2026, 6, 10, 9);
+    String? note(Duration d) => longOpenNote(start, start.add(d));
+
+    test('nothing up to 24 hours', () {
+      expect(note(const Duration(hours: 5)), isNull);
+      expect(note(const Duration(hours: 24)), isNull);
+    });
+
+    test('hours under 2 days, days after', () {
+      expect(note(const Duration(hours: 25)),
+          'This day has been open for 25 hours.');
+      expect(note(const Duration(hours: 47, minutes: 59)),
+          'This day has been open for 47 hours.');
+      expect(note(const Duration(days: 2)), 'This day has been open for 2 days.');
+      expect(note(const Duration(days: 9, hours: 3)),
+          'This day has been open for 9 days.');
     });
   });
 

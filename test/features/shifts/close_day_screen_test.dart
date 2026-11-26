@@ -14,6 +14,7 @@ import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/features/backup/data/share_files.dart';
 import 'package:pos_app/features/printing/domain/receipt_printer.dart';
+import 'package:pos_app/features/shifts/data/shift_service.dart';
 import 'package:pos_app/features/shifts/presentation/close_day_screen.dart';
 import 'package:pos_app/features/shifts/presentation/close_history_screen.dart';
 import 'package:pos_app/features/shifts/presentation/shift_summary_panel.dart';
@@ -162,6 +163,40 @@ void main() {
       expect((await db.shiftsDao.currentShift())!.openingCash, 77.5);
     });
 
+    testWidgets('the first day ever says so; later days say the till rule',
+        (tester) async {
+      await pump(tester, const CloseDayScreen());
+      expect(find.text(kFirstDayNote), findsOneWidget);
+      expect(find.text(kTillClosedNote), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('open-till')));
+      await tester.pumpAndSettle();
+      final id = (await db.shiftsDao.currentShift())!.id;
+      await db.shiftsDao.closeShift(id, countedCash: 0, summary: (_) => 'x');
+      await pump(tester, const CloseDayScreen());
+      expect(find.text(kTillClosedNote), findsOneWidget);
+      expect(find.text(kFirstDayNote), findsNothing);
+    });
+
+    testWidgets('a clock behind the last close is called out',
+        (tester) async {
+      final now = DateTime.now();
+      final id = await db.shiftsDao.openShift(
+          openingCash: 0, openedAt: now.subtract(const Duration(hours: 1)));
+      // Closed "in the future": the clock has since gone back.
+      await db.shiftsDao.closeShift(id,
+          countedCash: 0,
+          at: now.add(const Duration(hours: 2)),
+          summary: (_) => 'x');
+      await pump(tester, const CloseDayScreen());
+      expect(find.text(kClockBehindNote), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('open-till')));
+      await tester.pumpAndSettle();
+      // The new day opens at the last close; the clock is still behind it.
+      expect(find.textContaining('Open since'), findsOneWidget);
+      expect(find.text(kClockBehindNote), findsOneWidget);
+    });
+
     testWidgets('a short gap with sales says so, with no separate offer',
         (tester) async {
       final now = DateTime.now();
@@ -218,6 +253,22 @@ void main() {
     Future<int> openDay({double opening = 100}) => db.shiftsDao.openShift(
         openingCash: opening,
         openedAt: DateTime.now().subtract(const Duration(hours: 3)));
+
+    testWidgets('a day open over 24 hours says how long; a fresh one does not',
+        (tester) async {
+      await db.shiftsDao.openShift(
+          openingCash: 0,
+          openedAt: DateTime.now().subtract(const Duration(days: 3, hours: 1)));
+      await pump(tester, const CloseDayScreen());
+      expect(find.text('This day has been open for 3 days.'), findsOneWidget);
+      expect(find.text(kClockBehindNote), findsNothing);
+    });
+
+    testWidgets('no long-open line for a day open a few hours', (tester) async {
+      await openDay();
+      await pump(tester, const CloseDayScreen());
+      expect(find.byKey(const ValueKey('long-open-note')), findsNothing);
+    });
 
     testWidgets(
         'tips taken, then Tips switched off: the close still counts them',
