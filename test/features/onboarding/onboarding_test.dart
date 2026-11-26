@@ -14,6 +14,8 @@ import 'package:pos_app/features/onboarding/domain/locale_country.dart';
 import 'package:pos_app/features/onboarding/domain/onboarding_state.dart';
 import 'package:pos_app/features/onboarding/presentation/onboarding_notifier.dart';
 import 'package:pos_app/features/onboarding/presentation/onboarding_screen.dart';
+import 'package:pos_app/features/onboarding/presentation/widgets/confirm_step.dart';
+import 'package:pos_app/features/onboarding/presentation/widgets/country_step.dart';
 import 'package:pos_app/features/onboarding/presentation/widgets/features_step.dart';
 import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
 
@@ -45,7 +47,8 @@ void main() {
       Map<String, Object?>.from(box.get(kFeaturesKey) as Map);
 
   group('steps', () {
-    test('Business type → Suggested features → Name → Country → Tax → '
+    test(
+        'Business type → Suggested features → Name → Country → Tax → '
         'Confirm; the count comes from the list', () {
       expect(kOnboardingSteps, [
         OnboardingStep.businessType,
@@ -57,6 +60,18 @@ void main() {
       ]);
       expect(OnboardingState(step: kOnboardingSteps.length - 1).isLast, isTrue);
       expect(const OnboardingState(step: 4).isLast, isFalse);
+    });
+
+    test('Taxes off in the chosen switches: no Tax step, one step fewer', () {
+      final off = OnboardingState(
+          switches: {for (final f in Feature.values) f: f != Feature.taxes});
+      expect(off.steps, isNot(contains(OnboardingStep.tax)));
+      expect(off.steps, hasLength(kOnboardingSteps.length - 1));
+      expect(
+          OnboardingState(step: off.steps.length - 1, switches: off.switches)
+              .isLast,
+          isTrue);
+      expect(const OnboardingState().steps, contains(OnboardingStep.tax));
     });
   });
 
@@ -104,10 +119,7 @@ void main() {
         Feature.csvImportExport,
         Feature.dashboardExtras,
       },
-      BusinessType.marketStall: {
-        Feature.reviewReminder,
-        Feature.usageCounting
-      },
+      BusinessType.marketStall: {Feature.reviewReminder, Feature.usageCounting},
       BusinessType.services: {
         ...app,
         Feature.customers,
@@ -131,8 +143,9 @@ void main() {
     }
 
     test('a preset changes switches only, never data', () async {
-      await db.into(db.customers).insert(
-          CustomersCompanion.insert(name: 'Kept'));
+      await db
+          .into(db.customers)
+          .insert(CustomersCompanion.insert(name: 'Kept'));
       final c = container();
       final n = c.read(onboardingNotifierProvider.notifier)
         ..setBusinessType(BusinessType.other);
@@ -143,7 +156,8 @@ void main() {
   });
 
   group('writing features_v1', () {
-    test('Start minimal turns every optional feature off but Review reminder '
+    test(
+        'Start minimal turns every optional feature off but Review reminder '
         'and Usage counting; Auto-print off', () async {
       await box.put(kLoyaltyEnabled, true);
       final c = container();
@@ -161,7 +175,8 @@ void main() {
       expect(box.get(kLoyaltyEnabled), isFalse);
     });
 
-    test('Review reminder and Usage counting are on in every preset; '
+    test(
+        'Review reminder and Usage counting are on in every preset; '
         'Auto-print off only in the minimal ones', () {
       for (final t in BusinessType.values) {
         expect(kPresets[t], containsAll(kAlwaysSuggested), reason: t.name);
@@ -172,7 +187,8 @@ void main() {
       }
     });
 
-    test('skip with no choice writes the defaults (every feature on) and '
+    test(
+        'skip with no choice writes the defaults (every feature on) and '
         'leaves loyalty alone', () async {
       final c = container();
       await c.read(onboardingNotifierProvider.notifier).skip();
@@ -185,7 +201,8 @@ void main() {
           reason: 'skipped before the suggestions: the drawer line explains');
     });
 
-    test('finish writes the edited switches and the business type; a 0 rate '
+    test(
+        'finish writes the edited switches and the business type; a 0 rate '
         'leaves Taxes alone and adds no rate', () async {
       final c = container();
       final n = c.read(onboardingNotifierProvider.notifier)
@@ -210,14 +227,53 @@ void main() {
 
       final c2 = container();
       final n2 = c2.read(onboardingNotifierProvider.notifier)
-        ..setBusinessType(BusinessType.marketStall)
+        ..setBusinessType(BusinessType.cafe) // Taxes on
         ..setTaxRate(8.5);
       await n2.finish();
-      expect(c2.read(featureFlagsProvider).taxes, isTrue,
-          reason: 'a rate > 0 turns Taxes on over the preset');
       final rates = await db.select(db.taxRates).get();
       expect(rates.single.rate, closeTo(0.085, 1e-9));
       expect(c2.read(defaultTaxIdProvider), rates.single.id);
+    });
+
+    for (final (name, choose) in <(String, void Function(OnboardingNotifier))>[
+      ('Market stall', (n) => n.setBusinessType(BusinessType.marketStall)),
+      ('Something else', (n) => n.setBusinessType(BusinessType.other)),
+      (
+        'Start minimal',
+        (n) => n
+          ..setBusinessType(BusinessType.cafe)
+          ..startMinimal()
+      ),
+    ]) {
+      test('$name never ends with Taxes on from a country pre-fill', () async {
+        final c = container(region: 'GB');
+        final n = c.read(onboardingNotifierProvider.notifier);
+        choose(n);
+        n.setCountry(const CountryDefault(
+            code: 'GB',
+            name: 'United Kingdom',
+            currency: 'GBP',
+            symbol: '£',
+            timezone: 'Europe/London',
+            taxName: 'VAT',
+            taxRate: 20)); // the pre-fill
+        expect(c.read(onboardingNotifierProvider).steps,
+            isNot(contains(OnboardingStep.tax)));
+        await n.finish();
+        expect(c.read(featureFlagsProvider).taxes, isFalse);
+        expect(await db.select(db.taxRates).get(), isEmpty);
+      });
+    }
+
+    test('Taxes on with the rate field cleared: Taxes on, no rate row',
+        () async {
+      final c = container();
+      final n = c.read(onboardingNotifierProvider.notifier)
+        ..setBusinessType(BusinessType.cafe)
+        ..setTaxRate(0); // what the cleared field now sets
+      await n.finish();
+      expect(c.read(featureFlagsProvider).taxes, isTrue);
+      expect(await db.select(db.taxRates).get(), isEmpty);
     });
 
     test("a 0 rate never turns off Taxes the user switched on", () async {
@@ -230,8 +286,7 @@ void main() {
       expect(stored()['taxes'], isTrue);
     });
 
-    test('skip keeps the name, country and currency already entered',
-        () async {
+    test('skip keeps the name, country and currency already entered', () async {
       final c = container();
       final n = c.read(onboardingNotifierProvider.notifier)
         ..setBusinessName('Corner Cafe')
@@ -256,9 +311,8 @@ void main() {
           reason: 'the tax step was not passed');
     });
 
-    test('skip before the country step uses the device region, not a '
-        'country the shopkeeper never confirmed', () async {
-      final c = container(region: 'GB');
+    test('Skip on the Country step keeps the country just picked', () async {
+      final c = container(region: 'US');
       final n = c.read(onboardingNotifierProvider.notifier)
         ..setCountry(const CountryDefault(
             code: 'KE',
@@ -268,18 +322,24 @@ void main() {
             timezone: 'Africa/Nairobi',
             taxName: 'VAT',
             taxRate: 16))
-        ..next();
+        ..next()
+        ..next()
+        ..next(); // on the Country step, not passed yet
+      expect(
+          c.read(onboardingNotifierProvider).current, OnboardingStep.country);
       await n.skip();
-      expect(c.read(settingsProvider).currencyCode, 'GBP');
+      expect(c.read(settingsProvider).currencyCode, 'KES');
+      expect(c.read(settingsProvider).countryCode, 'KE');
     });
 
     group('device region defaults', () {
       for (final (region, code, currency, symbol) in [
         ('GB', 'GB', 'GBP', '£'),
         (null, 'US', 'USD', r'$'),
-        ('ZZ', 'US', 'USD', r'$'), // not in the country data
+        ('ZZ', '', 'USD', r'$'), // not in the data: no country, no timezone
       ]) {
-        test('region $region: skip and a blank finish both give '
+        test(
+            'region $region: skip and a blank finish both give '
             '$currency/$code', () async {
           final skipped = container(region: region);
           await skipped.read(onboardingNotifierProvider.notifier).skip();
@@ -293,6 +353,7 @@ void main() {
           final s2 = finished.read(settingsProvider);
           expect((s2.currencyCode, s2.currencySymbol, s2.countryCode),
               (currency, symbol, code));
+          if (region == 'ZZ') expect(s2.timezone, '');
         });
       }
     });
@@ -315,11 +376,10 @@ void main() {
       expect(stored()['taxes'], isTrue, reason: "the preset's choice");
     });
 
-    test('skip after the tax step with a rate turns Taxes on and adds it',
-        () async {
+    test('skip after the Tax step with a rate adds it (Taxes on)', () async {
       final c = container();
       final n = c.read(onboardingNotifierProvider.notifier)
-        ..setBusinessType(BusinessType.marketStall)
+        ..setBusinessType(BusinessType.cafe)
         ..setTaxRate(5);
       for (var i = 0; i <= OnboardingStep.tax.index; i++) {
         n.next();
@@ -339,8 +399,7 @@ void main() {
       c = container(region: region);
       final router = GoRouter(initialLocation: '/onboarding', routes: [
         GoRoute(
-            path: '/onboarding',
-            builder: (_, __) => const OnboardingScreen()),
+            path: '/onboarding', builder: (_, __) => const OnboardingScreen()),
         GoRoute(path: '/pos', builder: (_, __) => const Text('POS home')),
       ]);
       addTearDown(router.dispose);
@@ -350,10 +409,50 @@ void main() {
       return router;
     }
 
-    testWidgets("the country step pre-selects the device region's country, "
+    testWidgets(
+        "the country step pre-selects the device region's country, "
         'not Nepal', (tester) async {
       await pump(tester, region: 'KE');
       expect(c.read(onboardingNotifierProvider).country?.code, 'KE');
+    });
+
+    testWidgets(
+        "a region not in the data: the match line, nothing pre-selected",
+        (tester) async {
+      await pump(tester, region: 'ZZ');
+      expect(c.read(onboardingNotifierProvider).country, isNull);
+      for (var i = 0; i < OnboardingStep.country.index; i++) {
+        await tester.tap(find.text('Continue'));
+        await tester.pumpAndSettle();
+      }
+      expect(find.text(kUnmatchedRegionText), findsOneWidget);
+    });
+
+    testWidgets(
+        'Taxes off (Market stall): the Tax step is skipped and Confirm says '
+        'Taxes is off', (tester) async {
+      await pump(tester, region: 'GB');
+      await tester.tap(find.text(BusinessType.marketStall.label));
+      await tester.pumpAndSettle();
+      final count = kOnboardingSteps.length - 1;
+      expect(find.text('2 of $count'), findsOneWidget);
+      while (find.text('Finish Setup').evaluate().isEmpty) {
+        await tester.tap(find.text('Continue'));
+        await tester.pumpAndSettle();
+      }
+      expect(find.text('$count of $count'), findsOneWidget);
+      expect(find.text(kTaxesOffSummary), findsOneWidget);
+    });
+
+    testWidgets('the always-suggested switches say why', (tester) async {
+      await pump(tester);
+      await tester.tap(find.text(BusinessType.other.label));
+      await tester.pumpAndSettle();
+      for (final why in kSuggestWhy.values) {
+        await tester.scrollUntilVisible(find.textContaining(why), 200,
+            scrollable: find.byType(Scrollable).last);
+        expect(find.textContaining(why), findsOneWidget);
+      }
     });
 
     testWidgets('no usable region: the US is pre-selected', (tester) async {
@@ -378,7 +477,8 @@ void main() {
     });
 
     for (var at = 0; at < kOnboardingSteps.length; at++) {
-      testWidgets('Skip on step ${at + 1} (${kOnboardingSteps[at].name}) '
+      testWidgets(
+          'Skip on step ${at + 1} (${kOnboardingSteps[at].name}) '
           'completes setup and writes features_v1', (tester) async {
         final router = await pump(tester);
         for (var i = 0; i < at; i++) {
@@ -399,8 +499,8 @@ void main() {
   group('upgrades', () {
     test('onboarding never replays once complete', () {
       final flags = FeatureFlags.defaults();
-      expect(appRedirect(onboarded: true, flags: flags, location: '/pos'),
-          isNull);
+      expect(
+          appRedirect(onboarded: true, flags: flags, location: '/pos'), isNull);
       expect(appRedirect(onboarded: false, flags: flags, location: '/pos'),
           '/onboarding');
     });

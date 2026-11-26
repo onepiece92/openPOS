@@ -20,14 +20,25 @@ void main() {
 
   test('a region maps through the bundled country data', () async {
     final countries = await CountryRepository.load();
-    final gb = countryForRegion(countries, 'GB');
+    final gb = countryForRegion(countries, 'GB')!;
     expect((gb.code, gb.currency, gb.symbol), ('GB', 'GBP', '£'));
-    expect(countryForRegion(countries, 'gb').code, 'GB');
-    // Nothing usable, or not in the data: the US.
-    for (final r in [null, '', 'ZZ', '419']) {
-      final c = countryForRegion(countries, r);
+    expect(countryForRegion(countries, 'gb')!.code, 'GB');
+    // No usable region: the US.
+    for (final r in [null, '', '419']) {
+      final c = countryForRegion(countries, r)!;
       expect((c.code, c.currency), ('US', 'USD'), reason: '$r');
     }
-    expect(countryForRegion(const [], 'GB'), kFallbackCountry);
+    expect(countryForRegion(const [], null), kFallbackCountry);
+    // A region that isn't in the data: no match (the shopkeeper picks).
+    expect(countryForRegion(countries, 'ZZ'), isNull);
+    expect((
+      kUnmatchedCountry.currency,
+      kUnmatchedCountry.taxName,
+      kUnmatchedCountry.timezone
+    ), (
+      'USD',
+      'Tax',
+      ''
+    ));
   });
 }

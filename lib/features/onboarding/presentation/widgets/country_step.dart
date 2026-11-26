@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 
 import 'package:pos_app/features/onboarding/domain/country_default.dart';
 
+const kUnmatchedRegionText =
+    "We couldn't match your region — pick your country";
+
 class CountryStep extends StatelessWidget {
   const CountryStep({
     super.key,
@@ -11,7 +14,11 @@ class CountryStep extends StatelessWidget {
     required this.searchController,
     required this.onSearch,
     required this.onSelect,
+    this.unmatchedRegion = false,
   });
+
+  /// The device region isn't in the data: nothing is pre-selected.
+  final bool unmatchedRegion;
 
   final List<CountryDefault> countries;
   final bool loading;
@@ -42,6 +49,12 @@ class CountryStep extends StatelessWidget {
                 'Sets your currency, timezone, and default tax.',
                 style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
               ),
+              if (unmatchedRegion) ...[
+                const SizedBox(height: 6),
+                Text(kUnmatchedRegionText,
+                    key: const ValueKey('unmatched-region'),
+                    style: tt.bodyMedium),
+              ],
               const SizedBox(height: 16),
               TextField(
                 controller: searchController,

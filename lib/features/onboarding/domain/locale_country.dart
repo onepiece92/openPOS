@@ -43,8 +43,8 @@ String? regionFromLocaleName(String? name) {
   return null;
 }
 
-/// The United States entry, used only when the locale gives nothing
-/// usable (and as the last resort if the country data lacks it).
+/// The United States entry, used when the locale has no region (and as
+/// the last resort if the country data lacks it).
 const kFallbackCountry = CountryDefault(
   code: 'US',
   name: 'United States',
@@ -55,10 +55,27 @@ const kFallbackCountry = CountryDefault(
   taxRate: 0,
 );
 
-/// The country of [region] in the bundled country data, else the US.
-CountryDefault countryForRegion(List<CountryDefault> countries, String? region) {
+/// Saved when the device has a region that isn't in the country data:
+/// USD, the plain tax name "Tax", and no country or timezone (nothing
+/// country-specific is shown for a country we don't know).
+const kUnmatchedCountry = CountryDefault(
+  code: '',
+  name: '',
+  currency: 'USD',
+  symbol: r'$',
+  timezone: '',
+  taxName: 'Tax',
+  taxRate: 0,
+);
+
+/// The country of [region] in the bundled country data. No usable region
+/// gives the US; a region that isn't in the data gives null (the country
+/// step then pre-selects nothing and asks the shopkeeper to pick).
+CountryDefault? countryForRegion(
+    List<CountryDefault> countries, String? region) {
   CountryDefault? byCode(String code) =>
       countries.where((c) => c.code == code).firstOrNull;
   final r = normalizeRegion(region);
-  return (r == null ? null : byCode(r)) ?? byCode('US') ?? kFallbackCountry;
+  if (r == null) return byCode('US') ?? kFallbackCountry;
+  return byCode(r);
 }

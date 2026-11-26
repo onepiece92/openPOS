@@ -2,8 +2,9 @@ import 'package:pos_app/core/providers/feature_flags.dart';
 import 'package:pos_app/features/onboarding/domain/business_type.dart';
 import 'package:pos_app/features/onboarding/domain/country_default.dart';
 
-/// The setup steps, in order. The step count, the header and the nav bar
-/// all come from this list.
+/// Every setup step, in order. The steps a run actually shows are
+/// [OnboardingState.steps] (the Tax step only while Taxes is on); the
+/// step count, the header and the nav bar all come from that list.
 enum OnboardingStep {
   businessType('Type'),
   features('Features'),
@@ -21,7 +22,7 @@ enum OnboardingStep {
 const kOnboardingSteps = OnboardingStep.values;
 
 class OnboardingState {
-  final int step; // index into kOnboardingSteps
+  final int step; // index into [steps]
   final String businessName;
   final CountryDefault? country;
   final String taxName;
@@ -45,10 +46,29 @@ class OnboardingState {
     this.saving = false,
     this.businessType,
     this.switches,
+    this.defaultTaxesOn = true,
   });
 
-  OnboardingStep get current => kOnboardingSteps[step];
-  bool get isLast => step == kOnboardingSteps.length - 1;
+  /// Taxes when no switch was chosen yet (the stored default).
+  final bool defaultTaxesOn;
+
+  /// Taxes as the chosen switches say — they decide, never the pre-fill.
+  bool get taxesOn => switches?[Feature.taxes] ?? defaultTaxesOn;
+
+  /// The steps of this run: the Tax step is skipped while Taxes is off.
+  List<OnboardingStep> get steps => [
+        for (final s in OnboardingStep.values)
+          if (s != OnboardingStep.tax || taxesOn) s,
+      ];
+
+  /// Whether [s] is in this run and already behind the current step.
+  bool passed(OnboardingStep s) {
+    final i = steps.indexOf(s);
+    return i >= 0 && step > i;
+  }
+
+  OnboardingStep get current => steps[step];
+  bool get isLast => step == steps.length - 1;
 
   OnboardingState copyWith({
     int? step,
@@ -69,5 +89,6 @@ class OnboardingState {
         saving: saving ?? this.saving,
         businessType: businessType ?? this.businessType,
         switches: switches ?? this.switches,
+        defaultTaxesOn: defaultTaxesOn,
       );
 }

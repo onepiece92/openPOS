@@ -34,6 +34,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   List<CountryDefault> _countries = [];
   List<CountryDefault> _filtered = [];
   bool _loadingCountries = true;
+  bool _unmatchedRegion = false;
 
   @override
   void initState() {
@@ -49,10 +50,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           .setTaxName(_taxNameCtrl.text);
     });
     _taxRateCtrl.addListener(() {
-      final v = double.tryParse(_taxRateCtrl.text);
-      if (v != null) {
-        ref.read(onboardingNotifierProvider.notifier).setTaxRate(v);
-      }
+      // Empty (or unreadable) text is 0, never the old rate.
+      ref
+          .read(onboardingNotifierProvider.notifier)
+          .setTaxRate(double.tryParse(_taxRateCtrl.text.trim()) ?? 0);
     });
     _loadCountries();
   }
@@ -61,13 +62,19 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     final countries = await CountryRepository.load();
     if (!mounted) return;
     // Pre-select the device region's country (the US when the locale has
-    // none, or it isn't in the data).
+    // no region). A region that isn't in the data: nothing pre-selected,
+    // and the step asks the shopkeeper to pick.
     final initial =
         countryForRegion(countries, ref.read(deviceRegionProvider));
-    ref.read(onboardingNotifierProvider.notifier).setCountry(initial);
-    _taxNameCtrl.text = initial.taxName;
-    _taxRateCtrl.text = formatPercentNumber(initial.taxRate);
+    if (initial != null) {
+      ref.read(onboardingNotifierProvider.notifier).setCountry(initial);
+      _taxNameCtrl.text = initial.taxName;
+      _taxRateCtrl.text = formatPercentNumber(initial.taxRate);
+    } else {
+      _taxNameCtrl.text = kUnmatchedCountry.taxName;
+    }
     setState(() {
+      _unmatchedRegion = initial == null;
       _countries = countries;
       _filtered = countries;
       _loadingCountries = false;
@@ -163,14 +170,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           children: [
             WizardHeader(
                 step: state.step,
-                labels: [for (final s in kOnboardingSteps) s.label],
+                labels: [for (final s in state.steps) s.label],
                 onSkip: state.saving ? null : _skip),
             Expanded(
               child: PageView(
                 controller: _pageController,
                 physics: const NeverScrollableScrollPhysics(),
                 children: [
-                  for (final step in kOnboardingSteps)
+                  for (final step in state.steps)
                     switch (step) {
                       OnboardingStep.businessType => BusinessTypeStep(
                           selected: state.businessType,
@@ -197,6 +204,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       OnboardingStep.country => CountryStep(
                           countries: _filtered,
                           loading: _loadingCountries,
+                          unmatchedRegion:
+                              _unmatchedRegion && state.country == null,
                           selected: state.country,
                           searchController: _searchCtrl,
                           onSearch: _filterCountries,

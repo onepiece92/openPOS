@@ -12,7 +12,8 @@ import 'package:pos_app/features/onboarding/domain/onboarding_state.dart';
 
 class OnboardingNotifier extends Notifier<OnboardingState> {
   @override
-  OnboardingState build() => const OnboardingState();
+  OnboardingState build() => OnboardingState(
+      defaultTaxesOn: ref.read(featureFlagsProvider).stored(Feature.taxes));
 
   void setBusinessName(String value) =>
       state = state.copyWith(businessName: value.trim());
@@ -53,13 +54,12 @@ class OnboardingNotifier extends Notifier<OnboardingState> {
 
   void setSaving(bool value) => state = state.copyWith(saving: value);
 
-  bool _passed(OnboardingStep s) => state.step > s.index;
+  bool _passed(OnboardingStep s) => state.passed(s);
 
   /// Writes the switches (features_v1), the business type and whether the
-  /// "turn features on or off" intro is still due. [taxFromRate]: the tax
-  /// step was passed. One way only: a rate > 0 turns Taxes on; a 0 rate
-  /// leaves the preset's (or the user's) switch alone.
-  Future<void> _saveFeatures({required bool taxFromRate}) async {
+  /// "turn features on or off" intro is still due. The switches decide
+  /// Taxes; the tax step's rate never turns it on or off.
+  Future<void> _saveFeatures() async {
     final settings = ref.read(settingsProvider.notifier);
     final type = state.businessType;
     if (type != null) await settings.setBusinessType(type.name);
@@ -72,7 +72,6 @@ class OnboardingNotifier extends Notifier<OnboardingState> {
         // keeps its own key untouched.
         for (final f in Feature.values)
           if (f != Feature.loyalty) f: _defaults.stored(f),
-      if (taxFromRate && state.taxRate > 0) Feature.taxes: true,
     };
     await settings.setFeatures(values);
     // The suggestions step showed what Features does: no drawer intro.
@@ -97,20 +96,20 @@ class OnboardingNotifier extends Notifier<OnboardingState> {
     if (all || _passed(OnboardingStep.name) || state.businessName.isNotEmpty) {
       await settings.setStoreProfile(name: state.businessName);
     }
-    // The country (and with it the currency) is always saved: the one
-    // chosen, or — skipped or left blank — the device region's, so Skip
-    // and a blank Finish give the same result.
-    final country = (_passed(OnboardingStep.country) || all
-            ? state.country
-            : null) ??
-        await _regionCountry();
+    // The country (and with it the currency) is always saved: the one on
+    // screen (picked, or pre-selected from the device region), else the
+    // region's — so Skip and a blank Finish give the same result. A region
+    // that isn't in the data: USD, no country, no timezone.
+    final country = state.country ?? await _regionCountry();
     await settings.setCurrency(symbol: country.symbol, code: country.currency);
     await settings.setLocale(
         countryCode: country.code, timezone: country.timezone);
 
-    // The default tax rate, only when one was given: a blank (0) rate
-    // creates no "Tax 0%" (rate stored as decimal: 13% → 0.13).
-    if ((all || _passed(OnboardingStep.tax)) && state.taxRate > 0) {
+    // A tax rate only with Taxes on and a rate > 0 given on the Tax step:
+    // a blank (0) rate creates no "Tax 0%" (stored as decimal: 13% → 0.13).
+    if (state.taxesOn &&
+        (all || _passed(OnboardingStep.tax)) &&
+        state.taxRate > 0) {
       final taxId = await db.taxDao.upsertRate(
         TaxRatesCompanion.insert(
           name: state.taxName.isNotEmpty ? state.taxName : 'Tax',
@@ -123,9 +122,9 @@ class OnboardingNotifier extends Notifier<OnboardingState> {
     }
   }
 
-  /// The device region's country from the bundled country data, or the
-  /// US when the locale gives nothing usable. The region is read here, at
-  /// setup only.
+  /// The device region's country from the bundled country data: the US
+  /// when the locale has no region, [kUnmatchedCountry] when its region is
+  /// not in the data. The region is read here, at setup only.
   Future<CountryDefault> _regionCountry() async {
     List<CountryDefault> countries;
     try {
@@ -133,7 +132,8 @@ class OnboardingNotifier extends Notifier<OnboardingState> {
     } catch (_) {
       countries = const [];
     }
-    return countryForRegion(countries, ref.read(deviceRegionProvider));
+    return countryForRegion(countries, ref.read(deviceRegionProvider)) ??
+        kUnmatchedCountry;
   }
 
   Future<void> finish() async {
@@ -152,7 +152,7 @@ class OnboardingNotifier extends Notifier<OnboardingState> {
       'backup': false,
     });
 
-    await _saveFeatures(taxFromRate: true);
+    await _saveFeatures();
     await settings.setOnboardingComplete(true);
     state = state.copyWith(saving: false);
   }
@@ -162,7 +162,7 @@ class OnboardingNotifier extends Notifier<OnboardingState> {
   Future<void> skip() async {
     state = state.copyWith(saving: true);
     await _saveProfile(all: false);
-    await _saveFeatures(taxFromRate: _passed(OnboardingStep.tax));
+    await _saveFeatures();
     await ref.read(settingsProvider.notifier).setOnboardingComplete(true);
     state = state.copyWith(saving: false);
   }

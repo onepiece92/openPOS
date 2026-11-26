@@ -10,6 +10,12 @@ const kSuggestSubtitle =
 const kStartMinimal = 'Start minimal';
 const kSuggestFooter = 'You can change these any time in Features.';
 
+/// Why the two always-suggested switches are on, under their line.
+const kSuggestWhy = {
+  Feature.reviewReminder: 'Why: helps other shopkeepers find Open POS.',
+  Feature.usageCounting: 'Why: lets you send us usage details, if you choose.',
+};
+
 /// Step 2: every switch pre-set from the preset, one line each, editable.
 class FeaturesStep extends StatelessWidget {
   const FeaturesStep({
@@ -55,7 +61,10 @@ class FeaturesStep extends StatelessWidget {
               key: ValueKey('suggest-${f.name}'),
               contentPadding: EdgeInsets.only(left: p == null ? 0 : 16),
               title: Text(f.label),
-              subtitle: Text(blocked ? needsLine(p) : f.description),
+              subtitle: Text(blocked
+                  ? needsLine(p)
+                  : [f.description, if (kSuggestWhy[f] case final why?) why]
+                      .join('\n')),
               value: switches[f] ?? false,
               onChanged: blocked ? null : (v) => onChanged(f, v),
             );
