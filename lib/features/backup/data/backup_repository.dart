@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:uuid/uuid.dart';
 
+import 'package:pos_app/core/utils/money.dart';
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/database/tables/orders_table.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
@@ -787,8 +788,8 @@ class BackupRepository {
           // Older exports have no Tip column: no tip. (A fully refunded
           // order imports with no refund rows; netTipsForPeriod counts it
           // as keeping nothing.)
-          tipAmount: Value(
-              (first.numberOf('tip') ?? 0.0).clamp(0.0, double.infinity)),
+          tipAmount: Value(roundMoney(
+              (first.numberOf('tip') ?? 0.0).clamp(0.0, kMaxMoneyAmount))),
           paymentMethod: method,
           tenderedAmount: Value(tendered),
           changeAmount: Value(change),

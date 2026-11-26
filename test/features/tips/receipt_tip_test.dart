@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/utils/currency_formatter.dart';
+import '../../_support/pdf_text.dart';
 import 'package:pos_app/features/printing/domain/receipt_roll_pdf.dart';
 import 'package:pos_app/features/printing/domain/render_receipt.dart';
 import 'package:pos_app/features/receipts/domain/receipt_labels.dart';
@@ -71,12 +72,12 @@ void main() {
       tester.pumpWidget(
           MaterialApp(home: Scaffold(body: ReceiptBody(data: d, fmt: fmt))));
 
-  testWidgets('on-screen receipt: Tip row, Total Paid includes the tip',
+  testWidgets('on-screen receipt: Tip row, Total paid includes the tip',
       (tester) async {
     await body(tester, _data(tip: 10));
     expect(find.text('Tip'), findsOneWidget);
     expect(find.text('Rs 10.00'), findsOneWidget);
-    expect(find.text('Total Paid'), findsOneWidget);
+    expect(find.text('Total paid'), findsOneWidget);
     expect(find.text('Rs 123.00'), findsOneWidget); // 113 + 10
     expect(find.text('Grand Total'), findsNothing);
   });
@@ -84,7 +85,7 @@ void main() {
   testWidgets('on-screen receipt without a tip is unchanged', (tester) async {
     await body(tester, _data());
     expect(find.text('Tip'), findsNothing);
-    expect(find.text('Total Paid'), findsNothing);
+    expect(find.text('Total paid'), findsNothing);
     expect(find.text('Grand Total'), findsOneWidget);
     expect(find.text('Rs 113.00'), findsOneWidget);
   });
@@ -114,7 +115,7 @@ void main() {
   test('the closing total row is total + tip, labelled for each format', () {
     final tipped = _data(tip: 10).order;
     expect(tipped.paidTotal, 123); // what both PDFs print as the total
-    expect(tipped.totalRowLabel('Grand Total'), 'Total Paid'); // A4
+    expect(tipped.totalRowLabel('Grand Total'), 'Total paid'); // A4
     expect(tipped.totalRowLabel('TOTAL', shout: true), 'TOTAL PAID'); // roll
     final plain = _data().order;
     expect(plain.paidTotal, 113);
@@ -138,5 +139,37 @@ void main() {
     final tipped = await (await buildReceiptPdf(_data(tip: 10), fmt)).save();
     final plain = await (await buildReceiptPdf(_data(), fmt)).save();
     expect(tipped.length, isNot(plain.length));
+  });
+
+  group('PDF text (extracted through each font\'s ToUnicode map)', () {
+    // Runs come word by word; the page's text reads as one spaced string.
+    String textOf(List<int> bytes) => pdfTextRuns(bytes).join(' ');
+
+    test('A4: Tip and Total paid rows with their values', () async {
+      final t = textOf(await (await buildReceiptPdf(_data(tip: 10), fmt)).save());
+      expect(t, matches(RegExp(r'Tip\s+Rs\s+10\.00')), reason: t);
+      expect(t, matches(RegExp(r'Total paid\s+Rs\s+123\.00')), reason: t);
+      expect(t, isNot(contains('Grand Total')));
+      expect(t, isNot(contains('TOTAL PAID')));
+    });
+
+    test('A4 without a tip keeps Grand Total', () async {
+      final t = textOf(await (await buildReceiptPdf(_data(), fmt)).save());
+      expect(t, matches(RegExp(r'Grand Total\s+Rs\s+113\.00')), reason: t);
+      expect(t, isNot(contains('Tip')));
+      expect(t, isNot(contains('Total paid')));
+    });
+
+    for (final dots in [384, 576]) {
+      test('roll $dots dots: Tip and TOTAL PAID rows with their values',
+          () async {
+        final doc =
+            await buildReceiptRollPdf(_data(tip: 10), fmt, widthDots: dots);
+        final t = textOf(await doc.save());
+        expect(t, matches(RegExp(r'Tip\s+Rs\s+10\.00')), reason: t);
+        expect(t, matches(RegExp(r'TOTAL PAID\s+Rs\s+123\.00')), reason: t);
+        expect(t, isNot(contains('Total paid')));
+      });
+    }
   });
 }

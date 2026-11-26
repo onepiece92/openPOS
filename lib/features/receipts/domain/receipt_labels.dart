@@ -26,11 +26,12 @@ extension ReceiptTip on Order {
   /// What the customer paid: [total] plus [tipAmount].
   double get paidTotal => paidWithTip(total, tipAmount);
 
-  /// The label of the closing total row: "Total Paid" once there is a tip,
+  /// The label of the closing total row: "Total paid" once there is a tip,
   /// else [plain] ("Grand Total" on the page formats, "TOTAL" on the roll).
-  /// [shout] upper-cases it for the roll and ESC/POS.
+  /// [shout] upper-cases it ("TOTAL PAID") for the roll and ESC/POS, where
+  /// every total is in capitals; everywhere else it is "Total paid".
   String totalRowLabel(String plain, {bool shout = false}) {
-    final label = hasTip ? 'Total Paid' : plain;
+    final label = hasTip ? 'Total paid' : plain;
     return shout ? label.toUpperCase() : label;
   }
 }

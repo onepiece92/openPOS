@@ -91,6 +91,7 @@ class _TipPresetsSheetState extends ConsumerState<TipPresetsSheet> {
           TextField(
             controller: _ctrl,
             autofocus: true,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: InputDecoration(
               labelText: 'Percentages, separated by commas',
               helperText: 'Up to $kMaxTipPresets, from above 0 to 100',

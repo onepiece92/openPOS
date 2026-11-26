@@ -81,8 +81,10 @@ String? parseTipPresets(String raw, List<double> out) {
   if (parts.isEmpty) return 'Enter at least one percentage';
   final values = <double>[];
   for (final p in parts) {
-    final v = double.tryParse(p.replaceAll('%', ''));
-    if (v == null) return '"$p" is not a number';
+    final parsed = double.tryParse(p.replaceAll('%', ''));
+    if (parsed == null || !parsed.isFinite) return '"$p" is not a number';
+    // One decimal at most: 12.5 stays, 12.34 becomes 12.3.
+    final v = (parsed * 10).round() / 10;
     if (v <= 0 || v > 100) {
       return 'Each percentage must be above 0 and at most 100';
     }
