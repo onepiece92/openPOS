@@ -269,7 +269,7 @@ final _articles = <_Article>[
       ArticleSection(
         heading: 'Close the Day',
         steps: [
-          'The screen shows net sales, orders and the cash drawer: opening cash, cash sales, cash tips, cash refunds, cash voids and paid out, giving the expected cash. Pull down to refresh the figures.',
+          'The screen shows net sales, orders and the cash drawer: opening cash, cash sales, cash tips, cash refunds, cash voids, cash tips returned and paid out, giving the expected cash. Tips handed back with a refund or void are listed on their own line, so the drawer adds up. Pull down to refresh the figures.',
           'Enter any cash paid out of the drawer, then the cash you counted. The screen shows whether the drawer is over, short or balanced.',
           'Add a note if you like, tap "Close day" and confirm. A closed day cannot be reopened.',
           'The summary is saved as it was at the close. Print it, share it, email it or copy it.',
