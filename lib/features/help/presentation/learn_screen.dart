@@ -120,6 +120,7 @@ final _articles = <_Article>[
           'Switching a feature off never deletes data. Switch it back on and your data is still there.',
           'Some features need another one. While the parent is off, the feature shows "Needs <parent>" (for example, Tables needs Held tickets).',
           'Turning Taxes off asks you to confirm first.',
+          'A factory reset returns every switch to its default, including Usage counting being back on, with its one-time notice.',
         ],
       ),
     ],

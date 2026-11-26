@@ -365,6 +365,13 @@ class AppDatabase extends _$AppDatabase {
         await _seedDefaultData();
       });
 
+  /// Rebuilds the database file so space freed by a big delete is given back
+  /// (`VACUUM`). For a factory reset only: it rewrites the whole file, so
+  /// it is slow on a large database and must not run during normal use.
+  /// SQLite refuses `VACUUM` inside a transaction, so call it on its own,
+  /// never from within [transaction].
+  Future<void> compact() => customStatement('VACUUM');
+
   /// Seeds essential data on a fresh install.
   /// Wrapped in a check so it's idempotent — safe to call multiple times.
   Future<void> _seedDefaultData() async {
