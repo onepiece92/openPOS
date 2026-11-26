@@ -30,7 +30,11 @@ class Shifts extends Table {
   RealColumn get cashVoids => real().nullable()();
   RealColumn get paidOut => real().nullable()();
   RealColumn get expectedCash => real().nullable()();
+  /// NULL also after a close made without counting the drawer.
   RealColumn get countedCash => real().nullable()();
+  /// Sales − refunds − voids in the window (all methods, tip-free), frozen
+  /// at close so history never recomputes it.
+  RealColumn get netSales => real().nullable()();
   /// The plain-text close summary as printed/shared at close time.
   TextColumn get summaryText => text().nullable()();
   TextColumn get notes => text().nullable()();

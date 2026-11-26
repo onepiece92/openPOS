@@ -71,7 +71,7 @@ void main() {
       'expected ${c.expectedCash} counted ${c.countedCash}';
 
   Future<ShiftClose> close(int id,
-          {double counted = 0, double paidOut = 0, DateTime? when}) =>
+          {double? counted = 0, double paidOut = 0, DateTime? when}) =>
       dao.closeShift(id,
           countedCash: counted, paidOut: paidOut, at: when, summary: summaryOf);
 
@@ -124,6 +124,7 @@ void main() {
       expect((s.cashSales, s.cashTips, s.cashRefunds, s.cashVoids, s.paidOut),
           (240.0, 10.0, 20.0, 0.0, 5.0));
       expect((s.expectedCash, s.countedCash), (275.0, 275.0));
+      expect(s.netSales, 240 - 20, reason: 'frozen at close');
       expect(s.summaryText, 'expected 275.0 counted 275.0');
 
       await expectLater(close(id), throwsA(isA<ShiftStateException>()));
@@ -139,6 +140,42 @@ void main() {
       final c = await close(id, when: at(21));
       expect(c.figures.cashSales, 10);
       expect((await dao.lastClosedShift())!.cashSales, 10);
+    });
+
+    test('an uncounted close stores no count but every other figure',
+        () async {
+      final id = await dao.openShift(openingCash: 50, openedAt: at(8));
+      await order(total: 30, tip: 2);
+      final c = await close(id, counted: null, paidOut: 4, when: at(20));
+      expect(c.counted, isFalse);
+      expect(c.countedCash, isNull);
+      expect((c.overShort, c.overShortCents), (null, null));
+      expect(c.expectedCash, 50 + 30 + 2 - 4);
+
+      final s = (await dao.lastClosedShift())!;
+      expect(s.closedAt, at(20));
+      expect(s.countedCash, isNull);
+      expect((s.cashSales, s.cashTips, s.paidOut, s.expectedCash, s.netSales),
+          (30.0, 2.0, 4.0, 78.0, 30.0));
+      expect(s.summaryText, isNotNull);
+
+      final counted = await close(
+          await dao.openShift(openingCash: 0, openedAt: at(20)),
+          counted: 1,
+          when: at(21));
+      expect((counted.counted, counted.overShort, counted.overShortCents),
+          (true, 1.0, 100));
+    });
+
+    test('lastCountedShift skips uncounted closes', () async {
+      expect(await dao.lastCountedShift(), isNull);
+      final a = await dao.openShift(openingCash: 0, openedAt: at(8));
+      await close(a, counted: 120, when: at(9));
+      final b = await dao.openShift(openingCash: 120, openedAt: at(9));
+      await close(b, counted: null, when: at(10));
+      expect((await dao.lastClosedShift())!.id, b);
+      final counted = (await dao.lastCountedShift())!;
+      expect((counted.id, counted.countedCash), (a, 120.0));
     });
 
     test('a new shift opens once the last is closed, from its counted cash',

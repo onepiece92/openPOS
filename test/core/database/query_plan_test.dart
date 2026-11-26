@@ -245,6 +245,13 @@ void main() {
     expectIndexed(stock, ['idx_stock_adjustments_product_created']);
     expect(stock.join(' | '), isNot(contains('TEMP B-TREE')),
         reason: 'the index also delivers newest-first order');
+    final byOrder =
+        await planOf(() => db.inventoryDao.getAdjustmentsForOrder(1));
+    expectIndexed(byOrder, ['idx_stock_adjustments_order_id']);
+    expect(
+        byOrder.join(' | '),
+        contains('SEARCH stock_adjustments USING INDEX '
+            'idx_stock_adjustments_order_id (order_id=?)'));
   });
 
   test('connection pragmas: foreign keys on, temp space in memory, '

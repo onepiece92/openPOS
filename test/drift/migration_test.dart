@@ -237,6 +237,7 @@ void main() {
     'idx_shifts_closed_at': 'shifts',
     'idx_shifts_one_open': 'shifts',
     'idx_orders_voided_at': 'orders',
+    'idx_stock_adjustments_order_id': 'stock_adjustments',
     'idx_returns_created_at': 'returns',
   };
 
@@ -292,14 +293,19 @@ void main() {
 
     for (final t in tables) {
       final rows = await db.customSelect('SELECT * FROM $t ORDER BY id').get();
-      // v16 appends tip_amount (default 0) to orders and returns, and
-      // voided_at (NULL) to orders; every
-      // column that existed at v14 must be untouched.
+      // v16 appends tip_amount (default 0) to orders and returns,
+      // voided_at (NULL) to orders and order_id (NULL) to
+      // stock_adjustments; every column that existed at v14 must be
+      // untouched.
+      final v16Columns = {
+        'orders': ['tip_amount', 'voided_at'],
+        'returns': ['tip_amount'],
+        'stock_adjustments': ['order_id'],
+      }[t] ?? const <String>[];
       expect(
           rows
               .map((r) => (Map.of(r.data)
-                    ..remove('tip_amount')
-                    ..remove('voided_at'))
+                    ..removeWhere((k, _) => v16Columns.contains(k)))
                   .values
                   .join('|'))
               .join('\n'),
@@ -328,6 +334,10 @@ void main() {
     );
     raw.execute(
         'INSERT INTO returns (order_id, amount, created_at) VALUES (1, 13, 1500), (2, 50, 2500)');
+    raw.execute("INSERT INTO products (id, sku, name, price) VALUES (1, 'TEA', 'Tea', 5)");
+    raw.execute(
+        'INSERT INTO stock_adjustments (product_id, delta, reason_code, created_at) VALUES '
+        "(1, -1, 'sale', 1000), (1, 1, 'void', 2000), (1, 4, 'receive', 3000)");
 
     final db = AppDatabase(schema.newConnection());
     addTearDown(db.close);
@@ -350,6 +360,10 @@ void main() {
     expect(returns.map((r) => (r.read<double>('amount'), r.read<double>('tip_amount'))),
         [(13.0, 0.0), (50.0, 0.0)]);
     expect(await db.shiftsDao.currentShift(), isNull);
+    final adj = await db.inventoryDao.getAdjustmentsForProduct(1);
+    expect(adj, hasLength(3));
+    expect(adj.map((a) => a.orderId), everyElement(isNull),
+        reason: 'pre-v16 rows have no order link');
     expect(await indexes(db), allIndexes);
   });
 
@@ -365,6 +379,8 @@ void main() {
     'idx_shifts_closed_at',
     'idx_shifts_one_open',
     'idx_returns_created_at',
+    'ALTER TABLE "stock_adjustments" ADD COLUMN "order_id"',
+    'idx_stock_adjustments_order_id',
     'PRAGMA user_version',
   ];
 

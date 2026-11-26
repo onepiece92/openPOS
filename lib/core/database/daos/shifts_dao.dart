@@ -131,7 +131,8 @@ class ShiftFigures {
 /// [expectedCash] is roundMoney'd here; [countedCash] and [paidOut] are
 /// roundMoney'd on input; [overShort] = roundMoney(counted − expected);
 /// compare money in whole cents ([overShortCents]), never with `==` on
-/// doubles.
+/// doubles. A close may be uncounted ([countedCash] null): then [counted]
+/// is false and [overShort] / [overShortCents] are null.
 class ShiftClose {
   const ShiftClose({
     required this.shiftId,
@@ -144,13 +145,25 @@ class ShiftClose {
   final int shiftId;
   final double openingCash;
   final double paidOut;
-  final double countedCash;
+  /// The drawer as counted, or null when the close was not counted.
+  final double? countedCash;
   final ShiftFigures figures;
+
+  bool get counted => countedCash != null;
 
   double get expectedCash =>
       figures.expectedCash(openingCash: openingCash, paidOut: paidOut);
-  double get overShort => roundMoney(countedCash - expectedCash);
-  int get overShortCents => (overShort * 100).round();
+
+  /// counted − expected, or null when not counted.
+  double? get overShort {
+    final c = countedCash;
+    return c == null ? null : roundMoney(c - expectedCash);
+  }
+
+  int? get overShortCents {
+    final o = overShort;
+    return o == null ? null : (o * 100).round();
+  }
 }
 
 DateTime _wholeSecond(DateTime t) => DateTime.fromMillisecondsSinceEpoch(
@@ -224,12 +237,23 @@ class ShiftsDao extends DatabaseAccessor<AppDatabase> with _$ShiftsDaoMixin {
 
   Stream<Shift?> watchCurrentShift() => _open().watchSingleOrNull();
 
-  /// The most recently closed shift — its `countedCash` is the natural
-  /// default for the next shift's opening cash.
+  /// The most recently closed shift, counted or not.
   Future<Shift?> lastClosedShift() async {
     final rows = await closedShifts(limit: 1);
     return rows.isEmpty ? null : rows.first;
   }
+
+  /// The most recent close whose drawer was counted — its `countedCash` is
+  /// the natural default for the next shift's opening cash. Walks
+  /// idx_shifts_closed_at newest first and stops at the first counted one.
+  Future<Shift?> lastCountedShift() => (select(shifts)
+        ..where((s) => s.closedAt.isNotNull() & s.countedCash.isNotNull())
+        ..orderBy([
+          (s) => OrderingTerm.desc(s.closedAt),
+          (s) => OrderingTerm.desc(s.id),
+        ])
+        ..limit(1))
+      .getSingleOrNull();
 
   /// Closed shifts, newest close first.
   Future<List<Shift>> closedShifts({int limit = 30}) => (select(shifts)
@@ -260,7 +284,7 @@ class ShiftsDao extends DatabaseAccessor<AppDatabase> with _$ShiftsDaoMixin {
   }
 
   Future<ShiftClose> _compute(Shift shift,
-      {DateTime? at, required double paidOut, required double countedCash}) async {
+      {DateTime? at, required double paidOut, required double? countedCash}) async {
     final from = await windowStart(shift);
     final to = _latest(
         [_wholeSecond(at ?? DateTime.now()), from, shift.openedAt]);
@@ -268,7 +292,7 @@ class ShiftsDao extends DatabaseAccessor<AppDatabase> with _$ShiftsDaoMixin {
       shiftId: shift.id,
       openingCash: shift.openingCash,
       paidOut: roundMoney(paidOut),
-      countedCash: roundMoney(countedCash),
+      countedCash: countedCash == null ? null : roundMoney(countedCash),
       figures: await figuresForWindow(from, to),
     );
   }
@@ -276,7 +300,7 @@ class ShiftsDao extends DatabaseAccessor<AppDatabase> with _$ShiftsDaoMixin {
   /// The close of open shift [id] as it would be at [at] (default now),
   /// without writing anything — for the close screen while it is open.
   Future<ShiftClose> previewClose(int id,
-          {DateTime? at, double paidOut = 0, double countedCash = 0}) =>
+          {DateTime? at, double paidOut = 0, double? countedCash}) =>
       transaction(() async {
         final shift = await _require(id);
         return _compute(shift,
@@ -287,13 +311,15 @@ class ShiftsDao extends DatabaseAccessor<AppDatabase> with _$ShiftsDaoMixin {
   /// window start / opening if the clock went back). The figures are
   /// computed inside the same transaction as the write, so they cannot be
   /// stale; [summary] is called with them to build the frozen
-  /// `summary_text`. Returns what was stored.
+  /// `summary_text`. Returns what was stored. Pass [countedCash] null for
+  /// a close without a count: counted_cash stays NULL, everything else
+  /// (expected cash included) is stored as usual.
   ///
   /// Throws [ShiftStateException] if the shift does not exist or is already
   /// closed.
   Future<ShiftClose> closeShift(
     int id, {
-    required double countedCash,
+    required double? countedCash,
     double paidOut = 0,
     String? notes,
     DateTime? at,
@@ -317,6 +343,7 @@ class ShiftsDao extends DatabaseAccessor<AppDatabase> with _$ShiftsDaoMixin {
             paidOut: Value(close.paidOut),
             expectedCash: Value(close.expectedCash),
             countedCash: Value(close.countedCash),
+            netSales: Value(f.netSales),
             summaryText: Value(summary(close)),
             notes: Value(notes),
           ),

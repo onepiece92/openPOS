@@ -26,6 +26,14 @@ class InventoryDao extends DatabaseAccessor<AppDatabase>
             ..orderBy([(s) => OrderingTerm.desc(s.createdAt)]))
           .get();
 
+  /// Every stock movement an order caused (sale deductions, void / refund
+  /// restocks), oldest first — via idx_stock_adjustments_order_id.
+  Future<List<StockAdjustment>> getAdjustmentsForOrder(int orderId) =>
+      (select(stockAdjustments)
+            ..where((s) => s.orderId.equals(orderId))
+            ..orderBy([(s) => OrderingTerm.asc(s.id)]))
+          .get();
+
   Future<int> logAdjustment(StockAdjustmentsCompanion entry) =>
       into(stockAdjustments).insert(entry);
 }

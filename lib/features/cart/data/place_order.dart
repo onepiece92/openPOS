@@ -127,6 +127,7 @@ Future<int> placeOrder(
           delta: -taken,
           reasonCode: 'sale',
           notes: Value(note),
+          orderId: Value(id),
         ),
       );
     }

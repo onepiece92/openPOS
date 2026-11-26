@@ -7374,6 +7374,15 @@ class $StockAdjustmentsTable extends StockAdjustments
   late final GeneratedColumn<String> notes = GeneratedColumn<String>(
       'notes', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _orderIdMeta =
+      const VerificationMeta('orderId');
+  @override
+  late final GeneratedColumn<int> orderId = GeneratedColumn<int>(
+      'order_id', aliasedName, true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('REFERENCES orders (id)'));
   static const VerificationMeta _createdAtMeta =
       const VerificationMeta('createdAt');
   @override
@@ -7384,7 +7393,7 @@ class $StockAdjustmentsTable extends StockAdjustments
       defaultValue: currentDateAndTime);
   @override
   List<GeneratedColumn> get $columns =>
-      [id, productId, delta, reasonCode, notes, createdAt];
+      [id, productId, delta, reasonCode, notes, orderId, createdAt];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -7422,6 +7431,10 @@ class $StockAdjustmentsTable extends StockAdjustments
       context.handle(
           _notesMeta, notes.isAcceptableOrUnknown(data['notes']!, _notesMeta));
     }
+    if (data.containsKey('order_id')) {
+      context.handle(_orderIdMeta,
+          orderId.isAcceptableOrUnknown(data['order_id']!, _orderIdMeta));
+    }
     if (data.containsKey('created_at')) {
       context.handle(_createdAtMeta,
           createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
@@ -7445,6 +7458,8 @@ class $StockAdjustmentsTable extends StockAdjustments
           .read(DriftSqlType.string, data['${effectivePrefix}reason_code'])!,
       notes: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}notes']),
+      orderId: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}order_id']),
       createdAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
     );
@@ -7462,6 +7477,11 @@ class StockAdjustment extends DataClass implements Insertable<StockAdjustment> {
   final int delta;
   final String reasonCode;
   final String? notes;
+
+  /// The order that moved this stock: its sale deduction, or its void /
+  /// refund restock. NULL for manual adjustments and for rows written
+  /// before schema v16.
+  final int? orderId;
   final DateTime createdAt;
   const StockAdjustment(
       {required this.id,
@@ -7469,6 +7489,7 @@ class StockAdjustment extends DataClass implements Insertable<StockAdjustment> {
       required this.delta,
       required this.reasonCode,
       this.notes,
+      this.orderId,
       required this.createdAt});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -7479,6 +7500,9 @@ class StockAdjustment extends DataClass implements Insertable<StockAdjustment> {
     map['reason_code'] = Variable<String>(reasonCode);
     if (!nullToAbsent || notes != null) {
       map['notes'] = Variable<String>(notes);
+    }
+    if (!nullToAbsent || orderId != null) {
+      map['order_id'] = Variable<int>(orderId);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
     return map;
@@ -7492,6 +7516,9 @@ class StockAdjustment extends DataClass implements Insertable<StockAdjustment> {
       reasonCode: Value(reasonCode),
       notes:
           notes == null && nullToAbsent ? const Value.absent() : Value(notes),
+      orderId: orderId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(orderId),
       createdAt: Value(createdAt),
     );
   }
@@ -7505,6 +7532,7 @@ class StockAdjustment extends DataClass implements Insertable<StockAdjustment> {
       delta: serializer.fromJson<int>(json['delta']),
       reasonCode: serializer.fromJson<String>(json['reasonCode']),
       notes: serializer.fromJson<String?>(json['notes']),
+      orderId: serializer.fromJson<int?>(json['orderId']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
@@ -7517,6 +7545,7 @@ class StockAdjustment extends DataClass implements Insertable<StockAdjustment> {
       'delta': serializer.toJson<int>(delta),
       'reasonCode': serializer.toJson<String>(reasonCode),
       'notes': serializer.toJson<String?>(notes),
+      'orderId': serializer.toJson<int?>(orderId),
       'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
@@ -7527,6 +7556,7 @@ class StockAdjustment extends DataClass implements Insertable<StockAdjustment> {
           int? delta,
           String? reasonCode,
           Value<String?> notes = const Value.absent(),
+          Value<int?> orderId = const Value.absent(),
           DateTime? createdAt}) =>
       StockAdjustment(
         id: id ?? this.id,
@@ -7534,6 +7564,7 @@ class StockAdjustment extends DataClass implements Insertable<StockAdjustment> {
         delta: delta ?? this.delta,
         reasonCode: reasonCode ?? this.reasonCode,
         notes: notes.present ? notes.value : this.notes,
+        orderId: orderId.present ? orderId.value : this.orderId,
         createdAt: createdAt ?? this.createdAt,
       );
   StockAdjustment copyWithCompanion(StockAdjustmentsCompanion data) {
@@ -7544,6 +7575,7 @@ class StockAdjustment extends DataClass implements Insertable<StockAdjustment> {
       reasonCode:
           data.reasonCode.present ? data.reasonCode.value : this.reasonCode,
       notes: data.notes.present ? data.notes.value : this.notes,
+      orderId: data.orderId.present ? data.orderId.value : this.orderId,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
@@ -7556,6 +7588,7 @@ class StockAdjustment extends DataClass implements Insertable<StockAdjustment> {
           ..write('delta: $delta, ')
           ..write('reasonCode: $reasonCode, ')
           ..write('notes: $notes, ')
+          ..write('orderId: $orderId, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
@@ -7563,7 +7596,7 @@ class StockAdjustment extends DataClass implements Insertable<StockAdjustment> {
 
   @override
   int get hashCode =>
-      Object.hash(id, productId, delta, reasonCode, notes, createdAt);
+      Object.hash(id, productId, delta, reasonCode, notes, orderId, createdAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -7573,6 +7606,7 @@ class StockAdjustment extends DataClass implements Insertable<StockAdjustment> {
           other.delta == this.delta &&
           other.reasonCode == this.reasonCode &&
           other.notes == this.notes &&
+          other.orderId == this.orderId &&
           other.createdAt == this.createdAt);
 }
 
@@ -7582,6 +7616,7 @@ class StockAdjustmentsCompanion extends UpdateCompanion<StockAdjustment> {
   final Value<int> delta;
   final Value<String> reasonCode;
   final Value<String?> notes;
+  final Value<int?> orderId;
   final Value<DateTime> createdAt;
   const StockAdjustmentsCompanion({
     this.id = const Value.absent(),
@@ -7589,6 +7624,7 @@ class StockAdjustmentsCompanion extends UpdateCompanion<StockAdjustment> {
     this.delta = const Value.absent(),
     this.reasonCode = const Value.absent(),
     this.notes = const Value.absent(),
+    this.orderId = const Value.absent(),
     this.createdAt = const Value.absent(),
   });
   StockAdjustmentsCompanion.insert({
@@ -7597,6 +7633,7 @@ class StockAdjustmentsCompanion extends UpdateCompanion<StockAdjustment> {
     required int delta,
     required String reasonCode,
     this.notes = const Value.absent(),
+    this.orderId = const Value.absent(),
     this.createdAt = const Value.absent(),
   })  : productId = Value(productId),
         delta = Value(delta),
@@ -7607,6 +7644,7 @@ class StockAdjustmentsCompanion extends UpdateCompanion<StockAdjustment> {
     Expression<int>? delta,
     Expression<String>? reasonCode,
     Expression<String>? notes,
+    Expression<int>? orderId,
     Expression<DateTime>? createdAt,
   }) {
     return RawValuesInsertable({
@@ -7615,6 +7653,7 @@ class StockAdjustmentsCompanion extends UpdateCompanion<StockAdjustment> {
       if (delta != null) 'delta': delta,
       if (reasonCode != null) 'reason_code': reasonCode,
       if (notes != null) 'notes': notes,
+      if (orderId != null) 'order_id': orderId,
       if (createdAt != null) 'created_at': createdAt,
     });
   }
@@ -7625,6 +7664,7 @@ class StockAdjustmentsCompanion extends UpdateCompanion<StockAdjustment> {
       Value<int>? delta,
       Value<String>? reasonCode,
       Value<String?>? notes,
+      Value<int?>? orderId,
       Value<DateTime>? createdAt}) {
     return StockAdjustmentsCompanion(
       id: id ?? this.id,
@@ -7632,6 +7672,7 @@ class StockAdjustmentsCompanion extends UpdateCompanion<StockAdjustment> {
       delta: delta ?? this.delta,
       reasonCode: reasonCode ?? this.reasonCode,
       notes: notes ?? this.notes,
+      orderId: orderId ?? this.orderId,
       createdAt: createdAt ?? this.createdAt,
     );
   }
@@ -7654,6 +7695,9 @@ class StockAdjustmentsCompanion extends UpdateCompanion<StockAdjustment> {
     if (notes.present) {
       map['notes'] = Variable<String>(notes.value);
     }
+    if (orderId.present) {
+      map['order_id'] = Variable<int>(orderId.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -7668,6 +7712,7 @@ class StockAdjustmentsCompanion extends UpdateCompanion<StockAdjustment> {
           ..write('delta: $delta, ')
           ..write('reasonCode: $reasonCode, ')
           ..write('notes: $notes, ')
+          ..write('orderId: $orderId, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
@@ -8176,6 +8221,12 @@ class $ShiftsTable extends Shifts with TableInfo<$ShiftsTable, Shift> {
   late final GeneratedColumn<double> countedCash = GeneratedColumn<double>(
       'counted_cash', aliasedName, true,
       type: DriftSqlType.double, requiredDuringInsert: false);
+  static const VerificationMeta _netSalesMeta =
+      const VerificationMeta('netSales');
+  @override
+  late final GeneratedColumn<double> netSales = GeneratedColumn<double>(
+      'net_sales', aliasedName, true,
+      type: DriftSqlType.double, requiredDuringInsert: false);
   static const VerificationMeta _summaryTextMeta =
       const VerificationMeta('summaryText');
   @override
@@ -8200,6 +8251,7 @@ class $ShiftsTable extends Shifts with TableInfo<$ShiftsTable, Shift> {
         paidOut,
         expectedCash,
         countedCash,
+        netSales,
         summaryText,
         notes
       ];
@@ -8264,6 +8316,10 @@ class $ShiftsTable extends Shifts with TableInfo<$ShiftsTable, Shift> {
           countedCash.isAcceptableOrUnknown(
               data['counted_cash']!, _countedCashMeta));
     }
+    if (data.containsKey('net_sales')) {
+      context.handle(_netSalesMeta,
+          netSales.isAcceptableOrUnknown(data['net_sales']!, _netSalesMeta));
+    }
     if (data.containsKey('summary_text')) {
       context.handle(
           _summaryTextMeta,
@@ -8305,6 +8361,8 @@ class $ShiftsTable extends Shifts with TableInfo<$ShiftsTable, Shift> {
           .read(DriftSqlType.double, data['${effectivePrefix}expected_cash']),
       countedCash: attachedDatabase.typeMapping
           .read(DriftSqlType.double, data['${effectivePrefix}counted_cash']),
+      netSales: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}net_sales']),
       summaryText: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}summary_text']),
       notes: attachedDatabase.typeMapping
@@ -8331,7 +8389,13 @@ class Shift extends DataClass implements Insertable<Shift> {
   final double? cashVoids;
   final double? paidOut;
   final double? expectedCash;
+
+  /// NULL also after a close made without counting the drawer.
   final double? countedCash;
+
+  /// Sales − refunds − voids in the window (all methods, tip-free), frozen
+  /// at close so history never recomputes it.
+  final double? netSales;
 
   /// The plain-text close summary as printed/shared at close time.
   final String? summaryText;
@@ -8348,6 +8412,7 @@ class Shift extends DataClass implements Insertable<Shift> {
       this.paidOut,
       this.expectedCash,
       this.countedCash,
+      this.netSales,
       this.summaryText,
       this.notes});
   @override
@@ -8379,6 +8444,9 @@ class Shift extends DataClass implements Insertable<Shift> {
     }
     if (!nullToAbsent || countedCash != null) {
       map['counted_cash'] = Variable<double>(countedCash);
+    }
+    if (!nullToAbsent || netSales != null) {
+      map['net_sales'] = Variable<double>(netSales);
     }
     if (!nullToAbsent || summaryText != null) {
       map['summary_text'] = Variable<String>(summaryText);
@@ -8418,6 +8486,9 @@ class Shift extends DataClass implements Insertable<Shift> {
       countedCash: countedCash == null && nullToAbsent
           ? const Value.absent()
           : Value(countedCash),
+      netSales: netSales == null && nullToAbsent
+          ? const Value.absent()
+          : Value(netSales),
       summaryText: summaryText == null && nullToAbsent
           ? const Value.absent()
           : Value(summaryText),
@@ -8441,6 +8512,7 @@ class Shift extends DataClass implements Insertable<Shift> {
       paidOut: serializer.fromJson<double?>(json['paidOut']),
       expectedCash: serializer.fromJson<double?>(json['expectedCash']),
       countedCash: serializer.fromJson<double?>(json['countedCash']),
+      netSales: serializer.fromJson<double?>(json['netSales']),
       summaryText: serializer.fromJson<String?>(json['summaryText']),
       notes: serializer.fromJson<String?>(json['notes']),
     );
@@ -8460,6 +8532,7 @@ class Shift extends DataClass implements Insertable<Shift> {
       'paidOut': serializer.toJson<double?>(paidOut),
       'expectedCash': serializer.toJson<double?>(expectedCash),
       'countedCash': serializer.toJson<double?>(countedCash),
+      'netSales': serializer.toJson<double?>(netSales),
       'summaryText': serializer.toJson<String?>(summaryText),
       'notes': serializer.toJson<String?>(notes),
     };
@@ -8477,6 +8550,7 @@ class Shift extends DataClass implements Insertable<Shift> {
           Value<double?> paidOut = const Value.absent(),
           Value<double?> expectedCash = const Value.absent(),
           Value<double?> countedCash = const Value.absent(),
+          Value<double?> netSales = const Value.absent(),
           Value<String?> summaryText = const Value.absent(),
           Value<String?> notes = const Value.absent()}) =>
       Shift(
@@ -8492,6 +8566,7 @@ class Shift extends DataClass implements Insertable<Shift> {
         expectedCash:
             expectedCash.present ? expectedCash.value : this.expectedCash,
         countedCash: countedCash.present ? countedCash.value : this.countedCash,
+        netSales: netSales.present ? netSales.value : this.netSales,
         summaryText: summaryText.present ? summaryText.value : this.summaryText,
         notes: notes.present ? notes.value : this.notes,
       );
@@ -8513,6 +8588,7 @@ class Shift extends DataClass implements Insertable<Shift> {
           : this.expectedCash,
       countedCash:
           data.countedCash.present ? data.countedCash.value : this.countedCash,
+      netSales: data.netSales.present ? data.netSales.value : this.netSales,
       summaryText:
           data.summaryText.present ? data.summaryText.value : this.summaryText,
       notes: data.notes.present ? data.notes.value : this.notes,
@@ -8533,6 +8609,7 @@ class Shift extends DataClass implements Insertable<Shift> {
           ..write('paidOut: $paidOut, ')
           ..write('expectedCash: $expectedCash, ')
           ..write('countedCash: $countedCash, ')
+          ..write('netSales: $netSales, ')
           ..write('summaryText: $summaryText, ')
           ..write('notes: $notes')
           ..write(')'))
@@ -8552,6 +8629,7 @@ class Shift extends DataClass implements Insertable<Shift> {
       paidOut,
       expectedCash,
       countedCash,
+      netSales,
       summaryText,
       notes);
   @override
@@ -8569,6 +8647,7 @@ class Shift extends DataClass implements Insertable<Shift> {
           other.paidOut == this.paidOut &&
           other.expectedCash == this.expectedCash &&
           other.countedCash == this.countedCash &&
+          other.netSales == this.netSales &&
           other.summaryText == this.summaryText &&
           other.notes == this.notes);
 }
@@ -8585,6 +8664,7 @@ class ShiftsCompanion extends UpdateCompanion<Shift> {
   final Value<double?> paidOut;
   final Value<double?> expectedCash;
   final Value<double?> countedCash;
+  final Value<double?> netSales;
   final Value<String?> summaryText;
   final Value<String?> notes;
   const ShiftsCompanion({
@@ -8599,6 +8679,7 @@ class ShiftsCompanion extends UpdateCompanion<Shift> {
     this.paidOut = const Value.absent(),
     this.expectedCash = const Value.absent(),
     this.countedCash = const Value.absent(),
+    this.netSales = const Value.absent(),
     this.summaryText = const Value.absent(),
     this.notes = const Value.absent(),
   });
@@ -8614,6 +8695,7 @@ class ShiftsCompanion extends UpdateCompanion<Shift> {
     this.paidOut = const Value.absent(),
     this.expectedCash = const Value.absent(),
     this.countedCash = const Value.absent(),
+    this.netSales = const Value.absent(),
     this.summaryText = const Value.absent(),
     this.notes = const Value.absent(),
   });
@@ -8629,6 +8711,7 @@ class ShiftsCompanion extends UpdateCompanion<Shift> {
     Expression<double>? paidOut,
     Expression<double>? expectedCash,
     Expression<double>? countedCash,
+    Expression<double>? netSales,
     Expression<String>? summaryText,
     Expression<String>? notes,
   }) {
@@ -8644,6 +8727,7 @@ class ShiftsCompanion extends UpdateCompanion<Shift> {
       if (paidOut != null) 'paid_out': paidOut,
       if (expectedCash != null) 'expected_cash': expectedCash,
       if (countedCash != null) 'counted_cash': countedCash,
+      if (netSales != null) 'net_sales': netSales,
       if (summaryText != null) 'summary_text': summaryText,
       if (notes != null) 'notes': notes,
     });
@@ -8661,6 +8745,7 @@ class ShiftsCompanion extends UpdateCompanion<Shift> {
       Value<double?>? paidOut,
       Value<double?>? expectedCash,
       Value<double?>? countedCash,
+      Value<double?>? netSales,
       Value<String?>? summaryText,
       Value<String?>? notes}) {
     return ShiftsCompanion(
@@ -8675,6 +8760,7 @@ class ShiftsCompanion extends UpdateCompanion<Shift> {
       paidOut: paidOut ?? this.paidOut,
       expectedCash: expectedCash ?? this.expectedCash,
       countedCash: countedCash ?? this.countedCash,
+      netSales: netSales ?? this.netSales,
       summaryText: summaryText ?? this.summaryText,
       notes: notes ?? this.notes,
     );
@@ -8716,6 +8802,9 @@ class ShiftsCompanion extends UpdateCompanion<Shift> {
     if (countedCash.present) {
       map['counted_cash'] = Variable<double>(countedCash.value);
     }
+    if (netSales.present) {
+      map['net_sales'] = Variable<double>(netSales.value);
+    }
     if (summaryText.present) {
       map['summary_text'] = Variable<String>(summaryText.value);
     }
@@ -8739,6 +8828,7 @@ class ShiftsCompanion extends UpdateCompanion<Shift> {
           ..write('paidOut: $paidOut, ')
           ..write('expectedCash: $expectedCash, ')
           ..write('countedCash: $countedCash, ')
+          ..write('netSales: $netSales, ')
           ..write('summaryText: $summaryText, ')
           ..write('notes: $notes')
           ..write(')'))
@@ -8794,6 +8884,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final Index idxStockAdjustmentsProductCreated = Index(
       'idx_stock_adjustments_product_created',
       'CREATE INDEX idx_stock_adjustments_product_created ON stock_adjustments (product_id, created_at)');
+  late final Index idxStockAdjustmentsOrderId = Index(
+      'idx_stock_adjustments_order_id',
+      'CREATE INDEX idx_stock_adjustments_order_id ON stock_adjustments (order_id) WHERE order_id IS NOT NULL');
   late final Index idxAuditLogCreatedAt = Index('idx_audit_log_created_at',
       'CREATE INDEX idx_audit_log_created_at ON audit_log (created_at)');
   late final Index idxShiftsClosedAt = Index('idx_shifts_closed_at',
@@ -8843,6 +8936,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         idxReturnsCreatedAt,
         idxExpensesDate,
         idxStockAdjustmentsProductCreated,
+        idxStockAdjustmentsOrderId,
         idxAuditLogCreatedAt,
         idxShiftsClosedAt,
         idxShiftsOneOpen
@@ -12576,6 +12670,23 @@ final class $$OrdersTableReferences
     return ProcessedTableManager(
         manager.$state.copyWith(prefetchedData: cache));
   }
+
+  static MultiTypedResultKey<$StockAdjustmentsTable, List<StockAdjustment>>
+      _stockAdjustmentsRefsTable(_$AppDatabase db) =>
+          MultiTypedResultKey.fromTable(db.stockAdjustments,
+              aliasName: $_aliasNameGenerator(
+                  db.orders.id, db.stockAdjustments.orderId));
+
+  $$StockAdjustmentsTableProcessedTableManager get stockAdjustmentsRefs {
+    final manager =
+        $$StockAdjustmentsTableTableManager($_db, $_db.stockAdjustments)
+            .filter((f) => f.orderId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache =
+        $_typedResult.readTableOrNull(_stockAdjustmentsRefsTable($_db));
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: cache));
+  }
 }
 
 class $$OrdersTableFilterComposer
@@ -12773,6 +12884,27 @@ class $$OrdersTableFilterComposer
             $$ReturnsTableFilterComposer(
               $db: $db,
               $table: $db.returns,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
+
+  Expression<bool> stockAdjustmentsRefs(
+      Expression<bool> Function($$StockAdjustmentsTableFilterComposer f) f) {
+    final $$StockAdjustmentsTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.stockAdjustments,
+        getReferencedColumn: (t) => t.orderId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$StockAdjustmentsTableFilterComposer(
+              $db: $db,
+              $table: $db.stockAdjustments,
               $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
               joinBuilder: joinBuilder,
               $removeJoinBuilderFromRootComposer:
@@ -13107,6 +13239,27 @@ class $$OrdersTableAnnotationComposer
             ));
     return f(composer);
   }
+
+  Expression<T> stockAdjustmentsRefs<T extends Object>(
+      Expression<T> Function($$StockAdjustmentsTableAnnotationComposer a) f) {
+    final $$StockAdjustmentsTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.stockAdjustments,
+        getReferencedColumn: (t) => t.orderId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$StockAdjustmentsTableAnnotationComposer(
+              $db: $db,
+              $table: $db.stockAdjustments,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
 }
 
 class $$OrdersTableTableManager extends RootTableManager<
@@ -13126,7 +13279,8 @@ class $$OrdersTableTableManager extends RootTableManager<
         bool orderItemsRefs,
         bool orderTaxesRefs,
         bool orderTaxOverridesRefs,
-        bool returnsRefs})> {
+        bool returnsRefs,
+        bool stockAdjustmentsRefs})> {
   $$OrdersTableTableManager(_$AppDatabase db, $OrdersTable table)
       : super(TableManagerState(
           db: db,
@@ -13251,14 +13405,16 @@ class $$OrdersTableTableManager extends RootTableManager<
               orderItemsRefs = false,
               orderTaxesRefs = false,
               orderTaxOverridesRefs = false,
-              returnsRefs = false}) {
+              returnsRefs = false,
+              stockAdjustmentsRefs = false}) {
             return PrefetchHooks(
               db: db,
               explicitlyWatchedTables: [
                 if (orderItemsRefs) db.orderItems,
                 if (orderTaxesRefs) db.orderTaxes,
                 if (orderTaxOverridesRefs) db.orderTaxOverrides,
-                if (returnsRefs) db.returns
+                if (returnsRefs) db.returns,
+                if (stockAdjustmentsRefs) db.stockAdjustments
               ],
               addJoins: <
                   T extends TableManagerState<
@@ -13344,6 +13500,19 @@ class $$OrdersTableTableManager extends RootTableManager<
                         referencedItemsForCurrentItem: (item,
                                 referencedItems) =>
                             referencedItems.where((e) => e.orderId == item.id),
+                        typedResults: items),
+                  if (stockAdjustmentsRefs)
+                    await $_getPrefetchedData<Order, $OrdersTable,
+                            StockAdjustment>(
+                        currentTable: table,
+                        referencedTable: $$OrdersTableReferences
+                            ._stockAdjustmentsRefsTable(db),
+                        managerFromTypedResult: (p0) =>
+                            $$OrdersTableReferences(db, table, p0)
+                                .stockAdjustmentsRefs,
+                        referencedItemsForCurrentItem: (item,
+                                referencedItems) =>
+                            referencedItems.where((e) => e.orderId == item.id),
                         typedResults: items)
                 ];
               },
@@ -13369,7 +13538,8 @@ typedef $$OrdersTableProcessedTableManager = ProcessedTableManager<
         bool orderItemsRefs,
         bool orderTaxesRefs,
         bool orderTaxOverridesRefs,
-        bool returnsRefs})>;
+        bool returnsRefs,
+        bool stockAdjustmentsRefs})>;
 typedef $$OrderItemsTableCreateCompanionBuilder = OrderItemsCompanion Function({
   Value<int> id,
   required int orderId,
@@ -15393,6 +15563,7 @@ typedef $$StockAdjustmentsTableCreateCompanionBuilder
   required int delta,
   required String reasonCode,
   Value<String?> notes,
+  Value<int?> orderId,
   Value<DateTime> createdAt,
 });
 typedef $$StockAdjustmentsTableUpdateCompanionBuilder
@@ -15402,6 +15573,7 @@ typedef $$StockAdjustmentsTableUpdateCompanionBuilder
   Value<int> delta,
   Value<String> reasonCode,
   Value<String?> notes,
+  Value<int?> orderId,
   Value<DateTime> createdAt,
 });
 
@@ -15420,6 +15592,20 @@ final class $$StockAdjustmentsTableReferences extends BaseReferences<
     final manager = $$ProductsTableTableManager($_db, $_db.products)
         .filter((f) => f.id.sqlEquals($_column));
     final item = $_typedResult.readTableOrNull(_productIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: [item]));
+  }
+
+  static $OrdersTable _orderIdTable(_$AppDatabase db) => db.orders.createAlias(
+      $_aliasNameGenerator(db.stockAdjustments.orderId, db.orders.id));
+
+  $$OrdersTableProcessedTableManager? get orderId {
+    final $_column = $_itemColumn<int>('order_id');
+    if ($_column == null) return null;
+    final manager = $$OrdersTableTableManager($_db, $_db.orders)
+        .filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_orderIdTable($_db));
     if (item == null) return manager;
     return ProcessedTableManager(
         manager.$state.copyWith(prefetchedData: [item]));
@@ -15462,6 +15648,26 @@ class $$StockAdjustmentsTableFilterComposer
             $$ProductsTableFilterComposer(
               $db: $db,
               $table: $db.products,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+
+  $$OrdersTableFilterComposer get orderId {
+    final $$OrdersTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.orderId,
+        referencedTable: $db.orders,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$OrdersTableFilterComposer(
+              $db: $db,
+              $table: $db.orders,
               $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
               joinBuilder: joinBuilder,
               $removeJoinBuilderFromRootComposer:
@@ -15514,6 +15720,26 @@ class $$StockAdjustmentsTableOrderingComposer
             ));
     return composer;
   }
+
+  $$OrdersTableOrderingComposer get orderId {
+    final $$OrdersTableOrderingComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.orderId,
+        referencedTable: $db.orders,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$OrdersTableOrderingComposer(
+              $db: $db,
+              $table: $db.orders,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
 }
 
 class $$StockAdjustmentsTableAnnotationComposer
@@ -15559,6 +15785,26 @@ class $$StockAdjustmentsTableAnnotationComposer
             ));
     return composer;
   }
+
+  $$OrdersTableAnnotationComposer get orderId {
+    final $$OrdersTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.orderId,
+        referencedTable: $db.orders,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$OrdersTableAnnotationComposer(
+              $db: $db,
+              $table: $db.orders,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
 }
 
 class $$StockAdjustmentsTableTableManager extends RootTableManager<
@@ -15572,7 +15818,7 @@ class $$StockAdjustmentsTableTableManager extends RootTableManager<
     $$StockAdjustmentsTableUpdateCompanionBuilder,
     (StockAdjustment, $$StockAdjustmentsTableReferences),
     StockAdjustment,
-    PrefetchHooks Function({bool productId})> {
+    PrefetchHooks Function({bool productId, bool orderId})> {
   $$StockAdjustmentsTableTableManager(
       _$AppDatabase db, $StockAdjustmentsTable table)
       : super(TableManagerState(
@@ -15590,6 +15836,7 @@ class $$StockAdjustmentsTableTableManager extends RootTableManager<
             Value<int> delta = const Value.absent(),
             Value<String> reasonCode = const Value.absent(),
             Value<String?> notes = const Value.absent(),
+            Value<int?> orderId = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
           }) =>
               StockAdjustmentsCompanion(
@@ -15598,6 +15845,7 @@ class $$StockAdjustmentsTableTableManager extends RootTableManager<
             delta: delta,
             reasonCode: reasonCode,
             notes: notes,
+            orderId: orderId,
             createdAt: createdAt,
           ),
           createCompanionCallback: ({
@@ -15606,6 +15854,7 @@ class $$StockAdjustmentsTableTableManager extends RootTableManager<
             required int delta,
             required String reasonCode,
             Value<String?> notes = const Value.absent(),
+            Value<int?> orderId = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
           }) =>
               StockAdjustmentsCompanion.insert(
@@ -15614,6 +15863,7 @@ class $$StockAdjustmentsTableTableManager extends RootTableManager<
             delta: delta,
             reasonCode: reasonCode,
             notes: notes,
+            orderId: orderId,
             createdAt: createdAt,
           ),
           withReferenceMapper: (p0) => p0
@@ -15622,7 +15872,7 @@ class $$StockAdjustmentsTableTableManager extends RootTableManager<
                     $$StockAdjustmentsTableReferences(db, table, e)
                   ))
               .toList(),
-          prefetchHooksCallback: ({productId = false}) {
+          prefetchHooksCallback: ({productId = false, orderId = false}) {
             return PrefetchHooks(
               db: db,
               explicitlyWatchedTables: [],
@@ -15650,6 +15900,16 @@ class $$StockAdjustmentsTableTableManager extends RootTableManager<
                         .id,
                   ) as T;
                 }
+                if (orderId) {
+                  state = state.withJoin(
+                    currentTable: table,
+                    currentColumn: table.orderId,
+                    referencedTable:
+                        $$StockAdjustmentsTableReferences._orderIdTable(db),
+                    referencedColumn:
+                        $$StockAdjustmentsTableReferences._orderIdTable(db).id,
+                  ) as T;
+                }
 
                 return state;
               },
@@ -15672,7 +15932,7 @@ typedef $$StockAdjustmentsTableProcessedTableManager = ProcessedTableManager<
     $$StockAdjustmentsTableUpdateCompanionBuilder,
     (StockAdjustment, $$StockAdjustmentsTableReferences),
     StockAdjustment,
-    PrefetchHooks Function({bool productId})>;
+    PrefetchHooks Function({bool productId, bool orderId})>;
 typedef $$AuditLogTableCreateCompanionBuilder = AuditLogCompanion Function({
   Value<int> id,
   Value<DateTime> createdAt,
@@ -15889,6 +16149,7 @@ typedef $$ShiftsTableCreateCompanionBuilder = ShiftsCompanion Function({
   Value<double?> paidOut,
   Value<double?> expectedCash,
   Value<double?> countedCash,
+  Value<double?> netSales,
   Value<String?> summaryText,
   Value<String?> notes,
 });
@@ -15904,6 +16165,7 @@ typedef $$ShiftsTableUpdateCompanionBuilder = ShiftsCompanion Function({
   Value<double?> paidOut,
   Value<double?> expectedCash,
   Value<double?> countedCash,
+  Value<double?> netSales,
   Value<String?> summaryText,
   Value<String?> notes,
 });
@@ -15949,6 +16211,9 @@ class $$ShiftsTableFilterComposer
 
   ColumnFilters<double> get countedCash => $composableBuilder(
       column: $table.countedCash, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get netSales => $composableBuilder(
+      column: $table.netSales, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get summaryText => $composableBuilder(
       column: $table.summaryText, builder: (column) => ColumnFilters(column));
@@ -16000,6 +16265,9 @@ class $$ShiftsTableOrderingComposer
   ColumnOrderings<double> get countedCash => $composableBuilder(
       column: $table.countedCash, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<double> get netSales => $composableBuilder(
+      column: $table.netSales, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<String> get summaryText => $composableBuilder(
       column: $table.summaryText, builder: (column) => ColumnOrderings(column));
 
@@ -16049,6 +16317,9 @@ class $$ShiftsTableAnnotationComposer
   GeneratedColumn<double> get countedCash => $composableBuilder(
       column: $table.countedCash, builder: (column) => column);
 
+  GeneratedColumn<double> get netSales =>
+      $composableBuilder(column: $table.netSales, builder: (column) => column);
+
   GeneratedColumn<String> get summaryText => $composableBuilder(
       column: $table.summaryText, builder: (column) => column);
 
@@ -16090,6 +16361,7 @@ class $$ShiftsTableTableManager extends RootTableManager<
             Value<double?> paidOut = const Value.absent(),
             Value<double?> expectedCash = const Value.absent(),
             Value<double?> countedCash = const Value.absent(),
+            Value<double?> netSales = const Value.absent(),
             Value<String?> summaryText = const Value.absent(),
             Value<String?> notes = const Value.absent(),
           }) =>
@@ -16105,6 +16377,7 @@ class $$ShiftsTableTableManager extends RootTableManager<
             paidOut: paidOut,
             expectedCash: expectedCash,
             countedCash: countedCash,
+            netSales: netSales,
             summaryText: summaryText,
             notes: notes,
           ),
@@ -16120,6 +16393,7 @@ class $$ShiftsTableTableManager extends RootTableManager<
             Value<double?> paidOut = const Value.absent(),
             Value<double?> expectedCash = const Value.absent(),
             Value<double?> countedCash = const Value.absent(),
+            Value<double?> netSales = const Value.absent(),
             Value<String?> summaryText = const Value.absent(),
             Value<String?> notes = const Value.absent(),
           }) =>
@@ -16135,6 +16409,7 @@ class $$ShiftsTableTableManager extends RootTableManager<
             paidOut: paidOut,
             expectedCash: expectedCash,
             countedCash: countedCash,
+            netSales: netSales,
             summaryText: summaryText,
             notes: notes,
           ),

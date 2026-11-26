@@ -27,6 +27,7 @@ Future<void> restockOrderItems(
         delta: added,
         reasonCode: reasonCode,
         notes: Value(notes),
+        orderId: Value(order.id),
       ),
     );
   }

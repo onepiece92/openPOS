@@ -1225,6 +1225,12 @@ class StockAdjustments extends Table with TableInfo {
   late final GeneratedColumn<String> notes = GeneratedColumn<String>(
       'notes', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  late final GeneratedColumn<int> orderId = GeneratedColumn<int>(
+      'order_id', aliasedName, true,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('REFERENCES orders (id)'));
   late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
       'created_at', aliasedName, false,
       type: DriftSqlType.dateTime,
@@ -1233,7 +1239,7 @@ class StockAdjustments extends Table with TableInfo {
           'CAST(strftime(\'%s\', CURRENT_TIMESTAMP) AS INTEGER)'));
   @override
   List<GeneratedColumn> get $columns =>
-      [id, productId, delta, reasonCode, notes, createdAt];
+      [id, productId, delta, reasonCode, notes, orderId, createdAt];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -1364,6 +1370,9 @@ class Shifts extends Table with TableInfo {
   late final GeneratedColumn<double> countedCash = GeneratedColumn<double>(
       'counted_cash', aliasedName, true,
       type: DriftSqlType.double, requiredDuringInsert: false);
+  late final GeneratedColumn<double> netSales = GeneratedColumn<double>(
+      'net_sales', aliasedName, true,
+      type: DriftSqlType.double, requiredDuringInsert: false);
   late final GeneratedColumn<String> summaryText = GeneratedColumn<String>(
       'summary_text', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
@@ -1383,6 +1392,7 @@ class Shifts extends Table with TableInfo {
         paidOut,
         expectedCash,
         countedCash,
+        netSales,
         summaryText,
         notes
       ];
@@ -1446,6 +1456,9 @@ class DatabaseAtV16 extends GeneratedDatabase {
   late final Index idxStockAdjustmentsProductCreated = Index(
       'idx_stock_adjustments_product_created',
       'CREATE INDEX idx_stock_adjustments_product_created ON stock_adjustments (product_id, created_at)');
+  late final Index idxStockAdjustmentsOrderId = Index(
+      'idx_stock_adjustments_order_id',
+      'CREATE INDEX idx_stock_adjustments_order_id ON stock_adjustments (order_id) WHERE order_id IS NOT NULL');
   late final Index idxAuditLogCreatedAt = Index('idx_audit_log_created_at',
       'CREATE INDEX idx_audit_log_created_at ON audit_log (created_at)');
   late final Index idxShiftsClosedAt = Index('idx_shifts_closed_at',
@@ -1486,6 +1499,7 @@ class DatabaseAtV16 extends GeneratedDatabase {
         idxReturnsCreatedAt,
         idxExpensesDate,
         idxStockAdjustmentsProductCreated,
+        idxStockAdjustmentsOrderId,
         idxAuditLogCreatedAt,
         idxShiftsClosedAt,
         idxShiftsOneOpen

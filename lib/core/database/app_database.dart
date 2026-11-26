@@ -242,6 +242,9 @@ class AppDatabase extends _$AppDatabase {
               await m.createIndex(idxShiftsOneOpen);
               // The close sums refunds by the date they were handed out.
               await m.createIndex(idxReturnsCreatedAt);
+              // Stock movements traceable to the order that caused them.
+              await m.addColumn(stockAdjustments, stockAdjustments.orderId);
+              await m.createIndex(idxStockAdjustmentsOrderId);
             }
             await customStatement('PRAGMA user_version = $to');
           });
