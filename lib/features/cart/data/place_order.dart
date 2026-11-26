@@ -46,6 +46,8 @@ Future<int> placeOrder(
       OrdersCompanion.insert(
         invoiceNo: Value(invoiceNo),
         invoicePrefix: Value(invoicePrefix),
+        // Every movement below is logged with this order's id.
+        stockLinked: const Value(1),
         subtotal: summary.subtotal,
         taxTotal: Value(summary.taxAmount),
         discountTotal: Value(summary.orderDiscount),

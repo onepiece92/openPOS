@@ -3790,6 +3790,12 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
   late final GeneratedColumn<DateTime> voidedAt = GeneratedColumn<DateTime>(
       'voided_at', aliasedName, true,
       type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  static const VerificationMeta _stockLinkedMeta =
+      const VerificationMeta('stockLinked');
+  @override
+  late final GeneratedColumn<int> stockLinked = GeneratedColumn<int>(
+      'stock_linked', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
   static const VerificationMeta _createdAtMeta =
       const VerificationMeta('createdAt');
   @override
@@ -3830,6 +3836,7 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
         printCount,
         notes,
         voidedAt,
+        stockLinked,
         createdAt,
         updatedAt
       ];
@@ -3960,6 +3967,12 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
       context.handle(_voidedAtMeta,
           voidedAt.isAcceptableOrUnknown(data['voided_at']!, _voidedAtMeta));
     }
+    if (data.containsKey('stock_linked')) {
+      context.handle(
+          _stockLinkedMeta,
+          stockLinked.isAcceptableOrUnknown(
+              data['stock_linked']!, _stockLinkedMeta));
+    }
     if (data.containsKey('created_at')) {
       context.handle(_createdAtMeta,
           createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
@@ -4021,6 +4034,8 @@ class $OrdersTable extends Orders with TableInfo<$OrdersTable, Order> {
           .read(DriftSqlType.string, data['${effectivePrefix}notes']),
       voidedAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}voided_at']),
+      stockLinked: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}stock_linked']),
       createdAt: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
       updatedAt: attachedDatabase.typeMapping
@@ -4072,6 +4087,16 @@ class Order extends DataClass implements Insertable<Order> {
   /// orders that are not voided, and for voids made before schema v16 —
   /// those predate any till shift and the drawer close ignores them.
   final DateTime? voidedAt;
+
+  /// 1 when every stock movement of this sale is in stock_adjustments with
+  /// its order_id (set by placeOrder from schema v16 on, whether or not
+  /// anything was deducted). NULL = a legacy order (placed before v16,
+  /// imported, or demo data): its stock history can't be read from rows.
+  ///
+  /// An int, not a bool, on purpose: Drift gives booleans a CHECK, and
+  /// SQLite tests an added column's CHECK against every existing row, which
+  /// would make this ADD COLUMN O(orders) instead of O(1).
+  final int? stockLinked;
   final DateTime createdAt;
   final DateTime updatedAt;
   const Order(
@@ -4097,6 +4122,7 @@ class Order extends DataClass implements Insertable<Order> {
       required this.printCount,
       this.notes,
       this.voidedAt,
+      this.stockLinked,
       required this.createdAt,
       required this.updatedAt});
   @override
@@ -4139,6 +4165,9 @@ class Order extends DataClass implements Insertable<Order> {
     }
     if (!nullToAbsent || voidedAt != null) {
       map['voided_at'] = Variable<DateTime>(voidedAt);
+    }
+    if (!nullToAbsent || stockLinked != null) {
+      map['stock_linked'] = Variable<int>(stockLinked);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
@@ -4184,6 +4213,9 @@ class Order extends DataClass implements Insertable<Order> {
       voidedAt: voidedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(voidedAt),
+      stockLinked: stockLinked == null && nullToAbsent
+          ? const Value.absent()
+          : Value(stockLinked),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
     );
@@ -4215,6 +4247,7 @@ class Order extends DataClass implements Insertable<Order> {
       printCount: serializer.fromJson<int>(json['printCount']),
       notes: serializer.fromJson<String?>(json['notes']),
       voidedAt: serializer.fromJson<DateTime?>(json['voidedAt']),
+      stockLinked: serializer.fromJson<int?>(json['stockLinked']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -4245,6 +4278,7 @@ class Order extends DataClass implements Insertable<Order> {
       'printCount': serializer.toJson<int>(printCount),
       'notes': serializer.toJson<String?>(notes),
       'voidedAt': serializer.toJson<DateTime?>(voidedAt),
+      'stockLinked': serializer.toJson<int?>(stockLinked),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -4273,6 +4307,7 @@ class Order extends DataClass implements Insertable<Order> {
           int? printCount,
           Value<String?> notes = const Value.absent(),
           Value<DateTime?> voidedAt = const Value.absent(),
+          Value<int?> stockLinked = const Value.absent(),
           DateTime? createdAt,
           DateTime? updatedAt}) =>
       Order(
@@ -4301,6 +4336,7 @@ class Order extends DataClass implements Insertable<Order> {
         printCount: printCount ?? this.printCount,
         notes: notes.present ? notes.value : this.notes,
         voidedAt: voidedAt.present ? voidedAt.value : this.voidedAt,
+        stockLinked: stockLinked.present ? stockLinked.value : this.stockLinked,
         createdAt: createdAt ?? this.createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
       );
@@ -4350,6 +4386,8 @@ class Order extends DataClass implements Insertable<Order> {
           data.printCount.present ? data.printCount.value : this.printCount,
       notes: data.notes.present ? data.notes.value : this.notes,
       voidedAt: data.voidedAt.present ? data.voidedAt.value : this.voidedAt,
+      stockLinked:
+          data.stockLinked.present ? data.stockLinked.value : this.stockLinked,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -4380,6 +4418,7 @@ class Order extends DataClass implements Insertable<Order> {
           ..write('printCount: $printCount, ')
           ..write('notes: $notes, ')
           ..write('voidedAt: $voidedAt, ')
+          ..write('stockLinked: $stockLinked, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -4410,6 +4449,7 @@ class Order extends DataClass implements Insertable<Order> {
         printCount,
         notes,
         voidedAt,
+        stockLinked,
         createdAt,
         updatedAt
       ]);
@@ -4439,6 +4479,7 @@ class Order extends DataClass implements Insertable<Order> {
           other.printCount == this.printCount &&
           other.notes == this.notes &&
           other.voidedAt == this.voidedAt &&
+          other.stockLinked == this.stockLinked &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
 }
@@ -4466,6 +4507,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
   final Value<int> printCount;
   final Value<String?> notes;
   final Value<DateTime?> voidedAt;
+  final Value<int?> stockLinked;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
   const OrdersCompanion({
@@ -4491,6 +4533,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     this.printCount = const Value.absent(),
     this.notes = const Value.absent(),
     this.voidedAt = const Value.absent(),
+    this.stockLinked = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
   });
@@ -4517,6 +4560,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     this.printCount = const Value.absent(),
     this.notes = const Value.absent(),
     this.voidedAt = const Value.absent(),
+    this.stockLinked = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
   })  : subtotal = Value(subtotal),
@@ -4545,6 +4589,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     Expression<int>? printCount,
     Expression<String>? notes,
     Expression<DateTime>? voidedAt,
+    Expression<int>? stockLinked,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
   }) {
@@ -4571,6 +4616,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
       if (printCount != null) 'print_count': printCount,
       if (notes != null) 'notes': notes,
       if (voidedAt != null) 'voided_at': voidedAt,
+      if (stockLinked != null) 'stock_linked': stockLinked,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
     });
@@ -4599,6 +4645,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
       Value<int>? printCount,
       Value<String?>? notes,
       Value<DateTime?>? voidedAt,
+      Value<int?>? stockLinked,
       Value<DateTime>? createdAt,
       Value<DateTime>? updatedAt}) {
     return OrdersCompanion(
@@ -4624,6 +4671,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
       printCount: printCount ?? this.printCount,
       notes: notes ?? this.notes,
       voidedAt: voidedAt ?? this.voidedAt,
+      stockLinked: stockLinked ?? this.stockLinked,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -4698,6 +4746,9 @@ class OrdersCompanion extends UpdateCompanion<Order> {
     if (voidedAt.present) {
       map['voided_at'] = Variable<DateTime>(voidedAt.value);
     }
+    if (stockLinked.present) {
+      map['stock_linked'] = Variable<int>(stockLinked.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -4732,6 +4783,7 @@ class OrdersCompanion extends UpdateCompanion<Order> {
           ..write('printCount: $printCount, ')
           ..write('notes: $notes, ')
           ..write('voidedAt: $voidedAt, ')
+          ..write('stockLinked: $stockLinked, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -12550,6 +12602,7 @@ typedef $$OrdersTableCreateCompanionBuilder = OrdersCompanion Function({
   Value<int> printCount,
   Value<String?> notes,
   Value<DateTime?> voidedAt,
+  Value<int?> stockLinked,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
 });
@@ -12576,6 +12629,7 @@ typedef $$OrdersTableUpdateCompanionBuilder = OrdersCompanion Function({
   Value<int> printCount,
   Value<String?> notes,
   Value<DateTime?> voidedAt,
+  Value<int?> stockLinked,
   Value<DateTime> createdAt,
   Value<DateTime> updatedAt,
 });
@@ -12761,6 +12815,9 @@ class $$OrdersTableFilterComposer
 
   ColumnFilters<DateTime> get voidedAt => $composableBuilder(
       column: $table.voidedAt, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get stockLinked => $composableBuilder(
+      column: $table.stockLinked, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnFilters(column));
@@ -12993,6 +13050,9 @@ class $$OrdersTableOrderingComposer
   ColumnOrderings<DateTime> get voidedAt => $composableBuilder(
       column: $table.voidedAt, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<int> get stockLinked => $composableBuilder(
+      column: $table.stockLinked, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
       column: $table.createdAt, builder: (column) => ColumnOrderings(column));
 
@@ -13108,6 +13168,9 @@ class $$OrdersTableAnnotationComposer
 
   GeneratedColumn<DateTime> get voidedAt =>
       $composableBuilder(column: $table.voidedAt, builder: (column) => column);
+
+  GeneratedColumn<int> get stockLinked => $composableBuilder(
+      column: $table.stockLinked, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -13314,6 +13377,7 @@ class $$OrdersTableTableManager extends RootTableManager<
             Value<int> printCount = const Value.absent(),
             Value<String?> notes = const Value.absent(),
             Value<DateTime?> voidedAt = const Value.absent(),
+            Value<int?> stockLinked = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<DateTime> updatedAt = const Value.absent(),
           }) =>
@@ -13340,6 +13404,7 @@ class $$OrdersTableTableManager extends RootTableManager<
             printCount: printCount,
             notes: notes,
             voidedAt: voidedAt,
+            stockLinked: stockLinked,
             createdAt: createdAt,
             updatedAt: updatedAt,
           ),
@@ -13366,6 +13431,7 @@ class $$OrdersTableTableManager extends RootTableManager<
             Value<int> printCount = const Value.absent(),
             Value<String?> notes = const Value.absent(),
             Value<DateTime?> voidedAt = const Value.absent(),
+            Value<int?> stockLinked = const Value.absent(),
             Value<DateTime> createdAt = const Value.absent(),
             Value<DateTime> updatedAt = const Value.absent(),
           }) =>
@@ -13392,6 +13458,7 @@ class $$OrdersTableTableManager extends RootTableManager<
             printCount: printCount,
             notes: notes,
             voidedAt: voidedAt,
+            stockLinked: stockLinked,
             createdAt: createdAt,
             updatedAt: updatedAt,
           ),

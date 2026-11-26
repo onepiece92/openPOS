@@ -245,6 +245,9 @@ class AppDatabase extends _$AppDatabase {
               // Stock movements traceable to the order that caused them.
               await m.addColumn(stockAdjustments, stockAdjustments.orderId);
               await m.createIndex(idxStockAdjustmentsOrderId);
+              // Which orders those rows fully describe (NULL for all
+              // existing orders).
+              await m.addColumn(orders, orders.stockLinked);
             }
             await customStatement('PRAGMA user_version = $to');
           });

@@ -298,7 +298,7 @@ void main() {
       // stock_adjustments; every column that existed at v14 must be
       // untouched.
       final v16Columns = {
-        'orders': ['tip_amount', 'voided_at'],
+        'orders': ['tip_amount', 'voided_at', 'stock_linked'],
         'returns': ['tip_amount'],
         'stock_adjustments': ['order_id'],
       }[t] ?? const <String>[];
@@ -364,6 +364,9 @@ void main() {
     expect(adj, hasLength(3));
     expect(adj.map((a) => a.orderId), everyElement(isNull),
         reason: 'pre-v16 rows have no order link');
+    expect((await db.ordersDao.getById(1))!.stockLinked, isNull,
+        reason: 'pre-v16 orders are legacy');
+    expect(await db.inventoryDao.stockToRestock(1), isNull);
     expect(await indexes(db), allIndexes);
   });
 
@@ -381,6 +384,7 @@ void main() {
     'idx_returns_created_at',
     'ALTER TABLE "stock_adjustments" ADD COLUMN "order_id"',
     'idx_stock_adjustments_order_id',
+    'ALTER TABLE "orders" ADD COLUMN "stock_linked"',
     'PRAGMA user_version',
   ];
 
@@ -409,8 +413,18 @@ void main() {
 
       // Nothing of v16 stuck: still a v15 file.
       expect(raw.select('PRAGMA user_version').single.values.single, 15);
-      final cols = raw.select('PRAGMA table_info(orders)').map((r) => r['name']);
-      expect(cols, isNot(contains('tip_amount')));
+      List<Object?> cols(String t) =>
+          raw.select('PRAGMA table_info($t)').map((r) => r['name']).toList();
+      for (final c in ['tip_amount', 'voided_at', 'stock_linked']) {
+        expect(cols('orders'), isNot(contains(c)));
+      }
+      expect(cols('returns'), isNot(contains('tip_amount')));
+      expect(cols('stock_adjustments'), isNot(contains('order_id')));
+      expect(
+          raw.select("SELECT name FROM sqlite_master WHERE type = 'index' "
+              "AND name IN ('idx_stock_adjustments_order_id', "
+              "'idx_orders_voided_at', 'idx_returns_created_at')"),
+          isEmpty);
       expect(raw.select("SELECT name FROM sqlite_master WHERE name = 'shifts'"),
           isEmpty);
 

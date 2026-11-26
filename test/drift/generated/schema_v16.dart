@@ -723,6 +723,9 @@ class Orders extends Table with TableInfo {
   late final GeneratedColumn<DateTime> voidedAt = GeneratedColumn<DateTime>(
       'voided_at', aliasedName, true,
       type: DriftSqlType.dateTime, requiredDuringInsert: false);
+  late final GeneratedColumn<int> stockLinked = GeneratedColumn<int>(
+      'stock_linked', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
   late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
       'created_at', aliasedName, false,
       type: DriftSqlType.dateTime,
@@ -759,6 +762,7 @@ class Orders extends Table with TableInfo {
         printCount,
         notes,
         voidedAt,
+        stockLinked,
         createdAt,
         updatedAt
       ];

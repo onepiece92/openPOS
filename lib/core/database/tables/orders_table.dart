@@ -76,6 +76,15 @@ class Orders extends Table {
   /// orders that are not voided, and for voids made before schema v16 —
   /// those predate any till shift and the drawer close ignores them.
   DateTimeColumn get voidedAt => dateTime().nullable()();
+  /// 1 when every stock movement of this sale is in stock_adjustments with
+  /// its order_id (set by placeOrder from schema v16 on, whether or not
+  /// anything was deducted). NULL = a legacy order (placed before v16,
+  /// imported, or demo data): its stock history can't be read from rows.
+  ///
+  /// An int, not a bool, on purpose: Drift gives booleans a CHECK, and
+  /// SQLite tests an added column's CHECK against every existing row, which
+  /// would make this ADD COLUMN O(orders) instead of O(1).
+  IntColumn get stockLinked => integer().nullable()();
   DateTimeColumn get createdAt =>
       dateTime().withDefault(currentDateAndTime)();
   DateTimeColumn get updatedAt =>
