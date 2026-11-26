@@ -1,10 +1,13 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path/path.dart' as p;
 
 import 'package:pos_app/core/providers/hive_provider.dart'
     show kAutoBackupLastAt;
+import 'package:pos_app/features/backup/data/snapshot_providers.dart'
+    show receiptsDir;
 import 'package:pos_app/features/cart/data/ticket_sequence.dart';
 import 'package:pos_app/features/usage/data/usage_counter.dart';
 
@@ -50,37 +53,199 @@ const kFactoryResetProgress = 'Resetting…';
 const kFactoryResetFailedNotice =
     "Reset didn't work. Your data was not changed.";
 
-/// Shown when the database was erased but some local files were not.
+/// The error screen when the reset erased the database but could not
+/// clear everything else. Nothing of the app opens on the half-erased
+/// stores: "Try again" (and any later launch) finishes the reset, because
+/// [kFactoryResetPendingKey] is still set.
+const kFactoryResetIncompleteTitle = "Reset didn't finish";
 const kFactoryResetIncompleteNotice =
-    "Reset didn't finish. Open Settings and run Factory Reset again.";
+    "Open POS couldn't finish erasing this device. Try again to finish it.";
+
+/// Shown on the next launch after a reset interrupted part-way (app killed,
+/// phone switched off) was finished.
+const kFactoryResetFinishedNotice = 'The factory reset was finished.';
+
+/// Settings key set — and flushed — before a factory reset erases
+/// anything, and removed in the very last write of the reset. While it is
+/// set the reset is unfinished, and [finishPendingFactoryReset] completes
+/// it on launch: so a kill at any point leaves either the old shop (killed
+/// before the flag) or, after the next launch, a clean fresh shop — never
+/// a mix of erased data and old settings.
+const kFactoryResetPendingKey = 'factory_reset_pending';
+
+/// The reset's steps, in order (for the kill-point tests).
+enum FactoryResetStep {
+  flagWritten,
+  databaseErased,
+  heldTicketsCleared,
+  usageCleared,
+  receiptsDeleted,
+  settingsCleared,
+}
+
+/// Test hook run after each step; a throw there models a kill.
+typedef FactoryResetStepHook = void Function(FactoryResetStep step);
+
+/// Writes [kFactoryResetPendingKey] durably, before anything is erased.
+Future<void> markFactoryResetPending(Box<dynamic> settings) async {
+  await settings.put(kFactoryResetPendingKey, true);
+  await settings.flush();
+}
+
+/// Whether a factory reset was started and not finished.
+bool isFactoryResetPending(Box<dynamic> settings) =>
+    settings.get(kFactoryResetPendingKey) == true;
+
+/// Clears the pending flag (only when the database erase was refused, so
+/// nothing changed).
+Future<void> clearFactoryResetPending(Box<dynamic> settings) async {
+  await settings.delete(kFactoryResetPendingKey);
+  await settings.flush();
+}
 
 /// The Hive and file half of a factory reset (the database half is
-/// `AppDatabase.eraseAllData`). Clears:
-/// * [settings] (so onboarding shows again), except [kSettingsKeptByReset];
-/// * every held ticket in [heldOrders], keeping its ticket counter so
-///   numbers never repeat;
-/// * [usage] — counts and flags, so the first-run usage notice shows again;
-/// * the receipt photos folder [receipts].
+/// `AppDatabase.eraseAllData`, which runs first). In this order:
+/// 1. every held ticket in [heldOrders], keeping its ticket counter so
+///    numbers never repeat;
+/// 2. [usage] — counts and flags, so the first-run usage notice shows again;
+/// 3. the receipt photos folder [receipts];
+/// 4. LAST, [settings] (so onboarding shows again), except
+///    [kSettingsKeptByReset], in one write whose final key is
+///    [kFactoryResetPendingKey] — so the reset counts as done only once
+///    everything else is gone, and the kept keys are never deleted (no
+///    clear-then-put window that could lose them).
 ///
-/// Automatic backups (`backups/auto`) are not touched. Run with the app's
-/// widget tree and providers torn down, so nothing writes back stale state.
+/// Every step is idempotent, so [finishPendingFactoryReset] can rerun the
+/// whole thing. Automatic backups (`backups/auto`) are not touched. Run
+/// with the app's widget tree and providers torn down, so nothing writes
+/// back stale state.
 Future<void> eraseLocalStores({
   required Box<dynamic> settings,
   required Box<dynamic> heldOrders,
   required Box<dynamic> usage,
   required Directory receipts,
+  FactoryResetStepHook? afterStep,
 }) async {
   await clearHeldTicketsKeepingCounter(heldOrders);
+  await heldOrders.flush();
+  afterStep?.call(FactoryResetStep.heldTicketsCleared);
   await usage.clear();
-  // The last automatic backup's time survives, so the reset does not make
-  // an automatic backup due at once (see kSettingsKeptByReset).
-  final kept = {
-    for (final k in kSettingsKeptByReset)
-      if (settings.containsKey(k)) k: settings.get(k),
-  };
-  await settings.clear();
-  if (kept.isNotEmpty) await settings.putAll(kept);
+  await usage.flush();
+  afterStep?.call(FactoryResetStep.usageCleared);
   if (receipts.existsSync()) await receipts.delete(recursive: true);
+  afterStep?.call(FactoryResetStep.receiptsDeleted);
+  final doomed = [
+    for (final k in settings.keys)
+      if (!kSettingsKeptByReset.contains(k) && k != kFactoryResetPendingKey) k,
+    kFactoryResetPendingKey,
+  ];
+  await settings.deleteAll(doomed);
+  await settings.flush();
+  afterStep?.call(FactoryResetStep.settingsCleared);
+}
+
+/// Finishes a factory reset that a kill interrupted: reruns the database
+/// erase (idempotent: empty tables stay empty, the defaults are seeded
+/// only once) and then [eraseLocalStores]. Returns false at once — one
+/// key read — when no reset is pending. Run at launch before any screen
+/// builds (see `startUp`) and by `AppRoot`'s "Try again".
+Future<bool> finishPendingFactoryReset({
+  required Box<dynamic> settings,
+  required Future<void> Function() eraseDatabase,
+  required Box<dynamic> heldOrders,
+  required Future<Box<dynamic>> Function() usage,
+  required Future<Directory> Function() receipts,
+}) async {
+  if (!isFactoryResetPending(settings)) return false;
+  await eraseDatabase();
+  await eraseLocalStores(
+    settings: settings,
+    heldOrders: heldOrders,
+    usage: await usage(),
+    receipts: await receipts(),
+  );
+  return true;
+}
+
+/// [finishPendingFactoryReset] on the app's open Hive boxes, for launch and
+/// "Try again". [eraseDatabase] erases the database the app is about to
+/// use.
+Future<bool> finishPendingFactoryResetOnLaunch(
+        Future<void> Function() eraseDatabase) =>
+    finishPendingFactoryReset(
+      settings: Hive.box<dynamic>('settings'),
+      eraseDatabase: eraseDatabase,
+      heldOrders: Hive.box<dynamic>('held_orders'),
+      usage: usageBoxForReset,
+      receipts: receiptsDir,
+    );
+
+/// How [runFactoryReset] ended.
+enum FactoryResetOutcome {
+  /// Everything erased; the app comes up like a first run.
+  done,
+
+  /// The database erase was refused (rolled back): nothing changed.
+  refused,
+
+  /// The database is erased but the local stores are not all cleared; the
+  /// pending flag is still set, so it must be finished before the app opens.
+  incomplete,
+}
+
+/// The whole factory reset, in its durable order:
+/// [markFactoryResetPending] (flushed) → [eraseDatabase] (one transaction)
+/// → [releaseDatabase] (flush usage counts, close the DB, drop the old
+/// providers) → [eraseLocalStores] (held tickets, usage, receipt photos,
+/// settings last, which also removes the flag).
+///
+/// A kill anywhere leaves either the old shop (before the flag, or before
+/// the DB commit, which [finishPendingFactoryReset] then completes) or a
+/// fresh one. A [releaseDatabase] failure (the old connection would not
+/// close) is caught: the erase has committed, so the reset carries on
+/// rather than stopping half-way. [afterStep] is a test hook.
+Future<FactoryResetOutcome> runFactoryReset({
+  required Box<dynamic> settings,
+  required Future<void> Function() eraseDatabase,
+  required Future<void> Function() releaseDatabase,
+  required Box<dynamic> heldOrders,
+  required Future<Box<dynamic>> Function() usage,
+  required Future<Directory> Function() receipts,
+  FactoryResetStepHook? afterStep,
+}) async {
+  try {
+    await markFactoryResetPending(settings);
+  } catch (_) {
+    return FactoryResetOutcome.refused;
+  }
+  afterStep?.call(FactoryResetStep.flagWritten);
+  try {
+    await eraseDatabase();
+  } catch (_) {
+    // Rolled back: the shop is unchanged, so it is not a pending reset.
+    try {
+      await clearFactoryResetPending(settings);
+    } catch (_) {/* the next launch then finishes the reset */}
+    return FactoryResetOutcome.refused;
+  }
+  afterStep?.call(FactoryResetStep.databaseErased);
+  try {
+    await releaseDatabase();
+  } catch (e) {
+    debugPrint('Factory reset: closing the old database failed: $e');
+  }
+  try {
+    await eraseLocalStores(
+      settings: settings,
+      heldOrders: heldOrders,
+      usage: await usage(),
+      receipts: await receipts(),
+      afterStep: afterStep,
+    );
+  } catch (_) {
+    return FactoryResetOutcome.incomplete;
+  }
+  return FactoryResetOutcome.done;
 }
 
 /// The usage box, opened beside the settings box when the usage counter

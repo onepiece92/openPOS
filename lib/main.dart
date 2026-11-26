@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pos_app/app_root.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/utils/bundled_fonts.dart';
+import 'package:pos_app/features/settings/data/factory_reset.dart';
 import 'package:pos_app/startup.dart';
 
 void main() {
@@ -22,6 +23,8 @@ void main() {
   final startup = startUp(
     checkDatabase: () =>
         container.read(databaseProvider).customSelect('SELECT 1').get(),
+    finishFactoryReset: () => finishPendingFactoryResetOnLaunch(
+        () => container.read(databaseProvider).eraseAllData()),
   ).catchError((Object e) => StartupResult(dbError: e));
 
   runApp(AppRoot(container: container, startup: startup));

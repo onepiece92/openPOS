@@ -391,15 +391,18 @@ class AppRootState extends State<AppRoot> {
     await c.read(databaseProvider).customSelect('SELECT 1').get();
   }
 
-  /// Factory reset, as a restart: unmounts the app, erases the database
-  /// (one transaction) and then the Hive boxes and receipt photos (see
-  /// [eraseLocalStores]), and brings the app back on a fresh container — so
-  /// no provider, SnackBar or usage counter carries state across, and the
-  /// app comes up like a first run (onboarding, then the usage notice
-  /// once). Automatic backups are kept.
+  /// Factory reset, as a restart: unmounts the app, then [runFactoryReset]
+  /// — a durable pending flag, the database erase (one transaction), the
+  /// old container released, then held tickets, usage, receipt photos and
+  /// settings last — and brings the app back on a fresh container, so no
+  /// provider, SnackBar or usage counter carries state across and the app
+  /// comes up like a first run (onboarding, then the usage notice once).
+  /// Automatic backups are kept.
   ///
-  /// When the database cannot be erased nothing has changed: the app comes
-  /// back on its data with [kFactoryResetFailedNotice].
+  /// Outcomes: done → onboarding; the erase refused → back on the
+  /// unchanged data with [kFactoryResetFailedNotice]; erased but not all
+  /// cleared → the error screen, whose "Try again" (like the next launch)
+  /// finishes the reset. Never an app on half-erased stores.
   Future<void> factoryReset() async {
     if (_restoring || _fatal != null) return;
     _autoBackupTimer?.cancel();
@@ -409,44 +412,53 @@ class AppRootState extends State<AppRoot> {
       _splashMessage = kFactoryResetProgress;
     });
     String? notice;
+    String? fatal;
     try {
       final inFlight = _autoBackupRun;
       if (inFlight != null) await inFlight;
       await WidgetsBinding.instance.endOfFrame;
       final old = _container;
-      try {
-        await old.read(databaseProvider).eraseAllData();
-      } catch (_) {
-        notice = kFactoryResetFailedNotice;
-        return;
+      final outcome = await runFactoryReset(
+        settings: Hive.box<dynamic>('settings'),
+        eraseDatabase: () => old.read(databaseProvider).eraseAllData(),
+        releaseDatabase: () async {
+          try {
+            // Write pending usage counts now, so tearing the container
+            // down cannot write them back after the usage box is cleared.
+            if (old.exists(usageCounterProvider)) {
+              await old.read(usageCounterProvider).flush();
+            }
+            await old.read(databaseProvider).close();
+          } finally {
+            old.dispose();
+            _container = ProviderContainer();
+          }
+        },
+        heldOrders: Hive.box<dynamic>('held_orders'),
+        usage: usageBoxForReset,
+        receipts: receiptsDir,
+      );
+      switch (outcome) {
+        case FactoryResetOutcome.done:
+          await startReviewClock(); // a fresh install's clock
+        case FactoryResetOutcome.refused:
+          notice = kFactoryResetFailedNotice;
+        case FactoryResetOutcome.incomplete:
+          fatal = kFactoryResetIncompleteNotice;
       }
-      // Write pending usage counts now, so tearing the container down
-      // cannot write them back after the usage box is cleared.
-      if (old.exists(usageCounterProvider)) {
-        await old.read(usageCounterProvider).flush();
-      }
-      try {
-        await old.read(databaseProvider).close();
-      } finally {
-        old.dispose();
-        _container = ProviderContainer();
-      }
-      try {
-        await eraseLocalStores(
-          settings: Hive.box<dynamic>('settings'),
-          heldOrders: Hive.box<dynamic>('held_orders'),
-          usage: await usageBoxForReset(),
-          receipts: await receiptsDir(),
-        );
-        await startReviewClock(); // a fresh install's clock
-      } catch (_) {
-        notice = kFactoryResetIncompleteNotice;
-      }
+    } catch (_) {
+      // Only the review clock can get here; the reset itself is done.
     } finally {
       if (mounted) {
         setState(() {
           _restoring = false;
           _notice = notice;
+          if (fatal != null) {
+            _fatal = fatal;
+            _fatalTitle = kFactoryResetIncompleteTitle;
+            _fatalCanRetry = true;
+            _dbOpenFailure = false;
+          }
         });
       } else {
         _restoring = false;
@@ -475,9 +487,16 @@ class AppRootState extends State<AppRoot> {
         throw StateError('the interrupted restore could not be undone');
       }
       await _reopenStores();
+      // A factory reset that stopped part-way (here or before a kill) is
+      // finished before the app opens on its stores.
+      final c = _container;
+      final resetFinished = await finishPendingFactoryResetOnLaunch(
+          () => c.read(databaseProvider).eraseAllData());
       // startUp() skipped this when recovery failed; no-op otherwise.
       await startReviewClock();
-      notice = restoreRecoveryNotice(recovered);
+      notice = resetFinished
+          ? kFactoryResetFinishedNotice
+          : restoreRecoveryNotice(recovered);
       // A restore that ended on this error screen may have been accepted
       // after all (commit recorded, not confirmed): finish its merge and
       // say so.

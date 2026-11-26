@@ -4,6 +4,7 @@ import 'package:pos_app/features/backup/data/restore_merge_marker.dart';
 import 'package:pos_app/features/backup/data/snapshot_providers.dart';
 import 'package:pos_app/features/backup/data/snapshot_service.dart';
 import 'package:pos_app/features/review/data/review_state_store.dart';
+import 'package:pos_app/features/settings/data/factory_reset.dart';
 
 /// How the app should come up: with an optional toast, or — when [fatal] is
 /// set — on the error screen with nothing opened.
@@ -28,7 +29,13 @@ class StartupResult {
 /// 4. [checkDatabase], when given: the database's first query (`SELECT 1`
 ///    on the connection the app goes on to use, so it costs one trivial
 ///    query). A failure is returned as [StartupResult.dbError] instead of
-///    surfacing later as broken screens.
+///    surfacing later as broken screens;
+/// 5. [finishFactoryReset], when given and the check passed: completes a
+///    factory reset a kill interrupted (one settings key read when there
+///    is none), then restarts the review clock it cleared — still before
+///    any screen builds, so no screen ever sees half-erased stores. A
+///    failure goes to the error screen like a failed check ("Try again"
+///    finishes it).
 ///
 /// The parameters exist for tests; `main()` uses the defaults and passes
 /// [checkDatabase].
@@ -37,6 +44,7 @@ Future<StartupResult> startUp({
   Future<void> Function()? initHive,
   Future<void> Function()? openStores,
   Future<void> Function()? checkDatabase,
+  Future<bool> Function()? finishFactoryReset,
 }) async {
   final recovery = await (recover ?? recoverInterruptedRestoreAtStartup)();
   await (initHive ?? () => Hive.initFlutter())();
@@ -51,12 +59,23 @@ Future<StartupResult> startUp({
       return StartupResult(dbError: e);
     }
   }
+  var resetFinished = false;
+  if (finishFactoryReset != null) {
+    try {
+      resetFinished = await finishFactoryReset();
+      if (resetFinished) await startReviewClock();
+    } catch (e) {
+      return StartupResult(dbError: e);
+    }
+  }
   // A restore killed on its error screen: finish its merge (one exists
   // check when there is none).
   if (await finishPendingRestoreMerge(recovery)) {
     return const StartupResult(notice: kRestoreCompletedOnRetryNotice);
   }
-  return StartupResult(notice: restoreRecoveryNotice(recovery));
+  return StartupResult(
+      notice: restoreRecoveryNotice(recovery) ??
+          (resetFinished ? kFactoryResetFinishedNotice : null));
 }
 
 /// Opens the Hive boxes before the ProviderContainer exists so providers
