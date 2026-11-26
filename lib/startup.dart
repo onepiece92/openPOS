@@ -17,7 +17,8 @@ class StartupResult {
   final Object? dbError;
 }
 
-/// Pre-`runApp` startup, in this order:
+/// Launch startup, run while `AppRoot` shows its plain first frame (see
+/// `AppRoot.startup`), in this order:
 /// 1. [recover] an interrupted restore — before Hive is even initialised,
 ///    so no box or DB file is touched while a swap may be half done;
 /// 2. [initHive] (sets Hive's path only; opens nothing);

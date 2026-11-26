@@ -6,25 +6,23 @@ import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/utils/bundled_fonts.dart';
 import 'package:pos_app/startup.dart';
 
-Future<void> main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
   registerBundledFontLicenses();
 
-  // Recovers an interrupted restore before any store opens, then opens the
-  // Hive boxes — or, if recovery failed, opens nothing and shows the error
-  // screen (see startUp). The first DB query runs here, on the container
-  // the app then uses, so a database that cannot open lands on the error
-  // screen instead of half-working screens.
+  // The first frame goes up straight away: AppRoot shows a plain surface
+  // (the launch screen's colour) until startUp resolves. startUp recovers
+  // an interrupted restore before any store opens, opens the Hive boxes,
+  // then runs the database's first query on the container the app goes on
+  // to use — so the DB open (and any migration) happens after the first
+  // frame, and a database that cannot open lands on the error screen
+  // instead of half-working screens. An unexpected throw is routed there
+  // too ("Something went wrong", with Try again).
   final container = ProviderContainer();
-  final startup = await startUp(
+  final startup = startUp(
     checkDatabase: () =>
         container.read(databaseProvider).customSelect('SELECT 1').get(),
-  );
+  ).catchError((Object e) => StartupResult(dbError: e));
 
-  runApp(AppRoot(
-    container: container,
-    startupNotice: startup.notice,
-    startupFatal: startup.fatal,
-    startupDbError: startup.dbError,
-  ));
+  runApp(AppRoot(container: container, startup: startup));
 }

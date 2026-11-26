@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 
 import 'package:pos_app/core/database/connection/native.dart';
 import 'package:pos_app/core/database/database_open_errors.dart';
+import 'package:pos_app/core/database/upgrade_progress.dart';
 
 import 'package:pos_app/core/database/daos/audit_dao.dart';
 import 'package:pos_app/core/database/daos/customers_dao.dart';
@@ -104,6 +105,9 @@ class AppDatabase extends _$AppDatabase {
           if (from > to) {
             throw DatabaseTooNewError(from, to);
           }
+          // Tells the launch surface a migration is running (see
+          // databaseUpgradeRunning); cleared however the upgrade ends.
+          databaseUpgradeRunning.value = true;
           // Drift (2.28) neither wraps onUpgrade in a transaction nor writes
           // user_version until it returns, so a crash mid-upgrade used to
           // leave half the DDL applied and the old version on disk — every
@@ -248,7 +252,7 @@ class AppDatabase extends _$AppDatabase {
               await m.addColumn(orders, orders.stockLinked);
             }
             await customStatement('PRAGMA user_version = $to');
-          });
+          }).whenComplete(() => databaseUpgradeRunning.value = false);
         },
         beforeOpen: (details) async {
           // Enable WAL mode for better concurrent read performance.

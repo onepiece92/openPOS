@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:drift/native.dart';
@@ -43,19 +44,23 @@ void main() {
   });
 
   group('startUp', () {
-    test('runs the database check after the stores and reports a failure',
-        () async {
+    test(
+        'recovery, Hive, the stores, then the database check; a failure '
+        'is reported', () async {
       final order = <String>[];
       final r = await startUp(
-        recover: () async => RestoreRecovery.none,
-        initHive: () async {},
+        recover: () async {
+          order.add('recover');
+          return RestoreRecovery.none;
+        },
+        initHive: () async => order.add('initHive'),
         openStores: () async => order.add('openStores'),
         checkDatabase: () async {
           order.add('check');
           throw DatabaseTooNewError(99, 16);
         },
       );
-      expect(order, ['openStores', 'check']);
+      expect(order, ['recover', 'initHive', 'openStores', 'check']);
       expect(r.dbError, isA<DatabaseTooNewError>());
       expect(r.fatal, isNull);
     });
@@ -82,6 +87,72 @@ void main() {
       );
       expect(checks, 0);
       expect(r.fatal, kRecoveryFailedMessage);
+    });
+  });
+
+  // The check now runs after the first frame: AppRoot is pumped with the
+  // still-running startUp future and routes its result when it resolves.
+  group('routed from the startup future, after the first frame', () {
+    Future<void> launchWith(WidgetTester tester, Object error,
+        {bool asThrow = false}) async {
+      final pending = Completer<StartupResult>();
+      await tester.pumpWidget(AppRoot(
+        startup: pending.future,
+        recoverForRetry: () async => RestoreRecovery.none,
+      ));
+      expect(find.byType(StartupSurface), findsOneWidget);
+      expect(find.byType(Text), findsNothing);
+      asThrow
+          ? pending.completeError(error)
+          : pending.complete(StartupResult(dbError: error));
+      // One pump delivers the result, the next draws it.
+      await tester.pump();
+      await tester.pump();
+      expect(find.byType(StartupSurface), findsNothing);
+    }
+
+    testWidgets('too new: Update Open POS, no Try again', (tester) async {
+      await launchWith(tester, DatabaseTooNewError(99, 16));
+      expect(find.text('Update Open POS'), findsOneWidget);
+      expect(
+          find.text('This data was saved by a newer version of Open POS. '
+              'Update the app to open it.'),
+          findsOneWidget);
+      expect(find.text('Try again'), findsNothing);
+      expect(find.textContaining('Contact support'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
+    });
+
+    testWidgets('other failure: Something went wrong, Try again, WhatsApp',
+        (tester) async {
+      await launchWith(tester, Exception('disk I/O error'));
+      expect(find.text('Something went wrong'), findsOneWidget);
+      expect(find.text("Open POS couldn't open its data."), findsOneWidget);
+      expect(find.text('Try again'), findsOneWidget);
+      expect(find.textContaining('WhatsApp'), findsOneWidget);
+      expect(find.textContaining('disk I/O'), findsNothing);
+      await tester.pumpWidget(const SizedBox());
+    });
+
+    testWidgets('a startup that throws is the same plain failure',
+        (tester) async {
+      await launchWith(tester, StateError('Hive init failed'), asThrow: true);
+      expect(find.text('Something went wrong'), findsOneWidget);
+      expect(find.text('Try again'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
+    });
+
+    testWidgets('failed recovery: the restore error screen with Try again',
+        (tester) async {
+      final pending = Completer<StartupResult>();
+      await tester.pumpWidget(AppRoot(startup: pending.future));
+      pending.complete(const StartupResult(fatal: kRecoveryFailedMessage));
+      await tester.pump();
+      await tester.pump();
+      expect(find.text('Restore failed'), findsOneWidget);
+      expect(find.text(kRecoveryFailedMessage), findsOneWidget);
+      expect(find.text('Try again'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
     });
   });
 

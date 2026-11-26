@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -10,6 +11,7 @@ import 'package:pos_app/app.dart';
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/database/close_on_exit.dart';
 import 'package:pos_app/core/database/database_open_errors.dart';
+import 'package:pos_app/core/database/upgrade_progress.dart';
 import 'package:pos_app/core/restart_notice.dart';
 import 'package:pos_app/core/database/connection/native.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
@@ -23,7 +25,7 @@ import 'package:pos_app/features/settings/data/factory_reset.dart';
 import 'package:pos_app/features/usage/data/usage_counter.dart';
 import 'package:pos_app/features/usage/domain/usage_event.dart';
 import 'package:pos_app/features/usage/usage_providers.dart';
-import 'package:pos_app/startup.dart' show startReviewClock;
+import 'package:pos_app/startup.dart' show StartupResult, startReviewClock;
 
 /// Owns the Riverpod container so the whole app can be hot-restarted —
 /// needed to restore a backup: close DB + Hive, swap files on disk, then
@@ -32,6 +34,7 @@ class AppRoot extends StatefulWidget {
   const AppRoot({
     super.key,
     this.container,
+    this.startup,
     this.startupNotice,
     this.startupFatal,
     this.startupDbError,
@@ -41,6 +44,14 @@ class AppRoot extends StatefulWidget {
   /// The container the startup DB check ran on (so its connection is
   /// reused); a fresh one when null.
   final ProviderContainer? container;
+
+  /// The launch's `startUp` (restore recovery, Hive, the startup stores,
+  /// the database check), still running when the first frame is drawn.
+  /// Until it resolves only [StartupSurface] is shown — nothing that reads
+  /// Hive or the database builds. Its result then replaces
+  /// [startupNotice] / [startupFatal] / [startupDbError]. When null, those
+  /// three are the startup result (already resolved; used by tests).
+  final Future<StartupResult>? startup;
 
   /// Toast for the first frame, e.g. after startup restore recovery.
   final String? startupNotice;
@@ -85,7 +96,15 @@ class AppRootState extends State<AppRoot> {
   Timer? _autoBackupTimer;
   Future<void>? _autoBackupRun; // in flight; a restore waits for it
 
-  late final DatabaseExitGuard _exitGuard;
+  // Installed once startup has resolved (after the review clock, as in
+  // 1.1.0).
+  DatabaseExitGuard? _exitGuard;
+
+  // [AppRoot.startup] has not resolved yet: [StartupSurface] is showing.
+  bool _starting = false;
+  // The check is taking longer than [kStartupLineDelay]: show one line.
+  bool _startupSlow = false;
+  Timer? _startupSlowTimer;
 
   @visibleForTesting
   bool get autoBackupScheduledForTest => _autoBackupTimer != null;
@@ -97,9 +116,42 @@ class AppRootState extends State<AppRoot> {
   void initState() {
     super.initState();
     _container = widget.container ?? ProviderContainer();
-    _notice = widget.startupNotice;
-    _fatal = widget.startupFatal;
-    final dbError = widget.startupDbError;
+    final startup = widget.startup;
+    if (startup == null) {
+      _applyStartup(StartupResult(
+        notice: widget.startupNotice,
+        fatal: widget.startupFatal,
+        dbError: widget.startupDbError,
+      ));
+      return;
+    }
+    _starting = true;
+    // A fast open (milliseconds) never shows any text; only a slow one —
+    // e.g. a migration on a cold low-end phone — gets a line.
+    _startupSlowTimer = Timer(kStartupLineDelay, () {
+      if (mounted && _starting) setState(() => _startupSlow = true);
+    });
+    startup.then(_startupResolved,
+        onError: (Object e) => _startupResolved(StartupResult(dbError: e)));
+  }
+
+  void _startupResolved(StartupResult result) {
+    _startupSlowTimer?.cancel();
+    _startupSlowTimer = null;
+    if (!mounted) return;
+    setState(() {
+      _starting = false;
+      _startupSlow = false;
+      _applyStartup(result);
+    });
+  }
+
+  /// Takes on the startup result: toast or error screen, then the exit
+  /// guard and the auto-backup timer (10 s after the app's first frame).
+  void _applyStartup(StartupResult result) {
+    _notice = result.notice;
+    _fatal = result.fatal;
+    final dbError = result.dbError;
     if (_fatal == null && dbError != null) _showDbOpenFailure(dbError);
     _exitGuard = DatabaseExitGuard(_closeDatabaseForExit);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -150,7 +202,8 @@ class AppRootState extends State<AppRoot> {
 
   @override
   void dispose() {
-    _exitGuard.dispose();
+    _exitGuard?.dispose();
+    _startupSlowTimer?.cancel();
     _autoBackupTimer?.cancel();
     _autoBackupTimer = null;
     _container.dispose();
@@ -458,6 +511,7 @@ class AppRootState extends State<AppRoot> {
 
   @override
   Widget build(BuildContext context) {
+    if (_starting) return StartupSurface(showLine: _startupSlow);
     if (_restoring) return _RestoringSplash(message: _splashMessage);
     if (_fatal != null) {
       return _RestoreFailedScreen(
@@ -476,6 +530,68 @@ class AppRootState extends State<AppRoot> {
               message: _notice!,
               onDone: () => setState(() => _notice = null),
               child: const POSApp(),
+            ),
+    );
+  }
+}
+
+/// How long the launch surface stays blank before it says what it is
+/// waiting for. A normal open takes a few milliseconds and shows nothing.
+const kStartupLineDelay = Duration(milliseconds: 300);
+
+/// The launch surface's line while the database opens…
+const kOpeningAppText = 'Opening Open POS…';
+
+/// …and while it is being migrated to this version's schema.
+const kUpdatingDataText = 'Updating your data…';
+
+/// Launch-screen background: Android's launch window is
+/// `?android:colorBackground` of Theme.Light / Theme.Black (white, or black
+/// in dark mode); iOS's LaunchScreen.storyboard is always white.
+@visibleForTesting
+Color launchSurfaceColor(Brightness platformBrightness, TargetPlatform os) =>
+    os == TargetPlatform.iOS || platformBrightness == Brightness.light
+        ? const Color(0xFFFFFFFF)
+        : const Color(0xFF000000);
+
+/// The first frame: the native launch screen's plain colour, so the hand-
+/// off from it is invisible. Text only when [showLine] (startup is slow):
+/// [kUpdatingDataText] while a migration runs, else [kOpeningAppText].
+/// Deliberately not a MaterialApp: nothing here reads Hive, settings, the
+/// router or the database.
+class StartupSurface extends StatelessWidget {
+  const StartupSurface({super.key, required this.showLine});
+  final bool showLine;
+
+  @override
+  Widget build(BuildContext context) {
+    final brightness = MediaQuery.maybePlatformBrightnessOf(context) ??
+        View.maybeOf(context)?.platformDispatcher.platformBrightness ??
+        Brightness.light;
+    final background = launchSurfaceColor(brightness, defaultTargetPlatform);
+    final dark = background == const Color(0xFF000000);
+    return ColoredBox(
+      color: background,
+      child: !showLine
+          ? const SizedBox.expand()
+          : Directionality(
+              textDirection: TextDirection.ltr,
+              child: Center(
+                child: ValueListenableBuilder<bool>(
+                  valueListenable: databaseUpgradeRunning,
+                  builder: (_, upgrading, __) => Text(
+                    upgrading ? kUpdatingDataText : kOpeningAppText,
+                    style: TextStyle(
+                      fontFamily: 'JetBrainsMono',
+                      fontSize: 16,
+                      decoration: TextDecoration.none,
+                      color: dark
+                          ? const Color(0xFFB0B0B0)
+                          : const Color(0xFF555555),
+                    ),
+                  ),
+                ),
+              ),
             ),
     );
   }
