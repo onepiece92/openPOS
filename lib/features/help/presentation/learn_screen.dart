@@ -269,7 +269,7 @@ final _articles = <_Article>[
         heading: 'How Stock Decreases',
         steps: [
           'Every time this product is sold, the stock count is reduced automatically.',
-          'If a sale is refunded with "Restock items" switched on, the quantity is added back.',
+          'If a sale is voided, or refunded with "Restock items" switched on, the stock it took is added back.',
         ],
       ),
       ArticleSection(

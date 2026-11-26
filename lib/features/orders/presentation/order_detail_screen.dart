@@ -14,6 +14,7 @@ import 'package:pos_app/features/products/domain/products_provider.dart';
 import 'package:pos_app/features/receipts/presentation/receipt_body.dart';
 import 'package:pos_app/features/receipts/presentation/receipt_pdf_service.dart';
 import 'package:pos_app/features/returns/domain/process_return.dart';
+import 'package:pos_app/features/returns/domain/reverse_sale.dart';
 import 'package:pos_app/features/returns/domain/void_order.dart' as void_svc;
 import 'package:pos_app/features/orders/domain/order_number.dart';
 import 'package:pos_app/features/printing/domain/auto_print.dart';
@@ -44,11 +45,17 @@ class _DetailData {
     required this.order,
     required this.refundable,
     required this.restocked,
+    required this.owed,
   });
   final ReceiptBodyData receipt;
   final Order order; // kept for status / action bar
   final double refundable; // order total less refunds so far
   final bool restocked; // an earlier refund already put the items back
+  final Map<int, int>? owed; // stockToRestock: null for a legacy order
+
+  /// What a void or refund would restock, by the same rule they apply.
+  RestockPlan restockPlan({required bool trackStock}) => planRestock(order,
+      owed: owed, trackStock: trackStock, restocked: restocked);
 
   bool get isPartlyRefunded =>
       order.status == 'completed' && refundable < order.total;
@@ -82,6 +89,7 @@ final _orderDetailProvider =
     order: order,
     refundable: await refundableAmount(db, order),
     restocked: await db.ordersDao.hasRestockedReturn(orderId),
+    owed: await db.inventoryDao.stockToRestock(orderId),
   );
 });
 
@@ -271,8 +279,8 @@ class _DetailBody extends StatelessWidget {
     final reasonCtrl = TextEditingController();
     final trackStock = ref.read(featureOnProvider(Feature.stockTracking));
     final text = voidDialogText(
-      // A refund that already restocked leaves nothing to put back.
-      restocks: trackStock && !data.restocked,
+      // Only when something is owed back to the shelf.
+      restocks: data.restockPlan(trackStock: trackStock).any,
       points: data.order.pointsRedeemed > 0 || data.order.pointsEarned > 0,
     );
     final confirm = await showDialog<bool>(
@@ -350,8 +358,11 @@ class _DetailBody extends StatelessWidget {
         TextEditingController(text: refundable.toStringAsFixed(2));
     final reasonCtrl = TextEditingController();
     bool restock = false;
-    // Stock tracking off: no "Restock items" (interim rule, see voidOrder).
     final trackStock = ref.read(featureOnProvider(Feature.stockTracking));
+    // "Restock items" only when the refund would put something back, and
+    // once per order (processReturn refuses a second restocking refund).
+    final canRestock =
+        !data.restocked && data.restockPlan(trackStock: trackStock).any;
 
     // Mirrors processReturn's rules so the cashier sees the problem before
     // confirming rather than as a failure afterwards.
@@ -402,7 +413,7 @@ class _DetailBody extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                if (trackStock && !data.restocked)
+                if (canRestock)
                   SwitchListTile(
                     key: const ValueKey('refund-restock'),
                     title: const Text('Restock items'),
