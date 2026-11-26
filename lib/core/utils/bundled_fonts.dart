@@ -18,14 +18,23 @@ const openPosSymbolsBold = 'assets/fonts/OpenPOSSymbols-Bold.ttf';
 /// The SIL Open Font License that covers the OpenPOS Symbols subsets.
 const openPosSymbolsLicense = 'assets/fonts/OFL.txt';
 
+/// JetBrains Mono's own OFL text (upstream OFL.txt, with its copyright line).
+const jetBrainsMonoLicense = 'assets/fonts/JetBrainsMono-OFL.txt';
+
 /// Lists the bundled symbol fonts' OFL in Flutter's license registry
 /// (what `showLicensePage` reads). The file is read only when someone asks
 /// for the licenses, never at startup.
 void registerBundledFontLicenses() {
   LicenseRegistry.addLicense(() async* {
     yield LicenseEntryWithLineBreaks(
-      const ['OpenPOS Symbols (Noto Sans, Noto Sans Bengali, Noto Sans Thai)'],
+      const ['OpenPOS Symbols (Noto subset)'],
       await rootBundle.loadString(openPosSymbolsLicense),
+    );
+  });
+  LicenseRegistry.addLicense(() async* {
+    yield LicenseEntryWithLineBreaks(
+      const ['JetBrains Mono'],
+      await rootBundle.loadString(jetBrainsMonoLicense),
     );
   });
 }
@@ -82,6 +91,8 @@ class ReceiptPdfFonts {
 }
 
 Future<ReceiptPdfFonts> loadReceiptPdfFonts({bool italic = false}) async {
+  // Sequential awaits, not Future.wait: flutter_test serves assets as
+  // SynchronousFuture, and Future.wait returned empty there.
   return ReceiptPdfFonts._(
     await bundledPdfFont(jetBrainsMonoRegular),
     await bundledPdfFont(jetBrainsMonoBold),
@@ -125,6 +136,8 @@ Future<Set<int>> receiptFontCoverage() {
 }
 
 Future<Set<int>> _computeReceiptCoverage() async {
+  // Sequential awaits, not Future.wait: flutter_test serves assets as
+  // SynchronousFuture, and Future.wait returned empty there.
   final regular = (await bundledFontCodePoints(jetBrainsMonoRegular))
       .union(await bundledFontCodePoints(openPosSymbolsRegular));
   final bold = (await bundledFontCodePoints(jetBrainsMonoBold))

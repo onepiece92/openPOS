@@ -95,6 +95,19 @@ class SupportScreen extends ConsumerWidget {
           _SectionHeader('App Info', tt, cs),
           _InfoRow(label: 'Version', value: kAppVersion, cs: cs, tt: tt),
           _InfoRow(label: 'Build', value: kAppBuildNumber, cs: cs, tt: tt),
+          const SizedBox(height: 8),
+          _SupportTile(
+            icon: Icons.description_outlined,
+            title: 'Open-source licences',
+            subtitle: 'Fonts and libraries Open POS is built with',
+            cs: cs,
+            tt: tt,
+            onTap: () => showLicensePage(
+              context: context,
+              applicationName: 'Open POS',
+              applicationVersion: kAppVersion,
+            ),
+          ),
         ],
       ),
     );

@@ -18,4 +18,17 @@ void main() {
     expect(find.text('Documentation'), findsNothing);
     expect(find.text('Ordering App'), findsNothing);
   });
+
+  testWidgets('Open-source licences row opens the licence page',
+      (tester) async {
+    tester.view.physicalSize = const Size(800, 3000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(const ProviderScope(
+      child: MaterialApp(home: SupportScreen()),
+    ));
+    await tester.tap(find.text('Open-source licences'));
+    await tester.pumpAndSettle();
+    expect(find.byType(LicensePage), findsOneWidget);
+  });
 }
