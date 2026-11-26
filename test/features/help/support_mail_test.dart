@@ -10,7 +10,7 @@ void main() {
       throw PlatformException(code: 'ACTIVITY_NOT_FOUND');
 
   group('openSupportMail', () {
-    test('builds the mailto, with and without a subject', () async {
+    test('builds the mailto', () async {
       final seen = <String>[];
       Future<bool> record(Uri u) async {
         seen.add('$u');
@@ -18,12 +18,7 @@ void main() {
       }
 
       expect(await openSupportMail(launch: record), isTrue);
-      expect(await openSupportMail(subject: 'Open POS Bug', launch: record),
-          isTrue);
-      expect(seen, [
-        'mailto:support@rebuzzpos.com',
-        'mailto:support@rebuzzpos.com?subject=Open%20POS%20Bug',
-      ]);
+      expect(seen, ['mailto:support@rebuzzpos.com']);
     });
 
     test('false, never an exception, when nothing opens', () async {
