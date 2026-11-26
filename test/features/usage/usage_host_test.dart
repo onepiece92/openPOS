@@ -25,6 +25,7 @@ import 'package:pos_app/features/usage/usage_constants.dart';
 import 'package:pos_app/features/usage/usage_providers.dart';
 
 import '../../_support/test_db.dart';
+import '../../_support/temp_dir.dart';
 
 void main() {
   late AppDatabase db;
@@ -44,9 +45,9 @@ void main() {
     tmp = Directory.systemTemp.createTempSync('pos_usage_host_');
   });
   tearDown(() async {
-    tmp.deleteSync(recursive: true);
     await db.close();
     await Hive.close();
+    await deleteTempDir(tmp);
   });
 
   Future<ProviderContainer> pump(WidgetTester tester,

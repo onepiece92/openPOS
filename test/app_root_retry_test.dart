@@ -18,6 +18,8 @@ import 'package:pos_app/features/usage/data/usage_counter.dart';
 import 'package:pos_app/features/usage/domain/usage_event.dart';
 import 'package:pos_app/features/usage/domain/usage_summary.dart';
 
+import '_support/temp_dir.dart';
+
 /// Pumps, letting real async work (file IO, isolates) run between frames,
 /// until [done] holds. Fails rather than hangs if it never does.
 Future<void> pumpUntil(WidgetTester tester, bool Function() done) async {
@@ -47,7 +49,7 @@ void main() {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(channel, null);
       await Hive.close();
-      docs.deleteSync(recursive: true);
+      await deleteTempDir(docs);
     });
 
     testWidgets('retry refuses to open while an uncommitted journal exists',

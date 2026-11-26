@@ -20,6 +20,7 @@ import 'package:pos_app/features/usage/presentation/usage_screen.dart';
 import 'package:pos_app/features/usage/usage_constants.dart';
 import 'package:pos_app/features/usage/usage_providers.dart';
 
+import '../../_support/temp_dir.dart';
 import '../../_support/test_db.dart';
 import '_grammar.dart';
 
@@ -60,7 +61,7 @@ void main() {
   tearDown(() async {
     await db.close();
     await Hive.close();
-    tmp.deleteSync(recursive: true);
+    await deleteTempDir(tmp);
   });
 
   Future<void> pump(WidgetTester tester) async {
