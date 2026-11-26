@@ -38,6 +38,20 @@ double tipBaseOf(CartSummary s, {bool postTax = false}) => tipBase(
       postTax: postTax,
     );
 
+/// Thrown by `placeOrder` when the tip is above [maxTipFor]; [max] is the
+/// limit, for a message in the shop's currency.
+class TipTooLargeException implements Exception {
+  const TipTooLargeException(this.max);
+  final double max;
+  @override
+  String toString() => 'Tip is too large (at most $max)';
+}
+
+/// "That tip is too large for this sale. The most you can add is 1,000.00."
+String tipTooLargeText(String formattedMax) =>
+    'That tip is too large for this sale. The most you can add is '
+    '$formattedMax.';
+
 /// [percent] of [base], rounded to the cent.
 double tipForPercent(double base, double percent) =>
     roundMoney(base * percent / 100);
@@ -46,14 +60,12 @@ double tipForPercent(double base, double percent) =>
 /// sale is already a typo (1500 for 15); real tips are a small fraction.
 const kTipMaxFactor = 10;
 
-/// The most a tip may be on an order with no total (a free or fully
-/// discounted sale): 1,000 in the shop's currency, a generous tip on a free
-/// order that still stops a stray extra digit.
-const kTipMaxOnFreeOrder = 1000.0;
-
-/// The largest tip [placeOrder] accepts for a sale of [total].
+/// The largest tip [placeOrder] accepts for a sale of [total]: 10x the
+/// total, never above the money cap. A zero-total order has no scale to
+/// judge by (and currencies differ by orders of magnitude), so only the
+/// money cap applies there; the payment screen's confirmation is its guard.
 double maxTipFor(double total) {
-  final cap = total > 0 ? total * kTipMaxFactor : kTipMaxOnFreeOrder;
+  final cap = total > 0 ? total * kTipMaxFactor : kMaxMoneyAmount;
   return roundMoney(cap < kMaxMoneyAmount ? cap : kMaxMoneyAmount);
 }
 

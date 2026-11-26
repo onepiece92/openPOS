@@ -33,11 +33,7 @@ Future<int> placeOrder(
   // the sale is a typo, so it is refused before anything is written.
   final maxTip = maxTipFor(summary.total);
   if (tip > maxTip) {
-    return Future.error(ArgumentError.value(
-        tipAmount,
-        'tipAmount',
-        'Tip is too large for this sale (at most '
-            '${maxTip.toStringAsFixed(2)})'));
+    return Future.error(TipTooLargeException(maxTip));
   }
   return db.transaction(() async {
     // Read once: needed for the cost snapshot and again for stock below.

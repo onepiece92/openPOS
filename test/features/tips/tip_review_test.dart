@@ -59,10 +59,10 @@ void main() {
       refundTip: true);
 
   group('tip cap in placeOrder', () {
-    test('the cap is 10x the sale, or 1000 on a free order', () {
+    test('the cap is 10x the sale; a zero-total order has only the money cap', () {
       expect(kTipMaxFactor, 10);
       expect(maxTipFor(100), 1000);
-      expect(maxTipFor(0), 1000);
+      expect(maxTipFor(0), kMaxMoneyAmount);
       expect(maxTipFor(999999999), kMaxMoneyAmount);
     });
 
@@ -70,20 +70,32 @@ void main() {
         () async {
       final id = await sale(tip: 1000);
       expect((await db.ordersDao.getById(id))!.tipAmount, 1000);
-      await expectLater(sale(tip: 1500), throwsA(isA<ArgumentError>()));
-      await expectLater(sale(tip: 99999999999), throwsA(isA<ArgumentError>()));
+      await expectLater(sale(tip: 1500), throwsA(isA<TipTooLargeException>()));
+      await expectLater(
+          sale(tip: 99999999999), throwsA(isA<TipTooLargeException>()));
       expect(await db.select(db.orders).get(), hasLength(1));
     });
 
-    test('the error says what the limit is', () async {
-      await expectLater(sale(tip: 1000.01),
-          throwsA(predicate((e) => '$e'.contains('at most 1000.00'))));
+    test('the error carries the limit', () async {
+      await expectLater(
+          sale(tip: 1000.01),
+          throwsA(predicate((e) => e is TipTooLargeException && e.max == 1000)));
     });
 
-    test('a zero-total order allows a small tip only', () async {
-      await sale(total: 0, tip: 1000);
-      await expectLater(
-          sale(total: 0, tip: 1001), throwsA(isA<ArgumentError>()));
+    test('a zero-total order takes any tip up to the money cap (5,000 Rp, '
+        '1,500 dong)', () async {
+      final a = await sale(total: 0, tip: 5000);
+      final b = await sale(total: 0, tip: 150000);
+      expect((await db.ordersDao.getById(a))!.tipAmount, 5000);
+      expect((await db.ordersDao.getById(b))!.tipAmount, 150000);
+      await expectLater(sale(total: 0, tip: 99999999999),
+          throwsA(isA<TipTooLargeException>()));
+    });
+
+    test('the plain sentence for the cashier', () {
+      expect(tipTooLargeText('Rs 1,000.00'),
+          'That tip is too large for this sale. The most you can add is '
+          'Rs 1,000.00.');
     });
   });
 

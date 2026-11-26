@@ -127,6 +127,16 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       return;
     }
 
+    // Far past any real tip: say so plainly, before anything is asked.
+    final maxTip = maxTipFor(summary.total);
+    if (tip > maxTip) {
+      final fmt = ref.read(currencyFormatterProvider);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(tipTooLargeText(fmt.format(maxTip)))),
+      );
+      return;
+    }
+
     // A tip bigger than the sale is most likely a typo: ask first.
     if (tip > summary.total + 0.005) {
       final fmt = ref.read(currencyFormatterProvider);
@@ -170,6 +180,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     final messenger = ScaffoldMessenger.of(context);
     final usage = ref.read(usageCounterProvider);
     final trackStock = ref.read(featureOnProvider(Feature.stockTracking));
+    final fmt = ref.read(currencyFormatterProvider);
 
     final int orderId;
     try {
@@ -190,7 +201,10 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       if (mounted) setState(() {});
       if (messenger.mounted) {
         messenger.showSnackBar(
-          SnackBar(content: Text('Order failed: $e')),
+          SnackBar(
+              content: Text(e is TipTooLargeException
+                  ? tipTooLargeText(fmt.format(e.max))
+                  : 'Order failed: $e')),
         );
       }
       return;

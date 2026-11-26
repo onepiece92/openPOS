@@ -221,18 +221,46 @@ void main() {
     expect((await theOrder(tester)).tipAmount, 100);
   });
 
-  testWidgets('a mistyped tip far past the cap is refused by placeOrder',
-      (tester) async {
+  testWidgets('a mistyped tip far past the cap: a plain sentence with the '
+      'formatted maximum, no dialog, no order', (tester) async {
     await pumpScreen(tester, on: true);
     await tester.tap(find.text('Card'));
     await tester.pump();
-    await customTip(tester, '99999999');
+    await customTip(tester, '1500');
+    await tester.tap(confirm());
+    await settle(tester);
+    expect(
+        find.textContaining('That tip is too large for this sale. '
+            'The most you can add is'),
+        findsOneWidget);
+    expect(find.textContaining('1,000.00'), findsOneWidget);
+    expect(find.textContaining('Order failed'), findsNothing);
+    expect(find.textContaining('Invalid argument'), findsNothing);
+    expect(find.text('Keep tip'), findsNothing);
+    expect(await tester.runAsync(() => db.select(db.orders).get()), isEmpty);
+  });
+
+  testWidgets('a zero-total order with a large tip goes through after Keep tip',
+      (tester) async {
+    await pumpScreen(tester, on: true);
+    c.read(cartProvider.notifier).clear();
+    c.read(cartProvider.notifier).restoreItem(CartItem(
+        productId: productId,
+        name: 'Free',
+        unitPrice: 0,
+        quantity: 1,
+        isTaxable: false));
+    await tester.pump();
+    await tester.tap(find.text('Card'));
+    await tester.pump();
+    await customTip(tester, '5000');
     await tester.tap(confirm());
     await tester.pump();
+    expect(find.textContaining('Keep it?'), findsOneWidget);
     await tester.tap(find.text('Keep tip'));
     await settle(tester);
-    expect(find.textContaining('Tip is too large'), findsOneWidget);
-    expect(await tester.runAsync(() => db.select(db.orders).get()), isEmpty);
+    final o = await theOrder(tester);
+    expect((o.total, o.tipAmount), (0, 5000));
   });
 
   testWidgets('nothing to tip on: chips are disabled with the reason',
