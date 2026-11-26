@@ -1,13 +1,16 @@
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:intl/intl.dart';
 import 'package:path/path.dart' as p;
 
 import 'package:pos_app/core/providers/hive_provider.dart'
     show kAutoBackupLastAt;
-import 'package:pos_app/features/backup/data/snapshot_providers.dart'
-    show receiptsDir;
+import 'package:pos_app/core/providers/database_provider.dart';
+import 'package:pos_app/features/backup/data/snapshot_providers.dart';
+import 'package:pos_app/features/backup/data/snapshot_service.dart';
 import 'package:pos_app/features/cart/data/ticket_sequence.dart';
 import 'package:pos_app/features/usage/data/usage_counter.dart';
 
@@ -36,10 +39,41 @@ const kFactoryResetNoBackups =
 
 const kFactoryResetConfirmButton = 'Erase everything';
 
-/// The dialog's text; [hasAutoBackups] is checked when it opens.
-String factoryResetConfirmText({required bool hasAutoBackups}) =>
+/// The dialog's last line: the newest automatic backup's date.
+const kLatestBackupLabel = 'Latest automatic backup: ';
+String latestBackupLine(DateTime? latest) => '$kLatestBackupLabel'
+    '${latest == null ? 'none' : DateFormat.yMMMd().add_jm().format(latest)}';
+
+/// The dialog's text. [latestBackup] — the newest file in `backups/auto`,
+/// null when there is none — is read when it opens.
+String factoryResetConfirmText({required DateTime? latestBackup}) =>
     '$kFactoryResetBody\n\n'
-    '${hasAutoBackups ? kFactoryResetBackupsKept : kFactoryResetNoBackups}';
+    '${latestBackup != null ? kFactoryResetBackupsKept : kFactoryResetNoBackups}'
+    '\n\n${latestBackupLine(latestBackup)}';
+
+/// Shown while the one backup taken just before the erase is written.
+const kSavingBackupFirst = 'Saving a backup first…';
+
+/// Asked when that backup failed; the user may still cancel.
+const kBackupFirstFailed = "Couldn't save a backup first. Erase anyway?";
+
+/// Takes ONE automatic backup (no receipt photos, like every automatic
+/// backup) just before a factory reset, so the erased shop can be restored
+/// from Settings › Backup & Restore. Returns null without writing anything
+/// when the shop has no data of the user's (one query); throws when the
+/// backup could not be saved. The cost is paid only at reset.
+final preResetBackupProvider = Provider<Future<File?> Function()>(
+  (ref) => () async {
+    if (!await hasUserData(ref.read(databaseProvider))) return null;
+    final dir = await autoBackupDir();
+    final zip = await ref
+        .read(snapshotCoordinatorProvider)
+        .create(dir, includePhotos: false);
+    await const SnapshotService()
+        .prune(dir, keep: kAutoBackupKeep, protect: zip);
+    return zip;
+  },
+);
 
 /// Settings keys a factory reset keeps: automatic-backup bookkeeping. The
 /// backups kept on the device are how a regretted reset is undone, so the

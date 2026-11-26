@@ -1,18 +1,22 @@
 import 'dart:io';
 
-import 'package:drift/drift.dart';
+import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path/path.dart' as p;
 
 import 'package:pos_app/core/database/app_database.dart';
+import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/features/backup/data/snapshot_providers.dart';
+import 'package:pos_app/features/backup/data/snapshot_service.dart';
 import 'package:pos_app/features/settings/data/factory_reset.dart';
 import 'package:pos_app/features/settings/presentation/widgets/danger_section.dart';
 
+import '../../_support/sales.dart';
 import '../../app_root_retry_test.dart' show pumpUntil;
 
 /// What each thing the factory reset erases is called in the confirm text.
@@ -64,8 +68,7 @@ class _DeleteRecorder extends QueryInterceptor {
 
 void main() {
   group('the confirm text names everything the reset erases', () {
-    test('every table eraseAllData deletes from is mapped and named',
-        () async {
+    test('every table eraseAllData deletes from is mapped and named', () async {
       final rec = _DeleteRecorder();
       final db = AppDatabase(NativeDatabase.memory().interceptWith(rec));
       addTearDown(db.close);
@@ -135,59 +138,158 @@ void main() {
       docs.deleteSync(recursive: true);
     });
 
-    Future<List<String>> open(WidgetTester tester, List<String> erased) async {
+    /// Pumps the section with a fake pre-reset backup ([backup] runs it).
+    Future<void> pump(WidgetTester tester, List<String> log,
+        {Future<File?> Function()? backup}) async {
       await tester.pumpWidget(ProviderScope(
+        overrides: [
+          preResetBackupProvider.overrideWithValue(() async {
+            log.add('backup');
+            return backup == null ? null : await backup();
+          }),
+        ],
         child: MaterialApp(
           home: Scaffold(
-            body: DangerSection(onErase: (_) async => erased.add('erase')),
+            body: DangerSection(onErase: (_) async => log.add('erase')),
           ),
         ),
       ));
-      // Step one: the tile.
+    }
+
+    /// Step one: the tile; then waits for the dialog.
+    Future<void> openDialog(WidgetTester tester) async {
       await tester.tap(find.text('Factory Reset'));
       await pumpUntil(
           tester, () => find.text(kFactoryResetTitle).evaluate().isNotEmpty);
       await tester.pumpAndSettle();
-      return erased;
     }
 
-    testWidgets('with an automatic backup: says they are kept',
+    Future<void> tapAndSettle(WidgetTester tester, String label) async {
+      await tester.tap(find.text(label));
+      await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 20)));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('with an automatic backup: says they are kept, and its date',
         (tester) async {
       final auto = Directory(p.join(docs.path, 'backups', 'auto'))
         ..createSync(recursive: true);
-      File(p.join(auto.path, 'pos_backup_20261101_120000.zip'))
-          .writeAsBytesSync([1]);
-      await open(tester, []);
-      expect(find.text(factoryResetConfirmText(hasAutoBackups: true)),
+      final when = DateTime(2026, 11, 1, 9, 30);
+      File(p.join(auto.path, 'pos_backup_20261101_093000.zip'))
+        ..writeAsBytesSync([1])
+        ..setLastModifiedSync(when);
+      await pump(tester, []);
+      await openDialog(tester);
+      expect(find.text(factoryResetConfirmText(latestBackup: when)),
           findsOneWidget);
       expect(find.textContaining(kFactoryResetBackupsKept), findsOneWidget);
       expect(find.textContaining(kFactoryResetNoBackups), findsNothing);
+      expect(find.textContaining('Latest automatic backup: Nov 1, 2026'),
+          findsOneWidget);
     });
 
-    testWidgets('with none: says it cannot be undone', (tester) async {
-      await open(tester, []);
+    testWidgets('with none: says it cannot be undone, latest none',
+        (tester) async {
+      await pump(tester, []);
+      await openDialog(tester);
       expect(find.textContaining(kFactoryResetBody), findsOneWidget);
       expect(find.textContaining(kFactoryResetNoBackups), findsOneWidget);
       expect(find.textContaining(kFactoryResetBackupsKept), findsNothing);
+      expect(
+          find.textContaining('Latest automatic backup: none'), findsOneWidget);
     });
 
-    testWidgets('Cancel erases nothing; Erase everything erases',
-        (tester) async {
-      final erased = await open(tester, []);
+    testWidgets(
+        'Cancel erases nothing (no backup either); Erase everything backs '
+        'up first, then erases', (tester) async {
+      final log = <String>[];
+      await pump(tester, log, backup: () async => File('x.zip'));
+      await openDialog(tester);
       expect(find.text('Cancel'), findsOneWidget);
       expect(find.text('Erase everything'), findsOneWidget);
-      await tester.tap(find.text('Cancel'));
-      await tester.pumpAndSettle();
+      await tapAndSettle(tester, 'Cancel');
       expect(find.text(kFactoryResetTitle), findsNothing);
-      expect(erased, isEmpty);
+      expect(log, isEmpty);
 
-      await tester.tap(find.text('Factory Reset'));
-      await pumpUntil(
-          tester, () => find.text(kFactoryResetTitle).evaluate().isNotEmpty);
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Erase everything'));
-      await tester.pumpAndSettle();
-      expect(erased, ['erase']);
+      await openDialog(tester);
+      await tapAndSettle(tester, 'Erase everything');
+      expect(log, ['backup', 'erase']);
+      expect(find.text(kSavingBackupFirst), findsNothing);
+      expect(find.text(kBackupFirstFailed), findsNothing);
+    });
+
+    testWidgets('a failed backup asks again; Cancel there keeps the shop',
+        (tester) async {
+      final log = <String>[];
+      await pump(tester, log, backup: () async => throw StateError('disk'));
+      await openDialog(tester);
+      await tapAndSettle(tester, 'Erase everything');
+      expect(find.text(kBackupFirstFailed), findsOneWidget);
+      await tapAndSettle(tester, 'Cancel');
+      expect(log, ['backup'], reason: 'not erased');
+
+      await openDialog(tester);
+      await tapAndSettle(tester, 'Erase everything');
+      expect(find.text("Couldn't save a backup first. Erase anyway?"),
+          findsOneWidget);
+      await tapAndSettle(tester, 'Erase everything');
+      expect(log, ['backup', 'backup', 'erase']);
+    });
+  });
+
+  group('the pre-reset backup', () {
+    late Directory docs;
+    const channel = MethodChannel('plugins.flutter.io/path_provider');
+
+    setUp(() {
+      docs = Directory.systemTemp.createTempSync('pos_prereset_');
+      Hive.init(docs.path);
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (_) async => docs.path);
+    });
+    tearDown(() async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null);
+      await Hive.close();
+      docs.deleteSync(recursive: true);
+    });
+
+    ProviderContainer containerWith(AppDatabase db) {
+      final c = ProviderContainer(
+          overrides: [databaseProvider.overrideWithValue(db)]);
+      addTearDown(c.dispose);
+      return c;
+    }
+
+    Future<void> openBoxes() async {
+      for (final b in kSnapshotHiveBoxes) {
+        await Hive.openBox<dynamic>(b);
+      }
+    }
+
+    test('an empty shop: nothing written', () async {
+      await openBoxes();
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      final made = await containerWith(db).read(preResetBackupProvider)();
+      expect(made, isNull);
+      expect(Directory(p.join(docs.path, 'backups', 'auto')).existsSync(),
+          isFalse);
+    });
+
+    test('a shop with data: one automatic backup in backups/auto', () async {
+      await openBoxes();
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      await seedProduct(db, sku: 'A');
+      final made = await containerWith(db).read(preResetBackupProvider)();
+      expect(made, isNotNull);
+      expect(made!.existsSync(), isTrue);
+      expect(p.dirname(made.path), p.join(docs.path, 'backups', 'auto'));
+      final listed = await const SnapshotService()
+          .listLocal(Directory(p.join(docs.path, 'backups', 'auto')));
+      expect(listed.map((f) => f.path), [made.path]);
     });
   });
 }
