@@ -37,18 +37,26 @@ class AuditService {
     int orderId, {
     required double total,
     required String paymentMethod,
+    double tip = 0,
   }) =>
       log(
         entityType: 'order',
         entityId: orderId,
         action: 'place',
-        newValue: {'total': total, 'payment_method': paymentMethod},
+        newValue: {
+          'total': total,
+          'tip': tip,
+          'payment_method': paymentMethod,
+        },
       );
 
-  Future<void> orderVoided(int orderId, {String? reason}) => log(
+  /// [tip] is the tip that was still with the shop and is handed back.
+  Future<void> orderVoided(int orderId, {String? reason, double tip = 0}) =>
+      log(
         entityType: 'order',
         entityId: orderId,
         action: 'void',
+        newValue: {'tip': tip},
         metadata: reason != null ? {'reason': reason} : null,
       );
 
@@ -57,12 +65,13 @@ class AuditService {
     required double amount,
     required bool restocked,
     String? reason,
+    double tip = 0,
   }) =>
       log(
         entityType: 'order',
         entityId: orderId,
         action: 'refund',
-        newValue: {'amount': amount, 'restocked': restocked},
+        newValue: {'amount': amount, 'tip': tip, 'restocked': restocked},
         metadata: reason != null ? {'reason': reason} : null,
       );
 

@@ -1,5 +1,6 @@
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/services/audit_service.dart';
+import 'package:pos_app/core/utils/money.dart';
 import 'package:pos_app/features/returns/domain/reverse_sale.dart';
 
 /// Atomically voids a previously-completed order.
@@ -42,7 +43,11 @@ Future<RestockResult> voidOrder(
 
     await db.ordersDao.voidOrder(orderId);
 
-    await audit.orderVoided(orderId, reason: reason);
+    // The tip not yet handed back by a refund goes back with the void.
+    final tipLeft = roundMoney(
+        order.tipAmount - await db.ordersDao.refundedTipTotal(orderId));
+    await audit.orderVoided(orderId,
+        reason: reason, tip: tipLeft > 0 ? tipLeft : 0);
     return restocked;
   });
 }

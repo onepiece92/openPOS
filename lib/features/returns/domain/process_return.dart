@@ -65,6 +65,9 @@ Future<RefundResult> processReturn(
     final refund = roundMoney(amount);
     // A tip-only refund: no goods, just the tip still left.
     final tipOnly = refund == 0 && refundTip && tipLeft > 0;
+    if (refund == 0 && refundTip && order.tipAmount > 0 && tipLeft <= 0) {
+      throw StateError('The tip was already refunded.');
+    }
     if (refundable <= 0 && !tipOnly) {
       throw StateError('Order #$orderId has nothing left to refund');
     }
@@ -108,6 +111,7 @@ Future<RefundResult> processReturn(
       amount: refund,
       restocked: restocked.any,
       reason: reason,
+      tip: tipBack,
     );
 
     return RefundResult(
