@@ -90,6 +90,11 @@ class AppRootState extends State<AppRoot> {
   // The error screen is showing a database-open failure (not a restore):
   // a failed retry keeps the plain wording.
   bool _dbOpenFailure = false;
+  // A factory reset is pending on data that is still there: the blocking
+  // "Finish erasing" / "Keep my data" question is showing.
+  bool _resetChoice = false;
+  // "Keep my data" could not clear the flag yet.
+  bool _resetKeepFailed = false;
 
   /// How long after the first frame the daily auto-backup waits, so its
   /// `VACUUM INTO` + zip don't compete with startup work.
@@ -152,6 +157,7 @@ class AppRootState extends State<AppRoot> {
   void _applyStartup(StartupResult result) {
     _notice = result.notice;
     _fatal = result.fatal;
+    _resetChoice = result.resetChoice;
     final dbError = result.dbError;
     if (_fatal == null && dbError != null) _showDbOpenFailure(dbError);
     _exitGuard = DatabaseExitGuard(_closeDatabaseForExit);
@@ -176,7 +182,7 @@ class AppRootState extends State<AppRoot> {
   /// [restoreFrom] and [dispose] also cancel the pending timer.
   void _startAutoBackup() {
     _autoBackupTimer = null;
-    if (!mounted || _restoring || _fatal != null) return;
+    if (!mounted || _restoring || _fatal != null || _resetChoice) return;
     final run = _container
         .read(snapshotCoordinatorProvider)
         .runAutoBackupIfDue() // never throws
@@ -387,6 +393,16 @@ class AppRootState extends State<AppRoot> {
     for (final name in kSnapshotHiveBoxes) {
       await Hive.openBox<dynamic>(name);
     }
+    if (verifyingRestore) {
+      // The restored data is the user's explicit choice: a reset-pending
+      // flag a backup might carry (backups strip it, older ones may not)
+      // must not re-arm an erase. Best effort: the launch finisher never
+      // erases a database that still holds data anyway.
+      try {
+        await clearFactoryResetPendingConfirmed(Hive.box<dynamic>('settings'),
+            attempts: 1);
+      } catch (_) {}
+    }
     await checkDatabaseFileBeforeOpen();
     final c = ProviderContainer();
     _container = c;
@@ -401,20 +417,26 @@ class AppRootState extends State<AppRoot> {
   /// comes up like a first run (onboarding, then the usage notice once).
   /// Automatic backups are kept.
   ///
-  /// Outcomes: done → onboarding; the erase refused → back on the
-  /// unchanged data with [kFactoryResetFailedNotice]; erased but not all
-  /// cleared → the error screen, whose "Try again" (like the next launch)
-  /// finishes the reset. Never an app on half-erased stores.
+  /// Outcomes: done → onboarding; the erase refused and the flag confirmed
+  /// cleared → back on the unchanged data with [kFactoryResetFailedNotice];
+  /// nothing erased but the flag not confirmed cleared → the blocking
+  /// [kResetChoiceTitle] question; erased but not all cleared → the error
+  /// screen, whose "Try again" (like the next launch) finishes the reset.
+  /// Never an app on half-erased stores, never "not changed" with a stale
+  /// flag. Also the question's "Finish erasing".
   Future<void> factoryReset() async {
     if (_restoring || _fatal != null) return;
     _autoBackupTimer?.cancel();
     _autoBackupTimer = null;
     setState(() {
       _restoring = true;
+      _resetChoice = false;
+      _resetKeepFailed = false;
       _splashMessage = kFactoryResetProgress;
     });
     String? notice;
     String? fatal;
+    var choice = false;
     try {
       final inFlight = _autoBackupRun;
       if (inFlight != null) await inFlight;
@@ -422,7 +444,8 @@ class AppRootState extends State<AppRoot> {
       final old = _container;
       final outcome = await runFactoryReset(
         settings: Hive.box<dynamic>('settings'),
-        eraseDatabase: () => old.read(databaseProvider).eraseAllDataAndCompact(),
+        eraseDatabase: () =>
+            old.read(databaseProvider).eraseAllDataAndCompact(),
         releaseDatabase: () async {
           try {
             // Write pending usage counts now, so tearing the container
@@ -445,6 +468,8 @@ class AppRootState extends State<AppRoot> {
           await startReviewClock(); // a fresh install's clock
         case FactoryResetOutcome.refused:
           notice = kFactoryResetFailedNotice;
+        case FactoryResetOutcome.undecided:
+          choice = true;
         case FactoryResetOutcome.incomplete:
           fatal = kFactoryResetIncompleteNotice;
       }
@@ -455,6 +480,7 @@ class AppRootState extends State<AppRoot> {
         setState(() {
           _restoring = false;
           _notice = notice;
+          _resetChoice = choice;
           if (fatal != null) {
             _fatal = fatal;
             _fatalTitle = kFactoryResetIncompleteTitle;
@@ -476,6 +502,7 @@ class AppRootState extends State<AppRoot> {
     String? fatal;
     String? notice;
     Object? dbError;
+    var choice = false;
     try {
       try {
         await _releaseStores();
@@ -492,11 +519,12 @@ class AppRootState extends State<AppRoot> {
       // A factory reset that stopped part-way (here or before a kill) is
       // finished before the app opens on its stores.
       final c = _container;
-      final resetFinished = await finishPendingFactoryResetOnLaunch(
-          () => c.read(databaseProvider).eraseAllDataAndCompact());
+      final pendingReset = await finishPendingFactoryResetOnLaunch(
+          () => c.read(databaseProvider));
+      choice = pendingReset == PendingFactoryReset.askUser;
       // startUp() skipped this when recovery failed; no-op otherwise.
       await startReviewClock();
-      notice = resetFinished
+      notice = pendingReset == PendingFactoryReset.finished
           ? kFactoryResetFinishedNotice
           : restoreRecoveryNotice(recovered);
       // A restore that ended on this error screen may have been accepted
@@ -514,8 +542,9 @@ class AppRootState extends State<AppRoot> {
         setState(() {
           _restoring = false;
           _fatal = fatal;
+          _resetChoice = fatal == null && choice;
           if (fatal == null) {
-            _notice = notice;
+            _notice = choice ? null : notice;
             _dbOpenFailure = false;
           } else if (dbError != null &&
               (_dbOpenFailure || isDatabaseTooNew(dbError))) {
@@ -523,10 +552,30 @@ class AppRootState extends State<AppRoot> {
           }
         });
         // This launch's auto-backup was skipped while on the error screen.
-        if (fatal == null && _autoBackupTimer == null) {
+        if (fatal == null && !choice && _autoBackupTimer == null) {
           _autoBackupTimer = Timer(autoBackupDelay, _startAutoBackup);
         }
       }
+    }
+  }
+
+  /// "Keep my data": clears the pending flag, retrying, and opens the app
+  /// on its data only once that is confirmed — otherwise the question
+  /// stays, with [kResetKeepFailed].
+  Future<void> _keepData() async {
+    final kept = await clearFactoryResetPendingConfirmed(
+        Hive.box<dynamic>('settings'),
+        attempts: 5);
+    if (!mounted) return;
+    setState(() {
+      _resetKeepFailed = !kept;
+      if (kept) {
+        _resetChoice = false;
+        _notice = kResetKeptNotice;
+      }
+    });
+    if (kept && _autoBackupTimer == null) {
+      _autoBackupTimer = Timer(autoBackupDelay, _startAutoBackup);
     }
   }
 
@@ -539,6 +588,13 @@ class AppRootState extends State<AppRoot> {
         title: _fatalTitle,
         message: _fatal!,
         onRetry: _fatalCanRetry ? _retryOpen : null,
+      );
+    }
+    if (_resetChoice) {
+      return _ResetChoiceScreen(
+        keepFailed: _resetKeepFailed,
+        onFinish: factoryReset,
+        onKeep: _keepData,
       );
     }
     return UncontrolledProviderScope(
@@ -653,6 +709,77 @@ class _RestoringSplash extends StatelessWidget {
                 const SizedBox(height: 16),
                 Text(message),
               ],
+            ),
+          ),
+        ),
+      );
+}
+
+/// The blocking question for a pending factory reset whose data is still
+/// on the device. Text only; nothing else of the app builds behind it.
+class _ResetChoiceScreen extends StatefulWidget {
+  const _ResetChoiceScreen({
+    required this.keepFailed,
+    required this.onFinish,
+    required this.onKeep,
+  });
+  final bool keepFailed;
+  final Future<void> Function() onFinish;
+  final Future<void> Function() onKeep;
+
+  @override
+  State<_ResetChoiceScreen> createState() => _ResetChoiceScreenState();
+}
+
+class _ResetChoiceScreenState extends State<_ResetChoiceScreen> {
+  bool _busy = false;
+
+  Future<void> _run(Future<void> Function() action) async {
+    setState(() => _busy = true);
+    try {
+      await action();
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: Scaffold(
+          body: SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      kResetChoiceTitle,
+                      textAlign: TextAlign.center,
+                      style:
+                          TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(kResetChoiceMessage,
+                        textAlign: TextAlign.center),
+                    if (widget.keepFailed) ...[
+                      const SizedBox(height: 12),
+                      const Text(kResetKeepFailed, textAlign: TextAlign.center),
+                    ],
+                    const SizedBox(height: 24),
+                    FilledButton(
+                      onPressed: _busy ? null : () => _run(widget.onKeep),
+                      child: const Text(kResetChoiceKeep),
+                    ),
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: _busy ? null : () => _run(widget.onFinish),
+                      child: const Text(kResetChoiceFinish),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),

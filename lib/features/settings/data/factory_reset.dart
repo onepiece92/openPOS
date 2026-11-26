@@ -8,6 +8,7 @@ import 'package:path/path.dart' as p;
 
 import 'package:pos_app/core/providers/hive_provider.dart'
     show kAutoBackupLastAt;
+import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/features/backup/data/snapshot_providers.dart';
 import 'package:pos_app/features/backup/data/snapshot_service.dart';
@@ -130,12 +131,46 @@ Future<void> markFactoryResetPending(Box<dynamic> settings) async {
 bool isFactoryResetPending(Box<dynamic> settings) =>
     settings.get(kFactoryResetPendingKey) == true;
 
-/// Clears the pending flag (only when the database erase was refused, so
-/// nothing changed).
-Future<void> clearFactoryResetPending(Box<dynamic> settings) async {
-  await settings.delete(kFactoryResetPendingKey);
-  await settings.flush();
+/// Clears the pending flag and confirms it is gone: the delete and the
+/// flush must both succeed and a re-read must no longer find the key.
+/// Tried [attempts] times with a short, growing pause (a full disk may
+/// free up). True only when confirmed — a caller must never tell the user
+/// "nothing changed" while the flag may still be set, because the next
+/// launch would act on it.
+Future<bool> clearFactoryResetPendingConfirmed(
+  Box<dynamic> settings, {
+  int attempts = 3,
+  Duration pause = const Duration(milliseconds: 50),
+}) async {
+  for (var i = 0; i < attempts; i++) {
+    try {
+      await settings.delete(kFactoryResetPendingKey);
+      await settings.flush();
+      if (!settings.containsKey(kFactoryResetPendingKey)) return true;
+    } catch (e) {
+      debugPrint('Factory reset: clearing the pending flag failed: $e');
+    }
+    if (i < attempts - 1) await Future<void>.delayed(pause * (i + 1));
+  }
+  return false;
 }
+
+/// The blocking question shown when a reset is pending but the data is
+/// still there (see [PendingFactoryReset.askUser] and
+/// [FactoryResetOutcome.undecided]). Nothing is erased until the user
+/// chooses.
+const kResetChoiceTitle = 'Finish the factory reset?';
+const kResetChoiceMessage = "A factory reset on this device didn't finish, "
+    'and your data is still here. Erase everything now, or keep your data?';
+const kResetChoiceFinish = 'Finish erasing';
+const kResetChoiceKeep = 'Keep my data';
+
+/// "Keep my data" could not be saved (the flag would not clear).
+const kResetKeepFailed = "Couldn't save your choice. Free up some space on "
+    'this device, then tap Keep my data again.';
+
+/// After "Keep my data".
+const kResetKeptNotice = 'Your data was kept. Nothing was erased.';
 
 /// The Hive and file half of a factory reset (the database half is
 /// `AppDatabase.eraseAllData`, which runs first). In this order:
@@ -178,19 +213,38 @@ Future<void> eraseLocalStores({
   afterStep?.call(FactoryResetStep.settingsCleared);
 }
 
-/// Finishes a factory reset that a kill interrupted: reruns the database
-/// erase (idempotent: empty tables stay empty, the defaults are seeded
-/// only once) and then [eraseLocalStores]. Returns false at once — one
-/// key read — when no reset is pending. Run at launch before any screen
-/// builds (see `startUp`) and by `AppRoot`'s "Try again".
-Future<bool> finishPendingFactoryReset({
+/// What the launch found about a pending factory reset.
+enum PendingFactoryReset {
+  /// No reset pending (one key read).
+  none,
+
+  /// A reset was pending and the database was already erased (the kill
+  /// came after its commit): it was finished.
+  finished,
+
+  /// A reset is pending but the database still holds the user's data — a
+  /// stale flag (e.g. a disk too full to clear it) or a kill before the
+  /// erase committed. Nothing was erased: the user must choose
+  /// ([kResetChoiceTitle]).
+  askUser,
+}
+
+/// Finishes a factory reset that a kill interrupted — but only when the
+/// database erase had already committed ([databaseHasUserData] is false):
+/// then it reruns the erase (idempotent) and [eraseLocalStores]. A pending
+/// flag on a database that still holds data is never acted on silently:
+/// [PendingFactoryReset.askUser]. Run at launch before any screen builds
+/// (see `startUp`) and by `AppRoot`'s "Try again".
+Future<PendingFactoryReset> finishPendingFactoryReset({
   required Box<dynamic> settings,
+  required Future<bool> Function() databaseHasUserData,
   required Future<void> Function() eraseDatabase,
   required Box<dynamic> heldOrders,
   required Future<Box<dynamic>> Function() usage,
   required Future<Directory> Function() receipts,
 }) async {
-  if (!isFactoryResetPending(settings)) return false;
+  if (!isFactoryResetPending(settings)) return PendingFactoryReset.none;
+  if (await databaseHasUserData()) return PendingFactoryReset.askUser;
   await eraseDatabase();
   await eraseLocalStores(
     settings: settings,
@@ -198,17 +252,17 @@ Future<bool> finishPendingFactoryReset({
     usage: await usage(),
     receipts: await receipts(),
   );
-  return true;
+  return PendingFactoryReset.finished;
 }
 
-/// [finishPendingFactoryReset] on the app's open Hive boxes, for launch and
-/// "Try again". [eraseDatabase] erases the database the app is about to
-/// use.
-Future<bool> finishPendingFactoryResetOnLaunch(
-        Future<void> Function() eraseDatabase) =>
+/// [finishPendingFactoryReset] on the app's open Hive boxes and [db], for
+/// launch and "Try again".
+Future<PendingFactoryReset> finishPendingFactoryResetOnLaunch(
+        AppDatabase Function() db) =>
     finishPendingFactoryReset(
       settings: Hive.box<dynamic>('settings'),
-      eraseDatabase: eraseDatabase,
+      databaseHasUserData: () => hasUserData(db()),
+      eraseDatabase: () => db().eraseAllDataAndCompact(),
       heldOrders: Hive.box<dynamic>('held_orders'),
       usage: usageBoxForReset,
       receipts: receiptsDir,
@@ -219,8 +273,14 @@ enum FactoryResetOutcome {
   /// Everything erased; the app comes up like a first run.
   done,
 
-  /// The database erase was refused (rolled back): nothing changed.
+  /// The database erase was refused (rolled back), or the flag could not
+  /// be written: nothing changed, and the flag is confirmed cleared.
   refused,
+
+  /// Nothing was erased, but the pending flag may still be set (it could
+  /// not be confirmed cleared — typically a full disk). The user is asked
+  /// [kResetChoiceTitle] before anything else; never "not changed".
+  undecided,
 
   /// The database is erased but the local stores are not all cleared; the
   /// pending flag is still set, so it must be finished before the app opens.
@@ -247,20 +307,24 @@ Future<FactoryResetOutcome> runFactoryReset({
   required Future<Directory> Function() receipts,
   FactoryResetStepHook? afterStep,
 }) async {
+  // Nothing erased yet: "not changed" only once the flag is confirmed
+  // gone, or the next launch would act on a stale flag.
+  Future<FactoryResetOutcome> unchanged() async =>
+      await clearFactoryResetPendingConfirmed(settings)
+          ? FactoryResetOutcome.refused
+          : FactoryResetOutcome.undecided;
   try {
     await markFactoryResetPending(settings);
   } catch (_) {
-    return FactoryResetOutcome.refused;
+    // The put may have reached the box even though the flush failed.
+    return unchanged();
   }
   afterStep?.call(FactoryResetStep.flagWritten);
   try {
     await eraseDatabase();
   } catch (_) {
     // Rolled back: the shop is unchanged, so it is not a pending reset.
-    try {
-      await clearFactoryResetPending(settings);
-    } catch (_) {/* the next launch then finishes the reset */}
-    return FactoryResetOutcome.refused;
+    return unchanged();
   }
   afterStep?.call(FactoryResetStep.databaseErased);
   try {

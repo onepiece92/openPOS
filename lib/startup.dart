@@ -13,13 +13,18 @@ import 'package:pos_app/features/settings/data/factory_reset.dart';
 /// How the app should come up: with an optional toast, or — when [fatal] is
 /// set — on the error screen with nothing opened.
 class StartupResult {
-  const StartupResult({this.notice, this.fatal, this.dbError});
+  const StartupResult(
+      {this.notice, this.fatal, this.dbError, this.resetChoice = false});
   final String? notice;
   final String? fatal;
 
   /// The first database query failed (e.g. the file is from a newer app):
   /// the app starts on the error screen, see `AppRoot.startupDbError`.
   final Object? dbError;
+
+  /// A factory reset is pending on a database that still holds data: the
+  /// app starts on the blocking "Finish erasing" / "Keep my data" question.
+  final bool resetChoice;
 }
 
 /// Launch startup, run while `AppRoot` shows its plain first frame (see
@@ -48,7 +53,7 @@ Future<StartupResult> startUp({
   Future<void> Function()? initHive,
   Future<void> Function()? openStores,
   Future<void> Function()? checkDatabase,
-  Future<bool> Function()? finishFactoryReset,
+  Future<PendingFactoryReset> Function()? finishFactoryReset,
 }) async {
   final recovery = await (recover ?? recoverInterruptedRestoreAtStartup)();
   await (initHive ?? () => Hive.initFlutter())();
@@ -66,8 +71,15 @@ Future<StartupResult> startUp({
   var resetFinished = false;
   if (finishFactoryReset != null) {
     try {
-      resetFinished = await finishFactoryReset();
-      if (resetFinished) await startReviewClock();
+      switch (await finishFactoryReset()) {
+        case PendingFactoryReset.none:
+          break;
+        case PendingFactoryReset.finished:
+          resetFinished = true;
+          await startReviewClock();
+        case PendingFactoryReset.askUser:
+          return const StartupResult(resetChoice: true);
+      }
     } catch (e) {
       return StartupResult(dbError: e);
     }

@@ -15,6 +15,8 @@ import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/features/backup/data/share_files.dart';
 import 'package:pos_app/features/backup/data/snapshot_service.dart';
+import 'package:pos_app/features/settings/data/factory_reset.dart'
+    show kFactoryResetPendingKey;
 import 'package:pos_app/features/usage/data/usage_counter.dart';
 import 'package:pos_app/features/usage/usage_providers.dart';
 
@@ -146,14 +148,19 @@ class SnapshotCoordinator {
     // open connection — unlike copying the live file, it can't catch a
     // half-applied write or miss pages still in the WAL.
     final tmpDir = await getTemporaryDirectory();
-    final copy = File(p.join(
-        tmpDir.path, 'pos_snapshot_${now.microsecondsSinceEpoch}.db'));
+    final copy = File(
+        p.join(tmpDir.path, 'pos_snapshot_${now.microsecondsSinceEpoch}.db'));
     if (await copy.exists()) await copy.delete();
     final quoted = copy.path.replaceAll("'", "''");
+    File? strippedSettings;
     try {
       await db.customStatement("VACUUM INTO '$quoted'");
       final dbPath = copy.path;
       final hiveFiles = snapshotHiveBoxFiles();
+      strippedSettings = await settingsCopyWithoutResetFlag(tmpDir, now);
+      if (strippedSettings != null) {
+        hiveFiles['settings'] = strippedSettings.path;
+      }
       final outPath = outDir.path;
       final photosPath = (await receiptsDir()).path;
       // Pure-Dart work with only paths captured → safe to run in an isolate.
@@ -168,6 +175,9 @@ class SnapshotCoordinator {
           ));
     } finally {
       if (await copy.exists()) await copy.delete();
+      if (strippedSettings != null && await strippedSettings.exists()) {
+        await strippedSettings.delete();
+      }
     }
   }
 
@@ -231,6 +241,30 @@ class SnapshotCoordinator {
       autoBackupLastError.value = '$e';
       return null;
     }
+  }
+}
+
+/// A backup never carries [kFactoryResetPendingKey]: restoring one must not
+/// re-arm an erase. Only when the open settings box has the flag (rare: a
+/// reset that could not clear it) is a copy of the box written without it
+/// into [tmpDir]; returns that file (the caller deletes it), else null at
+/// the cost of one key lookup.
+Future<File?> settingsCopyWithoutResetFlag(
+    Directory tmpDir, DateTime now) async {
+  if (!Hive.isBoxOpen('settings')) return null;
+  final settings = Hive.box<dynamic>('settings');
+  if (!settings.containsKey(kFactoryResetPendingKey)) return null;
+  final name = 'settings_snapshot_${now.microsecondsSinceEpoch}';
+  final copy = await Hive.openBox<dynamic>(name, path: tmpDir.path);
+  try {
+    await copy.putAll({
+      for (final k in settings.keys)
+        if (k != kFactoryResetPendingKey) k: settings.get(k),
+    });
+    await copy.flush();
+    return File(copy.path!);
+  } finally {
+    await copy.close();
   }
 }
 

@@ -7,8 +7,11 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path/path.dart' as p;
 
 import 'package:pos_app/core/database/app_database.dart';
-import 'package:pos_app/core/providers/hive_provider.dart' show kAutoBackupLastAt;
+import 'package:pos_app/core/providers/hive_provider.dart'
+    show kAutoBackupLastAt;
 import 'package:pos_app/core/services/audit_service.dart';
+import 'package:pos_app/features/backup/data/snapshot_providers.dart'
+    show hasUserData;
 import 'package:pos_app/features/backup/data/snapshot_service.dart';
 import 'package:pos_app/features/cart/data/ticket_sequence.dart';
 import 'package:pos_app/features/cart/domain/held_order.dart';
@@ -59,12 +62,11 @@ void main() {
     await held.put(
         't1',
         jsonEncode(HeldOrder(
-                id: 't1',
-                ticketNumber: '#0005',
-                label: '#0005',
-                createdAt: DateTime(2026, 1, 1),
-                items: const [])
-            .toJson()));
+            id: 't1',
+            ticketNumber: '#0005',
+            label: '#0005',
+            createdAt: DateTime(2026, 1, 1),
+            items: const []).toJson()));
     await held.put(kTicketSeqKey, 5);
     await usage.put(kUsageDisclosureShownKey, true);
     receipts().createSync();
@@ -77,12 +79,13 @@ void main() {
     docs.deleteSync(recursive: true);
   });
 
-  Future<int> rows(String table) async => (await db
-          .customSelect('SELECT COUNT(*) AS n FROM "$table"')
-          .getSingle())
-      .read<int>('n');
+  Future<int> rows(String table) async =>
+      (await db.customSelect('SELECT COUNT(*) AS n FROM "$table"').getSingle())
+          .read<int>('n');
 
-  /// Exactly one of the two allowed states, judged on every store.
+  /// Exactly one of the allowed states, judged on every store: 'old' (the
+  /// shop intact, nothing pending), 'old, asking' (intact with the flag
+  /// still set — the launch asks before erasing) or 'fresh'.
   Future<String> shopState() async {
     final old = [
       await rows('products') > 0,
@@ -94,8 +97,7 @@ void main() {
       receipts().existsSync(),
     ];
     if (old.every((x) => x)) {
-      expect(isFactoryResetPending(settings), isFalse);
-      return 'old';
+      return isFactoryResetPending(settings) ? 'old, asking' : 'old';
     }
     if (old.every((x) => !x)) {
       expect(isFactoryResetPending(settings), isFalse);
@@ -123,8 +125,9 @@ void main() {
       );
 
   /// What the next launch does (startUp step 5).
-  Future<bool> finishOnLaunch() => finishPendingFactoryReset(
+  Future<PendingFactoryReset> finishOnLaunch() => finishPendingFactoryReset(
         settings: settings,
+        databaseHasUserData: () => hasUserData(db),
         eraseDatabase: db.eraseAllData,
         heldOrders: held,
         usage: () async => usage,
@@ -133,32 +136,55 @@ void main() {
 
   test('killed before the reset started: the old shop, untouched', () async {
     await relaunch();
-    expect(await finishOnLaunch(), isFalse);
+    expect(await finishOnLaunch(), PendingFactoryReset.none);
     expect(await shopState(), 'old');
   });
 
   for (final step in FactoryResetStep.values) {
-    test('killed after "${step.name}": the next launch is a fresh shop',
+    final beforeCommit = step == FactoryResetStep.flagWritten;
+    test(
+        'killed after "${step.name}": the next launch '
+        '${beforeCommit ? 'asks (the data is still there)' : 'is a fresh shop'}',
         () async {
       try {
         await reset(killAt: step);
       } on _Kill {/* the app died here */}
       await relaunch();
-      final finished = await finishOnLaunch();
-      expect(finished, step != FactoryResetStep.settingsCleared,
+      final pending = await finishOnLaunch();
+      if (beforeCommit) {
+        expect(pending, PendingFactoryReset.askUser);
+        expect(await shopState(), 'old, asking', reason: 'nothing erased');
+        return;
+      }
+      expect(
+          pending,
+          step == FactoryResetStep.settingsCleared
+              ? PendingFactoryReset.none
+              : PendingFactoryReset.finished,
           reason: 'pending until the very last write');
       expect(await shopState(), 'fresh');
     });
   }
 
   test(
-      'killed with the flag written but the DB erase not committed: '
-      'finished on launch', () async {
+      'the flag written but the DB erase not committed: the launch asks, '
+      'never erases; Keep my data keeps it', () async {
     await markFactoryResetPending(settings);
     // (eraseAllData never committed.)
     await relaunch();
-    expect(await rows('products'), greaterThan(0));
-    expect(await finishOnLaunch(), isTrue);
+    expect(await finishOnLaunch(), PendingFactoryReset.askUser);
+    expect(await shopState(), 'old, asking');
+    expect(await clearFactoryResetPendingConfirmed(settings), isTrue);
+    await relaunch();
+    expect(await finishOnLaunch(), PendingFactoryReset.none);
+    expect(await shopState(), 'old');
+  });
+
+  test('… and Finish erasing (a fresh reset run) gives a fresh shop', () async {
+    await markFactoryResetPending(settings);
+    await relaunch();
+    expect(await finishOnLaunch(), PendingFactoryReset.askUser);
+    expect(await reset(), FactoryResetOutcome.done);
     expect(await shopState(), 'fresh');
   });
 
@@ -172,7 +198,7 @@ void main() {
     await settings.delete('onboarding_complete');
     await relaunch();
     expect(isFactoryResetPending(settings), isTrue);
-    expect(await finishOnLaunch(), isTrue);
+    expect(await finishOnLaunch(), PendingFactoryReset.finished);
     expect(await shopState(), 'fresh');
   });
 
@@ -180,7 +206,7 @@ void main() {
     expect(await reset(), FactoryResetOutcome.done);
     expect(await shopState(), 'fresh');
     await relaunch();
-    expect(await finishOnLaunch(), isFalse);
+    expect(await finishOnLaunch(), PendingFactoryReset.none);
     expect(await shopState(), 'fresh');
   });
 
@@ -211,7 +237,7 @@ void main() {
     expect(outcome, FactoryResetOutcome.refused);
     expect(await shopState(), 'old');
     await relaunch();
-    expect(await finishOnLaunch(), isFalse);
+    expect(await finishOnLaunch(), PendingFactoryReset.none);
     expect(await shopState(), 'old');
   });
 
@@ -228,13 +254,30 @@ void main() {
     expect(outcome, FactoryResetOutcome.incomplete);
     expect(isFactoryResetPending(settings), isTrue);
     await relaunch();
-    expect(await finishOnLaunch(), isTrue);
+    expect(await finishOnLaunch(), PendingFactoryReset.finished);
     expect(await shopState(), 'fresh');
+  });
+
+  test('startUp asks (resetChoice) when the pending reset finds data',
+      () async {
+    await markFactoryResetPending(settings);
+    await relaunch();
+    final r = await startUp(
+      recover: () async => RestoreRecovery.none,
+      initHive: () async {},
+      openStores: () async {},
+      checkDatabase: () async {},
+      finishFactoryReset: finishOnLaunch,
+    );
+    expect(r.resetChoice, isTrue);
+    expect(r.notice, isNull);
+    expect(await shopState(), 'old, asking');
   });
 
   test('startUp finishes a pending reset after the DB check, then toasts',
       () async {
     await markFactoryResetPending(settings);
+    await db.eraseAllData(); // the kill came after the commit
     await relaunch();
     final order = <String>[];
     final r = await startUp(
