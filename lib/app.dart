@@ -29,7 +29,6 @@ import 'package:pos_app/features/reports/presentation/dashboard_screen.dart';
 import 'package:pos_app/features/settings/presentation/settings_screen.dart';
 import 'package:pos_app/features/settings/presentation/store_profile_edit_screen.dart';
 import 'package:pos_app/features/tax/presentation/tax_settings_screen.dart';
-import 'package:pos_app/features/theme/presentation/theme_preview_screen.dart';
 import 'package:pos_app/features/usage/presentation/usage_host.dart';
 import 'package:pos_app/features/usage/presentation/usage_route_counter.dart';
 import 'package:pos_app/features/usage/presentation/usage_screen.dart';
@@ -269,10 +268,6 @@ final routerProvider = Provider<GoRouter>((ref) {
                 _slide(state, const PrinterSetupScreen()),
           ),
         ],
-      ),
-      GoRoute(
-        path: '/theme/preview',
-        pageBuilder: (_, state) => _slide(state, const ThemePreviewScreen()),
       ),
       GoRoute(
         path: '/help/support',

@@ -113,6 +113,7 @@ Map<String, Object?> _usageToJson(UsageSnapshot s) => {
       'on': s.countingOn,
       'disclosed': s.disclosureShown,
       'asked': s.askedVersion,
+      'unavail': s.reviewUnavailableSince,
     };
 
 UsageSnapshot? _usageFromJson(Object? j) {
@@ -133,5 +134,7 @@ UsageSnapshot? _usageFromJson(Object? j) {
     countingOn: j['on'] is bool ? j['on'] as bool : null,
     disclosureShown: j['disclosed'] is bool ? j['disclosed'] as bool : null,
     askedVersion: j['asked'] is String ? j['asked'] as String : null,
+    reviewUnavailableSince:
+        j['unavail'] is String ? j['unavail'] as String : null,
   );
 }

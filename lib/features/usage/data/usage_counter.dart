@@ -284,11 +284,15 @@ class UsageSnapshot {
     this.countingOn,
     this.disclosureShown,
     this.askedVersion,
+    this.reviewUnavailableSince,
   });
   final Map<UsageEvent, UsageCount> counts;
   final bool? countingOn;
   final bool? disclosureShown;
   final String? askedVersion;
+
+  /// Raw ISO text of `review_unavailable_since`; device-local like the rest.
+  final String? reviewUnavailableSince;
 
   static UsageSnapshot of(Box<dynamic> box) {
     T? typed<T>(String k) => switch (box.get(k)) { final T v => v, _ => null };
@@ -297,6 +301,7 @@ class UsageSnapshot {
       countingOn: typed<bool>(kUsageCountingOnKey),
       disclosureShown: typed<bool>(kUsageDisclosureShownKey),
       askedVersion: typed<String>(kUsageAskedVersionKey),
+      reviewUnavailableSince: typed<String>(kUsageReviewUnavailableSinceKey),
     );
   }
 }
@@ -304,7 +309,7 @@ class UsageSnapshot {
 /// Merges [before] (this device, captured pre-restore) into the restored
 /// box: per event the higher count, the earlier first month and the later
 /// last month; the counting on/off flag, the disclosure-shown flag and the
-/// asked version are this device's, as they were before the restore.
+/// asked version and the review-unavailable-since stamp are this device's, as they were before the restore.
 Future<void> mergeUsageBox(Box<dynamic> box, UsageSnapshot before) async {
   final after = readUsageCounts(box);
   final puts = <String, Object>{};
@@ -332,6 +337,7 @@ Future<void> mergeUsageBox(Box<dynamic> box, UsageSnapshot before) async {
   await keep(kUsageCountingOnKey, before.countingOn);
   await keep(kUsageDisclosureShownKey, before.disclosureShown);
   await keep(kUsageAskedVersionKey, before.askedVersion);
+  await keep(kUsageReviewUnavailableSinceKey, before.reviewUnavailableSince);
 }
 
 /// Captured by `AppRoot.restoreFrom` before the files are swapped (after

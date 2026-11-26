@@ -19,7 +19,7 @@ class InventorySection extends ConsumerWidget {
       child: ListTile(
         leading: const Icon(Icons.inventory_2_outlined),
         title: const Text('Low Stock Threshold'),
-        subtitle: Text('Alert when stock falls below $threshold units'),
+        subtitle: Text('Alert when stock is at or below $threshold units'),
         trailing: const Icon(Icons.chevron_right_rounded),
         onTap: () => _editThreshold(context, ref, threshold),
       ),

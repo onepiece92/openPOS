@@ -72,6 +72,23 @@ void main() {
       expect(box.get(kUsageAskedVersionKey), '1.1.0+10');
     });
 
+    test('a restored review_unavailable_since never replaces this device\'s',
+        () async {
+      final old = DateTime.now()
+          .subtract(const Duration(days: 20))
+          .toIso8601String();
+      // Device had none: the backup's 20-day-old stamp must be dropped.
+      await box.put(kUsageReviewUnavailableSinceKey, old);
+      await mergeUsageBox(box, const UsageSnapshot(counts: {}));
+      expect(box.containsKey(kUsageReviewUnavailableSinceKey), isFalse);
+      // Device had its own: it wins.
+      final mine = DateTime.now().toIso8601String();
+      await box.put(kUsageReviewUnavailableSinceKey, old);
+      await mergeUsageBox(
+          box, UsageSnapshot(counts: const {}, reviewUnavailableSince: mine));
+      expect(box.get(kUsageReviewUnavailableSinceKey), mine);
+    });
+
     test('merging the box with its own snapshot changes nothing', () async {
       await box.putAll({
         'e.ticketHeld': {'c': 7, 'f': '2026-03', 'l': '2026-09'},
