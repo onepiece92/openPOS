@@ -365,7 +365,6 @@ class _DetailBody extends StatelessWidget {
     final amountCtrl =
         TextEditingController(text: refundable.toStringAsFixed(2));
     final reasonCtrl = TextEditingController();
-    bool restock = false;
     final trackStock = ref.read(featureOnProvider(Feature.stockTracking));
     // "Restock items" only when the refund would put something back.
     final canRestock = data.restockPlan(trackStock: trackStock).any;
@@ -374,6 +373,11 @@ class _DetailBody extends StatelessWidget {
     // give back: the dialog is just that.
     final tipOnlyOrder = refundable <= 0 && tipLeft > 0;
     bool refundTip = tipOnlyOrder;
+    // On by default for a full refund (the amount starts at the full
+    // refundable), off once a partial amount is typed: it puts the whole
+    // order's stock back. The cashier can still change it.
+    bool restock = canRestock && !tipOnlyOrder;
+    var restockTouched = false;
     if (tipOnlyOrder) amountCtrl.text = '0';
 
     // Mirrors processReturn's rules so the cashier sees the problem before
@@ -411,7 +415,13 @@ class _DetailBody extends StatelessWidget {
                       FilteringTextInputFormatter.allow(
                           RegExp(r'^\d*\.?\d{0,2}')),
                     ],
-                    onChanged: (_) => setState(() {}),
+                    onChanged: (_) => setState(() {
+                      if (!restockTouched) {
+                        restock = (double.tryParse(amountCtrl.text.trim()) ??
+                                0) >=
+                            refundable - 0.005;
+                      }
+                    }),
                     decoration: InputDecoration(
                       labelText: 'Refund amount',
                       border: const OutlineInputBorder(),
@@ -452,9 +462,12 @@ class _DetailBody extends StatelessWidget {
                   SwitchListTile(
                     key: const ValueKey('refund-restock'),
                     title: const Text('Restock items'),
-                    subtitle: const Text('Return quantities to inventory'),
+                    subtitle: const Text('Puts every item of this order back in stock'),
                     value: restock,
-                    onChanged: (v) => setState(() => restock = v),
+                    onChanged: (v) => setState(() {
+                      restock = v;
+                      restockTouched = true;
+                    }),
                     contentPadding: EdgeInsets.zero,
                   ),
               ],

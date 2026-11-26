@@ -203,6 +203,8 @@ void main() {
       await open(tester, 'Refund');
       await tester.enterText(
           find.widgetWithText(TextField, 'Refund amount'), '5');
+      await tester.pump();
+      // Partial: off by default, so one tap turns it on.
       await tester.tap(find.byKey(const ValueKey('refund-restock')));
       await tester.pump();
       await tester.tap(find.widgetWithText(FilledButton, 'Refund').last);
@@ -243,6 +245,37 @@ void main() {
     await pump(tester, stock: false);
     await open(tester, 'Refund');
     expect(find.byKey(const ValueKey('refund-restock')), findsNothing);
+  });
+
+  bool restockOn(WidgetTester tester) => tester
+      .widget<SwitchListTile>(find.byKey(const ValueKey('refund-restock')))
+      .value;
+
+  testWidgets('a full refund has "Restock items" on by default',
+      (tester) async {
+    await pump(tester, stock: true, order: linkedSale());
+    await open(tester, 'Refund');
+    expect(restockOn(tester), isTrue);
+    expect(find.text('Puts every item of this order back in stock'),
+        findsOneWidget);
+  });
+
+  testWidgets('a partial refund has "Restock items" off by default, and it '
+      'can be switched on', (tester) async {
+    await pump(tester, stock: true, order: linkedSale());
+    await open(tester, 'Refund');
+    await tester.enterText(
+        find.widgetWithText(TextField, 'Refund amount'), '1');
+    await tester.pump();
+    expect(restockOn(tester), isFalse);
+    await tester.tap(find.byKey(const ValueKey('refund-restock')));
+    await tester.pump();
+    expect(restockOn(tester), isTrue);
+    // A choice made by hand is kept when the amount changes again.
+    await tester.enterText(
+        find.widgetWithText(TextField, 'Refund amount'), '2');
+    await tester.pump();
+    expect(restockOn(tester), isTrue);
   });
 
   testWidgets('Stock tracking on: "Restock items" is offered', (tester) async {
