@@ -28,4 +28,30 @@ void main() {
 
     expect(after, lessThan(before ~/ 4));
   });
+
+  test('eraseAllDataAndCompact() erases the shop and shrinks the file',
+      () async {
+    final dir = Directory.systemTemp.createTempSync('pos_erase_compact_');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final file = File('${dir.path}/db.sqlite');
+
+    var db = AppDatabase(NativeDatabase(file));
+    // A big customer table stands in for a shop that has been trading.
+    await db.customStatement('WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL '
+        'SELECT i + 1 FROM n WHERE i < 4000) '
+        "INSERT INTO customers (name, address) SELECT 'c' || i, "
+        "hex(zeroblob(400)) FROM n");
+    await db.close();
+    final before = file.lengthSync();
+    expect(before, greaterThan(1000000), reason: 'the file grew');
+
+    db = AppDatabase(NativeDatabase(file));
+    await db.eraseAllDataAndCompact();
+    final left = await db.customSelect('SELECT COUNT(*) AS n FROM customers')
+        .getSingle();
+    await db.close();
+
+    expect(left.read<int>('n'), 0);
+    expect(file.lengthSync(), lessThan(before ~/ 2));
+  });
 }

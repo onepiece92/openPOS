@@ -1,4 +1,5 @@
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 
 import 'package:pos_app/core/database/connection/native.dart';
 import 'package:pos_app/core/database/database_open_errors.dart';
@@ -371,6 +372,18 @@ class AppDatabase extends _$AppDatabase {
   /// SQLite refuses `VACUUM` inside a transaction, so call it on its own,
   /// never from within [transaction].
   Future<void> compact() => customStatement('VACUUM');
+
+  /// [eraseAllData], then [compact] so a reset doesn't leave a large file
+  /// behind. Shrinking is a bonus: if `VACUUM` fails the erase has already
+  /// committed, so the error is logged and the reset carries on.
+  Future<void> eraseAllDataAndCompact() async {
+    await eraseAllData();
+    try {
+      await compact();
+    } catch (e, st) {
+      debugPrint('compact after reset failed: $e\n$st');
+    }
+  }
 
   /// Seeds essential data on a fresh install.
   /// Wrapped in a check so it's idempotent — safe to call multiple times.

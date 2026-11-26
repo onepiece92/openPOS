@@ -26,7 +26,7 @@ void main() {
       await container.read(databaseProvider).customSelect('SELECT 1').get();
     },
     finishFactoryReset: () => finishPendingFactoryResetOnLaunch(
-        () => container.read(databaseProvider).eraseAllData()),
+        () => container.read(databaseProvider).eraseAllDataAndCompact()),
   ).catchError((Object e) => StartupResult(dbError: e));
 
   runApp(AppRoot(container: container, startup: startup));

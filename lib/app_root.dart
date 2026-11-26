@@ -422,7 +422,7 @@ class AppRootState extends State<AppRoot> {
       final old = _container;
       final outcome = await runFactoryReset(
         settings: Hive.box<dynamic>('settings'),
-        eraseDatabase: () => old.read(databaseProvider).eraseAllData(),
+        eraseDatabase: () => old.read(databaseProvider).eraseAllDataAndCompact(),
         releaseDatabase: () async {
           try {
             // Write pending usage counts now, so tearing the container
@@ -493,7 +493,7 @@ class AppRootState extends State<AppRoot> {
       // finished before the app opens on its stores.
       final c = _container;
       final resetFinished = await finishPendingFactoryResetOnLaunch(
-          () => c.read(databaseProvider).eraseAllData());
+          () => c.read(databaseProvider).eraseAllDataAndCompact());
       // startUp() skipped this when recovery failed; no-op otherwise.
       await startReviewClock();
       notice = resetFinished
