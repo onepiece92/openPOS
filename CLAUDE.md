@@ -9,15 +9,6 @@ This is a **100% offline** Flutter POS app. Treat this as a hard constraint, not
 - **Allowed network-adjacent code**: `url_launcher` for user-initiated `mailto:`/`tel:`/`sms:`/`https://` links that hand off to native apps (these don't make the app itself reach the network).
 - If a feature genuinely needs network access (e.g. real Bluetooth-printer firmware update over WiFi), call it out explicitly and get confirmation before wiring it up.
 
-## graphify
-
-This project has a graphify knowledge graph at graphify-out/.
-
-Rules:
-- Before answering architecture or codebase questions, read graphify-out/GRAPH_REPORT.md for god nodes and community structure
-- If graphify-out/wiki/index.md exists, navigate it instead of reading raw files
-- After modifying code files in this session, run `graphify update .` to keep the graph current (AST-only, no API cost)
-
 ## Database schema changes
 
 Schema is verified by `test/drift/migration_test.dart` (every shipped version → current must equal `createAll()`). When you change any Drift table:
