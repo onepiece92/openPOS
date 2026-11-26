@@ -56,13 +56,6 @@ class OnboardingNotifier extends Notifier<OnboardingState> {
 
   bool _passed(OnboardingStep s) => state.passed(s);
 
-  /// [s] is passed or on screen now: Skip keeps what that step shows, as
-  /// the Country step keeps the country on screen.
-  bool _reached(OnboardingStep s) {
-    final i = state.steps.indexOf(s);
-    return i >= 0 && state.step >= i;
-  }
-
   /// Writes the switches (features_v1), the business type and whether the
   /// "turn features on or off" intro is still due. The switches decide
   /// Taxes; the tax step's rate never turns it on or off.
@@ -92,9 +85,8 @@ class OnboardingNotifier extends Notifier<OnboardingState> {
 
   /// Saves what setup has collected. [all] (Finish): every step, with the
   /// existing fallbacks for blank ones. Otherwise (Skip) only the steps
-  /// already passed or on screen, so a skip keeps the name, country,
-  /// currency and tax rate the shopkeeper entered — and nothing they never
-  /// saw.
+  /// already passed, so a skip keeps the name, country and currency the
+  /// shopkeeper entered — and nothing they never saw.
   Future<void> _saveProfile({required bool all}) async {
     final db = ref.read(databaseProvider);
     final settings = ref.read(settingsProvider.notifier);
@@ -116,7 +108,7 @@ class OnboardingNotifier extends Notifier<OnboardingState> {
     // A tax rate only with Taxes on and a rate > 0 given on the Tax step:
     // a blank (0) rate creates no "Tax 0%" (stored as decimal: 13% → 0.13).
     if (state.taxesOn &&
-        (all || _reached(OnboardingStep.tax)) &&
+        (all || _passed(OnboardingStep.tax)) &&
         state.taxRate > 0) {
       final taxId = await db.taxDao.upsertRate(
         TaxRatesCompanion.insert(

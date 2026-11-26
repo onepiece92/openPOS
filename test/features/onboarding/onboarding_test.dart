@@ -307,13 +307,11 @@ void main() {
       expect(s.currencyCode, 'KES');
       expect(s.currencySymbol, 'KSh');
       expect(s.countryCode, 'KE');
-      final rates = await db.select(db.taxRates).get();
-      expect(rates.map((r) => (r.name, r.rate)), [('VAT', 0.16)],
-          reason: 'Skip on the Tax step keeps the rate on screen');
+      expect(await db.select(db.taxRates).get(), isEmpty,
+          reason: 'the tax step was not passed');
     });
 
-    test('Skip on the Tax step saves the rate on screen, like Country',
-        () async {
+    test('Skip on the Tax step saves no rate', () async {
       final c = container();
       final n = c.read(onboardingNotifierProvider.notifier)
         ..setBusinessType(BusinessType.cafe)
@@ -322,8 +320,21 @@ void main() {
       while (c.read(onboardingNotifierProvider).current != OnboardingStep.tax) {
         n.next();
       }
-      expect(c.read(onboardingNotifierProvider).passed(OnboardingStep.tax),
-          isFalse);
+      await n.skip();
+      expect(await db.select(db.taxRates).get(), isEmpty);
+      expect(c.read(settingsProvider).defaultTaxId, isNull);
+    });
+
+    test('Continue on the Tax step saves the rate on screen', () async {
+      final c = container();
+      final n = c.read(onboardingNotifierProvider.notifier)
+        ..setBusinessType(BusinessType.cafe)
+        ..setTaxName('GST')
+        ..setTaxRate(7.5);
+      while (c.read(onboardingNotifierProvider).current != OnboardingStep.tax) {
+        n.next();
+      }
+      n.next(); // Continue: the Tax step is passed
       await n.skip();
       final rates = await db.select(db.taxRates).get();
       expect(rates.map((r) => (r.name, r.rate)), [('GST', 0.075)]);
