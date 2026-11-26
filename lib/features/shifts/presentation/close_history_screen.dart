@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
+import 'package:pos_app/core/utils/currency_formatter.dart';
 import 'package:pos_app/core/utils/money.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
 import 'package:pos_app/features/shifts/domain/shift_summary.dart';
@@ -13,19 +14,31 @@ import 'package:pos_app/features/shifts/shift_settings.dart';
 /// How many closes the history lists per page.
 const int kHistoryPage = 30;
 
-/// A closed shift's real window start and its net sales. Computed when its
-/// row is first shown (a few indexed range queries), so only the rows on
-/// screen cost anything.
-final _shiftWindowProvider = FutureProvider.autoDispose
-    .family<({DateTime from, double net}), int>((ref, id) async {
-  final db = ref.watch(databaseProvider);
-  final shift =
-      await (db.select(db.shifts)..where((s) => s.id.equals(id))).getSingle();
-  final from = await db.shiftsDao.windowStart(shift);
-  final f = await db.shiftsDao
-      .figuresForWindow(from, shift.closedAt ?? shift.openedAt);
-  return (from: from, net: f.netSales);
-});
+/// A closed shift's real window start (one indexed lookup), fetched when
+/// its row is first shown, so only the rows on screen cost anything.
+final _shiftWindowStartProvider =
+    FutureProvider.autoDispose.family<DateTime, Shift>((ref, shift) =>
+        ref.watch(databaseProvider).shiftsDao.windowStart(shift));
+
+/// Net sales as frozen at the close (shifts.net_sales), never recomputed.
+/// Every close on this line stores it; a null is shown as "-" rather than
+/// guessed.
+String historyNetSales(Shift shift, CurrencyFormatter fmt) {
+  final net = shift.netSales;
+  return net == null ? '-' : fmt.format(net);
+}
+
+/// "Over 1.00", "Short 0.50", "Balanced", or "Not counted" for a close
+/// whose drawer was not counted (never a 0.00 over/short).
+String historyOverShort(Shift shift, CurrencyFormatter fmt) {
+  final counted = shift.countedCash;
+  final expected = shift.expectedCash;
+  if (counted == null || expected == null) return kNotCounted;
+  final cents = (roundMoney(counted - expected) * 100).round();
+  return cents == 0
+      ? overShortLabel(0)
+      : '${overShortLabel(cents)} ${fmt.format(cents.abs() / 100)}';
+}
 
 final _closedShiftProvider =
     FutureProvider.autoDispose.family<Shift?, int>((ref, id) {
@@ -102,21 +115,15 @@ class _HistoryRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final fmt = ref.watch(currencyFormatterProvider);
     final closedAt = shift.closedAt ?? shift.openedAt;
-    final win = ref.watch(_shiftWindowProvider(shift.id));
-    final cents =
-        (roundMoney((shift.countedCash ?? 0) - (shift.expectedCash ?? 0)) * 100)
-            .round();
-    final os = cents == 0
-        ? overShortLabel(0)
-        : '${overShortLabel(cents)} ${fmt.format(cents.abs() / 100)}';
+    final from = ref.watch(_shiftWindowStartProvider(shift));
     return ListTile(
       key: ValueKey('history-${shift.id}'),
       title: Text(summaryRange(
-          win.maybeWhen(data: (w) => w.from, orElse: () => shift.openedAt),
+          from.maybeWhen(data: (f) => f, orElse: () => shift.openedAt),
           closedAt)),
       subtitle: Text(
-        'Net sales ${win.maybeWhen(data: (w) => fmt.format(w.net), orElse: () => '...')}'
-        '  ·  $os',
+        'Net sales ${historyNetSales(shift, fmt)}'
+        '  ·  ${historyOverShort(shift, fmt)}',
       ),
       trailing: const Icon(Icons.chevron_right_rounded),
       onTap: () => context.push('$kCloseDayHistoryRoute/${shift.id}'),

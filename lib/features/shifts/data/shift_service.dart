@@ -57,6 +57,26 @@ String? gapMessage(GapInfo? gap) {
       '$they included in this day.';
 }
 
+/// Shown under the opening cash when it comes from an uncounted close.
+const kOpeningFromUncountedNote =
+    'Expected cash from the last day (not counted)';
+
+/// Shown under the opening cash when it comes from a counted close.
+const kOpeningFromCountedNote = 'Cash counted at the last close';
+
+/// The opening cash to suggest, and where it came from.
+class OpeningSuggestion {
+  const OpeningSuggestion(this.amount, {required this.fromUncounted});
+  final double amount;
+
+  /// True when the last close was not counted, so [amount] is what the
+  /// drawer was expected to hold then, not what was counted.
+  final bool fromUncounted;
+
+  String get note =>
+      fromUncounted ? kOpeningFromUncountedNote : kOpeningFromCountedNote;
+}
+
 /// Till-session operations on top of [ShiftsDao]: the clock clamp, the gap
 /// rule and the "keep them separate" close. No money math lives here.
 class ShiftService {
@@ -93,11 +113,33 @@ class ShiftService {
     );
   }
 
+  /// The opening cash for the next day, or null when nothing has been
+  /// closed yet. After an uncounted close it is that close's stored
+  /// expected cash; otherwise the last counted close's counted cash
+  /// ("counted" = closed_at and counted_cash both set).
+  Future<OpeningSuggestion?> suggestedOpeningCash() async {
+    final last = await _dao.lastClosedShift();
+    if (last == null) return null;
+    final counted = last.countedCash;
+    if (counted != null) {
+      return OpeningSuggestion(counted, fromUncounted: false);
+    }
+    final expected = last.expectedCash;
+    if (expected != null) {
+      return OpeningSuggestion(expected, fromUncounted: true);
+    }
+    // Defensive: an uncounted close always stores expected_cash.
+    final prev = (await _dao.lastCountedShift())?.countedCash;
+    return prev == null ? null : OpeningSuggestion(prev, fromUncounted: false);
+  }
+
   /// Records the gap as its own closed day: a shift opened and closed at
   /// [now] whose window is [last close, now), so the activity stays out of
-  /// the day about to open. Cash was not counted, so counted = expected
-  /// (Balanced) and the note says so. Throws [ShiftStateException] if a
-  /// shift is open or nothing has been closed yet.
+  /// the day about to open. Cash was not counted, so counted_cash is NULL:
+  /// the summary says "Not counted" and there is no over/short. It opens
+  /// with the same opening cash the next day would get
+  /// ([suggestedOpeningCash]). Throws [ShiftStateException] if a shift is
+  /// open or nothing has been closed yet.
   Future<void> keepGapSeparate({
     required String Function(ShiftClose close, String notes) summary,
     DateTime? now,
@@ -108,12 +150,11 @@ class ShiftService {
           throw const ShiftStateException('There is no earlier close');
         }
         final at = _clamp(now ?? DateTime.now(), last.closedAt);
-        final id = await _dao.openShift(
-            openingCash: last.countedCash ?? 0, openedAt: at);
-        final expected = (await _dao.previewClose(id, at: at)).expectedCash;
+        final opening = (await suggestedOpeningCash())?.amount ?? 0;
+        final id = await _dao.openShift(openingCash: opening, openedAt: at);
         await _dao.closeShift(
           id,
-          countedCash: expected,
+          countedCash: null,
           at: at,
           notes: kGapCloseNote,
           summary: (c) => summary(c, kGapCloseNote),

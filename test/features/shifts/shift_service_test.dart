@@ -147,19 +147,64 @@ void main() {
       expect(gapDay.openedAt, next);
       expect(gapDay.closedAt, next);
       expect(gapDay.cashSales, 30);
+      expect(gapDay.openingCash, 20); // the counted close before it
       expect(gapDay.expectedCash, 50);
-      expect(gapDay.countedCash, 50); // not counted: balanced
+      expect(gapDay.countedCash, isNull); // not counted
+      expect(gapDay.netSales, 35);
       expect(gapDay.notes, kGapCloseNote);
-      expect(gapDay.summaryText, contains('Balanced'));
+      final text = gapDay.summaryText!;
+      expect(
+          text.split('\n'),
+          contains(predicate<String>((l) =>
+              l.startsWith('Counted cash') && l.endsWith('Not counted'))));
+      for (final word in ['Balanced', 'Over', 'Short']) {
+        expect(text, isNot(contains(word)), reason: word);
+      }
 
-      // The gap is gone and the next day starts clean.
+      // The gap is gone; the next day opens from the gap's expected cash.
       expect((await svc.gapBeforeOpen(now: next))!.hasActivity, isFalse);
+      final suggested = (await svc.suggestedOpeningCash())!;
+      expect(suggested.amount, 50);
+      expect(suggested.fromUncounted, isTrue);
+      expect(suggested.note, 'Expected cash from the last day (not counted)');
       final id3 = await svc.openTill(openingCash: 50, now: next);
       await sale(1, DateTime(2026, 6, 11, 10));
       final p =
           await db.shiftsDao.previewClose(id3, at: DateTime(2026, 6, 11, 18));
       expect(p.figures.sales.count, 1);
       expect(p.figures.cashSales, 1);
+    });
+
+    test('opening cash: the last counted close, else nothing', () async {
+      expect(await svc.suggestedOpeningCash(), isNull);
+      final id = await svc.openTill(openingCash: 10, now: at(9));
+      await sale(7, at(10));
+      await closeAt(id, at(17), counted: 16.5);
+      final s = (await svc.suggestedOpeningCash())!;
+      expect(s.amount, 16.5);
+      expect(s.fromUncounted, isFalse);
+      expect(s.note, kOpeningFromCountedNote);
+    });
+
+    test('a counted close after an uncounted one is used again', () async {
+      final id = await svc.openTill(openingCash: 10, now: at(9));
+      await closeAt(id, at(12), counted: 10);
+      await sale(5, at(13));
+      await svc.keepGapSeparate(
+          now: DateTime(2026, 6, 11, 9), summary: (c, n) => summaryOf(c, n));
+      expect((await svc.suggestedOpeningCash())!.amount, 15);
+      expect((await db.shiftsDao.lastCountedShift())!.id, id);
+
+      final id3 =
+          await svc.openTill(openingCash: 15, now: DateTime(2026, 6, 11, 9));
+      await db.shiftsDao.closeShift(id3,
+          countedCash: 14,
+          at: DateTime(2026, 6, 11, 17),
+          summary: (c) => summaryOf(c));
+      final s = (await svc.suggestedOpeningCash())!;
+      expect(s.amount, 14);
+      expect(s.fromUncounted, isFalse);
+      expect((await db.shiftsDao.lastCountedShift())!.id, id3);
     });
 
     test('Keep them separate needs an earlier close', () async {

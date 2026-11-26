@@ -13,7 +13,7 @@ ShiftClose _close({
   Map<String, MethodFlow> voids = const {},
   double opening = 100,
   double paidOut = 0,
-  double counted = 0,
+  double? counted = 0,
 }) =>
     ShiftClose(
       shiftId: 1,
@@ -66,6 +66,28 @@ void main() {
       expect(text, contains('Corner Cafe'));
       expect(text, contains('NOTES'));
     }
+  });
+
+  test('not counted: "Counted cash  Not counted" and no over/short line', () {
+    final text = _build(_close(
+        sales: {'cash': _flow(2, 50)}, opening: 10, counted: null));
+    final lines = text.split('\n');
+    expect(lines, contains('Counted cash         Not counted'));
+    expect(lines.any((l) => l.startsWith('= Expected cash')), isTrue);
+    for (final w in ['Balanced', 'Over', 'Short']) {
+      expect(lines.any((l) => l.startsWith(w)), isFalse, reason: w);
+    }
+  });
+
+  test('the Tips line shows only when the window has tips', () {
+    expect(_build(_close(sales: {'cash': _flow(1, 10)})),
+        isNot(contains('Tips (net)')));
+    expect(_build(_close(sales: {'card': _flow(1, 10, tips: 2)})),
+        contains('Tips (net)'));
+    // A tip handed back in the window still shows (net 0 or below).
+    expect(
+        _build(_close(refunds: {'cash': _flow(1, 0, tips: 2)})),
+        contains('Tips (net)'));
   });
 
   test('the 32-column sample is exactly this', () {

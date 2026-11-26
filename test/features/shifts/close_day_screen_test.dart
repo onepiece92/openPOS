@@ -196,7 +196,8 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('keep-separate')));
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('gap-card')), findsNothing);
-      // The opening cash is refreshed from the gap day's count (10 + 20).
+      // The gap day was not counted: the opening cash is its expected cash
+      // (10 + 20), and the screen says so.
       expect(
           tester
               .widget<TextField>(
@@ -204,7 +205,11 @@ void main() {
               .controller!
               .text,
           '30.00');
-      expect((await db.shiftsDao.closedShifts()).length, 2);
+      expect(find.text('Expected cash from the last day (not counted)'),
+          findsOneWidget);
+      final closes = await db.shiftsDao.closedShifts();
+      expect(closes.length, 2);
+      expect(closes.first.countedCash, isNull);
       expect(await db.shiftsDao.currentShift(), isNull);
     });
   });
@@ -213,6 +218,42 @@ void main() {
     Future<int> openDay({double opening = 100}) => db.shiftsDao.openShift(
         openingCash: opening,
         openedAt: DateTime.now().subtract(const Duration(hours: 3)));
+
+    testWidgets(
+        'tips taken, then Tips switched off: the close still counts them',
+        (tester) async {
+      await box.put(kFeaturesKey, {'tips': true});
+      await openDay();
+      final when = DateTime.now().subtract(const Duration(hours: 1));
+      await db.ordersDao.insertOrder(OrdersCompanion.insert(
+        subtotal: 40,
+        total: 40,
+        tipAmount: const Value(6),
+        paymentMethod: 'cash',
+        createdAt: Value(when),
+      ));
+      await box.put(kFeaturesKey, {'tips': false});
+      await pump(tester, const CloseDayScreen());
+
+      // 100 opening + 40 sale + 6 cash tip.
+      expect(tester.widget<Text>(find.byKey(const ValueKey('expected'))).data,
+          r'$ 146.00');
+      expect(find.text('Cash tips'), findsOneWidget);
+
+      await type(tester, 'field-Counted cash', '146');
+      await tester.tap(find.byKey(const ValueKey('close-day')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('confirm-close')));
+      await tester.pumpAndSettle();
+
+      final closed = (await db.shiftsDao.lastClosedShift())!;
+      expect(closed.expectedCash, 146);
+      expect(closed.cashTips, 6);
+      final lines = closed.summaryText!.split('\n');
+      expect(lines.where((l) => l.startsWith('+ Cash tips')), hasLength(1));
+      expect(lines.where((l) => l.startsWith('Tips (net)')), hasLength(1));
+      expect(find.textContaining('Tips (net)'), findsOneWidget);
+    });
 
     testWidgets('live figures; over, short and balanced are read in cents',
         (tester) async {
@@ -420,6 +461,57 @@ void main() {
       expect(find.text('FIRST DAY'), findsOneWidget);
       expect(find.byKey(const ValueKey('summary-print')), findsOneWidget);
       expect(find.byKey(const ValueKey('summary-share')), findsOneWidget);
+    });
+
+    testWidgets('an uncounted close says Not counted, never a 0.00 over/short',
+        (tester) async {
+      final base = DateTime(2026, 6, 10);
+      final a = await db.shiftsDao
+          .openShift(openingCash: 5, openedAt: base.add(const Duration(hours: 9)));
+      await order(12, base.add(const Duration(hours: 10)));
+      await db.shiftsDao.closeShift(a,
+          countedCash: null,
+          at: base.add(const Duration(hours: 17)),
+          summary: (_) => 'GAP DAY');
+      await pump(tester, const CloseHistoryScreen());
+      final tile = tester.widget<ListTile>(find.byType(ListTile));
+      expect((tile.subtitle as Text).data,
+          r'Net sales $ 12.00  ·  Not counted');
+      expect(find.textContaining('Balanced'), findsNothing);
+      expect(find.textContaining('0.00 '), findsNothing);
+    });
+
+    testWidgets('net sales are the frozen figure, not a recompute',
+        (tester) async {
+      final base = DateTime(2026, 6, 10);
+      final a = await db.shiftsDao
+          .openShift(openingCash: 0, openedAt: base.add(const Duration(hours: 9)));
+      final o = await order(25, base.add(const Duration(hours: 10)));
+      await db.shiftsDao.closeShift(a,
+          countedCash: 25,
+          at: base.add(const Duration(hours: 17)),
+          summary: (_) => 'DAY');
+      // Edit the order behind the close's back: history must not move.
+      await (db.update(db.orders)..where((r) => r.id.equals(o)))
+          .write(const OrdersCompanion(total: Value(99)));
+      await pump(tester, const CloseHistoryScreen());
+      final tile = tester.widget<ListTile>(find.byType(ListTile));
+      expect((tile.subtitle as Text).data, r'Net sales $ 25.00  ·  Balanced');
+    });
+
+    testWidgets('a close with no stored net sales shows "-"', (tester) async {
+      final base = DateTime(2026, 6, 10);
+      final a = await db.shiftsDao
+          .openShift(openingCash: 0, openedAt: base.add(const Duration(hours: 9)));
+      await db.shiftsDao.closeShift(a,
+          countedCash: 0,
+          at: base.add(const Duration(hours: 17)),
+          summary: (_) => 'DAY');
+      await (db.update(db.shifts)..where((r) => r.id.equals(a)))
+          .write(const ShiftsCompanion(netSales: Value(null)));
+      await pump(tester, const CloseHistoryScreen());
+      final tile = tester.widget<ListTile>(find.byType(ListTile));
+      expect((tile.subtitle as Text).data, r'Net sales -  ·  Balanced');
     });
 
     testWidgets('empty history says so', (tester) async {

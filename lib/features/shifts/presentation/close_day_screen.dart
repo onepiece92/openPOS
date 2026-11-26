@@ -64,6 +64,9 @@ class _CloseDayScreenState extends ConsumerState<CloseDayScreen> {
   GapInfo? _gap;
   Shift? _justClosed;
 
+  /// Where the suggested opening cash came from (counted or not).
+  String? _openingNote;
+
   @override
   void initState() {
     super.initState();
@@ -91,9 +94,10 @@ class _CloseDayScreenState extends ConsumerState<CloseDayScreen> {
       } else {
         gap = await ref.read(shiftServiceProvider).gapBeforeOpen();
         if (firstLoad || _opening.text.isEmpty) {
-          final last = await _dao.lastClosedShift();
-          final c = last?.countedCash;
-          _opening.text = c == null ? '' : c.toStringAsFixed(2);
+          final s =
+              await ref.read(shiftServiceProvider).suggestedOpeningCash();
+          _openingNote = s?.note;
+          _opening.text = s == null ? '' : s.amount.toStringAsFixed(2);
         }
       }
       if (!mounted) return;
@@ -323,8 +327,7 @@ class _CloseDayScreenState extends ConsumerState<CloseDayScreen> {
         ),
         const SizedBox(height: 16),
       ],
-      _moneyField(_opening, 'Opening cash',
-          helper: 'Cash counted at the last close'),
+      _moneyField(_opening, 'Opening cash', helper: _openingNote),
       const SizedBox(height: 16),
       FilledButton(
         key: const ValueKey('open-till'),
