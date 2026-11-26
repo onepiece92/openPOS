@@ -195,6 +195,7 @@ final _articles = <_Article>[
           'Tap "Checkout • <total>" at the bottom.',
           'Select a payment method: Cash or Card.',
           'For cash payments, enter the amount received — the change is calculated automatically.',
+          'To add a tip, pick a percentage or enter an amount; it is kept apart from the sale in reports (turn on Tips in Features).',
           'Tap "Confirm & Charge <total>" to complete the sale.',
         ],
       ),

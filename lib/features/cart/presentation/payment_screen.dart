@@ -455,6 +455,7 @@ class _TipLine extends StatelessWidget {
   Widget build(BuildContext context) {
     final style = Theme.of(context).textTheme.bodyLarge?.copyWith(
           fontFamily: AppFonts.mono,
+          fontFamilyFallback: AppFonts.monoFallback,
           fontWeight: strong ? FontWeight.bold : null,
         );
     return Padding(
