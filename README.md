@@ -81,7 +81,7 @@ HOLD -->
 
 ## Why Open POS
 
-- **The app never sends your data anywhere.** Its own code makes no network calls: no accounts, no cloud, no analytics. Sales, customers and stock live in a database on your device. Your phone's own backup (Google or iCloud), if you have it turned on, may include app data.
+- **The app never sends your data anywhere on its own.** Its own code makes no network calls: no accounts, no cloud, no analytics service or tracking. An optional usage summary stays on your phone unless you choose to send it; if you do, it goes through your own WhatsApp or email app, which shows us your WhatsApp number or email address. Sales, customers and stock live in a database on your device. Your phone's own backup (Google or iCloud), if you have it turned on, may include app data.
 - **Free, for good.** No subscription, no per-device fee, no premium tier. MIT licensed.
 - **Works with no internet.** A dropped connection never stops a sale, because the app never needed one.
 - **Made for small shops and cafes.** Tables, held tickets and simple reports, without the setup of a big system.
@@ -164,7 +164,7 @@ HOLD -->
 
 ## Privacy you can check yourself
 
-Open POS does not ask you to trust a privacy policy. The app's own code makes no network calls and has never included analytics or cloud services. Starting with the next release, the Android build also goes a step further: the operating system itself blocks it from the network, so you don't have to take our word for it.
+Open POS does not ask you to trust a privacy policy. The app's own code makes no network calls and has never included an analytics service or cloud services. Starting with the next release, the Android build also goes a step further: the operating system itself blocks it from the network, so you don't have to take our word for it.
 
 **Android (next release onwards).** The release build removes the `INTERNET` and `ACCESS_NETWORK_STATE` permissions (see [`android/app/src/release/AndroidManifest.xml`](android/app/src/release/AndroidManifest.xml)). Without `INTERNET`, Android does not let an app open network connections. You can check a release build yourself:
 
@@ -185,7 +185,7 @@ codesign -d --entitlements - "/Applications/Open POS.app"
 ```
 HOLD -->
 
-**What this means in practice:** no analytics, no crash reporting, no cloud backup built into the app, no update checks, no account. Receipts you share by SMS or email go through your device's own Messages or Mail app, which you control.
+**What this means in practice:** no analytics service or tracking, no crash reporting, no cloud backup built into the app, no update checks, no account. An optional usage summary stays on your phone unless you choose to send it; sending it shows us your WhatsApp number or email address. Receipts you share by SMS or email go through your device's own Messages or Mail app, which you control.
 
 ---
 
