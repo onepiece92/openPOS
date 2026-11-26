@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -199,7 +200,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       );
     } catch (e, st) {
       // The user sees plain words; this is for support (logcat / console).
-      debugPrint('Sale failed: $e\n$st');
+      debugPrint(saleFailureLog(e, st, release: kReleaseMode));
       _placing = false;
       if (mounted) setState(() {});
       if (messenger.mounted) {

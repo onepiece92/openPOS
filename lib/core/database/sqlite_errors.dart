@@ -40,3 +40,14 @@ String saleFailureMessage(Object error) {
   }
   return kSaleFailedMessage;
 }
+
+/// The support log line for a failed sale. Debug: the full error and the
+/// stack. Release: only the exception type and, for a SQLite error, its
+/// short message ("FOREIGN KEY constraint failed"): the full text of a
+/// database error carries the SQL and its bound values (customer, amounts).
+String saleFailureLog(Object error, StackTrace stack,
+    {required bool release}) {
+  if (!release) return 'Sale failed: $error\n$stack';
+  final short = error is SqliteException ? ': ${error.message}' : '';
+  return 'Sale failed: ${error.runtimeType}$short';
+}

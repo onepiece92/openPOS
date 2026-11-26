@@ -41,4 +41,24 @@ void main() {
     expect(isForeignKeyFailure(e), isFalse);
     expect(saleFailureMessage(e), kSaleFailedMessage);
   });
+
+  test('release sale log: type and short message, no SQL or parameters', () {
+    final e = violation("INSERT INTO c (id, p) VALUES (1, 4242)");
+    final st = StackTrace.current;
+
+    final release = saleFailureLog(e, st, release: true);
+    expect(release, startsWith('Sale failed: SqliteException'));
+    expect(release, contains('FOREIGN KEY'));
+    expect(release, isNot(contains('INSERT')));
+    expect(release, isNot(contains('4242')));
+    expect(release, isNot(contains('#0')), reason: 'no stack in release');
+
+    // Any other error: the type only, its text may hold values.
+    expect(saleFailureLog(StateError('amount 99.50'), st, release: true),
+        'Sale failed: StateError');
+
+    final debug = saleFailureLog(e, st, release: false);
+    expect(debug, contains('Sale failed: '));
+    expect(debug, contains('#0'));
+  });
 }

@@ -56,3 +56,6 @@ android/app/upload-keystore.jks
 
 # Local/FOSS dependency swaps (see packages/in_app_review_stub/)
 pubspec_overrides.yaml
+
+# old local graphify output; never commit
+graphify-out/
