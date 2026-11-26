@@ -26,9 +26,6 @@ String friendlyShiftError(Object e) => e is ShiftStateException
     ? 'The till changed. Pull down to refresh and try again.'
     : 'Something went wrong. Please try again.';
 
-const kBelowZeroNote =
-    'Net is below zero because a sale from an earlier day was voided or '
-    'refunded.';
 
 /// Close day: open the till, watch the live drawer figures, count the cash
 /// and close. Selling is never blocked by any of this.
@@ -412,8 +409,10 @@ class _CloseDayScreenState extends ConsumerState<CloseDayScreen> {
       row('Opening cash', fmt.format(live.openingCash)),
       row('Cash sales', fmt.format(f.cashSales)),
       if (f.cashTips != 0) row('Cash tips', fmt.format(f.cashTips)),
-      row('Cash refunds', fmt.format(f.cashRefunds)),
-      row('Cash voids', fmt.format(f.cashVoids)),
+      row('Cash refunds', fmt.format(f.refunds.cash.amount)),
+      row('Cash voids', fmt.format(f.voids.cash.amount)),
+      if (f.cashTipsReturned != 0)
+        row('Cash tips returned', fmt.format(f.cashTipsReturned)),
       row('Paid out', fmt.format(live.paidOut)),
       row('Expected cash', fmt.format(live.expectedCash),
           bold: true, key: const ValueKey('expected')),

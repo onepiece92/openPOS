@@ -96,6 +96,12 @@ class ShiftFigures {
   double get cashRefunds => refunds.cash.total;
   double get cashVoids => voids.cash.total;
 
+  /// The tip part of [cashRefunds] and [cashVoids]: cash tips handed back.
+  /// Shown as its own drawer line so the drawer adds up visibly next to
+  /// the tip-free Refunds and Voids above it.
+  double get cashTipsReturned =>
+      roundMoney(refunds.cash.tips + voids.cash.tips);
+
   /// opening + cash sales + cash tips − cash refunds − cash voids − paid out.
   double expectedCash({required double openingCash, double paidOut = 0}) =>
       roundMoney(roundMoney(openingCash) +
@@ -238,8 +244,6 @@ class ShiftsDao extends DatabaseAccessor<AppDatabase> with _$ShiftsDaoMixin {
 
   /// The open shift, or null.
   Future<Shift?> currentShift() => _open().getSingleOrNull();
-
-  Stream<Shift?> watchCurrentShift() => _open().watchSingleOrNull();
 
   /// The most recently closed shift, counted or not.
   Future<Shift?> lastClosedShift() async {

@@ -71,17 +71,20 @@ class _CloseHistoryState extends ConsumerState<CloseHistoryScreen> {
       body: FutureBuilder<List<Shift>>(
         future: _future,
         builder: (context, snap) {
-          if (snap.connectionState != ConnectionState.done) {
+          // FutureBuilder keeps the last rows while "Show older" loads, so
+          // the list (and its scroll position) stays put.
+          final loading = snap.connectionState != ConnectionState.done;
+          if (loading && !snap.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
-          if (snap.hasError) {
+          if (!loading && snap.hasError) {
             return Center(child: Text('Could not load: ${snap.error}'));
           }
           final rows = snap.data!;
           if (rows.isEmpty) {
             return const Center(child: Text('No days have been closed yet.'));
           }
-          final more = rows.length >= _limit;
+          final more = loading || rows.length >= _limit;
           return ListView.builder(
             itemCount: rows.length + (more ? 1 : 0),
             itemBuilder: (_, i) {
@@ -90,10 +93,12 @@ class _CloseHistoryState extends ConsumerState<CloseHistoryScreen> {
                   padding: const EdgeInsets.all(16),
                   child: OutlinedButton(
                     key: const ValueKey('history-more'),
-                    onPressed: () => setState(() {
-                      _limit += kHistoryPage;
-                      _future = _fetch();
-                    }),
+                    onPressed: loading
+                        ? null
+                        : () => setState(() {
+                              _limit += kHistoryPage;
+                              _future = _fetch();
+                            }),
                     child: const Text('Show older'),
                   ),
                 );

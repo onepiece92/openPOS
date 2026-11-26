@@ -209,18 +209,6 @@ void main() {
           [11.0, 10.0]);
       expect((await dao.lastClosedShift())!.countedCash, 11.0);
     });
-
-    test('watchCurrentShift follows open and close', () async {
-      final seen = <int?>[];
-      final sub = dao.watchCurrentShift().listen((s) => seen.add(s?.id));
-      await pumpEventQueue();
-      final id = await dao.openShift(openingCash: 0);
-      await pumpEventQueue();
-      await close(id);
-      await pumpEventQueue();
-      await sub.cancel();
-      expect(seen, [null, id, null]);
-    });
   });
 
   // ── Windows ──────────────────────────────────────────────────────────────

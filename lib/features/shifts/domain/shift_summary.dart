@@ -7,6 +7,12 @@ import 'package:pos_app/core/utils/money.dart';
 /// Receipt columns for a paper width: 58mm prints 32, 80mm prints 48.
 int summaryColumnsFor(int paperMm) => paperMm == 58 ? 32 : 48;
 
+/// Why net sales or tax can be below zero. Shown on the close screen and
+/// written into the frozen summary's NOTES.
+const kBelowZeroNote =
+    'Net is below zero because a sale from an earlier day was voided or '
+    'refunded.';
+
 /// Shown in place of an amount when the drawer was not counted.
 const kNotCounted = 'Not counted';
 
@@ -110,8 +116,13 @@ String buildShiftSummary(
   row('Opening cash', money(close.openingCash));
   row('+ Cash sales', money(f.cashSales));
   if (f.cashTips != 0) row('+ Cash tips', money(f.cashTips));
-  row('- Cash refunds', neg(f.cashRefunds));
-  row('- Cash voids', neg(f.cashVoids));
+  // Refunds and voids tip-free, as in the sales block above; the tips they
+  // handed back are their own line, so every line adds up.
+  row('- Cash refunds', neg(f.refunds.cash.amount));
+  row('- Cash voids', neg(f.voids.cash.amount));
+  if (f.cashTipsReturned != 0) {
+    row('- Cash tips returned', neg(f.cashTipsReturned));
+  }
   row('- Paid out', neg(close.paidOut));
   row('= Expected cash', money(close.expectedCash));
   final counted = close.countedCash;
@@ -125,10 +136,12 @@ String buildShiftSummary(
   }
 
   final note = notes?.trim() ?? '';
-  if (note.isNotEmpty) {
+  final belowZero = f.netSales < 0 || f.netTax < 0;
+  if (note.isNotEmpty || belowZero) {
     rule();
     out.add('NOTES');
-    out.addAll(_wrap(note, columns));
+    if (belowZero) out.addAll(_wrap(kBelowZeroNote, columns));
+    if (note.isNotEmpty) out.addAll(_wrap(note, columns));
   }
   rule('=');
   return out.join('\n');

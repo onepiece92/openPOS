@@ -16,6 +16,7 @@ import 'package:pos_app/core/utils/money.dart';
 import 'package:pos_app/features/backup/data/share_files.dart';
 import 'package:pos_app/features/printing/domain/receipt_printer.dart';
 import 'package:pos_app/features/shifts/data/shift_service.dart';
+import 'package:pos_app/features/shifts/domain/shift_summary.dart';
 import 'package:pos_app/features/shifts/presentation/close_day_screen.dart';
 import 'package:pos_app/features/shifts/presentation/close_history_screen.dart';
 import 'package:pos_app/features/shifts/presentation/shift_summary_panel.dart';
@@ -307,6 +308,44 @@ void main() {
       expect(find.textContaining('Tips (net)'), findsOneWidget);
     });
 
+    testWidgets('tips handed back are their own drawer line, in the preview '
+        'and the frozen summary', (tester) async {
+      await openDay();
+      final o = await db.ordersDao.insertOrder(OrdersCompanion.insert(
+        subtotal: 40,
+        total: 40,
+        tipAmount: const Value(6),
+        paymentMethod: 'cash',
+        createdAt: Value(DateTime.now().subtract(const Duration(hours: 2))),
+      ));
+      await db.ordersDao.insertReturn(ReturnsCompanion.insert(
+        orderId: o,
+        amount: 20,
+        tipAmount: const Value(6),
+        createdAt: Value(DateTime.now().subtract(const Duration(hours: 1))),
+      ));
+      await pump(tester, const CloseDayScreen());
+      // 100 + 40 + 6 - 20 - 6 = 120
+      expect(tester.widget<Text>(find.byKey(const ValueKey('expected'))).data,
+          r'$ 120.00');
+      expect(find.text('Cash tips returned'), findsOneWidget);
+      expect(find.text(r'$ 20.00'), findsWidgets); // Cash refunds, tip-free
+
+      await type(tester, 'field-Counted cash', '120');
+      await tester.tap(find.byKey(const ValueKey('close-day')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('confirm-close')));
+      await tester.pumpAndSettle();
+      final lines =
+          (await db.shiftsDao.lastClosedShift())!.summaryText!.split('\n');
+      expect(lines.firstWhere((l) => l.startsWith('- Refunds')),
+          endsWith(r'-$ 20.00'));
+      expect(lines.firstWhere((l) => l.startsWith('- Cash refunds')),
+          endsWith(r'-$ 20.00'));
+      expect(lines.firstWhere((l) => l.startsWith('- Cash tips returned')),
+          endsWith(r'-$ 6.00'));
+    });
+
     testWidgets('live figures; over, short and balanced are read in cents',
         (tester) async {
       await openDay();
@@ -582,6 +621,36 @@ void main() {
       await pump(tester, const CloseHistoryScreen());
       final tile = tester.widget<ListTile>(find.byType(ListTile));
       expect((tile.subtitle as Text).data, r'Net sales -  ·  Balanced');
+    });
+
+    testWidgets('Show older keeps the rows and the scroll position',
+        (tester) async {
+      final base = DateTime(2026, 1, 1);
+      for (var d = 0; d < kHistoryPage + 5; d++) {
+        final id = await db.shiftsDao.openShift(
+            openingCash: 0, openedAt: base.add(Duration(days: d, hours: 9)));
+        await db.shiftsDao.closeShift(id,
+            countedCash: 0,
+            at: base.add(Duration(days: d, hours: 17)),
+            summary: (_) => 'DAY $d');
+      }
+      await pump(tester, const CloseHistoryScreen());
+      tester.view.physicalSize = const Size(900, 700); // a phone-sized list
+      await tester.pumpAndSettle();
+      final more = find.byKey(const ValueKey('history-more'));
+      await tester.scrollUntilVisible(more, 300);
+      final scrollable = tester.state<ScrollableState>(find.byType(Scrollable));
+      final before = scrollable.position.pixels;
+      expect(before, greaterThan(0));
+      await tester.tap(more);
+      await tester.pump(); // the older rows are still loading
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(find.byType(ListTile), findsWidgets);
+      await tester.pumpAndSettle();
+      expect(scrollable.position.pixels, before);
+      await tester.scrollUntilVisible(
+          find.byKey(const ValueKey('history-1')), 300);
+      expect(find.byKey(const ValueKey('history-more')), findsNothing);
     });
 
     testWidgets('empty history says so', (tester) async {

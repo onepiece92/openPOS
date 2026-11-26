@@ -79,6 +79,43 @@ void main() {
     }
   });
 
+  test('below zero: the explanation is in NOTES, before the user note', () {
+    final text = _build(
+        _close(voids: {'cash': _flow(1, 30, tax: 3)}),
+        notes: 'Counted twice');
+    final lines = text.split('\n');
+    final at = lines.indexOf('NOTES');
+    expect(at, greaterThan(0));
+    expect(lines.sublist(at + 1).join(' '),
+        startsWith('Net is below zero because a sale from an earlier day'));
+    expect(text, contains('Counted twice'));
+    expect(text.indexOf('Net is below zero'),
+        lessThan(text.indexOf('Counted twice')));
+    // Not below zero: no NOTES unless the user wrote one.
+    expect(_build(_close(sales: {'cash': _flow(1, 10)})),
+        isNot(contains('NOTES')));
+  });
+
+  test('tips handed back are their own drawer line; it all adds up', () {
+    final c = _close(
+      sales: {'cash': _flow(2, 50, tips: 6)},
+      refunds: {'cash': _flow(1, 0, tips: 6)},
+      voids: {'cash': _flow(1, 10, tips: 2)},
+      opening: 0,
+    );
+    final lines = _build(c).split('\n');
+    String line(String l) => lines.firstWhere((x) => x.startsWith(l));
+    expect(line('- Refunds'), endsWith(r'$ 0.00'));
+    expect(line('- Cash refunds'), endsWith(r'$ 0.00'));
+    expect(line('- Cash voids'), endsWith(r'-$ 10.00'));
+    expect(line('- Cash tips returned'), endsWith(r'-$ 8.00'));
+    // 0 + 50 + 6 - 0 - 10 - 8 = 38
+    expect(line('= Expected cash'), endsWith(r'$ 38.00'));
+    expect(c.expectedCash, 38);
+    expect(_build(_close(sales: {'cash': _flow(1, 10)})),
+        isNot(contains('tips returned')));
+  });
+
   test('the Tips line shows only when the window has tips', () {
     expect(_build(_close(sales: {'cash': _flow(1, 10)})),
         isNot(contains('Tips (net)')));
