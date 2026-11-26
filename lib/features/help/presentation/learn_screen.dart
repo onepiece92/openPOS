@@ -271,6 +271,7 @@ final _articles = <_Article>[
         steps: [
           'Every time this product is sold, the stock count is reduced automatically.',
           'If a sale is voided, or refunded with "Restock items" switched on, the stock it took is added back.',
+          'A product with "Track stock" switched off isn\'t restocked by a void or refund; its stock can be corrected in Inventory.',
         ],
       ),
       ArticleSection(
