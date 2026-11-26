@@ -16,6 +16,7 @@ import 'package:pos_app/core/restart_notice.dart';
 import 'package:pos_app/core/database/connection/native.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
+import 'package:pos_app/features/backup/data/open_failure_recovery.dart';
 import 'package:pos_app/features/backup/data/restore_merge_marker.dart';
 import 'package:pos_app/features/backup/data/snapshot_providers.dart';
 import 'package:pos_app/features/backup/data/snapshot_service.dart';
@@ -559,6 +560,67 @@ class AppRootState extends State<AppRoot> {
     }
   }
 
+  /// The disposable container of the error screen: its database never
+  /// opened (or opened broken), so it is closed best-effort and replaced by
+  /// a fresh one before a restore or a fresh start touches the files.
+  Future<void> _dropFailedContainer() async {
+    final old = _container;
+    try {
+      if (old.exists(databaseProvider)) {
+        await old.read(databaseProvider).close();
+      }
+    } catch (_) {/* it never opened */}
+    old.dispose();
+    _container = ProviderContainer();
+  }
+
+  /// "Restore latest automatic backup" on the open-failure screen: the
+  /// NORMAL journaled [restoreFrom] of the backup the user picked.
+  @visibleForTesting
+  Future<void> restoreFromErrorScreen(File zip) async {
+    if (_restoring) return;
+    await _dropFailedContainer();
+    try {
+      await restoreFrom(zip);
+    } catch (_) {/* restoreFrom has already put the outcome on screen */}
+  }
+
+  /// "Start fresh" (confirmed): sets the database that would not open
+  /// aside — never deleted — and creates a new, empty one; settings are
+  /// kept. Only ever on the user's say-so, never automatically.
+  @visibleForTesting
+  Future<void> startFresh() async {
+    if (_restoring) return;
+    setState(() {
+      _restoring = true;
+      _splashMessage = kStartFreshProgress;
+    });
+    Object? error;
+    try {
+      await _dropFailedContainer();
+      await setAsideDatabaseFile(await databaseFile(), DateTime.now());
+      // Created directly: checkDatabaseFileBeforeOpen would (rightly)
+      // refuse a missing file under a finished onboarding.
+      await _container.read(databaseProvider).customSelect('SELECT 1').get();
+    } catch (e) {
+      error = e;
+    }
+    if (!mounted) return;
+    setState(() {
+      _restoring = false;
+      if (error == null) {
+        _fatal = null;
+        _dbOpenFailure = false;
+        _notice = kStartFreshDoneNotice;
+      } else {
+        _showDbOpenFailure(error);
+      }
+    });
+    if (error == null && _autoBackupTimer == null) {
+      _autoBackupTimer = Timer(autoBackupDelay, _startAutoBackup);
+    }
+  }
+
   /// "Keep my data": clears the pending flag, retrying, and opens the app
   /// on its data only once that is confirmed — otherwise the question
   /// stays, with [kResetKeepFailed].
@@ -584,10 +646,15 @@ class AppRootState extends State<AppRoot> {
     if (_starting) return StartupSurface(showLine: _startupSlow);
     if (_restoring) return _RestoringSplash(message: _splashMessage);
     if (_fatal != null) {
+      // A database that would not open (missing, empty, corrupt) — not
+      // one from a newer app — offers the two ways out besides Try again.
+      final recoverable = _dbOpenFailure && _fatalCanRetry;
       return _RestoreFailedScreen(
         title: _fatalTitle,
         message: _fatal!,
         onRetry: _fatalCanRetry ? _retryOpen : null,
+        onRestoreBackup: recoverable ? restoreFromErrorScreen : null,
+        onStartFresh: recoverable ? startFresh : null,
       );
     }
     if (_resetChoice) {
@@ -791,7 +858,74 @@ class _RestoreFailedScreen extends StatelessWidget {
     required this.title,
     required this.message,
     required this.onRetry,
+    this.onRestoreBackup,
+    this.onStartFresh,
   });
+
+  /// Null hides "Restore latest automatic backup" / "Start fresh" (only a
+  /// database that would not open offers them).
+  final Future<void> Function(File zip)? onRestoreBackup;
+  final Future<void> Function()? onStartFresh;
+
+  Future<void> _pickBackup(BuildContext context) async {
+    final backups = await listAutoBackups();
+    if (!context.mounted) return;
+    if (backups.isEmpty) {
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          content: const Text(kNoAutoBackups),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+    final picked = await showDialog<File>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: const Text(kPickBackupTitle),
+        children: [
+          for (var i = 0; i < backups.length; i++)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(ctx, backups[i].$1),
+              child: Text(autoBackupLabel(backups[i].$2, newest: i == 0)),
+            ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+    if (picked != null) await onRestoreBackup!(picked);
+  }
+
+  Future<void> _confirmStartFresh(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text(kStartFreshTitle),
+        content: const Text(kStartFreshMessage),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text(kStartFreshButton),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) await onStartFresh!();
+  }
+
   final String title;
   final String message;
 
@@ -825,6 +959,24 @@ class _RestoreFailedScreen extends StatelessWidget {
                       FilledButton(
                         onPressed: onRetry,
                         child: const Text('Try again'),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                    if (onRestoreBackup != null) ...[
+                      Builder(
+                        builder: (context) => OutlinedButton(
+                          onPressed: () => _pickBackup(context),
+                          child: const Text(kRestoreLatestBackupButton),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                    if (onStartFresh != null) ...[
+                      Builder(
+                        builder: (context) => TextButton(
+                          onPressed: () => _confirmStartFresh(context),
+                          child: const Text(kStartFreshButton),
+                        ),
                       ),
                       const SizedBox(height: 8),
                     ],
