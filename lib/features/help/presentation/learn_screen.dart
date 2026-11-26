@@ -250,6 +250,44 @@ final _articles = <_Article>[
     ],
   ),
   const _Article(
+    category: 'Sales',
+    title: 'Closing the day',
+    description:
+        'Count the cash drawer and save a summary of the day.',
+    readTime: '2 min',
+    icon: Icons.lock_clock_outlined,
+    sections: [
+      ArticleSection(
+        heading: 'Open the Till',
+        steps: [
+          'End-of-day close must be on (turn on End-of-day close in Features).',
+          'Open "Close day" from the sidebar.',
+          'Enter the opening cash and tap "Open". It is filled in from the last close: the cash counted then, or, if that day was not counted, the cash expected then.',
+          'Selling never waits for this. Sales made while no day is open are counted in the next day you open.',
+        ],
+      ),
+      ArticleSection(
+        heading: 'Close the Day',
+        steps: [
+          'The screen shows net sales, orders and the cash drawer: opening cash, cash sales, cash tips, cash refunds, cash voids and paid out, giving the expected cash. Pull down to refresh the figures.',
+          'Enter any cash paid out of the drawer, then the cash you counted. The screen shows whether the drawer is over, short or balanced.',
+          'Add a note if you like, tap "Close day" and confirm. A closed day cannot be reopened.',
+          'The summary is saved as it was at the close. Print it, share it, email it or copy it.',
+        ],
+        tip:
+            'Imported orders are history, not till activity, and are never in the drawer.',
+      ),
+      ArticleSection(
+        heading: 'Past Closes',
+        steps: [
+          'Tap "History" on the Close day screen to see past days, newest first, with net sales and over or short.',
+          'If the till was closed for a long time and sales were made, you can save them as their own day with "Keep them separate". That day is marked "Not counted".',
+          'Closes are stored on your device, like everything else.',
+        ],
+      ),
+    ],
+  ),
+  const _Article(
     category: 'Inventory',
     title: 'Stock tracking',
     description:
