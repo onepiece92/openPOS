@@ -3,15 +3,40 @@ import 'dart:io';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path/path.dart' as p;
 
-import 'package:pos_app/core/providers/hive_provider.dart' show kAutoBackupLastAt;
+import 'package:pos_app/core/providers/hive_provider.dart'
+    show kAutoBackupLastAt;
 import 'package:pos_app/features/cart/data/ticket_sequence.dart';
 import 'package:pos_app/features/usage/data/usage_counter.dart';
 
-/// Factory Reset's confirm text: exactly what goes and what stays.
-const kFactoryResetConfirmText =
-    'This permanently deletes all products, orders, customers, expenses, '
-    'held tickets, tables, receipt photos and settings. '
-    'Automatic backups are kept.';
+/// Factory Reset's confirm dialog: exactly what goes and what stays.
+/// test/features/settings/factory_reset_text_test.dart maps every table
+/// `AppDatabase.eraseAllData` deletes, every Hive box and the receipts
+/// folder to a phrase in [kFactoryResetBody] — add the words there when
+/// the reset erases something new.
+const kFactoryResetTitle = 'Erase everything?';
+const kFactoryResetBody =
+    'This permanently deletes everything in Open POS on this device: sales, '
+    'refunds and day closes, products and categories, customers, expenses '
+    'and expense categories, tax rates, stock history, held tickets, tables, '
+    'receipt photos, usage counts, the activity log and your settings.';
+
+/// Second sentence when at least one automatic backup is on the device.
+const kFactoryResetBackupsKept =
+    'Automatic backups already saved on this device are kept; they don\'t '
+    'include receipt photos. You can restore one from '
+    'Settings › Backup & Restore.';
+
+/// Second sentence when there is none.
+const kFactoryResetNoBackups =
+    'There are no automatic backups on this device, so this cannot be '
+    'undone.';
+
+const kFactoryResetConfirmButton = 'Erase everything';
+
+/// The dialog's text; [hasAutoBackups] is checked when it opens.
+String factoryResetConfirmText({required bool hasAutoBackups}) =>
+    '$kFactoryResetBody\n\n'
+    '${hasAutoBackups ? kFactoryResetBackupsKept : kFactoryResetNoBackups}';
 
 /// Settings keys a factory reset keeps: automatic-backup bookkeeping. The
 /// backups kept on the device are how a regretted reset is undone, so the
