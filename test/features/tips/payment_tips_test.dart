@@ -14,7 +14,6 @@ import 'package:pos_app/features/cart/domain/cart_item.dart';
 import 'package:pos_app/features/cart/presentation/payment_screen.dart';
 import 'package:pos_app/features/cart/presentation/providers/cart_notifier.dart';
 import 'package:pos_app/features/cart/presentation/providers/held_orders_notifier.dart';
-import 'package:pos_app/features/tips/tips_settings.dart';
 
 import '../../_support/sales.dart';
 import '../../_support/test_db.dart';
@@ -56,7 +55,9 @@ void main() {
 
   Future<void> pumpScreen(WidgetTester tester, {required bool on}) async {
     if (on) {
-      await tester.runAsync(() => settingsBox.put(kTipsEnabled, true));
+      await tester.runAsync(
+        () => settingsBox.put(kFeaturesKey, {'tips': true}),
+      );
     }
     final router = GoRouter(routes: [
       GoRoute(path: '/', builder: (_, __) => const PaymentScreen()),

@@ -17,7 +17,6 @@ class DashboardBody extends StatelessWidget {
     required this.periodLabel,
     required this.isCustomRange,
     this.sections = ReportSections.all,
-    this.showTips = false,
   });
 
   /// Parts switched off in Features are not built.
@@ -27,10 +26,6 @@ class DashboardBody extends StatelessWidget {
   final ColorScheme cs;
   final String periodLabel;
   final bool isCustomRange;
-
-  /// Tips are switched on: the Tips card shows even for a period without
-  /// any. It also shows whenever the period has tips.
-  final bool showTips;
 
   @override
   Widget build(BuildContext context) {
@@ -275,7 +270,7 @@ class DashboardBody extends StatelessWidget {
         color: cs.secondary,
         cs: cs,
       ),
-      if (showTips || data.netTips != 0)
+      if (sections.tips)
         KpiCard(
           label: 'Tips',
           value: '$symbol ${_fmt(data.netTips)}',

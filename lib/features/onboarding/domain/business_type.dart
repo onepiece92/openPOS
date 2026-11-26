@@ -36,12 +36,12 @@ const _app = {...kAlwaysSuggested, Feature.autoPrint};
 /// Market stall and Something else are minimal: [kAlwaysSuggested] only.
 /// A preset only sets switches: it never touches data.
 ///
-/// TODO(tips, end-of-day): once those Feature values exist, add tips to
-/// foodTruck, cafe, restaurant and services, and endOfDay to foodTruck,
-/// cafe, restaurant and marketStall.
+/// TODO(end-of-day): add endOfDay to foodTruck, cafe, restaurant and
+/// marketStall once that Feature exists.
 const Map<BusinessType, Set<Feature>> kPresets = {
   BusinessType.foodTruck: {
     ..._app,
+    Feature.tips,
     Feature.heldTickets,
     Feature.discounts,
     Feature.taxes,
@@ -49,6 +49,7 @@ const Map<BusinessType, Set<Feature>> kPresets = {
   },
   BusinessType.cafe: {
     ..._app,
+    Feature.tips,
     Feature.heldTickets,
     Feature.discounts,
     Feature.taxes,
@@ -58,6 +59,7 @@ const Map<BusinessType, Set<Feature>> kPresets = {
   },
   BusinessType.restaurant: {
     ..._app,
+    Feature.tips,
     Feature.tables,
     Feature.heldTickets,
     Feature.discounts,
@@ -80,6 +82,7 @@ const Map<BusinessType, Set<Feature>> kPresets = {
   BusinessType.marketStall: kAlwaysSuggested,
   BusinessType.services: {
     ..._app,
+    Feature.tips,
     Feature.customers,
     Feature.discounts,
     Feature.taxes,

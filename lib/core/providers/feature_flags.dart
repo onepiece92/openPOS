@@ -10,10 +10,9 @@ import 'package:flutter/foundation.dart' show immutable, listEquals;
 /// Order matters: it is the order of the Features screen, and a child is
 /// listed straight after its parent.
 ///
-/// TODO(tips, end-of-day): add `tips` and `endOfDay` here when those
-/// branches land (make [defaultOn] false for them if upgrades must not get them),
-/// and add them to `kPresets` — tips: foodTruck, cafe, restaurant,
-/// services; endOfDay: foodTruck, cafe, restaurant, marketStall.
+/// TODO(end-of-day): add `endOfDay` here when that branch lands (make
+/// [defaultOn] false if upgrades must not get it) and add it to `kPresets`
+/// for foodTruck, cafe, restaurant and marketStall.
 enum Feature {
   customers('Customers', 'Keep a customer list and add a customer to a sale.'),
   loyalty('Loyalty points',
@@ -24,6 +23,8 @@ enum Feature {
       parent: Feature.heldTickets),
   discounts('Discounts', 'Take an amount or a percentage off a sale.'),
   taxes('Taxes', 'Add tax to sales and keep a list of tax rates.'),
+  tips('Tips', 'Add a tip at payment and track tips in reports.',
+      defaultOn: false),
   stockTracking('Stock tracking',
       'Count stock, take it off on each sale, and show low-stock badges.'),
   bundles('Bundles', 'Sell a product made of other products.',
@@ -43,7 +44,12 @@ enum Feature {
   usageCounting('Usage counting',
       'Count which features you use. The counts stay on this device.');
 
-  const Feature(this.label, this.description, {this.parent});
+  const Feature(
+    this.label,
+    this.description, {
+    this.parent,
+    this.defaultOn = true,
+  });
 
   /// Name on the Features screen.
   final String label;
@@ -55,9 +61,9 @@ enum Feature {
   final Feature? parent;
 
   /// The value when nothing is stored yet (an upgrade, or a skipped setup):
-  /// every feature that exists today is on. A later feature that upgrades
-  /// must not get turned on can override this per value.
-  bool get defaultOn => true;
+  /// on for every feature that existed before, off for a later one that
+  /// must not appear by itself (Tips).
+  final bool defaultOn;
 }
 
 /// Settings-box key of the stored switches: a map of [Feature.name] → bool.
@@ -130,6 +136,7 @@ class FeatureFlags {
   bool get tables => isOn(Feature.tables);
   bool get discounts => isOn(Feature.discounts);
   bool get taxes => isOn(Feature.taxes);
+  bool get tips => isOn(Feature.tips);
   bool get stockTracking => isOn(Feature.stockTracking);
   bool get bundles => isOn(Feature.bundles);
   bool get units => isOn(Feature.units);

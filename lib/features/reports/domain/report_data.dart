@@ -199,15 +199,17 @@ class ReportSections {
     required this.costProfit,
     required this.expenses,
     required this.extras,
+    this.tips = true,
   });
 
   static const all =
-      ReportSections(costProfit: true, expenses: true, extras: true);
+      ReportSections(costProfit: true, expenses: true, extras: true, tips: true);
 
   factory ReportSections.of(FeatureFlags f) => ReportSections(
         costProfit: f.costProfit,
         expenses: f.expenses,
         extras: f.dashboardExtras,
+        tips: f.tips,
       );
 
   /// Cost of Goods, Net Profit and the missing-cost warning.
@@ -219,15 +221,19 @@ class ReportSections {
   /// The bar chart, the payment mix and top products.
   final bool extras;
 
+  /// The Tips card (and the query behind it).
+  final bool tips;
+
   @override
   bool operator ==(Object other) =>
       other is ReportSections &&
       other.costProfit == costProfit &&
       other.expenses == expenses &&
-      other.extras == extras;
+      other.extras == extras &&
+      other.tips == tips;
 
   @override
-  int get hashCode => Object.hash(costProfit, expenses, extras);
+  int get hashCode => Object.hash(costProfit, expenses, extras, tips);
 }
 
 final reportSectionsProvider = Provider<ReportSections>((ref) =>
@@ -270,7 +276,9 @@ Future<ReportData> loadReport(
   final goods = sections.costProfit
       ? await db.ordersDao.costOfGoodsForPeriod(from, to)
       : null;
-  final netTips = await db.ordersDao.netTipsForPeriod(from, to);
+  final netTips = sections.tips
+      ? await db.ordersDao.netTipsForPeriod(from, to)
+      : 0.0;
 
   final topProducts = !sections.extras
       ? const <TopProduct>[]

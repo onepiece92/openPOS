@@ -83,7 +83,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
 
   /// The tip for [summary] under the current choice; 0 when tips are off.
   double _tipFor(CartSummary summary, TipsSettings tips) {
-    if (!tips.enabled) return 0;
+    if (!ref.read(tipsEnabledProvider)) return 0;
     if (_customTip) {
       final v = double.tryParse(_customTipCtrl.text) ?? 0.0;
       return roundMoney(v.clamp(0.0, kMaxMoneyAmount));
@@ -215,6 +215,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       _followDue();
     });
     final tips = ref.watch(tipsSettingsProvider);
+    final tipsOn = ref.watch(tipsEnabledProvider);
     final tip = _tipFor(summary, tips);
     final due = paidWithTip(summary.total, tip);
     final symbol = ref.watch(currencySymbolProvider);
@@ -236,7 +237,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          if (tips.enabled) ...[
+          if (tipsOn) ...[
             Text('Tip', style: tt.titleMedium),
             const SizedBox(height: 12),
             Wrap(

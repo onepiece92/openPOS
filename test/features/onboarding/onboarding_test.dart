@@ -84,6 +84,7 @@ void main() {
     final expected = <BusinessType, Set<Feature>>{
       BusinessType.foodTruck: {
         ...app,
+        Feature.tips,
         Feature.heldTickets,
         Feature.discounts,
         Feature.taxes,
@@ -91,6 +92,7 @@ void main() {
       },
       BusinessType.cafe: {
         ...app,
+        Feature.tips,
         Feature.heldTickets,
         Feature.discounts,
         Feature.taxes,
@@ -100,6 +102,7 @@ void main() {
       },
       BusinessType.restaurant: {
         ...app,
+        Feature.tips,
         Feature.tables,
         Feature.heldTickets,
         Feature.discounts,
@@ -122,6 +125,7 @@ void main() {
       BusinessType.marketStall: {Feature.reviewReminder, Feature.usageCounting},
       BusinessType.services: {
         ...app,
+        Feature.tips,
         Feature.customers,
         Feature.discounts,
         Feature.taxes,
@@ -193,7 +197,15 @@ void main() {
       final c = container();
       await c.read(onboardingNotifierProvider.notifier).skip();
       expect(box.get(kOnboardingCompleteKeyForTest), isTrue);
-      expect(stored().values, everyElement(isTrue));
+      // Every feature that existed before Tips is on; Tips stays off.
+      expect(stored()['tips'], isFalse);
+      expect(
+        {
+          for (final e in stored().entries)
+            if (e.key != 'tips') e.value,
+        },
+        {true},
+      );
       expect(stored().containsKey('loyalty'), isFalse);
       expect(box.containsKey(kLoyaltyEnabled), isFalse);
       expect(box.containsKey(kBusinessType), isFalse);

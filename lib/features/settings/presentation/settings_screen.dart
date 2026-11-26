@@ -14,6 +14,7 @@ import 'package:pos_app/features/settings/presentation/widgets/settings_section_
 import 'package:pos_app/features/settings/presentation/widgets/store_profile_section.dart';
 import 'package:pos_app/features/settings/presentation/widgets/tax_section.dart';
 import 'package:pos_app/features/tips/tips_section.dart';
+import 'package:pos_app/features/tips/tips_settings.dart';
 import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
 
 /// Settings hub. Each section (and the sheet it opens) lives in
@@ -27,6 +28,7 @@ class SettingsScreen extends ConsumerWidget {
     final stock = ref.watch(featureOnProvider(Feature.stockTracking));
     final customers = ref.watch(featureOnProvider(Feature.customers));
     final taxes = ref.watch(featureOnProvider(Feature.taxes));
+    final tips = ref.watch(tipsEnabledProvider);
     return Scaffold(
       drawer: const PosDrawer(),
       appBar: AppBar(title: const Text('Settings')),
@@ -51,8 +53,7 @@ class SettingsScreen extends ConsumerWidget {
             SettingsSectionHeader('Loyalty'),
             LoyaltySection(),
           ],
-          const SettingsSectionHeader('Tips'),
-          const TipsSection(),
+          if (tips) ...const [SettingsSectionHeader('Tips'), TipsSection()],
           const SettingsSectionHeader('Appearance'),
           const AppearanceSection(),
           const SettingsSectionHeader('Hardware'),

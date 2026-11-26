@@ -34,27 +34,33 @@ void main() {
           container: c,
           child: const MaterialApp(home: Scaffold(body: TipsSection()))));
 
-  testWidgets('off by default; the switch reveals presets and the base toggle',
-      (tester) async {
+  testWidgets('percentages and the tip base are editable', (tester) async {
     await pump(tester);
-    expect(c.read(tipsSettingsProvider).enabled, isFalse);
     expect(c.read(tipsSettingsProvider).presets, [15, 18, 20]);
-    expect(find.text('Tip percentages'), findsNothing);
-
-    await tester.tap(find.text('Accept tips'));
-    await tester.pump();
-    expect(c.read(tipsSettingsProvider).enabled, isTrue);
-    expect(box.get(kTipsEnabled), isTrue);
     expect(find.text('15%, 18%, 20%'), findsOneWidget);
-    expect(find.text('Tip on total after tax'), findsOneWidget);
+    expect(find.text('Accept tips'), findsNothing);
 
     await tester.tap(find.text('Tip on total after tax'));
     await tester.pump();
     expect(c.read(tipsSettingsProvider).postTax, isTrue);
   });
 
+  test('Tips follows the Features switch: off by default, and the old '
+      'tips_enabled key is ignored', () async {
+    expect(c.read(tipsEnabledProvider), isFalse);
+    await box.put('tips_enabled', true);
+    final c2 = ProviderContainer(
+        overrides: [settingsBoxProvider.overrideWithValue(box)]);
+    addTearDown(c2.dispose);
+    expect(c2.read(tipsEnabledProvider), isFalse);
+    await box.put(kFeaturesKey, {'tips': true});
+    final c3 = ProviderContainer(
+        overrides: [settingsBoxProvider.overrideWithValue(box)]);
+    addTearDown(c3.dispose);
+    expect(c3.read(tipsEnabledProvider), isTrue);
+  });
+
   testWidgets('presets are validated, then saved', (tester) async {
-    await c.read(tipsSettingsProvider.notifier).setEnabled(true);
     await pump(tester);
     await tester.tap(find.text('Tip percentages'));
     await tester.pumpAndSettle();

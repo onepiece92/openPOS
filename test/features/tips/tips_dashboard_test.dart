@@ -35,10 +35,7 @@ void main() {
   Future<ReportData> report() async {
     const p = ReportPeriod.today;
     final q = ReportQuery(from: p.from, to: p.to, label: 'x');
-    final sub = c.listen(reportProvider(q), (_, __) {});
-    c.invalidate(reportProvider(q));
-    final d = await c.read(reportProvider(q).future);
-    sub.close();
+    final d = await loadReport(db, q, ReportSections.all);
     return d;
   }
 
@@ -107,7 +104,8 @@ void main() {
         cs: const ColorScheme.light(),
         periodLabel: 'Today',
         isCustomRange: false,
-        showTips: show,
+        sections: ReportSections(
+            costProfit: true, expenses: true, extras: true, tips: show),
       ))));
 
   ReportData data({double tips = 0}) => ReportData(
@@ -138,11 +136,24 @@ void main() {
     expect(find.text('Rs 0.00'), findsWidgets);
   });
 
-  testWidgets(
-      'Tips card: shown, with its value, when the period has tips even '
-      'if the switch is off', (tester) async {
+  testWidgets('Tips card: switched off in Features, it is not built',
+      (tester) async {
     await body(tester, data(tips: 21.5));
-    expect(find.text('Tips'), findsOneWidget);
+    expect(find.text('Tips'), findsNothing);
+  });
+
+  testWidgets('Tips card: on, it shows the net tips', (tester) async {
+    await body(tester, data(tips: 21.5), show: true);
     expect(find.text('Rs 21.50'), findsOneWidget);
+  });
+
+  test('loadReport skips the tips query when Tips is off', () async {
+    await taxedSale(10);
+    const off = ReportSections(
+        costProfit: true, expenses: true, extras: true, tips: false);
+    const p = ReportPeriod.today;
+    final q = ReportQuery(from: p.from, to: p.to, label: 'x');
+    expect((await loadReport(db, q, off)).netTips, 0);
+    expect((await loadReport(db, q, ReportSections.all)).netTips, 10);
   });
 }

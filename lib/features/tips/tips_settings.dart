@@ -3,13 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:pos_app/core/providers/hive_provider.dart';
 
-/// Tips settings, kept in the Hive settings box.
+/// Tips settings (percentages, tip base), kept in the Hive settings box.
 ///
-/// Every tips control asks [tipsEnabled] (or watches [tipsEnabledProvider]);
-/// it is the single gate, so moving the switch to another settings home
-/// later means changing only [tipsEnabledProvider].
+/// The on/off switch is the Tips feature in Features. Every tips control
+/// asks [tipsEnabled] (or watches [tipsEnabledProvider]). An earlier
+/// `tips_enabled` key was never shipped, so it is not read and a stray
+/// copy in the box is ignored.
 
-const kTipsEnabled = 'tips_enabled';
 const kTipPresets = 'tip_presets'; // list of percents
 const kTipOnPostTax = 'tip_on_post_tax';
 
@@ -18,12 +18,7 @@ const kMaxTipPresets = 4;
 
 @immutable
 class TipsSettings {
-  const TipsSettings({
-    this.enabled = false,
-    this.presets = kDefaultTipPresets,
-    this.postTax = false,
-  });
-  final bool enabled;
+  const TipsSettings({this.presets = kDefaultTipPresets, this.postTax = false});
   final List<double> presets;
 
   /// Tip on the total after tax instead of before it.
@@ -32,12 +27,11 @@ class TipsSettings {
   @override
   bool operator ==(Object other) =>
       other is TipsSettings &&
-      other.enabled == enabled &&
       other.postTax == postTax &&
       listEquals(other.presets, presets);
 
   @override
-  int get hashCode => Object.hash(enabled, postTax, Object.hashAll(presets));
+  int get hashCode => Object.hash(postTax, Object.hashAll(presets));
 }
 
 class TipsSettingsNotifier extends Notifier<TipsSettings> {
@@ -52,27 +46,18 @@ class TipsSettingsNotifier extends Notifier<TipsSettings> {
           ].take(kMaxTipPresets).toList()
         : <double>[];
     return TipsSettings(
-      enabled: box.get(kTipsEnabled, defaultValue: false) == true,
       presets: stored.isEmpty ? kDefaultTipPresets : stored,
       postTax: box.get(kTipOnPostTax, defaultValue: false) == true,
     );
   }
 
-  Future<void> setEnabled(bool v) async {
-    state = TipsSettings(
-        enabled: v, presets: state.presets, postTax: state.postTax);
-    await ref.read(settingsBoxProvider).put(kTipsEnabled, v);
-  }
-
   Future<void> setPostTax(bool v) async {
-    state = TipsSettings(
-        enabled: state.enabled, presets: state.presets, postTax: v);
+    state = TipsSettings(presets: state.presets, postTax: v);
     await ref.read(settingsBoxProvider).put(kTipOnPostTax, v);
   }
 
   Future<void> setPresets(List<double> presets) async {
-    state = TipsSettings(
-        enabled: state.enabled, presets: presets, postTax: state.postTax);
+    state = TipsSettings(presets: presets, postTax: state.postTax);
     await ref.read(settingsBoxProvider).put(kTipPresets, presets);
   }
 }
@@ -81,9 +66,10 @@ final tipsSettingsProvider =
     NotifierProvider<TipsSettingsNotifier, TipsSettings>(
         TipsSettingsNotifier.new);
 
-/// The one switch behind every tips control. Default off.
-final tipsEnabledProvider = Provider<bool>(
-    (ref) => ref.watch(tipsSettingsProvider.select((s) => s.enabled)));
+/// The one switch behind every tips control: the Tips feature, effective
+/// (default off).
+final tipsEnabledProvider =
+    Provider<bool>((ref) => ref.watch(featureOnProvider(Feature.tips)));
 
 bool tipsEnabled(WidgetRef ref) => ref.watch(tipsEnabledProvider);
 

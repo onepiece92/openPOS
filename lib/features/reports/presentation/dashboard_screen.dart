@@ -5,7 +5,6 @@ import 'package:intl/intl.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/features/reports/domain/report_data.dart';
 import 'package:pos_app/features/reports/presentation/widgets/dashboard_body.dart';
-import 'package:pos_app/features/tips/tips_settings.dart';
 import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
 
 /// Reports dashboard. Query building + models + provider live in
@@ -132,7 +131,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   periodLabel: query.label,
                   isCustomRange: _customRange != null,
                   sections: sections,
-                  showTips: tipsEnabled(ref),
                 ),
                 loading: () => const Center(child: CircularProgressIndicator()),
                 error: (e, _) => ListView(

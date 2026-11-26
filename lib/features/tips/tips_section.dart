@@ -4,7 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pos_app/features/tips/tips_settings.dart';
 import 'package:pos_app/shared/widgets/app_sheet.dart';
 
-/// Settings: the tips switch, the preset percentages and the tip base.
+/// Settings: the preset percentages and the tip base. Shown only while the
+/// Tips feature is on.
 class TipsSection extends ConsumerWidget {
   const TipsSection({super.key});
 
@@ -17,33 +18,24 @@ class TipsSection extends ConsumerWidget {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: Column(
         children: [
-          SwitchListTile(
-            title: const Text('Accept tips'),
-            subtitle: const Text('Offer a tip at payment'),
-            value: s.enabled,
-            onChanged: notifier.setEnabled,
+          ListTile(
+            title: const Text('Tip percentages'),
+            subtitle: Text(s.presets.map(tipPercentLabel).join(', ')),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () => showAppSheet(
+              context: context,
+              builder: (_) => const TipPresetsSheet(),
+            ),
           ),
-          if (s.enabled) ...[
-            const Divider(height: 1, indent: 16),
-            ListTile(
-              title: const Text('Tip percentages'),
-              subtitle: Text(s.presets.map(tipPercentLabel).join(', ')),
-              trailing: const Icon(Icons.chevron_right_rounded),
-              onTap: () => showAppSheet(
-                context: context,
-                builder: (_) => const TipPresetsSheet(),
-              ),
-            ),
-            const Divider(height: 1, indent: 16),
-            SwitchListTile(
-              title: const Text('Tip on total after tax'),
-              subtitle: Text(s.postTax
-                  ? 'Percentages apply to the total with tax'
-                  : 'Percentages apply to the price before tax'),
-              value: s.postTax,
-              onChanged: notifier.setPostTax,
-            ),
-          ],
+          const Divider(height: 1, indent: 16),
+          SwitchListTile(
+            title: const Text('Tip on total after tax'),
+            subtitle: Text(s.postTax
+                ? 'Percentages apply to the total with tax'
+                : 'Percentages apply to the price before tax'),
+            value: s.postTax,
+            onChanged: notifier.setPostTax,
+          ),
         ],
       ),
     );
