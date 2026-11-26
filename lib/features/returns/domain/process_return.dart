@@ -18,11 +18,15 @@ import 'package:pos_app/features/returns/domain/reverse_sale.dart';
 /// refund that brings the cumulative amount up to the total flips the order
 /// to `refunded` and reverses its loyalty points.
 ///
-/// `restock = true` re-adds every line item from the original order back
-/// into inventory, once per order. Composite products restock their
-/// components (mirroring `placeOrder`'s deduction logic). Per-line partial
-/// restock is a future extension — Returns schema only tracks per-order
-/// amount today.
+/// `restock = true` returns the whole order's items to inventory — a refund
+/// is per order, not per line, so every line counts as refunded whatever
+/// the amount. What goes back is decided by [RestockPlan]: a stock-linked
+/// order gets exactly what its own adjustment rows still owe (never more,
+/// so a sale capped by low stock restores only what it took, and a later
+/// refund or void finds nothing left); a CSV import gets nothing; another
+/// legacy order gets its lines while [trackStock] is on. Only one refund per
+/// order may restock.
+/// The Returns row records whether anything was to be restocked.
 ///
 /// Throws if the order doesn't exist, is voided, has nothing left to refund,
 /// or the amount is invalid. Caller handles UI error display.
@@ -35,17 +39,6 @@ Future<int> processReturn(
   String? reason,
   required bool trackStock,
 }) {
-  // INTERIM rule (until schema v16): restock only while Stock tracking is
-  // on NOW. It is wrong in both mixed cases:
-  // * sold with tracking ON, voided/refunded with it OFF: nothing is put
-  //   back, so stock stays LOW by the quantity sold;
-  // * sold with tracking OFF, voided/refunded with it ON: the sale deducted
-  //   nothing, yet it is restocked, so stock is OVER-restocked.
-  // TODO(schema v16): stock_adjustments gets order_id; replace this with
-  // the stock_linked + stockToRestock rule — restock exactly what THIS
-  // sale's own 'sale' rows deducted, whatever the switch says now. This
-  // branch is not merged to main on its own.
-  restock = restock && trackStock;
   return db.transaction(() async {
     final order = await db.ordersDao.getById(orderId);
     if (order == null) {
@@ -69,24 +62,28 @@ Future<int> processReturn(
       throw ArgumentError.value(amount, 'amount',
           'Refund amount exceeds the $refundable still refundable');
     }
+    // One restocking refund per order, as before.
     if (restock && await db.ordersDao.hasRestockedReturn(orderId)) {
       throw StateError(
           'Order #$orderId was already restocked by an earlier refund');
     }
+    // Read inside the transaction: a concurrent void can't restock twice.
+    final plan = restock
+        ? await readRestockPlan(db, order, trackStock: trackStock)
+        : RestockPlan.none;
+    final restocking = plan.any;
 
     final returnId = await db.ordersDao.insertReturn(
       ReturnsCompanion.insert(
         orderId: orderId,
         amount: refund,
-        restock: Value(restock),
+        restock: Value(restocking),
         reason: Value(reason),
       ),
     );
 
-    if (restock) {
-      await restockOrderItems(db, order,
-          reasonCode: 'return', note: 'Refund for Order');
-    }
+    await applyRestock(db, order, plan,
+        reasonCode: 'return', note: 'Refund for Order');
 
     if (refund >= refundable) {
       await db.ordersDao.refundOrder(orderId);
@@ -96,7 +93,7 @@ Future<int> processReturn(
     await audit.orderRefunded(
       orderId,
       amount: refund,
-      restocked: restock,
+      restocked: restocking,
       reason: reason,
     );
 
