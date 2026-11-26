@@ -29,8 +29,8 @@ void main() {
     await tmp.delete(recursive: true);
   });
 
-  Future<void> pump(WidgetTester tester) => tester.pumpWidget(
-      UncontrolledProviderScope(
+  Future<void> pump(WidgetTester tester) =>
+      tester.pumpWidget(UncontrolledProviderScope(
           container: c,
           child: const MaterialApp(home: Scaffold(body: TipsSection()))));
 

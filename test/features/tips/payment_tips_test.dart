@@ -132,8 +132,7 @@ void main() {
     await tester.tap(confirm());
     await settle(tester);
     expect(find.textContaining('less than the total with tip'), findsOneWidget);
-    expect(
-        await tester.runAsync(() => db.select(db.orders).get()), isEmpty);
+    expect(await tester.runAsync(() => db.select(db.orders).get()), isEmpty);
 
     await tester.enterText(tendered(), '150');
     await tester.pump();

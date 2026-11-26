@@ -133,7 +133,8 @@ void main() {
     expect((await restored.select(restored.orders).getSingle()).tipAmount, 9);
     expect((await restored.select(restored.returns).getSingle()).tipAmount, 4);
     expect(
-        await restored.ordersDao.netTipsForPeriod(DateTime(2020), DateTime(2100)),
+        await restored.ordersDao
+            .netTipsForPeriod(DateTime(2020), DateTime(2100)),
         5);
   });
 }

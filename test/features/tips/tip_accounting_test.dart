@@ -71,8 +71,8 @@ void main() {
       final id = await placeOrder(db, audit,
           cart: [line(pid)],
           summary: CartSummary.zero,
-          session: CartSession(
-              ticketNumber: '#2', openedAt: DateTime(2026, 1, 1)),
+          session:
+              CartSession(ticketNumber: '#2', openedAt: DateTime(2026, 1, 1)),
           paymentMethod: 'cash',
           tenderedAmount: 0,
           tipAmount: -5);
@@ -84,7 +84,7 @@ void main() {
     test('partial refund keeps the tip by default', () async {
       final id = await sale(tip: 15);
       await processReturn(db, audit,
-          orderId: id, amount: 40, restock: false);
+          orderId: id, amount: 40, restock: false, trackStock: true);
       expect((await returnsOf(id)).single.tipAmount, 0);
       expect(await netTips(), 15);
     });
@@ -93,12 +93,20 @@ void main() {
         () async {
       final id = await sale(tip: 15);
       await processReturn(db, audit,
-          orderId: id, amount: 40, restock: false, refundTip: true);
+          orderId: id,
+          amount: 40,
+          restock: false,
+          trackStock: true,
+          refundTip: true);
       expect((await returnsOf(id)).single.tipAmount, 15);
       expect(await netTips(), 0);
       // A later partial refund cannot return it a second time.
       await processReturn(db, audit,
-          orderId: id, amount: 10, restock: false, refundTip: true);
+          orderId: id,
+          amount: 10,
+          restock: false,
+          trackStock: true,
+          refundTip: true);
       expect((await returnsOf(id)).last.tipAmount, 0);
     });
 
@@ -107,7 +115,11 @@ void main() {
       final order = (await db.ordersDao.getById(id))!;
       expect(await refundableAmount(db, order), 100);
       await processReturn(db, audit,
-          orderId: id, amount: 40, restock: false, refundTip: true);
+          orderId: id,
+          amount: 40,
+          restock: false,
+          trackStock: true,
+          refundTip: true);
       expect(await refundableAmount(db, order), 60);
     });
 
@@ -115,9 +127,9 @@ void main() {
         () async {
       final id = await sale(tip: 15);
       await processReturn(db, audit,
-          orderId: id, amount: 40, restock: false);
+          orderId: id, amount: 40, restock: false, trackStock: true);
       await processReturn(db, audit,
-          orderId: id, amount: 60, restock: false);
+          orderId: id, amount: 60, restock: false, trackStock: true);
       final rs = await returnsOf(id);
       expect(rs.first.tipAmount, 0);
       expect(rs.last.tipAmount, 15);
@@ -128,7 +140,7 @@ void main() {
     test('a single full refund returns the tip', () async {
       final id = await sale(tip: 15);
       await processReturn(db, audit,
-          orderId: id, amount: 100, restock: false);
+          orderId: id, amount: 100, restock: false, trackStock: true);
       expect((await returnsOf(id)).single.tipAmount, 15);
       expect(await netTips(), 0);
     });
@@ -136,11 +148,14 @@ void main() {
     test('refund of an untipped order writes tip 0', () async {
       final id = await sale();
       await processReturn(db, audit,
-          orderId: id, amount: 100, restock: false, refundTip: true);
+          orderId: id,
+          amount: 100,
+          restock: false,
+          trackStock: true,
+          refundTip: true);
       expect((await returnsOf(id)).single.tipAmount, 0);
     });
   });
-
 
   group('tip-only refunds', () {
     Future<int> zeroTotalSale(double tip) => placeOrder(
@@ -168,7 +183,11 @@ void main() {
       final id = await zeroTotalSale(6);
       expect(await netTips(), 6);
       await processReturn(db, audit,
-          orderId: id, amount: 0, restock: false, refundTip: true);
+          orderId: id,
+          amount: 0,
+          restock: false,
+          trackStock: true,
+          refundTip: true);
       final r = (await returnsOf(id)).single;
       expect((r.amount, r.tipAmount), (0, 6));
       expect(await netTips(), 0);
@@ -176,7 +195,11 @@ void main() {
       // Nothing left: a second one is refused.
       expect(
           () => processReturn(db, audit,
-              orderId: id, amount: 0, restock: false, refundTip: true),
+              orderId: id,
+              amount: 0,
+              restock: false,
+              trackStock: true,
+              refundTip: true),
           throwsA(isA<StateError>()));
     });
 
@@ -184,7 +207,11 @@ void main() {
         () async {
       final id = await sale(tip: 15);
       await processReturn(db, audit,
-          orderId: id, amount: 0, restock: true, refundTip: true);
+          orderId: id,
+          amount: 0,
+          restock: true,
+          trackStock: true,
+          refundTip: true);
       var rs = await returnsOf(id);
       expect((rs.single.amount, rs.single.tipAmount, rs.single.restock),
           (0, 15, false));
@@ -194,7 +221,7 @@ void main() {
       expect(order.status, 'completed');
 
       await processReturn(db, audit,
-          orderId: id, amount: 100, restock: false);
+          orderId: id, amount: 100, restock: false, trackStock: true);
       rs = await returnsOf(id);
       expect(rs.last.tipAmount, 0);
       expect((await db.ordersDao.getById(id))!.status, 'refunded');
@@ -204,12 +231,16 @@ void main() {
       final id = await sale(tip: 15);
       expect(
           () => processReturn(db, audit,
-              orderId: id, amount: 0, restock: false),
+              orderId: id, amount: 0, restock: false, trackStock: true),
           throwsA(isA<ArgumentError>()));
       final plain = await sale();
       expect(
           () => processReturn(db, audit,
-              orderId: plain, amount: 0, restock: false, refundTip: true),
+              orderId: plain,
+              amount: 0,
+              restock: false,
+              trackStock: true,
+              refundTip: true),
           throwsA(isA<ArgumentError>()));
     });
   });
@@ -220,8 +251,7 @@ void main() {
     // As an import writes it: refunded, tip stored, no refund rows.
     await db.ordersDao.refundOrder(id);
     expect(await netTips(), 0);
-    expect(
-        await db.ordersDao.totalRevenueForPeriod(from, to), 0);
+    expect(await db.ordersDao.totalRevenueForPeriod(from, to), 0);
   });
 
   group('voids', () {
@@ -229,7 +259,8 @@ void main() {
       final keep = await sale(tip: 5);
       final gone = await sale(tip: 20);
       expect(await netTips(), 25);
-      await voidOrder(db, audit, orderId: gone, reason: 'mistake');
+      await voidOrder(db, audit,
+          orderId: gone, reason: 'mistake', trackStock: true);
       expect(await netTips(), 5);
       expect((await db.ordersDao.getById(keep))!.status, 'completed');
     });
@@ -238,9 +269,13 @@ void main() {
       final a = await sale(tip: 20);
       final b = await sale(tip: 5);
       await processReturn(db, audit,
-          orderId: a, amount: 10, restock: false, refundTip: true);
+          orderId: a,
+          amount: 10,
+          restock: false,
+          trackStock: true,
+          refundTip: true);
       expect(await netTips(), 5);
-      await voidOrder(db, audit, orderId: a, reason: 'x');
+      await voidOrder(db, audit, orderId: a, reason: 'x', trackStock: true);
       expect(await netTips(), 5, reason: 'voided order and its refund are out');
       expect((await db.ordersDao.getById(b))!.tipAmount, 5);
     });
@@ -300,16 +335,18 @@ void main() {
         await control.ordersDao.totalRevenueForPeriod(from, to),
         await control.ordersDao.vatCollectedForPeriod(from, to),
         (await control.ordersDao.costOfGoodsForPeriod(from, to)).cost,
-      ], [withTips[0], withTips[1], withTips[2]]);
+      ], [
+        withTips[0],
+        withTips[1],
+        withTips[2]
+      ]);
       expect(withTips[0], 400);
       expect(await netTips(), 21.5);
-      expect(
-          [
-            for (final r
-                in await control.ordersDao.paymentBreakdownForPeriod(from, to))
-              '${r['method']}:${r['count']}:${r['total']}'
-          ],
-          withTips[3]);
+      expect([
+        for (final r
+            in await control.ordersDao.paymentBreakdownForPeriod(from, to))
+          '${r['method']}:${r['count']}:${r['total']}'
+      ], withTips[3]);
     });
   });
 }

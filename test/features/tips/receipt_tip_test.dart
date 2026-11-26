@@ -68,8 +68,8 @@ void main() {
   final fmt = CurrencyFormatter(symbol: 'Rs ', locale: 'en_US');
 
   Future<void> body(WidgetTester tester, ReceiptBodyData d) =>
-      tester.pumpWidget(MaterialApp(
-          home: Scaffold(body: ReceiptBody(data: d, fmt: fmt))));
+      tester.pumpWidget(
+          MaterialApp(home: Scaffold(body: ReceiptBody(data: d, fmt: fmt))));
 
   testWidgets('on-screen receipt: Tip row, Total Paid includes the tip',
       (tester) async {
@@ -100,8 +100,7 @@ void main() {
   });
 
   test('ESC/POS text receipt', () async {
-    String text(List<int> b) =>
-        String.fromCharCodes(b.where((c) => c >= 0x20));
+    String text(List<int> b) => String.fromCharCodes(b.where((c) => c >= 0x20));
     final tipped = text(await renderReceiptBytes(_data(tip: 10), fmt, 80));
     expect(tipped, contains('Tip'));
     expect(tipped, contains('TOTAL PAID'));

@@ -89,7 +89,11 @@ void main() {
     expect(withTip.profit, withTip.salesExVat - withTip.costOfGoods);
 
     await processReturn(db, audit,
-        orderId: tipped, amount: 50, restock: false, refundTip: true);
+        orderId: tipped,
+        amount: 50,
+        restock: false,
+        trackStock: true,
+        refundTip: true);
     expect((await report()).netTips, 0);
     expect(plain, isNot(tipped));
   });
@@ -134,7 +138,8 @@ void main() {
     expect(find.text('Rs 0.00'), findsWidgets);
   });
 
-  testWidgets('Tips card: shown, with its value, when the period has tips even '
+  testWidgets(
+      'Tips card: shown, with its value, when the period has tips even '
       'if the switch is off', (tester) async {
     await body(tester, data(tips: 21.5));
     expect(find.text('Tips'), findsOneWidget);

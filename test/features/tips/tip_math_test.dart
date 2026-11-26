@@ -169,8 +169,7 @@ void tipBaseOfTests() {
           taxEnabled: false);
       expect(tipBaseOf(s), 113);
     });
-    test('mixed inclusive and exclusive: only the inclusive tax comes off',
-        () {
+    test('mixed inclusive and exclusive: only the inclusive tax comes off', () {
       // 113 prices (13 inside) + 5 exclusive tax = 118 total.
       final s = _summary(subtotal: 113, total: 118, taxes: [
         _tax(13, inclusive: true),
