@@ -31,9 +31,7 @@ class SupportScreen extends ConsumerWidget {
             subtitle: 'support@rebuzzpos.com',
             cs: cs,
             tt: tt,
-            onTap: () => launchUrl(
-              Uri.parse('mailto:support@rebuzzpos.com'),
-            ),
+            onTap: () => openSupportMailOrExplain(context),
           ),
           _SupportTile(
             icon: Icons.chat_rounded,
@@ -71,11 +69,8 @@ class SupportScreen extends ConsumerWidget {
             subtitle: 'Let us know what went wrong',
             cs: cs,
             tt: tt,
-            onTap: () => launchUrl(
-              Uri.parse(
-                'mailto:support@rebuzzpos.com?subject=${Uri.encodeComponent('openPOS Bug')}',
-              ),
-            ),
+            onTap: () =>
+                openSupportMailOrExplain(context, subject: 'Open POS Bug'),
           ),
           _SupportTile(
             icon: Icons.lightbulb_outline_rounded,
@@ -83,21 +78,8 @@ class SupportScreen extends ConsumerWidget {
             subtitle: 'Suggest improvements',
             cs: cs,
             tt: tt,
-            onTap: () => launchUrl(
-              Uri.parse(
-                'mailto:support@rebuzzpos.com?subject=${Uri.encodeComponent('openPOS Feature Request')}',
-              ),
-            ),
-          ),
-          _SupportTile(
-            icon: Icons.article_outlined,
-            title: 'Documentation',
-            subtitle: 'Full product docs & guides',
-            cs: cs,
-            tt: tt,
-            onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Documentation coming soon')),
-            ),
+            onTap: () => openSupportMailOrExplain(context,
+                subject: 'Open POS Feature Request'),
           ),
           const SizedBox(height: 20),
           _SectionHeader('More from the team', tt, cs),
@@ -106,20 +88,6 @@ class SupportScreen extends ConsumerWidget {
             title: 'RebuzzPOS',
             subtitle: 'Online POS with 40+ additional features',
             gradient: const [Color(0xFF6B68FF), Color(0xFF00B8C8)],
-            cs: cs,
-            tt: tt,
-            onTap: () => launchUrl(
-              Uri.parse('https://rebuzzpos.com'),
-              mode: LaunchMode.externalApplication,
-            ),
-          ),
-          const SizedBox(height: 8),
-          _UpgradeCard(
-            icon: Icons.phone_iphone_rounded,
-            title: 'Ordering App',
-            subtitle:
-                'Get your own online ordering mobile app for your business',
-            gradient: const [Color(0xFFE01E6A), Color(0xFFFF8C42)],
             cs: cs,
             tt: tt,
             onTap: () => launchUrl(
@@ -274,9 +242,12 @@ class _SupportTile extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 8),
         child: ListTile(
           leading: Icon(icon, color: cs.primary),
-          title: Text(title, style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
-          subtitle: Text(subtitle, style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-          trailing: Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
+          title: Text(title,
+              style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+          subtitle: Text(subtitle,
+              style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+          trailing:
+              Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
           onTap: onTap,
         ),
       );
@@ -299,9 +270,11 @@ class _InfoRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 6),
         child: Row(
           children: [
-            Text(label, style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
+            Text(label,
+                style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
             const Spacer(),
-            Text(value, style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+            Text(value,
+                style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
           ],
         ),
       );

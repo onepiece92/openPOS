@@ -54,3 +54,40 @@ Future<void> openSupportWhatsAppOrExplain(
     duration: kLinkFailureMessageDuration,
   ));
 }
+
+/// Support's email address.
+const kSupportEmail = 'support@rebuzzpos.com';
+
+/// Shown when no mail app opened.
+const kSupportMailUnavailable =
+    'No mail app opened. Email us at $kSupportEmail.';
+
+/// Opens a new email to support in the mail app. Never throws: false from
+/// `launchUrl` and a `PlatformException` both give false.
+Future<bool> openSupportMail({String? subject, UrlOpener? launch}) async {
+  final uri = Uri(
+    scheme: 'mailto',
+    path: kSupportEmail,
+    query: subject == null ? null : 'subject=${Uri.encodeComponent(subject)}',
+  );
+  try {
+    return await (launch ?? launchUrl)(uri);
+  } catch (_) {
+    return false;
+  }
+}
+
+/// [openSupportMail], and when nothing opens, a short message with the
+/// address so the shopkeeper can still reach us.
+Future<void> openSupportMailOrExplain(
+  BuildContext context, {
+  String? subject,
+  UrlOpener? launch,
+}) async {
+  final messenger = ScaffoldMessenger.maybeOf(context);
+  if (await openSupportMail(subject: subject, launch: launch)) return;
+  messenger?.showSnackBar(const SnackBar(
+    content: Text(kSupportMailUnavailable),
+    duration: kLinkFailureMessageDuration,
+  ));
+}

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -317,8 +318,8 @@ class _ProductArea extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final catalog = ref.watch(posCatalogProvider);
-    final (isGrid, favoritesOnly) = ref.watch(
-        posFilterProvider.select((f) => (f.isGrid, f.favoritesOnly)));
+    final (isGrid, favoritesOnly) =
+        ref.watch(posFilterProvider.select((f) => (f.isGrid, f.favoritesOnly)));
     return catalog.when(
       data: (view) {
         if (view.catalogEmpty) {
@@ -391,7 +392,9 @@ class _EmptyProductsStateState extends ConsumerState<_EmptyProductsState> {
             ),
             const SizedBox(height: 6),
             Text(
-              'Add your first product or load demo data\nto explore all features.',
+              kDebugMode
+                  ? 'Add your first product or load demo data\nto explore all features.'
+                  : 'Add your first product to get started.',
               textAlign: TextAlign.center,
               style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
             ),
@@ -401,19 +404,21 @@ class _EmptyProductsStateState extends ConsumerState<_EmptyProductsState> {
               icon: const Icon(Icons.add_rounded),
               label: const Text('Add Product'),
             ),
-            const SizedBox(height: 12),
-            _loading
-                ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : OutlinedButton.icon(
-                    onPressed: _loadDemo,
-                    icon: const Icon(Icons.dataset_rounded),
-                    label: const Text('Load Demo Data'),
-                  ),
-            if (!_loading) ...[
+            if (kDebugMode) ...[
+              const SizedBox(height: 12),
+              _loading
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : OutlinedButton.icon(
+                      onPressed: _loadDemo,
+                      icon: const Icon(Icons.dataset_rounded),
+                      label: const Text('Load Demo Data'),
+                    ),
+            ],
+            if (kDebugMode && !_loading) ...[
               const SizedBox(height: 8),
               Text(
                 '6 categories · 46 bakery products · 5 customers',
@@ -549,17 +554,15 @@ class _ListSeparator extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final eitherInCart = ref.watch(cartMainUnitQtyProvider.select((qty) =>
-        (qty[productId] ?? 0) > 0 || (qty[nextProductId] ?? 0) > 0));
+    final eitherInCart = ref.watch(cartMainUnitQtyProvider.select(
+        (qty) => (qty[productId] ?? 0) > 0 || (qty[nextProductId] ?? 0) > 0));
     if (eitherInCart) return const SizedBox(height: 2);
     return Divider(
       height: 1,
       indent: 16,
       endIndent: 16,
-      color: Theme.of(context)
-          .colorScheme
-          .outlineVariant
-          .withValues(alpha: 0.5),
+      color:
+          Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.5),
     );
   }
 }
