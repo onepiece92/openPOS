@@ -39,6 +39,7 @@ ReceiptBodyData _data() {
       pointsRedeemed: 10,
       loyaltyDiscount: 1.0,
       pointsEarned: 4,
+      tipAmount: 0.0,
       notes: null,
       createdAt: at,
       updatedAt: at,
