@@ -12,6 +12,8 @@ import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/theme/app_theme.dart';
 import 'package:pos_app/core/utils/money.dart';
 import 'package:pos_app/shared/widgets/app_sheet.dart';
+import 'package:pos_app/features/cart/domain/held_order.dart';
+import 'package:pos_app/features/cart/presentation/providers/held_orders_notifier.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
 
 /// Pass [productId] for edit mode; omit (null) for add mode.
@@ -237,12 +239,17 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
   }
 
   Future<void> _delete() async {
+    // One pass over the held tickets, only when deleting.
+    final onTickets = productOnHeldTicketsWarning(ref
+        .read(heldOrdersProvider.notifier)
+        .ticketsWithProduct(widget.productId!));
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Delete product?'),
-        content: const Text(
-          'This product will be hidden from the catalog. Past order history is preserved.',
+        content: Text(
+          'This product will be hidden from the catalog. Past order history is preserved.'
+          '${onTickets == null ? '' : '\n\n$onTickets'}',
         ),
         actions: [
           TextButton(

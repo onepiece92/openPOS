@@ -134,3 +134,79 @@ String _legacyNumber(Map<String, dynamic> json) {
   final id = int.tryParse(json['id'] as String? ?? '') ?? 0;
   return '#${(id % 10000).toString().padLeft(4, '0')}';
 }
+
+/// A held ticket checked against the database before it is resumed.
+class ResumeCheck {
+  const ResumeCheck(this.ticket, {this.removedLines = 0, this.changed = false});
+
+  /// The ticket to resume: lines for products that no longer exist are
+  /// dropped, and a customer or table that no longer exists is cleared.
+  final HeldOrder ticket;
+
+  /// How many lines were dropped.
+  final int removedLines;
+
+  /// Whether anything was dropped or cleared.
+  final bool changed;
+
+  /// What to tell the cashier, or null when no line was removed.
+  String? get message => removedLinesMessage(removedLines);
+}
+
+/// "1 item no longer exists and was removed" / "N items no longer exist and
+/// were removed"; null for none.
+String? removedLinesMessage(int n) => switch (n) {
+      0 => null,
+      1 => '1 item no longer exists and was removed',
+      _ => '$n items no longer exist and were removed',
+    };
+
+/// [ticket] without what is gone: lines whose product is not in
+/// [liveProductIds], and the customer / table when they no longer exist.
+/// Tickets can outlive their data (a factory reset, a backup restore, a
+/// deleted product); resuming one must not carry dead ids into a sale.
+ResumeCheck checkHeldOrder(
+  HeldOrder ticket, {
+  required Set<int> liveProductIds,
+  required bool customerExists,
+  required bool tableExists,
+}) {
+  final items =
+      ticket.items.where((i) => liveProductIds.contains(i.productId)).toList();
+  final removed = ticket.items.length - items.length;
+  final dropCustomer = ticket.customerId != null && !customerExists;
+  final dropTable = ticket.tableId != null && !tableExists;
+  if (removed == 0 && !dropCustomer && !dropTable) return ResumeCheck(ticket);
+  return ResumeCheck(
+    HeldOrder(
+      id: ticket.id,
+      ticketNumber: ticket.ticketNumber,
+      label: ticket.label,
+      createdAt: ticket.createdAt,
+      items: items,
+      customerName: dropCustomer ? null : ticket.customerName,
+      customerId: dropCustomer ? null : ticket.customerId,
+      tableId: dropTable ? null : ticket.tableId,
+      orderDiscount: ticket.orderDiscount,
+      orderDiscountIsPercent: ticket.orderDiscountIsPercent,
+      taxEnabled: ticket.taxEnabled,
+      taxRateIds: ticket.taxRateIds,
+      archivedAt: ticket.archivedAt,
+    ),
+    removedLines: removed,
+    changed: true,
+  );
+}
+
+/// How many held tickets (active or archived) have a line for [productId].
+int heldTicketsWithProduct(Iterable<HeldOrder> tickets, int productId) =>
+    tickets.where((t) => t.items.any((i) => i.productId == productId)).length;
+
+/// Warning for deleting a product that is on held tickets; null for none.
+String? productOnHeldTicketsWarning(int n) => switch (n) {
+      0 => null,
+      1 => 'This product is on 1 held ticket. It will be removed from it '
+          'when it is resumed.',
+      _ => 'This product is on $n held tickets. It will be removed from them '
+          'when they are resumed.',
+    };

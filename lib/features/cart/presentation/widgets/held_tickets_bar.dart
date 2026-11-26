@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -399,8 +401,15 @@ class _HeldTicketsSheetState extends ConsumerState<_HeldTicketsSheet>
     }
   }
 
-  void _loadTicket(
-      NavigatorState nav, GoRouter router, WidgetRef ref, HeldOrder ticket) {
+  Future<void> _loadTicket(NavigatorState nav, GoRouter router, WidgetRef ref,
+      HeldOrder held) async {
+    final messenger = ScaffoldMessenger.maybeOf(nav.context);
+    // Products, the customer or the table may be gone since the ticket was
+    // parked (deleted, a factory reset, a backup restore): drop them first.
+    final check =
+        await ref.read(heldOrdersProvider.notifier).checkForResume(held);
+    if (!nav.mounted) return;
+    final ticket = check.ticket;
     final notifier = ref.read(cartProvider.notifier);
     // clearItems, not clear: clear() would open a fresh session and burn a new
     // ticket number, which is exactly what resumeTicket is about to undo.
@@ -431,7 +440,10 @@ class _HeldTicketsSheetState extends ConsumerState<_HeldTicketsSheet>
       } catch (_) {}
     }
     nav.pop(); // close the sheet
-    router.push('/cart'); // open cart detail
+    unawaited(router.push('/cart')); // open cart detail
+    final removed = check.message;
+    if (removed != null) {
+      messenger?.showSnackBar(SnackBar(content: Text(removed)));
+    }
   }
 }
-

@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 
+import 'package:drift/drift.dart' show QueryRow, Variable;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
+import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/features/cart/data/ticket_sequence.dart';
 import 'package:pos_app/features/cart/domain/cart_item.dart';
@@ -167,6 +170,67 @@ class HeldOrdersNotifier extends Notifier<List<HeldOrder>> {
     ref.read(usageCounterProvider).record(UsageEvent.ticketHeld);
     return held;
   }
+
+  /// Checks [ticket] against the database before it is resumed, in one
+  /// query (primary-key lookups only): lines whose product is gone or was
+  /// deleted are dropped, and a customer or table that no longer exists is
+  /// cleared. A changed ticket is saved back, so it is cleaned only once.
+  /// When the database cannot be read the ticket is returned unchanged
+  /// (payment still refuses dead ids, see `placeOrder`).
+  Future<ResumeCheck> checkForResume(HeldOrder ticket) async {
+    final productIds = {for (final i in ticket.items) i.productId}.toList();
+    final parts = <String>[];
+    final args = <Variable<Object>>[];
+    if (productIds.isNotEmpty) {
+      parts.add("SELECT 'p' AS k, id FROM products "
+          'WHERE is_active = 1 AND id IN '
+          '(${List.filled(productIds.length, '?').join(', ')})');
+      args.addAll(productIds.map(Variable<int>.new));
+    }
+    if (ticket.customerId != null) {
+      parts.add("SELECT 'c' AS k, id FROM customers WHERE id = ?");
+      args.add(Variable<int>(ticket.customerId!));
+    }
+    if (ticket.tableId != null) {
+      parts.add("SELECT 't' AS k, id FROM tables WHERE id = ?");
+      args.add(Variable<int>(ticket.tableId!));
+    }
+    if (parts.isEmpty) return ResumeCheck(ticket);
+    final List<QueryRow> rows;
+    try {
+      rows = await ref
+          .read(databaseProvider)
+          .customSelect(parts.join(' UNION ALL '), variables: args)
+          .get();
+    } catch (_) {
+      return ResumeCheck(ticket);
+    }
+    final live = <int>{};
+    var customer = false, table = false;
+    for (final r in rows) {
+      switch (r.read<String>('k')) {
+        case 'p':
+          live.add(r.read<int>('id'));
+        case 'c':
+          customer = true;
+        case 't':
+          table = true;
+      }
+    }
+    final check = checkHeldOrder(ticket,
+        liveProductIds: live, customerExists: customer, tableExists: table);
+    if (check.changed && _box.containsKey(ticket.id)) {
+      // Like every write here: the box updates in memory at once.
+      unawaited(_box.put(ticket.id, jsonEncode(check.ticket.toJson())));
+      state = _loadAll();
+    }
+    return check;
+  }
+
+  /// How many held tickets have a line for [productId] (one scan of the
+  /// in-memory list). Used to warn before a product is deleted.
+  int ticketsWithProduct(int productId) =>
+      heldTicketsWithProduct(state, productId);
 
   /// Archives a held ticket by id.
   void archive(String id) {
