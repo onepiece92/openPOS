@@ -29,6 +29,13 @@ void main() {
     expect(saleFailureMessage(e), kSaleForeignKeyMessage);
   });
 
+  test("placeOrder's own refusals keep their plain message", () {
+    expect(
+        saleFailureMessage(ArgumentError.value(
+            900, 'tipAmount', 'Tip is too large for this sale (at most 50.00)')),
+        'Tip is too large for this sale (at most 50.00)');
+  });
+
   test('other constraint failures are not', () {
     final e = violation('INSERT INTO c (id, p) VALUES (1, NULL)');
     expect(isForeignKeyFailure(e), isFalse);

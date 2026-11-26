@@ -30,6 +30,13 @@ const kSaleForeignKeyMessage = 'Some items or the customer on this sale no '
 /// Payment: any other failure to save the sale (never the raw error).
 const kSaleFailedMessage = "The sale couldn't be saved. Please try again.";
 
-/// What payment shows when saving the sale threw [error].
-String saleFailureMessage(Object error) =>
-    isForeignKeyFailure(error) ? kSaleForeignKeyMessage : kSaleFailedMessage;
+/// What payment shows when saving the sale threw [error]. `placeOrder`'s
+/// own refusals (an [ArgumentError] such as a tip far past the cap) are
+/// already written for people and are shown as they are.
+String saleFailureMessage(Object error) {
+  if (isForeignKeyFailure(error)) return kSaleForeignKeyMessage;
+  if (error is ArgumentError && error.message is String) {
+    return error.message as String;
+  }
+  return kSaleFailedMessage;
+}
