@@ -307,8 +307,65 @@ void main() {
       expect(s.currencyCode, 'KES');
       expect(s.currencySymbol, 'KSh');
       expect(s.countryCode, 'KE');
-      expect(await db.select(db.taxRates).get(), isEmpty,
-          reason: 'the tax step was not passed');
+      final rates = await db.select(db.taxRates).get();
+      expect(rates.map((r) => (r.name, r.rate)), [('VAT', 0.16)],
+          reason: 'Skip on the Tax step keeps the rate on screen');
+    });
+
+    test('Skip on the Tax step saves the rate on screen, like Country',
+        () async {
+      final c = container();
+      final n = c.read(onboardingNotifierProvider.notifier)
+        ..setBusinessType(BusinessType.cafe)
+        ..setTaxName('GST')
+        ..setTaxRate(7.5);
+      while (c.read(onboardingNotifierProvider).current != OnboardingStep.tax) {
+        n.next();
+      }
+      expect(c.read(onboardingNotifierProvider).passed(OnboardingStep.tax),
+          isFalse);
+      await n.skip();
+      final rates = await db.select(db.taxRates).get();
+      expect(rates.map((r) => (r.name, r.rate)), [('GST', 0.075)]);
+      expect(c.read(settingsProvider).defaultTaxId, rates.single.id);
+    });
+
+    test('Skip on the Tax step with a blank rate adds no rate', () async {
+      final c = container();
+      final n = c.read(onboardingNotifierProvider.notifier)
+        ..setBusinessType(BusinessType.cafe)
+        ..setTaxRate(0);
+      while (c.read(onboardingNotifierProvider).current != OnboardingStep.tax) {
+        n.next();
+      }
+      await n.skip();
+      expect(await db.select(db.taxRates).get(), isEmpty);
+    });
+
+    group('Confirm: Currency', () {
+      test('nothing picked, region not matched: USD (\$), as Finish saves', () {
+        expect(currencySummary(null), r'USD ($)');
+        expect(currencySummary(null),
+            '${kUnmatchedCountry.currency} (${kUnmatchedCountry.symbol})');
+      });
+      test('a picked country shows its own currency', () {
+        expect(
+            currencySummary(const CountryDefault(
+                code: 'KE',
+                name: 'Kenya',
+                currency: 'KES',
+                symbol: 'KSh',
+                timezone: 'Africa/Nairobi',
+                taxName: 'VAT',
+                taxRate: 16)),
+            'KES (KSh)');
+      });
+      testWidgets('the Confirm step shows USD (\$), not a dash',
+          (tester) async {
+        await tester.pumpWidget(const MaterialApp(
+            home: Scaffold(body: ConfirmStep(state: OnboardingState()))));
+        expect(find.text(r'USD ($)'), findsOneWidget);
+      });
     });
 
     test('Skip on the Country step keeps the country just picked', () async {
@@ -426,6 +483,15 @@ void main() {
         await tester.pumpAndSettle();
       }
       expect(find.text(kUnmatchedRegionText), findsOneWidget);
+      // Nothing picked: Confirm shows what Finish will save.
+      while (find.text('Finish Setup').evaluate().isEmpty) {
+        await tester.tap(find.text('Continue'));
+        await tester.pumpAndSettle();
+      }
+      expect(find.text(r'USD ($)'), findsOneWidget);
+      await tester.tap(find.text('Finish Setup'));
+      await tester.pumpAndSettle();
+      expect(c.read(settingsProvider).currencyCode, 'USD');
     });
 
     testWidgets(

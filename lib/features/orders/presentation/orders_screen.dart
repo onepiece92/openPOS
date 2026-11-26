@@ -86,11 +86,17 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
         for (final o in history.orders)
           if (o.customerId case final id? when !_nameCache.containsKey(id)) id,
       ];
-      final fresh = ref
-          .watch(customerNamesProvider(customerNamesKey(missing)))
-          .valueOrNull;
-      if (fresh != null) _nameCache.addAll(fresh);
-      customerNames = _nameCache;
+      final lookup = customerNamesProvider(customerNamesKey(missing));
+      // The cache is written when a lookup completes, never during build.
+      ref.listen<AsyncValue<Map<int, String>>>(lookup, (_, next) {
+        final names = next.valueOrNull;
+        if (names == null || names.isEmpty || !mounted) return;
+        setState(() => _nameCache.addAll(names));
+      });
+      final fresh = ref.watch(lookup).valueOrNull;
+      customerNames = fresh == null || fresh.isEmpty
+          ? _nameCache
+          : {..._nameCache, ...fresh};
     }
 
     return Scaffold(

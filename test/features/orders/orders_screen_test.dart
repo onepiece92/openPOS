@@ -196,4 +196,52 @@ void main() {
         scrollable: find.byType(Scrollable).last);
     expect(find.textContaining('Cust5'), findsOneWidget);
   });
+
+  testWidgets(
+      'Customers off: looked-up names go into the cache when the lookup '
+      'completes, so the next page looks up only its new customers',
+      (tester) async {
+    final ids = <int>[];
+    await tester.runAsync(() async {
+      for (var i = 0; i < 6; i++) {
+        ids.add(await db.customersDao
+            .upsert(CustomersCompanion.insert(name: 'Cust$i')));
+      }
+      final now = DateTime.now();
+      for (var i = 0; i < 6; i++) {
+        await order(i + 1, now.subtract(Duration(minutes: i)),
+            customerId: ids[i]);
+      }
+    });
+    await settingsBox.put(kFeaturesKey,
+        {for (final f in Feature.values) f.name: true}..['customers'] = false);
+    container.dispose();
+    final keys = <String>[];
+    container = ProviderContainer(overrides: [
+      databaseProvider.overrideWithValue(db),
+      settingsBoxProvider.overrideWithValue(settingsBox),
+      orderHistoryProvider
+          .overrideWith((ref) => OrderHistoryNotifier(db, pageSize: 4)),
+      customerNamesProvider.overrideWith((ref, key) {
+        keys.add(key);
+        if (key.isEmpty) return const <int, String>{};
+        return db.customersDao.namesFor(key.split(',').map(int.parse));
+      }),
+    ]);
+    await pumpScreen(tester);
+    final firstPage = customerNamesKey(ids.take(4));
+    expect(keys.where((k) => k.isNotEmpty), [firstPage]);
+    expect(keys.last, '', reason: 'the cache now has page one: none missing');
+    expect(find.textContaining('Cust0'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Show older orders'));
+    await tester.tap(find.text('Show older orders'));
+    await settle(tester);
+    expect(keys.where((k) => k.isNotEmpty),
+        [firstPage, customerNamesKey(ids.skip(4))],
+        reason: 'page one is never looked up again');
+    await tester.scrollUntilVisible(find.textContaining('Cust5'), 300,
+        scrollable: find.byType(Scrollable).last);
+    expect(find.textContaining('Cust5'), findsOneWidget);
+  });
 }
