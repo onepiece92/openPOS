@@ -33,7 +33,14 @@ Future<int> processReturn(
   required double amount,
   required bool restock,
   String? reason,
+  bool trackStock = true,
 }) {
+  // INTERIM rule: restock only while Stock tracking is on NOW. A sale made
+  // while it was off deducted nothing, so putting it back would invent
+  // stock. TODO(schema v16): stock_adjustments gets an order_id; then
+  // restock exactly what THIS sale's own 'sale' rows deducted, whatever
+  // the switch says now (sold on / refunded off, and the reverse).
+  restock = restock && trackStock;
   return db.transaction(() async {
     final order = await db.ordersDao.getById(orderId);
     if (order == null) {

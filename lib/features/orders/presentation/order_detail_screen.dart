@@ -20,6 +20,22 @@ import 'package:pos_app/features/printing/domain/auto_print.dart';
 import 'package:pos_app/features/usage/usage_providers.dart';
 import 'package:pos_app/features/usage/domain/usage_event.dart';
 
+/// The void dialog's text: only what this void will actually do.
+@visibleForTesting
+String voidDialogText({required bool restocks, required bool points}) {
+  final does = [
+    if (restocks) 'reverses every stock deduction',
+    if (points) 'reverses the loyalty points redeemed and earned on it',
+  ];
+  final what = switch (does.length) {
+    0 => '',
+    1 => ' and ${does.single}',
+    _ => ', ${does.first} and ${does.last}',
+  };
+  return 'This marks the order as voided$what.'
+      '${restocks ? ' Composite components are restocked automatically.' : ''}';
+}
+
 // ─── Data bundle ──────────────────────────────────────────────────────────────
 
 class _DetailData {
@@ -253,6 +269,12 @@ class _DetailBody extends StatelessWidget {
 
   Future<void> _showVoidDialog(BuildContext context) async {
     final reasonCtrl = TextEditingController();
+    final trackStock = ref.read(featureOnProvider(Feature.stockTracking));
+    final text = voidDialogText(
+      // A refund that already restocked leaves nothing to put back.
+      restocks: trackStock && !data.restocked,
+      points: data.order.pointsRedeemed > 0 || data.order.pointsEarned > 0,
+    );
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -261,8 +283,7 @@ class _DetailBody extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-                'This marks the order as voided, reverses every stock deduction and reverses the loyalty points redeemed and earned on it. Composite components are restocked automatically.'),
+            Text(text, key: const ValueKey('void-text')),
             const SizedBox(height: 16),
             TextField(
               controller: reasonCtrl,
@@ -302,6 +323,7 @@ class _DetailBody extends StatelessWidget {
           audit,
           orderId: orderId,
           reason: reason.isEmpty ? '(no reason given)' : reason,
+          trackStock: trackStock,
         );
         return true;
       },
@@ -328,6 +350,8 @@ class _DetailBody extends StatelessWidget {
         TextEditingController(text: refundable.toStringAsFixed(2));
     final reasonCtrl = TextEditingController();
     bool restock = false;
+    // Stock tracking off: no "Restock items" (interim rule, see voidOrder).
+    final trackStock = ref.read(featureOnProvider(Feature.stockTracking));
 
     // Mirrors processReturn's rules so the cashier sees the problem before
     // confirming rather than as a failure afterwards.
@@ -378,8 +402,9 @@ class _DetailBody extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                if (!data.restocked)
+                if (trackStock && !data.restocked)
                   SwitchListTile(
+                    key: const ValueKey('refund-restock'),
                     title: const Text('Restock items'),
                     subtitle: const Text('Return quantities to inventory'),
                     value: restock,
@@ -423,6 +448,7 @@ class _DetailBody extends StatelessWidget {
           amount: amount,
           restock: restock,
           reason: reason,
+          trackStock: trackStock,
         );
         return true;
       },
