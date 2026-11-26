@@ -24,7 +24,11 @@ import 'package:pos_app/features/usage/domain/usage_event.dart';
 
 /// The void dialog's text: only what this void will actually do.
 @visibleForTesting
-String voidDialogText({required bool restocks, required bool points}) {
+String voidDialogText({
+  required bool restocks,
+  required bool points,
+  String? handBack,
+}) {
   final does = [
     if (restocks) 'reverses every stock deduction',
     if (points) 'reverses the loyalty points redeemed and earned on it',
@@ -35,8 +39,15 @@ String voidDialogText({required bool restocks, required bool points}) {
     _ => ', ${does.first} and ${does.last}',
   };
   return 'This marks the order as voided$what.'
-      '${restocks ? ' Composite components are restocked automatically.' : ''}';
+      '${restocks ? ' Composite components are restocked automatically.' : ''}'
+      '${handBack != null ? ' $handBack' : ''}';
 }
+
+/// "Hand back 115.00 including the tip of 15.00." - a void returns the sale
+/// and the tip with it.
+@visibleForTesting
+String voidHandBackText(String total, String tip) =>
+    'Hand back $total including the tip of $tip.';
 
 /// "3 units put back in stock." / "No stock to put back." — what a void or
 /// refund actually restocked, as its transaction found it.
@@ -289,10 +300,16 @@ class _DetailBody extends StatelessWidget {
   Future<void> _showVoidDialog(BuildContext context) async {
     final reasonCtrl = TextEditingController();
     final trackStock = ref.read(featureOnProvider(Feature.stockTracking));
+    // The tip still with the shop goes back with the sale.
+    final handBack = data.tipLeft > 0
+        ? voidHandBackText(
+            fmt.format(data.refundable + data.tipLeft), fmt.format(data.tipLeft))
+        : null;
     final text = voidDialogText(
       // Only when something is owed back to the shelf.
       restocks: data.restockPlan(trackStock: trackStock).any,
       points: data.order.pointsRedeemed > 0 || data.order.pointsEarned > 0,
+      handBack: handBack,
     );
     final confirm = await showDialog<bool>(
       context: context,
@@ -352,7 +369,9 @@ class _DetailBody extends StatelessWidget {
       ref.invalidate(_orderDetailProvider(orderId));
       // What the transaction did, not what the dialog expected.
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Order voided. ${restockedText(restocked)}')));
+          content: Text('Order voided. '
+              '${handBack != null ? '$handBack ' : ''}'
+              '${restockedText(restocked)}')));
       Navigator.pop(context);
     }
   }

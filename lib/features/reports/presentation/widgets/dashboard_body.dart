@@ -119,6 +119,15 @@ class DashboardBody extends StatelessWidget {
                               fontFamily: AppFonts.mono, fontFamilyFallback: AppFonts.monoFallback),
                         ),
                       )),
+                  if (sections.tips && data.netTips > 0)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                      child: Text(
+                        "Payment totals don't include tips.",
+                        key: const ValueKey('pay-mix-tips-note'),
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ),
                 ],
               ],
             ),

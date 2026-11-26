@@ -136,6 +136,38 @@ void main() {
     expect(find.text('Rs 0.00'), findsWidgets);
   });
 
+  // The caption only shows with a payment mix on screen.
+  ReportData withMix({double tips = 0}) => ReportData(
+        revenue: 10,
+        vatCollected: 0,
+        costOfGoods: 0,
+        soldLines: 0,
+        uncostedLines: 0,
+        expenses: 0,
+        orderCount: 1,
+        topProducts: const [],
+        payBreakdown: const [PayRow(method: 'cash', count: 1, total: 10)],
+        chartTitle: '',
+        chartDates: const [],
+        chartTotals: const [],
+        chartHighlightIndex: 0,
+        netTips: tips,
+      );
+
+  testWidgets('payment mix caption: tips on and tips in the period',
+      (tester) async {
+    await body(tester, withMix(tips: 4), show: true);
+    expect(find.text("Payment totals don't include tips."), findsOneWidget);
+  });
+
+  testWidgets('payment mix caption: absent without tips, or with Tips off',
+      (tester) async {
+    await body(tester, withMix(), show: true);
+    expect(find.text("Payment totals don't include tips."), findsNothing);
+    await body(tester, withMix(tips: 4));
+    expect(find.text("Payment totals don't include tips."), findsNothing);
+  });
+
   testWidgets('Tips card: switched off in Features, it is not built',
       (tester) async {
     await body(tester, data(tips: 21.5));
