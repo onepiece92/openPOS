@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-
 // ── Backup & Restore ──────────────────────────────────────────────────────────
 
 class BackupSection extends StatelessWidget {
@@ -14,7 +13,8 @@ class BackupSection extends StatelessWidget {
       child: ListTile(
         leading: const Icon(Icons.backup_outlined),
         title: const Text('Backup & Restore'),
-        subtitle: const Text('Export or import data via CSV'),
+        subtitle: const Text(
+            'Back up everything, restore, or export and import CSV files'),
         trailing: const Icon(Icons.chevron_right_rounded),
         onTap: () => context.push('/settings/backup'),
       ),
