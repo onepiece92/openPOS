@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:pos_app/core/database/app_database.dart';
+import 'package:pos_app/core/database/sqlite_errors.dart';
 import 'package:pos_app/core/providers/audit_service_provider.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
@@ -200,11 +201,14 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       _placing = false;
       if (mounted) setState(() {});
       if (messenger.mounted) {
+        // Plain words, never the raw database error. A foreign-key failure
+        // means a product, customer or table on the sale is gone (held
+        // tickets are cleaned on resume; this is the second guard).
         messenger.showSnackBar(
           SnackBar(
               content: Text(e is TipTooLargeException
                   ? tipTooLargeText(fmt.format(e.max))
-                  : 'Order failed: $e')),
+                  : saleFailureMessage(e))),
         );
       }
       return;

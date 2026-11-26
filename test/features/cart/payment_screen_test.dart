@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import 'package:pos_app/core/database/app_database.dart';
+import 'package:pos_app/core/database/sqlite_errors.dart';
 import 'package:pos_app/core/providers/audit_service_provider.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
@@ -165,6 +166,41 @@ void main() {
     expect(orders, hasLength(1));
     expect(find.textContaining('receipt'), findsOneWidget);
     expect(c.read(cartProvider), isEmpty);
+  });
+
+  testWidgets('a product that no longer exists: plain message, no SQL',
+      (tester) async {
+    c.read(cartProvider.notifier).restoreItem(CartItem(
+        productId: 999, // no such product: the order item's FK fails
+        name: 'Gone',
+        unitPrice: 10,
+        quantity: 1,
+        isTaxable: false));
+    await tester.pumpWidget(app(ValueNotifier(true)));
+    await tester.pump();
+
+    await tester.tap(confirm());
+    await settle(tester);
+
+    expect(
+        find.text('Some items or the customer on this sale no longer exist. '
+            'Remove them and try again.'),
+        findsOneWidget);
+    expect(find.textContaining('FOREIGN KEY'), findsNothing);
+    expect(find.textContaining('Sqlite'), findsNothing);
+    final orders = await tester.runAsync(() => db.select(db.orders).get());
+    expect(orders, isEmpty, reason: 'the sale was rolled back');
+    expect(c.read(cartProvider), hasLength(1), reason: 'cart kept to fix');
+    await tester.pump(const Duration(seconds: 5)); // SnackBar runs out
+  });
+
+  test('the message for each sale failure', () {
+    expect(saleFailureMessage(StateError('disk I/O error')),
+        "The sale couldn't be saved. Please try again.");
+    expect(
+        saleFailureMessage(Exception('SqliteException(787): while executing, '
+            'FOREIGN KEY constraint failed')),
+        kSaleForeignKeyMessage);
   });
 
   group('cash tendered', () {
