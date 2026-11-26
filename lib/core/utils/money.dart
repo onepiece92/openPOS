@@ -106,3 +106,36 @@ String? validateMoneyAmount(
   }
   return null;
 }
+
+/// What to show when a typed amount is not one [parseMoneyInput] accepts.
+const kMoneyInputHint = 'Enter the amount as a number, for example 1234.50';
+
+final _moneyInput = RegExp(r'^(\d*)(?:[.,](\d*))?$');
+
+/// Parses an amount typed into a money field, or null when it is not an
+/// unambiguous, in-range amount.
+///
+/// Rules (one place, so every money field can share them):
+///  * digits with at most one decimal separator, `.` or `,` ("12,5" is
+///    12.5); no grouping, no sign, no symbol;
+///  * a separator followed by exactly three digits is ambiguous ("1,234"
+///    could be 1234 or 1.234) and is rejected (money is kept in whole
+///    cents, [roundMoney], so three decimals are never meant);
+///  * more decimals than the currency's [decimalDigits] are rejected, never
+///    rounded away;
+///  * 0 to [kMaxMoneyAmount]; a trailing separator ("12.") is fine.
+///
+/// The payment screen's input formatter (`^\d*\.?\d{0,2}`) only lets
+/// through text these rules accept.
+double? parseMoneyInput(String raw, {int decimalDigits = 2}) {
+  final m = _moneyInput.firstMatch(raw.trim());
+  if (m == null) return null;
+  final whole = m.group(1)!;
+  final frac = m.group(2) ?? '';
+  if (whole.isEmpty && frac.isEmpty) return null;
+  if (frac.length == 3) return null;
+  if (frac.length > decimalDigits) return null;
+  final v = double.tryParse('${whole.isEmpty ? '0' : whole}.${frac}0');
+  if (v == null || !v.isFinite || v > kMaxMoneyAmount) return null;
+  return roundMoney(v);
+}

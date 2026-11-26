@@ -12,6 +12,7 @@ import 'package:share_plus/share_plus.dart' show XFile;
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
+import 'package:pos_app/core/utils/money.dart';
 import 'package:pos_app/features/backup/data/share_files.dart';
 import 'package:pos_app/features/printing/domain/receipt_printer.dart';
 import 'package:pos_app/features/shifts/data/shift_service.dart';
@@ -357,8 +358,26 @@ void main() {
       await type(tester, 'field-Counted cash', '99,5');
       expect(find.text('Short'), findsOneWidget);
       expect(parseMoneyField('12,5'), 12.5);
-      expect(parseMoneyField('1,234.50'), 1234.5);
       expect(parseMoneyField('abc'), isNull);
+    });
+
+    testWidgets('an ambiguous amount is refused with the example, never '
+        'misread', (tester) async {
+      await openDay();
+      await pump(tester, const CloseDayScreen());
+      for (final bad in ['1,234', '1.234,50', '1,234.50', '12.345']) {
+        await type(tester, 'field-Counted cash', bad);
+        expect(find.text(kMoneyInputHint), findsOneWidget, reason: bad);
+        expect(
+            tester
+                .widget<FilledButton>(find.byKey(const ValueKey('close-day')))
+                .onPressed,
+            isNull,
+            reason: bad);
+      }
+      await type(tester, 'field-Counted cash', '1234.50');
+      expect(find.text(kMoneyInputHint), findsNothing);
+      expect(find.text('Over'), findsOneWidget);
     });
 
     testWidgets('a void of an earlier day\'s sale explains the negative net',

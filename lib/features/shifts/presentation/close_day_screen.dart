@@ -16,17 +16,10 @@ import 'package:pos_app/features/shifts/presentation/shift_summary_panel.dart';
 import 'package:pos_app/features/shifts/shift_settings.dart';
 import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
 
-/// Parses a money field: null when empty, malformed, negative or too large.
-///
-/// A comma is accepted as the decimal separator ("12,5" is 12.5). When a dot
-/// is present too, commas are thousands separators and are dropped.
-double? parseMoneyField(String raw) {
-  var t = raw.trim();
-  t = t.contains('.') ? t.replaceAll(',', '') : t.replaceAll(',', '.');
-  final v = double.tryParse(t);
-  if (v == null || !v.isFinite || v < 0 || v > kMaxMoneyAmount) return null;
-  return roundMoney(v);
-}
+/// Parses a money field with the shared rules ([parseMoneyInput]): null
+/// when empty, malformed, ambiguous ("1,234"), too precise or too large.
+double? parseMoneyField(String raw, {int decimalDigits = 2}) =>
+    parseMoneyInput(raw, decimalDigits: decimalDigits);
 
 /// A plain sentence for an error shown to the shopkeeper.
 String friendlyShiftError(Object e) => e is ShiftStateException
@@ -123,10 +116,13 @@ class _CloseDayScreenState extends ConsumerState<CloseDayScreen> {
 
   CurrencyFormatter get _fmt => ref.read(currencyFormatterProvider);
 
+  double? _parse(String raw) =>
+      parseMoneyField(raw, decimalDigits: _fmt.decimalDigits);
+
   Future<void> _open() async {
-    final cash = parseMoneyField(_opening.text.isEmpty ? '0' : _opening.text);
+    final cash = _parse(_opening.text.isEmpty ? '0' : _opening.text);
     if (cash == null) {
-      _toast('Enter the opening cash as a number');
+      _toast(kMoneyInputHint);
       return;
     }
     setState(() => _busy = true);
@@ -179,20 +175,20 @@ class _CloseDayScreenState extends ConsumerState<CloseDayScreen> {
     return ShiftClose(
       shiftId: shift.id,
       openingCash: shift.openingCash,
-      paidOut: parseMoneyField(_paidOut.text) ?? 0,
-      countedCash: parseMoneyField(_counted.text),
+      paidOut: _parse(_paidOut.text) ?? 0,
+      countedCash: _parse(_counted.text),
       figures: f,
     );
   }
 
-  bool get _hasCount => parseMoneyField(_counted.text) != null;
+  bool get _hasCount => _parse(_counted.text) != null;
 
   Future<void> _closeDay() async {
     final shift = _shift!;
-    final paid = parseMoneyField(_paidOut.text.isEmpty ? '0' : _paidOut.text);
-    final counted = parseMoneyField(_counted.text);
+    final paid = _parse(_paidOut.text.isEmpty ? '0' : _paidOut.text);
+    final counted = _parse(_counted.text);
     if (paid == null || counted == null) {
-      _toast('Check the paid out and counted cash amounts');
+      _toast(kMoneyInputHint);
       return;
     }
     setState(() => _busy = true);
@@ -334,7 +330,8 @@ class _CloseDayScreenState extends ConsumerState<CloseDayScreen> {
         ),
         const SizedBox(height: 16),
       ],
-      _moneyField(_opening, 'Opening cash', helper: _openingNote),
+      _moneyField(_opening, 'Opening cash',
+          helper: _openingNote, onChanged: (_) => setState(() {})),
       const SizedBox(height: 16),
       FilledButton(
         key: const ValueKey('open-till'),
@@ -483,6 +480,9 @@ class _CloseDayScreenState extends ConsumerState<CloseDayScreen> {
         decoration: InputDecoration(
           labelText: label,
           helperText: helper,
+          errorText: c.text.trim().isEmpty || _parse(c.text) != null
+              ? null
+              : kMoneyInputHint,
           border: const OutlineInputBorder(),
         ),
       );
