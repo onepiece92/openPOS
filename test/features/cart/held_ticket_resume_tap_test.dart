@@ -15,6 +15,7 @@ import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/features/cart/domain/cart_item.dart';
+import 'package:pos_app/features/cart/domain/held_order.dart';
 import 'package:pos_app/features/cart/presentation/providers/cart_notifier.dart';
 import 'package:pos_app/features/cart/presentation/providers/held_orders_notifier.dart';
 import 'package:pos_app/features/cart/presentation/widgets/held_tickets_bar.dart';
@@ -156,7 +157,7 @@ void main() {
     expect(c.read(cartProvider), hasLength(1));
   });
 
-  testWidgets('a ticket with every product gone is removed, not loaded',
+  testWidgets('a ticket with every product gone is kept, with a Delete button',
       (tester) async {
     c
         .read(heldOrdersProvider.notifier)
@@ -168,10 +169,14 @@ void main() {
 
     expect(cartOpens, 0);
     expect(c.read(cartProvider), isEmpty);
+    expect(c.read(heldOrdersProvider), hasLength(1), reason: 'kept');
+    expect(find.text('None of the items on this ticket exist any more.'),
+        findsOneWidget);
+    await tester.pump(const Duration(seconds: 1));
+    await tester.tap(find.text('Delete ticket'));
+    await tester.pump(const Duration(seconds: 1));
     expect(c.read(heldOrdersProvider), isEmpty);
-    expect(
-        find.text('2 items no longer exist and were removed'), findsOneWidget);
-    await tester.pump(const Duration(seconds: 5));
+    await tester.pump(const Duration(seconds: 10));
   });
 
   group('tax rate on a held ticket', () {
@@ -201,7 +206,19 @@ void main() {
       expect(again.changed, isFalse);
     });
 
-    test('a rate switched off counts as gone', () async {
+    test('only the dead rate is removed, a live one stays', () async {
+      final a = await seedProduct(db, sku: 'A');
+      final live = await rate();
+      final held = c
+          .read(heldOrdersProvider.notifier)
+          .hold([item(a)], ticketNumber: '#0001', taxRateIds: [live, 99]);
+      final check =
+          await c.read(heldOrdersProvider.notifier).checkForResume(held);
+      expect(check.ticket.taxRateIds, [live]);
+      expect(check.message, kTicketTaxRemovedMessage);
+    });
+
+    test('a rate switched off is removed with its own message', () async {
       final a = await seedProduct(db, sku: 'A');
       final r = await rate(active: false);
       final held = c
@@ -209,7 +226,11 @@ void main() {
           .hold([item(a)], ticketNumber: '#0001', taxRateIds: [r]);
       final check =
           await c.read(heldOrdersProvider.notifier).checkForResume(held);
-      expect(check.taxRateRemoved, isTrue);
+      expect(check.taxRateOff, isTrue);
+      expect(check.taxRateRemoved, isFalse);
+      expect(check.ticket.taxRateIds, isEmpty);
+      expect(check.message,
+          'A tax on this ticket is switched off and was removed.');
     });
 
     test('a live rate, or no stored rate, is left alone', () async {
@@ -224,16 +245,15 @@ void main() {
       expect(check.ticket.taxRateIds, isNull);
     });
 
-    test('items and tax both gone: both messages, ticket removed', () async {
+    test('items and tax both gone: the ticket is kept untouched', () async {
       final held = c
           .read(heldOrdersProvider.notifier)
           .hold([item(404)], ticketNumber: '#0001', taxRateIds: [99]);
       final check =
           await c.read(heldOrdersProvider.notifier).checkForResume(held);
       expect(check.emptied, isTrue);
-      expect(check.message, contains('1 item no longer exists'));
-      expect(check.message, contains('The tax on this ticket'));
-      expect(c.read(heldOrdersProvider), isEmpty);
+      expect(check.message, kTicketEmptyMessage);
+      expect(c.read(heldOrdersProvider).single.taxRateIds, [99]);
     });
   });
 }

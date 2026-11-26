@@ -140,7 +140,8 @@ class ResumeCheck {
   const ResumeCheck(this.ticket,
       {this.removedLines = 0,
       this.changed = false,
-      this.taxRateRemoved = false});
+      this.taxRateRemoved = false,
+      this.taxRateOff = false});
 
   /// The ticket to resume: lines for products that no longer exist are
   /// dropped, and a customer or table that no longer exists is cleared.
@@ -152,18 +153,25 @@ class ResumeCheck {
   /// Whether anything was dropped or cleared.
   final bool changed;
 
-  /// Whether the ticket's tax rate no longer exists (it was cleared).
+  /// Whether a tax rate on the ticket no longer exists (it was removed).
   final bool taxRateRemoved;
 
-  /// Every line was dropped: there is nothing left to resume, so the ticket
-  /// is removed from the held list rather than loaded as an empty cart.
+  /// Whether a tax rate on the ticket is switched off (it was removed: the
+  /// cart only ever applies active rates).
+  final bool taxRateOff;
+
+  /// Every line is gone: nothing to resume. The ticket is kept as it was
+  /// (a soft-deleted product can be reactivated) and the cashier may delete
+  /// it; it is never loaded as an empty cart.
   bool get emptied => removedLines > 0 && ticket.items.isEmpty;
 
   /// What to tell the cashier, or null when nothing was removed.
   String? get message {
+    if (emptied) return kTicketEmptyMessage;
     final parts = [
       removedLinesMessage(removedLines),
       if (taxRateRemoved) kTicketTaxRemovedMessage,
+      if (taxRateOff) kTicketTaxOffMessage,
     ].whereType<String>();
     return parts.isEmpty ? null : parts.join('\n');
   }
@@ -171,6 +179,10 @@ class ResumeCheck {
 
 const kTicketTaxRemovedMessage =
     'The tax on this ticket no longer exists and was removed.';
+const kTicketTaxOffMessage =
+    'A tax on this ticket is switched off and was removed.';
+const kTicketEmptyMessage =
+    'None of the items on this ticket exist any more.';
 
 /// "1 item no longer exists and was removed" / "N items no longer exist and
 /// were removed"; null for none.
@@ -190,17 +202,30 @@ ResumeCheck checkHeldOrder(
   required bool customerExists,
   required bool tableExists,
   Set<int>? liveTaxRateIds,
+  Set<int> offTaxRateIds = const {},
 }) {
   final items =
       ticket.items.where((i) => liveProductIds.contains(i.productId)).toList();
   final removed = ticket.items.length - items.length;
   final dropCustomer = ticket.customerId != null && !customerExists;
   final dropTable = ticket.tableId != null && !tableExists;
-  // Null live set = not checked. A rate that is gone or switched off.
+  // Null live set = not checked. Only the dead rates are dropped; the
+  // others stay. [offTaxRateIds] exist but are switched off.
   final rates = ticket.taxRateIds;
-  final dropTax = liveTaxRateIds != null &&
-      rates != null &&
-      rates.any((id) => !liveTaxRateIds.contains(id));
+  final goneRates = liveTaxRateIds == null || rates == null
+      ? const <int>[]
+      : [
+          for (final id in rates)
+            if (!liveTaxRateIds.contains(id) && !offTaxRateIds.contains(id))
+              id
+        ];
+  final offRates = liveTaxRateIds == null || rates == null
+      ? const <int>[]
+      : [
+          for (final id in rates)
+            if (offTaxRateIds.contains(id)) id
+        ];
+  final dropTax = goneRates.isNotEmpty || offRates.isNotEmpty;
   if (removed == 0 && !dropCustomer && !dropTable && !dropTax) {
     return ResumeCheck(ticket);
   }
@@ -217,13 +242,20 @@ ResumeCheck checkHeldOrder(
       orderDiscount: ticket.orderDiscount,
       orderDiscountIsPercent: ticket.orderDiscountIsPercent,
       taxEnabled: ticket.taxEnabled,
-      // Empty = "none selected", not null (null means the default rate).
-      taxRateIds: dropTax ? <int>[] : ticket.taxRateIds,
+      // Only the dead rates go. Empty = "none selected", not null (null
+      // means the default rate).
+      taxRateIds: dropTax
+          ? [
+              for (final id in rates!)
+                if (!goneRates.contains(id) && !offRates.contains(id)) id
+            ]
+          : ticket.taxRateIds,
       archivedAt: ticket.archivedAt,
     ),
     removedLines: removed,
     changed: true,
-    taxRateRemoved: dropTax,
+    taxRateRemoved: goneRates.isNotEmpty,
+    taxRateOff: offRates.isNotEmpty,
   );
 }
 

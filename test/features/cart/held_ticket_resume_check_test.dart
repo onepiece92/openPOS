@@ -115,7 +115,10 @@ void main() {
     expect(check.ticket.customerId, isNull);
     expect(check.ticket.customerName, isNull);
     expect(check.ticket.tableId, isNull);
-    expect(check.message, '2 items no longer exist and were removed');
+    expect(check.emptied, isTrue);
+    expect(check.message, 'None of the items on this ticket exist any more.');
+    // Left as it was: nothing is saved back or deleted.
+    expect(c.read(heldOrdersProvider).single.items, hasLength(2));
   });
 
   test('after restoring a backup without these ids: dropped too', () async {

@@ -424,9 +424,17 @@ class _HeldTicketsSheetState extends ConsumerState<_HeldTicketsSheet>
         await ref.read(heldOrdersProvider.notifier).checkForResume(held);
     if (!nav.mounted) return;
     if (check.emptied) {
-      // Every product is gone: the ticket was removed, nothing to load.
-      final msg = check.message;
-      if (msg != null) messenger?.showSnackBar(SnackBar(content: Text(msg)));
+      // Every product is gone: keep the ticket, load nothing, offer delete.
+      final notifier = ref.read(heldOrdersProvider.notifier);
+      nav.pop(); // close the sheet so the message can be tapped
+      messenger?.showSnackBar(SnackBar(
+        content: const Text(kTicketEmptyMessage),
+        duration: const Duration(seconds: 8),
+        action: SnackBarAction(
+          label: 'Delete ticket',
+          onPressed: () => notifier.delete(held.id),
+        ),
+      ));
       return;
     }
     final ticket = check.ticket;
