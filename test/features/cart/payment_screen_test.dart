@@ -170,6 +170,9 @@ void main() {
 
   testWidgets('a product that no longer exists: plain message, no SQL',
       (tester) async {
+    final logged = <String>[];
+    final oldPrint = debugPrint;
+    debugPrint = (String? m, {int? wrapWidth}) => logged.add(m ?? '');
     c.read(cartProvider.notifier).restoreItem(CartItem(
         productId: 999, // no such product: the order item's FK fails
         name: 'Gone',
@@ -188,6 +191,10 @@ void main() {
         findsOneWidget);
     expect(find.textContaining('FOREIGN KEY'), findsNothing);
     expect(find.textContaining('Sqlite'), findsNothing);
+    // Support gets the error and the stack trace in the log.
+    expect(logged.any((l) => l.startsWith('Sale failed:') && l.contains('#0')),
+        isTrue);
+    debugPrint = oldPrint;
     final orders = await tester.runAsync(() => db.select(db.orders).get());
     expect(orders, isEmpty, reason: 'the sale was rolled back');
     expect(c.read(cartProvider), hasLength(1), reason: 'cart kept to fix');

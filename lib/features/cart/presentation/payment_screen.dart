@@ -197,7 +197,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         trackStock: trackStock,
         tipAmount: tip,
       );
-    } catch (e) {
+    } catch (e, st) {
+      // The user sees plain words; this is for support (logcat / console).
+      debugPrint('Sale failed: $e\n$st');
       _placing = false;
       if (mounted) setState(() {});
       if (messenger.mounted) {
