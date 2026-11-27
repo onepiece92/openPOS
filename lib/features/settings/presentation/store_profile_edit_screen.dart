@@ -133,7 +133,7 @@ class _StoreProfileEditScreenState
                     ],
                     decoration: const InputDecoration(
                       labelText: 'Phone',
-                      hintText: 'e.g. +977 98XXXXXXXX',
+                      hintText: 'Shop phone number, with country code',
                       prefixIcon: Icon(Icons.phone_outlined),
                       border: OutlineInputBorder(),
                     ),
@@ -144,7 +144,7 @@ class _StoreProfileEditScreenState
                     maxLines: 3,
                     decoration: const InputDecoration(
                       labelText: 'Address',
-                      hintText: 'e.g. 123 Main St, Kathmandu',
+                      hintText: 'Street, town or city',
                       prefixIcon: Icon(Icons.location_on_outlined),
                       border: OutlineInputBorder(),
                       alignLabelWithHint: true,
