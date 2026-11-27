@@ -79,9 +79,9 @@ class GridProductTile extends ConsumerWidget {
                 end: Alignment.bottomRight,
                 colors: cs.brightness == Brightness.dark
                     ? [
-                        const Color(0xFF1E1E34)
+                        const Color(0xFF3C3D47)
                             .withValues(alpha: inCart ? 0.95 : 0.80),
-                        const Color(0xFF14142A)
+                        const Color(0xFF383942)
                             .withValues(alpha: inCart ? 0.90 : 0.70),
                       ]
                     : [
@@ -136,7 +136,7 @@ class GridProductTile extends ConsumerWidget {
                   style: tt.bodySmall?.copyWith(
                     fontWeight: FontWeight.w500,
                     color: outOfStock
-                        ? cs.error.withValues(alpha: 0.6)
+                        ? cs.error
                         : cs.onSurfaceVariant,
                   ),
                 ),

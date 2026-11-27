@@ -15,6 +15,7 @@ import 'package:pos_app/core/database/close_on_exit.dart';
 import 'package:pos_app/core/database/database_open_errors.dart';
 import 'package:pos_app/core/database/upgrade_progress.dart';
 import 'package:pos_app/core/restart_notice.dart';
+import 'package:pos_app/core/theme/app_theme.dart';
 import 'package:pos_app/core/database/connection/native.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
@@ -959,6 +960,7 @@ class _RestoringSplash extends StatelessWidget {
   @override
   Widget build(BuildContext context) => MaterialApp(
         debugShowCheckedModeBanner: false,
+        theme: AppTheme.plainLight,
         home: Scaffold(
           body: Center(
             child: Column(
@@ -1007,6 +1009,7 @@ class _ResetChoiceScreenState extends State<_ResetChoiceScreen> {
   @override
   Widget build(BuildContext context) => MaterialApp(
         debugShowCheckedModeBanner: false,
+        theme: AppTheme.plainLight,
         home: Scaffold(
           body: SafeArea(
             child: Center(
@@ -1178,6 +1181,7 @@ class _RestoreFailedScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => MaterialApp(
         debugShowCheckedModeBanner: false,
+        theme: AppTheme.plainLight,
         home: Scaffold(
           body: SafeArea(
             child: Center(
@@ -1187,7 +1191,7 @@ class _RestoreFailedScreen extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     const Icon(Icons.error_outline,
-                        size: 48, color: Colors.red),
+                        size: 48, color: Color(0xFFB0103A)),
                     const SizedBox(height: 16),
                     Text(
                       title,
@@ -1298,13 +1302,13 @@ class RestartNoticeOverlayState extends State<RestartNoticeOverlay> {
                 child: Material(
                   elevation: 6,
                   borderRadius: BorderRadius.circular(12),
-                  color: const Color(0xFF1F2933),
+                  color: AppTheme.matteBlack,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 16, vertical: 14),
                     child: Text(
                       widget.message,
-                      style: const TextStyle(color: Colors.white),
+                      style: const TextStyle(color: Color(0xFFF1F1F4)),
                     ),
                   ),
                 ),

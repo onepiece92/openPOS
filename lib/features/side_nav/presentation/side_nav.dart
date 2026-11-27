@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pos_app/core/theme/app_theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -88,8 +89,10 @@ class PosDrawer extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
+    // The side nav is matte black in light and dark mode alike.
+    final navTheme = AppTheme.dark();
+    final cs = navTheme.colorScheme;
+    final tt = navTheme.textTheme;
     final location = GoRouterState.of(context).uri.path;
     final entries = visibleNavEntries(ref.watch(featureFlagsProvider));
     final introSeen = ref.watch(featuresIntroSeenProvider);
@@ -147,13 +150,16 @@ class PosDrawer extends ConsumerWidget {
     }
     children.add(const SizedBox(height: 16));
 
-    return NavigationDrawer(
-      onDestinationSelected: (i) {
-        Navigator.of(context).pop(); // close drawer
-        context.go(entries[i].route);
-      },
-      selectedIndex: selectedNavIndex(entries, location),
-      children: children,
+    return Theme(
+      data: navTheme,
+      child: NavigationDrawer(
+        onDestinationSelected: (i) {
+          Navigator.of(context).pop(); // close drawer
+          context.go(entries[i].route);
+        },
+        selectedIndex: selectedNavIndex(entries, location),
+        children: children,
+      ),
     );
   }
 }

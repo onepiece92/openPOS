@@ -31,6 +31,7 @@ const kAlwaysSuggested = {
   Feature.reviewReminder,
   Feature.usageCounting,
   Feature.whatsNew,
+  Feature.themeToggle,
 };
 
 /// The non-minimal presets also print automatically.

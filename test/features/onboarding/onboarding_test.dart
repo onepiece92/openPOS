@@ -81,6 +81,7 @@ void main() {
       Feature.reviewReminder,
       Feature.usageCounting,
       Feature.whatsNew,
+      Feature.themeToggle,
     };
     final expected = <BusinessType, Set<Feature>>{
       BusinessType.foodTruck: {
@@ -130,6 +131,7 @@ void main() {
         Feature.reviewReminder,
         Feature.usageCounting,
         Feature.whatsNew,
+        Feature.themeToggle,
         Feature.endOfDay,
       },
       BusinessType.services: {
@@ -144,6 +146,7 @@ void main() {
         Feature.reviewReminder,
         Feature.usageCounting,
         Feature.whatsNew,
+        Feature.themeToggle,
       },
     };
 
@@ -187,7 +190,8 @@ void main() {
         expect(flags.isOn(f),
             f == Feature.reviewReminder ||
                 f == Feature.usageCounting ||
-                f == Feature.whatsNew,
+                f == Feature.whatsNew ||
+                f == Feature.themeToggle,
             reason: f.name);
       }
       expect(flags.autoPrint, isFalse);

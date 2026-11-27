@@ -124,7 +124,7 @@ class _HeldTicketsBarState extends ConsumerState<HeldTicketsBar>
                   child: AnimatedBuilder(
                     animation: _ctrl,
                     builder: (_, __) => CustomPaint(
-                      painter: TronBorderPainter(_ctrl.value),
+                      painter: TronBorderPainter(_ctrl.value, color: cs.secondary),
                     ),
                   ),
                 ),

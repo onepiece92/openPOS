@@ -9,7 +9,6 @@ import 'package:pos_app/shared/widgets/app_sheet.dart';
 import 'package:pos_app/features/customers/domain/customers_provider.dart';
 import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
 
-
 class CustomersScreen extends ConsumerStatefulWidget {
   const CustomersScreen({super.key});
 
@@ -81,21 +80,12 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const SizedBox(height: 8),
-            Container(
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Theme.of(ctx).colorScheme.outlineVariant,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
               child: Align(
                 alignment: Alignment.centerLeft,
-                child: Text('Sort by',
-                    style: Theme.of(ctx).textTheme.titleMedium),
+                child:
+                    Text('Sort by', style: Theme.of(ctx).textTheme.titleMedium),
               ),
             ),
             for (final option in _SortBy.values)

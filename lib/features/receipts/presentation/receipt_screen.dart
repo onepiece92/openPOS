@@ -138,7 +138,7 @@ class _ShareMenu extends StatelessWidget {
           context,
           existing: data.customer?.phone,
           label: 'Phone number',
-          hint: '+977…',
+          hint: 'Phone number, with country code',
           keyboard: TextInputType.phone,
         );
         if (phone == null || !context.mounted) return;

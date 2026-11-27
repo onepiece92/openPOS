@@ -9,6 +9,7 @@ import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
 import 'package:pos_app/features/products/domain/stock_level.dart';
 import 'package:pos_app/features/side_nav/presentation/side_nav.dart';
+import 'package:pos_app/core/theme/app_theme.dart';
 
 class ProductsScreen extends ConsumerStatefulWidget {
   const ProductsScreen({super.key});
@@ -428,8 +429,8 @@ class _StockBadge extends StatelessWidget {
       fg = cs.onSurfaceVariant;
       label = 'Unlimited';
     } else if (lowStock) {
-      bg = cs.tertiaryContainer;
-      fg = cs.onTertiaryContainer;
+      fg = StatusColors.warning(cs);
+      bg = fg.withValues(alpha: 0.12);
       label = '$qty left';
     } else {
       bg = cs.secondaryContainer;

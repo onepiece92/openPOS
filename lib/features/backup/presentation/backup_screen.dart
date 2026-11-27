@@ -143,6 +143,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
           FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
             ),
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Restore & restart'),
@@ -505,7 +506,7 @@ class _SectionHeader extends StatelessWidget {
       child: Text(
         title.toUpperCase(),
         style: tt.labelSmall?.copyWith(
-          color: cs.primary,
+          color: cs.onSurfaceVariant,
           fontWeight: FontWeight.bold,
           letterSpacing: 1.0,
         ),

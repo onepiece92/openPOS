@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pos_app/core/theme/app_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -18,9 +19,9 @@ class InventoryCard extends ConsumerWidget {
   Color _badgeColor(ColorScheme cs) {
     if (product.isOutOfStock || product.stockQuantity < 0) return cs.error;
     if (product.stockQuantity > 0 && product.stockQuantity <= threshold) {
-      return const Color(0xFFD97706);
+      return StatusColors.warning(cs);
     }
-    return cs.primary;
+    return cs.onSurfaceVariant;
   }
 
   String _qtyLabel() {

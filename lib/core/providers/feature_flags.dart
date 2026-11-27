@@ -44,7 +44,9 @@ enum Feature {
   usageCounting('Usage counting',
       'Count which features you use. The counts stay on this device.'),
   whatsNew('Show what\'s new after updates',
-      'After a big update, show what changed, once. What\'s new in Support always works.');
+      'After a big update, show what changed, once. What\'s new in Support always works.'),
+  themeToggle('Day/night button',
+      'A sun/moon button at the top of the sales screen to switch light and dark.');
 
   const Feature(
     this.label,

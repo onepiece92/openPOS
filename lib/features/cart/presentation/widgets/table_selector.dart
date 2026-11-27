@@ -85,8 +85,7 @@ class TableSelectorRow extends ConsumerWidget {
         tables: tables,
         occupied: occupied,
         selectedId: currentId,
-        onSelect: (t) =>
-            ref.read(cartSessionProvider.notifier).setTable(t.id),
+        onSelect: (t) => ref.read(cartSessionProvider.notifier).setTable(t.id),
       ),
     );
   }
@@ -111,15 +110,6 @@ class _TablePickerSheet extends StatelessWidget {
     final tt = Theme.of(context).textTheme;
     return Column(
       children: [
-        const SizedBox(height: 8),
-        Container(
-          width: 36,
-          height: 4,
-          decoration: BoxDecoration(
-            color: cs.outlineVariant,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
           child: Align(
@@ -130,38 +120,36 @@ class _TablePickerSheet extends StatelessWidget {
         const Divider(height: 1),
         Expanded(
           child: ListView.builder(
+            primary: true,
             itemCount: tables.length,
-                itemBuilder: (_, i) {
-                  final t = tables[i];
-                  final isOccupied =
-                      occupied.contains(t.id) && t.id != selectedId;
-                  return ListTile(
-                    leading: Icon(
-                      Icons.table_restaurant_rounded,
-                      color: isOccupied ? cs.error : cs.primary,
-                    ),
-                    title: Text(t.name),
-                    subtitle: Text(
-                      isOccupied
-                          ? '${t.capacity} seats · already on another ticket'
-                          : '${t.capacity} seats',
-                      style: TextStyle(
-                        color: isOccupied
-                            ? cs.error
-                            : cs.onSurfaceVariant,
-                      ),
-                    ),
-                    trailing: t.id == selectedId
-                        ? Icon(Icons.check_circle_rounded, color: cs.primary)
-                        : null,
-                    onTap: () {
-                      onSelect(t);
-                      Navigator.pop(context);
-                    },
-                  );
+            itemBuilder: (_, i) {
+              final t = tables[i];
+              final isOccupied = occupied.contains(t.id) && t.id != selectedId;
+              return ListTile(
+                leading: Icon(
+                  Icons.table_restaurant_rounded,
+                  color: isOccupied ? cs.error : cs.primary,
+                ),
+                title: Text(t.name),
+                subtitle: Text(
+                  isOccupied
+                      ? '${t.capacity} seats · already on another ticket'
+                      : '${t.capacity} seats',
+                  style: TextStyle(
+                    color: isOccupied ? cs.error : cs.onSurfaceVariant,
+                  ),
+                ),
+                trailing: t.id == selectedId
+                    ? Icon(Icons.check_circle_rounded, color: cs.primary)
+                    : null,
+                onTap: () {
+                  onSelect(t);
+                  Navigator.pop(context);
                 },
-              ),
-            ),
+              );
+            },
+          ),
+        ),
       ],
     );
   }

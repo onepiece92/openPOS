@@ -149,7 +149,9 @@ class _CustomerRow extends ConsumerWidget {
     showAppSheet(
       context: context,
       draggable: true,
-      initialSize: 0.5,
+      // Opens tall: its search field is at the top and must clear the
+      // on-screen keyboard on a phone.
+      initialSize: 0.9,
       builder: (_) => CustomerPickerSheet(
         customers: customers,
         selectedId: currentId,

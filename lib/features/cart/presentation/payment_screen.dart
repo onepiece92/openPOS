@@ -567,13 +567,14 @@ class _PaymentChip extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     return ChoiceChip(
       avatar: Icon(icon,
-          size: 18, color: selected ? cs.onPrimary : cs.onSurfaceVariant),
+          size: 18,
+          color: selected ? AppTheme.onBrandOrange : cs.onSurfaceVariant),
       label: Text(label),
       selected: selected,
       onSelected: (_) => onTap(),
       showCheckmark: false,
-      selectedColor: cs.primary,
-      labelStyle: TextStyle(color: selected ? cs.onPrimary : null),
+      selectedColor: AppTheme.brandOrange,
+      labelStyle: TextStyle(color: selected ? AppTheme.onBrandOrange : null),
     );
   }
 }

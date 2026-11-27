@@ -93,7 +93,7 @@ class _StoreProfileEditScreenState
                     controller: _taglineCtrl,
                     decoration: const InputDecoration(
                       labelText: 'Tagline',
-                      hintText: 'e.g. Fresh & Fast',
+                      hintText: 'e.g. Fresh coffee all day',
                       prefixIcon: Icon(Icons.short_text_rounded),
                       border: OutlineInputBorder(),
                     ),
@@ -133,7 +133,7 @@ class _StoreProfileEditScreenState
                     ],
                     decoration: const InputDecoration(
                       labelText: 'Phone',
-                      hintText: 'e.g. +977-9800000000',
+                      hintText: 'Shop phone number, with country code',
                       prefixIcon: Icon(Icons.phone_outlined),
                       border: OutlineInputBorder(),
                     ),
@@ -144,7 +144,7 @@ class _StoreProfileEditScreenState
                     maxLines: 3,
                     decoration: const InputDecoration(
                       labelText: 'Address',
-                      hintText: 'e.g. 123 Main St, Kathmandu',
+                      hintText: 'Street, town or city',
                       prefixIcon: Icon(Icons.location_on_outlined),
                       border: OutlineInputBorder(),
                       alignLabelWithHint: true,
@@ -185,7 +185,7 @@ Widget _label(String text, TextTheme tt, ColorScheme cs) => Padding(
       child: Text(
         text.toUpperCase(),
         style: tt.labelSmall?.copyWith(
-          color: cs.primary,
+          color: cs.onSurfaceVariant,
           fontWeight: FontWeight.bold,
           letterSpacing: 1.1,
         ),

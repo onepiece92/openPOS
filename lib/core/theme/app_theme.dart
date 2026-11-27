@@ -10,10 +10,28 @@ import 'package:pos_app/core/theme/tokens.dart';
 ///    wrapping every widget in BackdropFilter.
 ///  – Cards: semi-transparent surface + subtle white border.
 ///  – Chips, buttons, inputs: heavily rounded with glass-tinted fills.
-///  – Color palette: rich indigo-violet primary, cyan secondary, pink tertiary.
+///  – Colour: the brand's 60/30/10 split. Storm-grey tints for surfaces,
+///    matte black for text, the side nav and dark surfaces, and safety
+///    orange only for the main action and active/selected states.
+///
+/// Safety orange (#FF6600) fails AA as text or a thin line on every brand
+/// surface (2.2–4.3:1), so it is only used as a FILL with matte-black on it
+/// ([brandOrange] / [onBrandOrange]: main buttons, FAB, selected nav item,
+/// segmented selection, switches). `colorScheme.primary` is an orange "ink"
+/// tuned per brightness so text, icons and focus rings in orange pass AA.
 abstract final class AppTheme {
-  // ── Brand seed ────────────────────────────────────────────────────────────
-  static const _seed = Color(0xFF6B68FF); // iOS 26-style violet
+  // ── Brand palette ─────────────────────────────────────────────────────────
+  /// Safety orange: fills for the primary action / selected state only.
+  static const brandOrange = Color(0xFFFF6600);
+
+  /// Text and icons on [brandOrange] (5.00:1). Never white on orange.
+  static const onBrandOrange = Color(0xFF28282B);
+
+  /// Matte black: text, side nav, dark surfaces.
+  static const matteBlack = Color(0xFF28282B);
+
+  /// Storm grey (mid). Low contrast: borders/decoration, not body text.
+  static const stormGrey = Color(0xFF717486);
 
   // ── Background gradients ──────────────────────────────────────────────────
 
@@ -23,14 +41,14 @@ abstract final class AppTheme {
   static const _darkGrad = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF07070E), Color(0xFF0D0C1C), Color(0xFF090914)],
+    colors: [Color(0xFF2E2F36), Color(0xFF32333B), Color(0xFF2F3037)],
     stops: [0.0, 0.55, 1.0],
   );
 
   static const _lightGrad = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFFEEECFF), Color(0xFFF8F7FF), Color(0xFFEAE8FF)],
+    colors: [Color(0xFFF0F0F4), Color(0xFFF5F5F8), Color(0xFFEEEEF2)],
     stops: [0.0, 0.55, 1.0],
   );
 
@@ -41,8 +59,8 @@ abstract final class AppTheme {
 
   static ButtonStyle ctaButtonStyle(ColorScheme cs) =>
       FilledButton.styleFrom(
-        backgroundColor: cs.primary,
-        foregroundColor: cs.onPrimary,
+        backgroundColor: brandOrange,
+        foregroundColor: onBrandOrange,
         // Override shape only — textStyle/elevation inherited from filledButtonTheme
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(18),
@@ -68,7 +86,7 @@ abstract final class AppTheme {
     final dark = cs.brightness == Brightness.dark;
     return BoxDecoration(
       color: dark
-          ? const Color(0xFF0E0E1E).withValues(alpha: AppOpacity.heavy)
+          ? const Color(0xFF3C3D47).withValues(alpha: AppOpacity.heavy)
           : Colors.white.withValues(alpha: 0.80),
       border: Border(
         top: BorderSide(
@@ -90,7 +108,7 @@ abstract final class AppTheme {
       .textTheme
       .labelSmall!
       .copyWith(
-        color: Theme.of(ctx).colorScheme.primary,
+        color: Theme.of(ctx).colorScheme.onSurfaceVariant,
         fontWeight: FontWeight.bold,
         letterSpacing: 1.2,
       );
@@ -115,8 +133,8 @@ abstract final class AppTheme {
         end: Alignment.bottomRight,
         colors: dark
             ? [
-                const Color(0xFF1E1E34).withValues(alpha: 0.88),
-                const Color(0xFF14142A).withValues(alpha: 0.72),
+                const Color(0xFF3C3D47).withValues(alpha: 0.88),
+                const Color(0xFF383942).withValues(alpha: 0.72),
               ]
             : [
                 Colors.white.withValues(alpha: 0.82),
@@ -137,7 +155,7 @@ abstract final class AppTheme {
         ),
         if (!dark)
           BoxShadow(
-            color: _seed.withValues(alpha: 0.06),
+            color: stormGrey.withValues(alpha: 0.06),
             blurRadius: 40,
             offset: const Offset(0, 10),
           ),
@@ -156,52 +174,109 @@ abstract final class AppTheme {
 
   static ThemeData light() => _light;
 
-  static ColorScheme _lightScheme() =>
-      ColorScheme.fromSeed(seedColor: _seed, brightness: Brightness.light)
-          .copyWith(
-        surface: const Color(0xFFF2F1FF),
-        surfaceContainerLowest: Colors.white,
-        surfaceContainerLow: const Color(0xFFF0EFFE),
-        surfaceContainer: const Color(0xFFE8E7F8),
-        surfaceContainerHigh: const Color(0xFFE0DFF4),
-        surfaceContainerHighest: const Color(0xFFD8D7F0),
-        primary: const Color(0xFF5E5BE8),
-        onPrimary: Colors.white,
-        primaryContainer: const Color(0xFFE2E0FF),
-        onPrimaryContainer: const Color(0xFF1A1880),
-        secondary: const Color(0xFF00B8C8),
-        onSecondary: Colors.white,
-        tertiary: const Color(0xFFE01E6A),
-        onTertiary: Colors.white,
-        error: const Color(0xFFD93025),
+  /// Colours-only light theme for the bare open-failure screen, which runs
+  /// before the app (and its fonts/background) is set up. Default text.
+  static final ThemeData plainLight = ThemeData(
+    useMaterial3: true,
+    colorScheme: _lightScheme(),
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        backgroundColor: brandOrange,
+        foregroundColor: onBrandOrange,
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(foregroundColor: matteBlack),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(foregroundColor: matteBlack),
+    ),
+  );
+
+
+  static ColorScheme _lightScheme() => const ColorScheme(
+        brightness: Brightness.light,
+        // Orange ink: 5.0:1 on tint #E8E9EE, 6.1:1 on white.
+        primary: Color(0xFFA84300),
+        onPrimary: Color(0xFFFFFFFF),
+        primaryContainer: Color(0xFFDCDDE4),
+        onPrimaryContainer: Color(0xFF28282B),
+        // Storm-grey ink (held tickets, orders, secondary data).
+        secondary: Color(0xFF4F5162),
+        onSecondary: Color(0xFFFFFFFF),
+        secondaryContainer: Color(0xFFE8E9EE),
+        onSecondaryContainer: Color(0xFF28282B),
+        // Violet: refunds, VAT, favourites; distinct from orange and red.
+        tertiary: Color(0xFF6D35A0),
+        onTertiary: Color(0xFFFFFFFF),
+        tertiaryContainer: Color(0xFFEDE3F7),
+        onTertiaryContainer: Color(0xFF3B1D57),
+        // Crimson, kept away from the orange accent's hue.
+        error: Color(0xFFB0103A),
+        onError: Color(0xFFFFFFFF),
+        errorContainer: Color(0xFFFADBE1),
+        onErrorContainer: Color(0xFF5C0B1F),
+        surface: Color(0xFFF5F5F8),
+        onSurface: Color(0xFF28282B),
+        onSurfaceVariant: Color(0xFF4F5162),
+        surfaceDim: Color(0xFFDCDDE4),
+        surfaceBright: Color(0xFFFFFFFF),
+        surfaceContainerLowest: Color(0xFFFFFFFF),
+        surfaceContainerLow: Color(0xFFF0F0F4),
+        surfaceContainer: Color(0xFFE8E9EE),
+        surfaceContainerHigh: Color(0xFFE2E3E9),
+        surfaceContainerHighest: Color(0xFFDCDDE4),
+        outline: Color(0xFF717486),
+        outlineVariant: Color(0xFFC9CAD3),
+        shadow: Color(0xFF000000),
+        scrim: Color(0xFF000000),
+        inverseSurface: Color(0xFF28282B),
+        onInverseSurface: Color(0xFFF1F1F4),
+        inversePrimary: Color(0xFFFFA366),
+        surfaceTint: Color(0x00000000),
       );
 
   // ── Dark theme ────────────────────────────────────────────────────────────
 
   static ThemeData dark() => _dark;
 
-  static ColorScheme _darkScheme() =>
-      ColorScheme.fromSeed(seedColor: _seed, brightness: Brightness.dark)
-          .copyWith(
-        surface: const Color(0xFF08080E),
-        surfaceContainerLowest: const Color(0xFF040408),
-        surfaceContainerLow: const Color(0xFF0E0E1C),
-        surfaceContainer: const Color(0xFF141428),
-        surfaceContainerHigh: const Color(0xFF1C1C34),
-        surfaceContainerHighest: const Color(0xFF242440),
-        primary: const Color(0xFF8A88FF),
-        onPrimary: const Color(0xFF18166A),
-        primaryContainer: const Color(0xFF3A38B0),
-        onPrimaryContainer: const Color(0xFFDFDEFF),
-        secondary: const Color(0xFF2ED8E8),
-        onSecondary: const Color(0xFF003840),
-        tertiary: const Color(0xFFFF70B4),
-        onTertiary: const Color(0xFF5A0030),
-        error: const Color(0xFFFF6B6B),
-        onSurface: const Color(0xFFF0EFFF),
-        onSurfaceVariant: const Color(0xFFAEACC8),
-        outline: const Color(0xFF48486A),
-        outlineVariant: const Color(0xFF2C2C48),
+  static ColorScheme _darkScheme() => const ColorScheme(
+        brightness: Brightness.dark,
+        // Light orange ink: 4.7:1 on tint #464754, 5.5:1 on card.
+        primary: Color(0xFFFFA366),
+        onPrimary: Color(0xFF28282B),
+        primaryContainer: Color(0xFF505261),
+        onPrimaryContainer: Color(0xFFF1F1F4),
+        secondary: Color(0xFFC6C8D2),
+        onSecondary: Color(0xFF28282B),
+        secondaryContainer: Color(0xFF464754),
+        onSecondaryContainer: Color(0xFFF1F1F4),
+        tertiary: Color(0xFFD0B3F5),
+        onTertiary: Color(0xFF28282B),
+        tertiaryContainer: Color(0xFF4A3D5E),
+        onTertiaryContainer: Color(0xFFEDE3F7),
+        error: Color(0xFFFFB3C1),
+        onError: Color(0xFF28282B),
+        errorContainer: Color(0xFF5C1A2A),
+        onErrorContainer: Color(0xFFFFDAE0),
+        surface: Color(0xFF32333B),
+        onSurface: Color(0xFFF1F1F4),
+        onSurfaceVariant: Color(0xFFC6C8D2),
+        surfaceDim: Color(0xFF2E2F36),
+        surfaceBright: Color(0xFF505261),
+        surfaceContainerLowest: Color(0xFF2B2C33),
+        surfaceContainerLow: Color(0xFF373841),
+        surfaceContainer: Color(0xFF3C3D47),
+        surfaceContainerHigh: Color(0xFF41424E),
+        surfaceContainerHighest: Color(0xFF464754),
+        outline: Color(0xFF9A9CAC),
+        outlineVariant: Color(0xFF505261),
+        shadow: Color(0xFF000000),
+        scrim: Color(0xFF000000),
+        inverseSurface: Color(0xFFF1F1F4),
+        onInverseSurface: Color(0xFF28282B),
+        inversePrimary: Color(0xFFA84300),
+        surfaceTint: Color(0x00000000),
       );
 
   // ── Text theme ────────────────────────────────────────────────────────────
@@ -295,7 +370,7 @@ abstract final class AppTheme {
       cardTheme: CardThemeData(
         elevation: 0,
         color: dark
-            ? const Color(0xFF1C1C34).withValues(alpha: 0.85)
+            ? const Color(0xFF3C3D47).withValues(alpha: 0.85)
             : Colors.white.withValues(alpha: 0.84),
         shadowColor: Colors.transparent,
         shape: RoundedRectangleBorder(
@@ -311,17 +386,28 @@ abstract final class AppTheme {
       ),
 
       // ── Navigation drawer ───────────────────────────────────────────────
+      // The side nav is matte black in both modes: PosDrawer renders it
+      // with the dark theme, so this is what shows.
       navigationDrawerTheme: NavigationDrawerThemeData(
-        backgroundColor: dark
-            ? const Color(0xFF0C0C1E).withValues(alpha: 0.97)
-            : const Color(0xFFF5F4FF).withValues(alpha: 0.97),
+        backgroundColor: matteBlack.withValues(alpha: 0.97),
         elevation: 0,
-        indicatorColor: scheme.primary.withValues(alpha: dark ? 0.22 : 0.14),
+        indicatorColor: brandOrange,
         indicatorShape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(14),
         ),
-        labelTextStyle: WidgetStateProperty.all(
-          tt.labelLarge?.copyWith(color: scheme.onSurface),
+        labelTextStyle: WidgetStateProperty.resolveWith(
+          (s) => tt.labelLarge?.copyWith(
+            color: s.contains(WidgetState.selected)
+                ? onBrandOrange
+                : scheme.onSurface,
+          ),
+        ),
+        iconTheme: WidgetStateProperty.resolveWith(
+          (s) => IconThemeData(
+            color: s.contains(WidgetState.selected)
+                ? onBrandOrange
+                : scheme.onSurfaceVariant,
+          ),
         ),
       ),
 
@@ -367,7 +453,7 @@ abstract final class AppTheme {
           side: BorderSide(
             color: dark
                 ? Colors.white.withValues(alpha: 0.10)
-                : scheme.primary.withValues(alpha: 0.25),
+                : stormGrey.withValues(alpha: 0.35),
           ),
         ),
         labelStyle: TextStyle(
@@ -384,6 +470,8 @@ abstract final class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
+          backgroundColor: brandOrange,
+          foregroundColor: onBrandOrange,
           textStyle: const TextStyle(
             fontWeight: FontWeight.w700,
             fontSize: 15,
@@ -393,16 +481,24 @@ abstract final class AppTheme {
         ),
       ),
 
+      // ── Text button ─────────────────────────────────────────────────────
+      // Secondary actions stay matte black / light grey so orange stays
+      // reserved for the main action.
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(foregroundColor: scheme.onSurface),
+      ),
+
       // ── Outlined button ─────────────────────────────────────────────────
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
+          foregroundColor: scheme.onSurface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
           side: BorderSide(
             color: dark
                 ? Colors.white.withValues(alpha: 0.22)
-                : scheme.primary.withValues(alpha: 0.40),
+                : stormGrey.withValues(alpha: 0.60),
           ),
           textStyle: const TextStyle(fontWeight: FontWeight.w600),
         ),
@@ -413,8 +509,8 @@ abstract final class AppTheme {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
         ),
-        backgroundColor: scheme.primary,
-        foregroundColor: scheme.onPrimary,
+        backgroundColor: brandOrange,
+        foregroundColor: onBrandOrange,
         elevation: 0,
         extendedTextStyle: const TextStyle(
           fontWeight: FontWeight.w700,
@@ -427,7 +523,7 @@ abstract final class AppTheme {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-        iconColor: scheme.primary,
+        iconColor: scheme.onSurfaceVariant,
       ),
 
       // ── Divider ─────────────────────────────────────────────────────────
@@ -442,8 +538,8 @@ abstract final class AppTheme {
       // ── Bottom sheet ────────────────────────────────────────────────────
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: dark
-            ? const Color(0xFF111126)
-            : const Color(0xFFF7F6FF),
+            ? const Color(0xFF3C3D47)
+            : const Color(0xFFF5F5F8),
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
         ),
@@ -455,7 +551,7 @@ abstract final class AppTheme {
 
       // ── Dialog ──────────────────────────────────────────────────────────
       dialogTheme: DialogThemeData(
-        backgroundColor: dark ? const Color(0xFF1A1A30) : Colors.white,
+        backgroundColor: dark ? const Color(0xFF3C3D47) : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         elevation: 0,
         titleTextStyle: tt.titleLarge,
@@ -468,8 +564,8 @@ abstract final class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
-          selectedBackgroundColor: scheme.primary,
-          selectedForegroundColor: scheme.onPrimary,
+          selectedBackgroundColor: brandOrange,
+          selectedForegroundColor: onBrandOrange,
           backgroundColor: dark
               ? Colors.white.withValues(alpha: 0.06)
               : Colors.white.withValues(alpha: 0.65),
@@ -485,16 +581,19 @@ abstract final class AppTheme {
       // ── Switch ──────────────────────────────────────────────────────────
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith(
-          (s) => s.contains(WidgetState.selected) ? scheme.onPrimary : null,
+          (s) => s.contains(WidgetState.selected) ? onBrandOrange : null,
         ),
         trackColor: WidgetStateProperty.resolveWith(
-          (s) => s.contains(WidgetState.selected) ? scheme.primary : null,
+          (s) => s.contains(WidgetState.selected) ? brandOrange : null,
+        ),
+        trackOutlineColor: WidgetStateProperty.resolveWith(
+          (s) => s.contains(WidgetState.selected) ? brandOrange : null,
         ),
       ),
 
       // ── Popup menu ──────────────────────────────────────────────────────
       popupMenuTheme: PopupMenuThemeData(
-        color: dark ? const Color(0xFF1E1E36) : Colors.white,
+        color: dark ? const Color(0xFF3C3D47) : Colors.white,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
           side: BorderSide(
@@ -509,11 +608,29 @@ abstract final class AppTheme {
 
       // ── Alert dialog ────────────────────────────────────────────────────
       snackBarTheme: SnackBarThemeData(
-        backgroundColor: dark ? const Color(0xFF2A2A46) : const Color(0xFF1A1A2E),
-        contentTextStyle: const TextStyle(color: Colors.white),
+        backgroundColor: dark ? const Color(0xFF505261) : matteBlack,
+        contentTextStyle: const TextStyle(color: Color(0xFFF1F1F4)),
+        actionTextColor:
+            dark ? const Color(0xFFFFBE8F) : const Color(0xFFFFA366),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         behavior: SnackBarBehavior.floating,
       ),
     );
   }
+}
+
+/// Status colours that are not in [ColorScheme]. Hues are kept clearly
+/// apart from the orange accent (#FF6600, hue 24°) so orange never reads as
+/// a warning: success is green, warning / low stock is yellow-gold (hue ~46°),
+/// errors are crimson and refunds use the scheme's violet tertiary.
+abstract final class StatusColors {
+  /// Success / profit. 5.3:1 (light, on tint-2) and 5.3:1 (dark, on tint).
+  static Color success(ColorScheme cs) => cs.brightness == Brightness.dark
+      ? const Color(0xFF4ADE80)
+      : const Color(0xFF166534);
+
+  /// Warning / low stock. 5.0:1 (light, on tint) and 6.0:1 (dark, on tint).
+  static Color warning(ColorScheme cs) => cs.brightness == Brightness.dark
+      ? const Color(0xFFEFD13A)
+      : const Color(0xFF7A5E00);
 }

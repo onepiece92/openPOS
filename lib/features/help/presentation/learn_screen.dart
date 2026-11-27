@@ -468,7 +468,7 @@ class _ArticleCard extends StatelessWidget {
                       Text(
                         category.toUpperCase(),
                         style: tt.labelSmall?.copyWith(
-                          color: cs.primary,
+                          color: cs.onSurfaceVariant,
                           fontWeight: FontWeight.w700,
                           letterSpacing: 0.8,
                         ),

@@ -73,6 +73,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
         title: const Text('POS'),
         actions: [
           const _ClearCartButton(),
+          const _ThemeToggleButton(),
           PopupMenuButton<String>(
             onSelected: (v) async {
               switch (v) {
@@ -287,6 +288,38 @@ class _CartScreenState extends ConsumerState<CartScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+// ─── Day/night button ─────────────────────────────────────────────────────────
+
+/// Day/night switch: sets an explicit light or dark, opposite to what shows.
+/// Settings > Appearance stays the way back to System. Not built when its
+/// Features switch is off.
+class _ThemeToggleButton extends ConsumerWidget {
+  const _ThemeToggleButton();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (!ref.watch(featureOnProvider(Feature.themeToggle))) {
+      return const SizedBox.shrink();
+    }
+    final mode = ref.watch(settingsProvider.select((s) => s.themeMode));
+    final dark = switch (mode) {
+      ThemeMode.dark => true,
+      ThemeMode.light => false,
+      ThemeMode.system =>
+        MediaQuery.platformBrightnessOf(context) == Brightness.dark,
+    };
+    final label = dark ? 'Switch to light mode' : 'Switch to dark mode';
+    return IconButton(
+      icon: Icon(dark ? Icons.light_mode_outlined : Icons.dark_mode_outlined),
+      tooltip: label,
+      constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+      onPressed: () => ref
+          .read(settingsProvider.notifier)
+          .setThemeMode(dark ? ThemeMode.light : ThemeMode.dark),
     );
   }
 }

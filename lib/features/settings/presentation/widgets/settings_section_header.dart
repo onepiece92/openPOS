@@ -14,7 +14,7 @@ class SettingsSectionHeader extends StatelessWidget {
       child: Text(
         title.toUpperCase(),
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: cs.primary,
+              color: cs.onSurfaceVariant,
               fontWeight: FontWeight.bold,
               letterSpacing: 1.2,
             ),

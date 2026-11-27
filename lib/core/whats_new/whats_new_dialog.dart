@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart' show listEquals, ValueNotifier;
 import 'package:flutter/material.dart';
+import 'package:pos_app/core/theme/app_theme.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:pos_app/core/app_version.dart';
@@ -119,9 +120,9 @@ class _WhatsNewDialogState extends State<WhatsNewDialog>
         cs.primary,
         cs.secondary,
         cs.tertiary,
-        const Color(0xFFFFB300),
-        const Color(0xFF26A69A),
-        const Color(0xFFEF5350),
+        AppTheme.brandOrange,
+        AppTheme.stormGrey,
+        const Color(0xFFDCDDE4),
       ]);
     }
   }
