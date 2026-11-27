@@ -90,7 +90,8 @@ class OrderSummary extends ConsumerWidget {
                       decoration: session.taxEnabled
                           ? null
                           : TextDecoration.lineThrough,
-                      fontFamily: AppFonts.mono, fontFamilyFallback: AppFonts.monoFallback,
+                      fontFamily: AppFonts.mono,
+                      fontFamilyFallback: AppFonts.monoFallback,
                     ),
                   ),
                   const SizedBox(width: 4),
@@ -183,15 +184,6 @@ class _TaxPickerSheet extends ConsumerWidget {
 
     return Column(
       children: [
-        const SizedBox(height: 8),
-        Container(
-          width: 36,
-          height: 4,
-          decoration: BoxDecoration(
-            color: cs.outlineVariant,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
           child: Text('Select Tax Rate', style: tt.titleMedium),
@@ -204,6 +196,7 @@ class _TaxPickerSheet extends ConsumerWidget {
                           tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
                 )
               : ListView.builder(
+                  primary: true,
                   itemCount: allRates.length,
                   itemBuilder: (_, i) {
                     final rate = allRates[i];

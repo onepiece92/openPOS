@@ -781,54 +781,49 @@ class _ComponentPickerSheetState extends State<_ComponentPickerSheet> {
                 p.sku.toLowerCase().contains(_search.toLowerCase()))
             .toList();
 
-    return DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: 0.6,
-      maxChildSize: 0.9,
-      builder: (_, scrollCtrl) => Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: TextField(
-              autofocus: true,
-              decoration: InputDecoration(
-                hintText: 'Search products…',
-                prefixIcon: const Icon(Icons.search_rounded, size: 20),
-                filled: true,
-                fillColor: cs.surfaceContainerHighest,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-                isDense: true,
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+          child: TextField(
+            autofocus: true,
+            decoration: InputDecoration(
+              hintText: 'Search products…',
+              prefixIcon: const Icon(Icons.search_rounded, size: 20),
+              filled: true,
+              fillColor: cs.surfaceContainerHighest,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
               ),
-              onChanged: (v) => setState(() => _search = v),
+              isDense: true,
             ),
+            onChanged: (v) => setState(() => _search = v),
           ),
-          Expanded(
-            child: filtered.isEmpty
-                ? Center(
-                    child: Text('No products',
-                        style: TextStyle(color: cs.onSurfaceVariant)))
-                : ListView.builder(
-                    controller: scrollCtrl,
-                    itemCount: filtered.length,
-                    itemBuilder: (_, i) {
-                      final p = filtered[i];
-                      return ListTile(
-                        title: Text(p.name),
-                        subtitle: Text('SKU: ${p.sku}'),
-                        trailing: Text(
-                          'Qty: ${p.stockQuantity}',
-                          style: TextStyle(color: cs.onSurfaceVariant),
-                        ),
-                        onTap: () => Navigator.pop(context, p),
-                      );
-                    },
-                  ),
-          ),
-        ],
-      ),
+        ),
+        Expanded(
+          child: filtered.isEmpty
+              ? Center(
+                  child: Text('No products',
+                      style: TextStyle(color: cs.onSurfaceVariant)))
+              : ListView.builder(
+                  primary: true,
+                  itemCount: filtered.length,
+                  itemBuilder: (_, i) {
+                    final p = filtered[i];
+                    return ListTile(
+                      title: Text(p.name),
+                      subtitle: Text('SKU: ${p.sku}'),
+                      trailing: Text(
+                        'Qty: ${p.stockQuantity}',
+                        style: TextStyle(color: cs.onSurfaceVariant),
+                      ),
+                      onTap: () => Navigator.pop(context, p),
+                    );
+                  },
+                ),
+        ),
+      ],
     );
   }
 }

@@ -5,7 +5,8 @@ import 'package:pos_app/shared/widgets/customer_avatar.dart';
 // ─── Customer picker sheet ────────────────────────────────────────────────────
 
 class CustomerPickerSheet extends StatefulWidget {
-  const CustomerPickerSheet({super.key, 
+  const CustomerPickerSheet({
+    super.key,
     required this.customers,
     required this.selectedId,
     required this.onSelect,
@@ -36,15 +37,6 @@ class _CustomerPickerSheetState extends State<CustomerPickerSheet> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const SizedBox(height: 8),
-        Container(
-          width: 36,
-          height: 4,
-          decoration: BoxDecoration(
-            color: cs.outlineVariant,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: TextField(
@@ -65,6 +57,7 @@ class _CustomerPickerSheetState extends State<CustomerPickerSheet> {
         ),
         Flexible(
           child: ListView.builder(
+            primary: true,
             itemCount: filtered.length,
             itemBuilder: (_, i) {
               final c = filtered[i];
