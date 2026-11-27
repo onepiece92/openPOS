@@ -35,3 +35,107 @@ Future<bool> deleteReceiptPhoto(String? path, Directory receiptsDir) async {
     return false;
   }
 }
+
+/// Copies a photo the picker returned into [receiptsDir] under [name] and
+/// returns the copy's path. The picker's own file is deleted afterwards when
+/// it is a temporary copy inside [tempDir] (camera shots and gallery picks
+/// on phones); a file anywhere else — the original photo a desktop picker
+/// hands back — is never touched.
+Future<String> importPickedPhoto(String pickedPath, Directory receiptsDir,
+    {required Directory tempDir, required String name}) async {
+  if (!await receiptsDir.exists()) await receiptsDir.create(recursive: true);
+  final dest = p.join(receiptsDir.path, name);
+  await File(pickedPath).copy(dest);
+  if (_isInside(pickedPath, tempDir)) {
+    try {
+      await File(pickedPath).delete();
+    } on FileSystemException {/* the OS clears its cache later */}
+  }
+  return dest;
+}
+
+bool _isInside(String path, Directory dir) {
+  if (!p.isAbsolute(path) || p.split(path).contains('..')) return false;
+  try {
+    final real = File(path).resolveSymbolicLinksSync();
+    return p.isWithin(dir.resolveSymbolicLinksSync(), real);
+  } on FileSystemException {
+    return false;
+  }
+}
+
+/// The receipt photo of an expense while its form is open. The saved photo
+/// is only deleted once the change is written ([committed]); a photo picked
+/// in the form and not kept is deleted when it is replaced or removed, or
+/// when the form is left without saving ([discard]).
+class ReceiptPhotoDraft {
+  ReceiptPhotoDraft({required this.saved, required this.receiptsDir})
+      : current = saved;
+
+  /// The photo the expense has in the database.
+  final String? saved;
+  final Directory receiptsDir;
+
+  /// The photo the form shows (and would save).
+  String? current;
+
+  /// Photos copied into receipts/ by this form, not yet saved.
+  final Set<String> _picked = {};
+  bool _done = false;
+
+  /// A new photo [path] (already in receipts/) replaces the current one.
+  Future<void> pick(String path) async {
+    final previous = current;
+    _picked.add(path);
+    current = path;
+    // An unsaved pick that is replaced is never needed again.
+    if (previous != null && _picked.remove(previous)) {
+      await deleteReceiptPhoto(previous, receiptsDir);
+    }
+  }
+
+  /// The photo is removed from the form (the saved one stays until saved).
+  Future<void> remove() async {
+    final previous = current;
+    current = null;
+    if (previous != null && _picked.remove(previous)) {
+      await deleteReceiptPhoto(previous, receiptsDir);
+    }
+  }
+
+  /// The expense was written with [current]: the saved photo it replaced
+  /// is deleted.
+  Future<void> committed() async {
+    _done = true;
+    _picked.clear();
+    if (saved != null && saved != current) {
+      await deleteReceiptPhoto(saved, receiptsDir);
+    }
+  }
+
+  /// The expense was deleted: its saved photo and any picked one go.
+  Future<void> expenseDeleted() async {
+    _done = true;
+    final all = {
+      if (saved != null) saved!,
+      if (current != null) current!,
+      ..._picked,
+    };
+    _picked.clear();
+    for (final path in all) {
+      await deleteReceiptPhoto(path, receiptsDir);
+    }
+  }
+
+  /// The form was left without saving: photos picked in it are deleted,
+  /// the saved photo is kept.
+  Future<void> discard() async {
+    if (_done) return;
+    _done = true;
+    final picked = [..._picked];
+    _picked.clear();
+    for (final path in picked) {
+      if (path != saved) await deleteReceiptPhoto(path, receiptsDir);
+    }
+  }
+}

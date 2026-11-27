@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:drift/drift.dart' show Value;
@@ -19,6 +20,7 @@ import 'package:pos_app/core/utils/money.dart';
 import 'package:pos_app/features/backup/data/snapshot_providers.dart'
     show receiptsDir;
 import 'package:pos_app/features/expenses/data/receipt_photos.dart';
+import 'package:path_provider/path_provider.dart' show getTemporaryDirectory;
 import 'package:pos_app/shared/widgets/app_empty_state.dart';
 import 'package:pos_app/shared/widgets/app_sheet.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
@@ -408,7 +410,11 @@ class _ExpenseFormState extends ConsumerState<_ExpenseForm> {
       TextEditingController(text: widget.expense?.notes ?? '');
   late DateTime _date;
   late int? _categoryId;
-  String? _imagePath;
+  // The saved photo is only deleted once the change is written; a photo
+  // picked here and not saved is deleted when the form is left.
+  ReceiptPhotoDraft? _photo;
+  String? get _imagePath =>
+      _photo != null ? _photo!.current : widget.expense?.receiptImagePath;
   bool _loading = false;
 
   @override
@@ -416,13 +422,18 @@ class _ExpenseFormState extends ConsumerState<_ExpenseForm> {
     super.initState();
     _date = widget.expense?.date ?? DateTime.now();
     _categoryId = widget.expense?.categoryId;
-    _imagePath = widget.expense?.receiptImagePath;
   }
+
+  Future<ReceiptPhotoDraft> _draft() async => _photo ??= ReceiptPhotoDraft(
+      saved: widget.expense?.receiptImagePath,
+      receiptsDir: await receiptsDir());
 
   bool get _isEdit => widget.expense != null;
 
   @override
   void dispose() {
+    // Cancelled (or closed) without saving: drop photos picked here.
+    unawaited(_photo?.discard());
     _amountCtrl.dispose();
     _notesCtrl.dispose();
     super.dispose();
@@ -499,24 +510,21 @@ class _ExpenseFormState extends ConsumerState<_ExpenseForm> {
     );
     if (xFile == null || !mounted) return;
 
-    // Copy to app documents so it persists if the picker temp file is cleared
-    final photos = await receiptsDir();
-    if (!await photos.exists()) {
-      await photos.create(recursive: true);
-    }
-    final destPath = '${photos.path}/${const Uuid().v4()}.jpg';
-    await File(xFile.path).copy(destPath);
-
-    // Delete previous image file if replacing (only ever a receipt photo).
-    await deleteReceiptPhoto(_imagePath, photos);
-
-    if (mounted) setState(() => _imagePath = destPath);
+    // Copied into the app's receipts folder (the picker's temp copy is
+    // deleted). The photo it replaces is deleted only once the expense is
+    // saved.
+    final draft = await _draft();
+    final destPath = await importPickedPhoto(xFile.path, draft.receiptsDir,
+        tempDir: await getTemporaryDirectory(),
+        name: '${const Uuid().v4()}.jpg');
+    await draft.pick(destPath);
+    if (mounted) setState(() {});
   }
 
   Future<void> _removeImage() async {
     if (_imagePath == null) return;
-    await deleteReceiptPhoto(_imagePath, await receiptsDir());
-    if (mounted) setState(() => _imagePath = null);
+    await (await _draft()).remove();
+    if (mounted) setState(() {});
   }
 
   // ── Add category dialog ──────────────────────────────────────────────────
@@ -601,6 +609,8 @@ class _ExpenseFormState extends ConsumerState<_ExpenseForm> {
       failurePrefix: 'Save failed',
     );
 
+    // Written: only now may the photo it replaced be deleted.
+    if (saved == true) await _photo?.committed();
     if (!mounted) return;
     setState(() => _loading = false);
     if (saved == true) Navigator.pop(context);
@@ -633,13 +643,14 @@ class _ExpenseFormState extends ConsumerState<_ExpenseForm> {
     );
     if (confirm == true && mounted) {
       // Also delete the receipt image file
-      // Only a file inside the receipts folder: the stored path may come
-      // from a restored backup.
-      await deleteReceiptPhoto(_imagePath, await receiptsDir());
+      final draft = await _draft();
       final db = ref.read(databaseProvider);
       await (db.delete(db.expenses)
             ..where((e) => e.id.equals(widget.expense!.id)))
           .go();
+      // After the row is gone; only files inside the receipts folder (the
+      // stored path may come from a restored backup).
+      await draft.expenseDeleted();
       if (mounted) Navigator.pop(context);
     }
   }
