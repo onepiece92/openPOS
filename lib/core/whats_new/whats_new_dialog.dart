@@ -20,6 +20,10 @@ final whatsNewShowing = ValueNotifier<bool>(false);
 /// Checks once whether to show the notes; call after the first frame, from
 /// the first normal screen. One settings read, and one small write when the
 /// stored version changes. Never throws.
+///
+/// The last-seen version ([kWhatsNewSeenKey]) lives in the settings box, so
+/// restoring an older backup brings back that backup's value and the notes
+/// may show once more — intended, e.g. for someone moving to a new device.
 Future<void> maybeShowWhatsNew(BuildContext context, WidgetRef ref) async {
   try {
     // A restart or refusal note from AppRoot (after a restore, a reset, a
