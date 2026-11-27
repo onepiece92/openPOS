@@ -165,7 +165,6 @@ void main() {
           {
             'lib/core/database/connection/native.dart',
             'lib/features/backup/data/snapshot_providers.dart',
-            'lib/features/expenses/presentation/expenses_screen.dart',
           },
           reason: 'a new user of the documents folder: if it stores data, '
               'erase it in the reset and map it in kErasedToWords');

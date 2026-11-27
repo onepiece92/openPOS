@@ -397,8 +397,7 @@ class SnapshotService {
             _extractTo(e.value, File(p.join(photoStage.path, e.key)), budget);
           }
         }
-        repointReceiptPaths(dbTmp, receiptsDir,
-            restoredNames: photoEntries.keys.toSet());
+        repointReceiptPaths(dbTmp, receiptsDir);
       }
     } catch (_) {
       await _deleteAll(staged);
@@ -857,14 +856,15 @@ class SnapshotService {
   /// and on iOS even on the same one, whose container path changes between
   /// installs. Per row:
   /// * no usable file name → cleared (NULL);
-  /// * a name in [restoredNames] (photos this restore is placing) →
-  ///   `receiptsDir/<name>`;
-  /// * a path that still names an existing file here → kept as is;
-  /// * otherwise → `receiptsDir/<name>`.
+  /// * otherwise → `receiptsDir/<name>` (a photo this restore places, one
+  ///   already here, or a missing one the UI shows as "no photo").
+  /// A stored path is never kept as it is: a crafted backup could name any
+  /// file in app storage (the database, say), which deleting the expense
+  /// would then delete. Only the file name is used, so every path points
+  /// directly into [receiptsDir].
   /// Returns the number of rows changed. Leaves no `-wal` / `-shm` beside
   /// [dbFile].
-  static int repointReceiptPaths(File dbFile, Directory receiptsDir,
-      {Set<String> restoredNames = const {}}) {
+  static int repointReceiptPaths(File dbFile, Directory receiptsDir) {
     final db = sqlite3.open(dbFile.path);
     var changed = 0;
     try {
@@ -878,16 +878,9 @@ class SnapshotService {
         for (final r in rows) {
           final old = r.columnAt(1) as String;
           final name = _baseName(old);
-          final String? next;
-          if (!_isSafeName(name)) {
-            next = null; // can never name a photo
-          } else if (restoredNames.contains(name)) {
-            next = p.join(receiptsDir.path, name); // the copy just restored
-          } else if (File(old).existsSync()) {
-            next = old; // still resolves on this device: leave it be
-          } else {
-            next = p.join(receiptsDir.path, name);
-          }
+          // Only a plain file name directly inside the receipts folder.
+          final next =
+              _isSafeName(name) ? p.join(receiptsDir.path, name) : null;
           if (next == old) continue;
           update.execute([next, r.columnAt(0)]);
           changed++;

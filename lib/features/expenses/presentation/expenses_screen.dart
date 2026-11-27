@@ -6,7 +6,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:uuid/uuid.dart';
 
@@ -17,6 +16,9 @@ import 'package:pos_app/core/theme/tokens.dart';
 import 'package:pos_app/core/utils/async_feedback.dart';
 import 'package:pos_app/core/utils/currency_formatter.dart';
 import 'package:pos_app/core/utils/money.dart';
+import 'package:pos_app/features/backup/data/snapshot_providers.dart'
+    show receiptsDir;
+import 'package:pos_app/features/expenses/data/receipt_photos.dart';
 import 'package:pos_app/shared/widgets/app_empty_state.dart';
 import 'package:pos_app/shared/widgets/app_sheet.dart';
 import 'package:pos_app/features/products/domain/products_provider.dart';
@@ -498,28 +500,23 @@ class _ExpenseFormState extends ConsumerState<_ExpenseForm> {
     if (xFile == null || !mounted) return;
 
     // Copy to app documents so it persists if the picker temp file is cleared
-    final dir = await getApplicationDocumentsDirectory();
-    final receiptsDir = Directory('${dir.path}/receipts');
-    if (!await receiptsDir.exists()) {
-      await receiptsDir.create(recursive: true);
+    final photos = await receiptsDir();
+    if (!await photos.exists()) {
+      await photos.create(recursive: true);
     }
-    final destPath = '${receiptsDir.path}/${const Uuid().v4()}.jpg';
+    final destPath = '${photos.path}/${const Uuid().v4()}.jpg';
     await File(xFile.path).copy(destPath);
 
-    // Delete previous image file if replacing
-    if (_imagePath != null) {
-      final old = File(_imagePath!);
-      if (await old.exists()) await old.delete();
-    }
+    // Delete previous image file if replacing (only ever a receipt photo).
+    await deleteReceiptPhoto(_imagePath, photos);
 
     if (mounted) setState(() => _imagePath = destPath);
   }
 
   Future<void> _removeImage() async {
     if (_imagePath == null) return;
-    final file = File(_imagePath!);
-    if (await file.exists()) await file.delete();
-    setState(() => _imagePath = null);
+    await deleteReceiptPhoto(_imagePath, await receiptsDir());
+    if (mounted) setState(() => _imagePath = null);
   }
 
   // ── Add category dialog ──────────────────────────────────────────────────
@@ -636,10 +633,9 @@ class _ExpenseFormState extends ConsumerState<_ExpenseForm> {
     );
     if (confirm == true && mounted) {
       // Also delete the receipt image file
-      if (_imagePath != null) {
-        final file = File(_imagePath!);
-        if (await file.exists()) await file.delete();
-      }
+      // Only a file inside the receipts folder: the stored path may come
+      // from a restored backup.
+      await deleteReceiptPhoto(_imagePath, await receiptsDir());
       final db = ref.read(databaseProvider);
       await (db.delete(db.expenses)
             ..where((e) => e.id.equals(widget.expense!.id)))

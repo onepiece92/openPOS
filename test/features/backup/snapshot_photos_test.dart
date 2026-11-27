@@ -13,6 +13,7 @@ import 'package:sqlite3/sqlite3.dart' as sql;
 
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/features/backup/data/snapshot_service.dart';
+import 'package:pos_app/features/expenses/data/receipt_photos.dart';
 
 /// Format-2 snapshot coverage: streaming create/restore, receipt photos
 /// travelling in the zip, path re-pointing, rollback of photos, and old
@@ -157,6 +158,63 @@ void main() {
         isEmpty);
   });
 
+  test('a crafted backup cannot point a receipt at the database or outside '
+      'the receipts folder; deleting those expenses keeps the database',
+      () async {
+    final dbPath = dbFileIn(live).path;
+    final outsidePath = p.join(tmp.path, 'outside', 'o.jpg');
+    await seed(restored, sku: 'NEW', receiptPaths: [
+      dbPath, // the live database itself
+      p.join(receiptsIn(live).path, '..', 'pos_database.db'), // ../ escape
+      outsidePath, // an absolute path outside receipts/
+    ]);
+    final zip = await backupOf(restored);
+    // Files on this device the crafted rows name (not in the backup).
+    final outside = photo(Directory(p.dirname(outsidePath)), 'o.jpg', 'O');
+    await seed(live);
+    final backup = await restoreInto(live, zip);
+    await svc.commit(backup);
+
+    final dest = receiptsIn(live).path;
+    final stored = await receiptPaths(live);
+    expect(stored, [
+      p.join(dest, 'pos_database.db'),
+      p.join(dest, 'pos_database.db'),
+      p.join(dest, 'o.jpg'),
+    ]);
+    final dbBytes = File(dbPath).readAsBytesSync();
+
+    // Deleting each expense deletes its photo, guarded: neither the stored
+    // paths nor the crafted originals (a legacy row) reach the database.
+    for (final path in [...stored, dbPath, '$dest/../pos_database.db',
+        outside.path]) {
+      expect(await deleteReceiptPhoto(path, receiptsIn(live)), isFalse,
+          reason: path);
+    }
+    expect(File(dbPath).readAsBytesSync(), dbBytes);
+    expect(outside.existsSync(), isTrue);
+    expect(await hasProduct(live, 'NEW'), isTrue);
+  });
+
+  test('the photo delete guard: only a real file directly in receipts/',
+      () async {
+    final dir = receiptsIn(live);
+    final ok = photo(dir, 'a.jpg', 'A');
+    final nested = photo(Directory(p.join(dir.path, 'sub')), 'b.jpg', 'B');
+    final target = photo(live, 'secret.db', 'S');
+    final link = Link(p.join(dir.path, 'link.jpg'))..createSync(target.path);
+
+    expect(isReceiptPhotoFile(link.path, dir), isFalse, reason: 'symlink out');
+    expect(await deleteReceiptPhoto(link.path, dir), isFalse);
+    expect(target.existsSync(), isTrue);
+    expect(isReceiptPhotoFile(nested.path, dir), isFalse);
+    expect(isReceiptPhotoFile('receipts/a.jpg', dir), isFalse, reason: 'rel');
+    expect(isReceiptPhotoFile(dir.path, dir), isFalse, reason: 'a folder');
+    expect(isReceiptPhotoFile(p.join(dir.path, 'none.jpg'), dir), isFalse);
+    expect(await deleteReceiptPhoto(ok.path, dir), isTrue);
+    expect(ok.existsSync(), isFalse);
+  });
+
   test('a referenced photo that no longer exists is skipped', () async {
     final a = photo(receiptsIn(live), 'a.jpg', 'photo A');
     await seed(live, receiptPaths: [
@@ -270,8 +328,8 @@ void main() {
       final before = tree(receiptsIn(live));
 
       await seed(restored, sku: 'NEW', receiptPaths: [
-        kept.path, // resolves here → kept as is
-        elsewhere.path, // resolves here, outside receipts/ → kept as is
+        kept.path, // already in this device's receipts folder
+        elsewhere.path, // outside receipts/ → re-pointed by name
         '/other/device/Documents/receipts/k.jpg', // → this device's folder
         '/other/device/Documents/receipts/', // no file name → NULL
       ]);
@@ -282,7 +340,7 @@ void main() {
       expect(await hasProduct(live, 'NEW'), isTrue);
       expect(await receiptPaths(live), [
         kept.path,
-        elsewhere.path,
+        p.join(receiptsIn(live).path, 'z.jpg'),
         p.join(receiptsIn(live).path, 'k.jpg'),
         null,
       ]);
