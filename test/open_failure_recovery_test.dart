@@ -11,6 +11,7 @@ import 'package:path/path.dart' as p;
 
 import 'package:pos_app/app.dart';
 import 'package:pos_app/app_root.dart';
+import 'package:pos_app/core/app_version.dart';
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/database/connection/native.dart';
 import 'package:pos_app/core/database/database_open_errors.dart';
@@ -53,7 +54,11 @@ void main() {
       await Hive.openBox<dynamic>(b);
     }
     if (onboarded) {
-      await Hive.box<dynamic>('settings').put(kOnboardingCompleteKey, true);
+      final settings = Hive.box<dynamic>('settings');
+      await settings.put(kOnboardingCompleteKey, true);
+      // Already on this version: the What's new check then writes nothing,
+      // so no Hive write is left pending in the fake-async zone.
+      await settings.put(kWhatsNewSeenKey, kAppVersion);
     }
   }
 

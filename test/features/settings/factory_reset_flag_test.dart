@@ -424,8 +424,11 @@ void main() {
 
     testWidgets('Start fresh clears a leftover reset flag', (tester) async {
       await tester.runAsync(() async {
-        await real.putAll(
-            {'onboarding_complete': true, kFactoryResetPendingKey: true});
+        await real.putAll({
+          'onboarding_complete': true,
+          kWhatsNewSeenKey: kAppVersion,
+          kFactoryResetPendingKey: true,
+        });
         File(p.join(docs.path, 'pos_database.db')).writeAsStringSync('junk');
       });
       await startFresh(tester);
@@ -471,8 +474,11 @@ void main() {
         'database aside', (tester) async {
       final file = File(p.join(docs.path, 'pos_database.db'));
       await tester.runAsync(() async {
-        await real.putAll(
-            {'onboarding_complete': true, kFactoryResetPendingKey: true});
+        await real.putAll({
+          'onboarding_complete': true,
+          kWhatsNewSeenKey: kAppVersion,
+          kFactoryResetPendingKey: true,
+        });
         file.writeAsStringSync('junk');
       });
       bool? dbInPlaceAtClear;
