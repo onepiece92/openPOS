@@ -75,6 +75,30 @@ void main() {
       expect(File('${moved.path}-wal').existsSync(), isTrue);
     });
 
+    test('only the newest set-aside set is kept', () async {
+      dbFile().writeAsStringSync('first');
+      File('${dbFile().path}-wal').writeAsStringSync('w1');
+      await setAsideDatabaseFile(dbFile(), DateTime(2026, 11, 1, 9));
+      dbFile().writeAsStringSync('second');
+      File('${dbFile().path}-shm').writeAsStringSync('s2');
+      final moved =
+          await setAsideDatabaseFile(dbFile(), DateTime(2026, 11, 2, 9));
+      final names = {
+        for (final e in docs.listSync())
+          if (p.basename(e.path).contains('.broken-')) p.basename(e.path)
+      };
+      expect(names, {
+        '$kDatabaseFileName.broken-20261102-090000',
+        '$kDatabaseFileName.broken-20261102-090000-shm',
+      });
+      expect(moved!.readAsStringSync(), 'second');
+    });
+
+    test('the Start fresh confirm says the damaged file is kept', () {
+      expect(kStartFreshMessage,
+          endsWith('The damaged file is kept on this device for support.'));
+    });
+
     test('listAutoBackups: newest first, labelled with dates', () async {
       autoDir().createSync(recursive: true);
       final older = DateTime(2026, 11, 1, 9);

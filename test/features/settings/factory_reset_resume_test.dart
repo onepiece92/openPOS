@@ -31,6 +31,7 @@ void main() {
   late Box<dynamic> settings, held, usage;
   Directory receipts() => Directory(p.join(docs.path, 'receipts'));
   File dbFile() => File(p.join(docs.path, 'pos.db'));
+  File broken() => File('${dbFile().path}.broken-20261101-090000');
   const lastBackup = '2026-11-01T09:00:00.000';
 
   Future<void> openStores() async {
@@ -71,6 +72,8 @@ void main() {
     await usage.put(kUsageDisclosureShownKey, true);
     receipts().createSync();
     File(p.join(receipts().path, 'r.jpg')).writeAsBytesSync([1]);
+    // A damaged database set aside earlier by "Start fresh".
+    broken().writeAsStringSync('old sales');
   });
 
   tearDown(() async {
@@ -95,6 +98,7 @@ void main() {
       held.containsKey('t1'),
       usage.containsKey(kUsageDisclosureShownKey),
       receipts().existsSync(),
+      broken().existsSync(),
     ];
     if (old.every((x) => x)) {
       return isFactoryResetPending(settings) ? 'old, asking' : 'old';
@@ -119,6 +123,7 @@ void main() {
         heldOrders: held,
         usage: () async => usage,
         receipts: () async => receipts(),
+        database: () async => dbFile(),
         afterStep: (s) {
           if (s == killAt) throw _Kill();
         },
@@ -132,6 +137,7 @@ void main() {
         heldOrders: held,
         usage: () async => usage,
         receipts: () async => receipts(),
+        database: () async => dbFile(),
       );
 
   test('killed before the reset started: the old shop, untouched', () async {
@@ -219,6 +225,7 @@ void main() {
       heldOrders: held,
       usage: () async => usage,
       receipts: () async => receipts(),
+      database: () async => dbFile(),
     );
     expect(outcome, FactoryResetOutcome.done);
     expect(await shopState(), 'fresh');
@@ -233,6 +240,7 @@ void main() {
       heldOrders: held,
       usage: () async => usage,
       receipts: () async => receipts(),
+      database: () async => dbFile(),
     );
     expect(outcome, FactoryResetOutcome.refused);
     expect(await shopState(), 'old');

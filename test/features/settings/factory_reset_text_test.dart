@@ -10,6 +10,10 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path/path.dart' as p;
 
 import 'package:pos_app/core/database/app_database.dart';
+import 'package:pos_app/core/database/connection/native.dart'
+    show kDatabaseFileName;
+import 'package:pos_app/features/backup/data/open_failure_recovery.dart'
+    show kBrokenCopyInfix;
 import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/features/cart/data/ticket_sequence.dart'
     show kTicketSeqKey;
@@ -51,6 +55,9 @@ const kErasedToWords = {
   'hive:usage': 'usage counts',
   // Folders.
   'dir:receipts': 'receipt photos',
+  // Files: copies of a damaged database that "Start fresh" set aside hold
+  // the shop's old sales.
+  'file:$kDatabaseFileName$kBrokenCopyInfix*': 'sales',
 };
 
 class _DeleteRecorder extends QueryInterceptor {
@@ -162,6 +169,38 @@ void main() {
           },
           reason: 'a new user of the documents folder: if it stores data, '
               'erase it in the reset and map it in kErasedToWords');
+    });
+
+    test('the reset deletes every set-aside damaged database copy', () async {
+      final dir = Directory.systemTemp.createTempSync('pos_broken_reset_');
+      addTearDown(() async {
+        await Hive.close();
+        dir.deleteSync(recursive: true);
+      });
+      Hive.init(dir.path);
+      final db = File(p.join(dir.path, kDatabaseFileName))
+        ..writeAsStringSync('new');
+      for (final s in ['', '-wal', '-shm']) {
+        File('${db.path}${kBrokenCopyInfix}20261101-090000$s')
+            .writeAsStringSync('old');
+      }
+      final auto = Directory(p.join(dir.path, 'backups', 'auto'))
+        ..createSync(recursive: true);
+      await eraseLocalStores(
+        settings: await Hive.openBox<dynamic>('settings'),
+        heldOrders: await Hive.openBox<dynamic>('held_orders'),
+        usage: await Hive.openBox<dynamic>('usage'),
+        receipts: Directory(p.join(dir.path, 'receipts')),
+        database: db,
+      );
+      expect(
+          dir
+              .listSync()
+              .where((e) => p.basename(e.path).contains(kBrokenCopyInfix)),
+          isEmpty,
+          reason: kErasedToWords.keys.firstWhere((k) => k.startsWith('file:')));
+      expect(db.existsSync(), isTrue, reason: 'not the live database');
+      expect(auto.existsSync(), isTrue, reason: 'automatic backups are kept');
     });
 
     test('each mapped phrase appears in the body', () {

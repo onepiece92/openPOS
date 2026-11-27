@@ -9,6 +9,9 @@ import 'package:path/path.dart' as p;
 import 'package:pos_app/core/providers/hive_provider.dart'
     show kAutoBackupLastAt;
 import 'package:pos_app/core/database/app_database.dart';
+import 'package:pos_app/core/database/connection/native.dart' show databaseFile;
+import 'package:pos_app/features/backup/data/open_failure_recovery.dart'
+    show deleteBrokenDatabaseCopies;
 import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/features/backup/data/snapshot_providers.dart';
 import 'package:pos_app/features/backup/data/snapshot_service.dart';
@@ -138,6 +141,7 @@ enum FactoryResetStep {
   heldTicketsCleared,
   usageCleared,
   receiptsDeleted,
+  brokenCopiesDeleted,
   settingsCleared,
 }
 
@@ -216,6 +220,7 @@ Future<void> eraseLocalStores({
   required Box<dynamic> heldOrders,
   required Box<dynamic> usage,
   required Directory receipts,
+  File? database,
   FactoryResetStepHook? afterStep,
 }) async {
   await clearHeldTicketsKeepingCounter(heldOrders);
@@ -226,6 +231,10 @@ Future<void> eraseLocalStores({
   afterStep?.call(FactoryResetStep.usageCleared);
   if (receipts.existsSync()) await receipts.delete(recursive: true);
   afterStep?.call(FactoryResetStep.receiptsDeleted);
+  // Copies of a damaged database set aside by "Start fresh" hold the
+  // shop's old sales: they go too.
+  if (database != null) await deleteBrokenDatabaseCopies(database);
+  afterStep?.call(FactoryResetStep.brokenCopiesDeleted);
   final doomed = [
     for (final k in settings.keys)
       if (!kSettingsKeptByReset.contains(k) && k != kFactoryResetPendingKey) k,
@@ -265,6 +274,7 @@ Future<PendingFactoryReset> finishPendingFactoryReset({
   required Box<dynamic> heldOrders,
   required Future<Box<dynamic>> Function() usage,
   required Future<Directory> Function() receipts,
+  Future<File> Function()? database,
 }) async {
   if (!isFactoryResetPending(settings)) return PendingFactoryReset.none;
   if (await databaseHasUserData()) return PendingFactoryReset.askUser;
@@ -274,6 +284,7 @@ Future<PendingFactoryReset> finishPendingFactoryReset({
     heldOrders: heldOrders,
     usage: await usage(),
     receipts: await receipts(),
+    database: database == null ? null : await database(),
   );
   return PendingFactoryReset.finished;
 }
@@ -289,6 +300,7 @@ Future<PendingFactoryReset> finishPendingFactoryResetOnLaunch(
       heldOrders: Hive.box<dynamic>('held_orders'),
       usage: usageBoxForReset,
       receipts: receiptsDir,
+      database: databaseFile,
     );
 
 /// How [runFactoryReset] ended.
@@ -328,6 +340,7 @@ Future<FactoryResetOutcome> runFactoryReset({
   required Box<dynamic> heldOrders,
   required Future<Box<dynamic>> Function() usage,
   required Future<Directory> Function() receipts,
+  Future<File> Function()? database,
   FactoryResetStepHook? afterStep,
 }) async {
   // Nothing erased yet: "not changed" only once the flag is confirmed
@@ -361,6 +374,7 @@ Future<FactoryResetOutcome> runFactoryReset({
       heldOrders: heldOrders,
       usage: await usage(),
       receipts: await receipts(),
+      database: database == null ? null : await database(),
       afterStep: afterStep,
     );
   } catch (_) {

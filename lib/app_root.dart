@@ -520,6 +520,7 @@ class AppRootState extends State<AppRoot> {
         heldOrders: Hive.box<dynamic>('held_orders'),
         usage: usageBoxForReset,
         receipts: receiptsDir,
+        database: databaseFile,
       );
       switch (outcome) {
         case FactoryResetOutcome.done:
