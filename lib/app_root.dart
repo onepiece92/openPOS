@@ -742,6 +742,16 @@ class AppRootState extends State<AppRoot> {
       if (mounted) setState(() => _errorNote = kStartFreshCannotSave);
       return;
     }
+    // The old shop's automatic backups are protected from pruning BEFORE
+    // anything moves: left until after, a failed write (a full disk is a
+    // likely cause of the damage) or a kill would let keep-7 pruning delete
+    // them within a week. Not confirmed: nothing is touched.
+    if (!await keepAutoBackupsForStartFresh(
+        [for (final b in await listAutoBackups()) p.basename(b.$1.path)],
+        settings: settings)) {
+      if (mounted) setState(() => _errorNote = kStartFreshCannotSave);
+      return;
+    }
     if (!mounted) return;
     setState(() {
       _errorNote = null;
@@ -755,14 +765,6 @@ class AppRootState extends State<AppRoot> {
       // Created directly: checkDatabaseFileBeforeOpen would (rightly)
       // refuse a missing file under a finished onboarding.
       await _container.read(databaseProvider).customSelect('SELECT 1').get();
-      // Keep the automatic backups of the shop that was set aside: they are
-      // not pruned until a restore or a Dismiss (best effort, logged).
-      try {
-        await keepAutoBackupsForStartFresh(
-            [for (final b in await listAutoBackups()) p.basename(b.$1.path)]);
-      } catch (e) {
-        debugPrint('Start fresh: could not record the kept backups: $e');
-      }
     } catch (e) {
       error = e;
     }

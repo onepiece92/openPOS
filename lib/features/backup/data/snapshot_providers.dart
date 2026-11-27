@@ -49,19 +49,38 @@ const kPrunePausedNotice = 'Backups from before Start fresh are kept. '
 /// The backups kept by "Start fresh", or null when none are (one key read).
 Set<String>? autoBackupsKeptByStartFresh() {
   if (!Hive.isBoxOpen('settings')) return null;
-  final v = Hive.box<dynamic>('settings').get(kStartFreshKeptBackupsKey);
-  if (v is! List || v.isEmpty) return null;
-  return {for (final n in v) '$n'};
+  return autoBackupsKeptIn(Hive.box<dynamic>('settings'));
 }
 
-/// Records [names] as kept (Start fresh). Throws on a failed write; the
-/// caller logs it.
-Future<void> keepAutoBackupsForStartFresh(Iterable<String> names) async {
-  final list = names.toList();
-  if (list.isEmpty) return; // nothing from before to protect
-  final s = Hive.box<dynamic>('settings');
-  await s.put(kStartFreshKeptBackupsKey, list);
-  await s.flush();
+/// Records [names] as kept (Start fresh), added to any list a previous
+/// Start fresh left. Runs BEFORE anything is set aside: true only when the
+/// write and flush succeeded and a re-read finds every name, so the caller
+/// can refuse rather than leave the old shop's backups unprotected. True
+/// at once when there is nothing to protect. Never throws.
+Future<bool> keepAutoBackupsForStartFresh(
+  Iterable<String> names, {
+  Box<dynamic>? settings,
+}) async {
+  final add = names.toSet();
+  if (add.isEmpty) return true; // nothing from before to protect
+  try {
+    final s = settings ?? Hive.box<dynamic>('settings');
+    final list = {...?autoBackupsKeptIn(s), ...add}.toList();
+    await s.put(kStartFreshKeptBackupsKey, list);
+    await s.flush();
+    final back = autoBackupsKeptIn(s);
+    return back != null && back.containsAll(add);
+  } catch (e) {
+    debugPrint('Start fresh: could not record the kept backups: $e');
+    return false;
+  }
+}
+
+/// The names kept in [settings], or null.
+Set<String>? autoBackupsKeptIn(Box<dynamic> settings) {
+  final v = settings.get(kStartFreshKeptBackupsKey);
+  if (v is! List || v.isEmpty) return null;
+  return {for (final n in v) '$n'};
 }
 
 /// Ends the pause (restore, Dismiss). Never throws.

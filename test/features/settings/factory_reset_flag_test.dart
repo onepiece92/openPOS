@@ -14,7 +14,8 @@ import 'package:pos_app/app_root.dart';
 import 'package:pos_app/core/app_version.dart';
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
-import 'package:pos_app/core/providers/hive_provider.dart' show kWhatsNewSeenKey;
+import 'package:pos_app/core/providers/hive_provider.dart'
+    show kWhatsNewSeenKey;
 import 'package:pos_app/features/backup/data/snapshot_providers.dart';
 import 'package:pos_app/features/backup/data/snapshot_service.dart';
 import 'package:pos_app/features/onboarding/presentation/onboarding_screen.dart';
@@ -34,12 +35,14 @@ class _FlakyBox implements Box<dynamic> {
   int failDeletes = 0; // the next N deletes throw
   bool failPuts = false;
   void Function(dynamic key)? onDelete;
+  void Function(dynamic key)? onPut;
 
   static Never _full() =>
       throw const FileSystemException('No space left on device');
 
   @override
   Future<void> put(dynamic key, dynamic value) async {
+    onPut?.call(key);
     if (failPuts) _full();
     await inner.put(key, value);
   }
@@ -494,6 +497,101 @@ void main() {
       expect(real.containsKey(kFactoryResetPendingKey), isFalse);
       expect(docs.listSync().where((e) => e.path.contains('.broken-')),
           isNotEmpty);
+      await tester.pump(const Duration(seconds: 9));
+      await done(tester);
+    });
+
+    // Start fresh records the old shop's automatic backups as kept BEFORE
+    // it moves anything. Kill points around that write:
+
+    File olderBackup() => File(p.join(docs.path, 'backups', 'auto',
+        '${SnapshotService.filePrefix}20261101_090000${SnapshotService.fileSuffix}'));
+
+    testWidgets(
+        'the keep-list write fails: Start fresh is refused and nothing moves',
+        (tester) async {
+      final file = File(p.join(docs.path, 'pos_database.db'));
+      await tester.runAsync(() async {
+        await real.putAll(
+            {'onboarding_complete': true, kWhatsNewSeenKey: kAppVersion});
+        file.writeAsStringSync('junk');
+        olderBackup()
+          ..parent.createSync(recursive: true)
+          ..writeAsBytesSync([1]);
+      });
+      settings.failPuts = true;
+      await startFresh(tester);
+      await pumpUntil(
+          tester, () => find.text(kStartFreshCannotSave).evaluate().isNotEmpty);
+      expect(find.byType(POSApp), findsNothing);
+      expect(file.readAsStringSync(), 'junk', reason: 'not set aside');
+      expect(
+          docs.listSync().where((e) => e.path.contains('.broken-')), isEmpty);
+      expect(real.containsKey(kStartFreshKeptBackupsKey), isFalse);
+      expect(olderBackup().existsSync(), isTrue);
+      await done(tester);
+    });
+
+    test(
+        'killed after the keep-list write, before the set-aside: the next '
+        'launch is consistent and the leftover list is harmless', () async {
+      final file = File(p.join(docs.path, 'pos_database.db'))
+        ..writeAsStringSync('junk');
+      olderBackup()
+        ..parent.createSync(recursive: true)
+        ..writeAsBytesSync([1]);
+      final name = p.basename(olderBackup().path);
+      expect(
+          await keepAutoBackupsForStartFresh([name], settings: real), isTrue);
+      // The kill, then a relaunch.
+      await Hive.close();
+      real = await Hive.openBox<dynamic>('settings');
+      // Nothing moved: the damaged file is where it was (the launch shows
+      // the open-failure screen again) and the old backup is protected.
+      expect(file.readAsStringSync(), 'junk');
+      expect(
+          docs.listSync().where((e) => e.path.contains('.broken-')), isEmpty);
+      expect(autoBackupsKeptByStartFresh(), {name});
+      // A new daily backup prunes around it, never deleting it…
+      final latest = File(p.join(olderBackup().parent.path,
+          '${SnapshotService.filePrefix}20261120_090000${SnapshotService.fileSuffix}'))
+        ..writeAsBytesSync([2]);
+      await pruneAutoBackups(olderBackup().parent, protect: latest);
+      expect(olderBackup().existsSync(), isTrue);
+      // …and Dismiss (or a restore, or a reset) still clears it.
+      await endAutoBackupPrunePause();
+      expect(autoBackupsKeptByStartFresh(), isNull);
+      // A second Start fresh adds to the list rather than replacing it.
+      expect(
+          await keepAutoBackupsForStartFresh([name], settings: real), isTrue);
+      expect(await keepAutoBackupsForStartFresh(['other.zip'], settings: real),
+          isTrue);
+      expect(autoBackupsKeptByStartFresh(), {name, 'other.zip'});
+    });
+
+    testWidgets('killed after the set-aside: the protection is already there',
+        (tester) async {
+      final file = File(p.join(docs.path, 'pos_database.db'));
+      await tester.runAsync(() async {
+        await real.putAll(
+            {'onboarding_complete': true, kWhatsNewSeenKey: kAppVersion});
+        file.writeAsStringSync('junk');
+        olderBackup()
+          ..parent.createSync(recursive: true)
+          ..writeAsBytesSync([1]);
+      });
+      bool? dbInPlaceAtKeep;
+      settings.onPut = (key) {
+        if (key == kStartFreshKeptBackupsKey) {
+          dbInPlaceAtKeep ??= file.existsSync();
+        }
+      };
+      await startFresh(tester);
+      await pumpUntil(tester, () => find.byType(POSApp).evaluate().isNotEmpty);
+      expect(dbInPlaceAtKeep, isTrue,
+          reason: 'written while the damaged file was still in place, so '
+              'any kill after the set-aside finds it');
+      expect(autoBackupsKeptByStartFresh(), {p.basename(olderBackup().path)});
       await tester.pump(const Duration(seconds: 9));
       await done(tester);
     });
