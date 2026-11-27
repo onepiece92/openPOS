@@ -430,20 +430,50 @@ void main() {
       await done(tester);
     });
 
-    testWidgets('… and asks the reset question when it cannot clear it',
+    testWidgets(
+        '… and refuses, touching nothing, when it cannot clear it first '
+        '(so no kill can leave the flag set over a set-aside database)',
         (tester) async {
+      final file = File(p.join(docs.path, 'pos_database.db'));
       await tester.runAsync(() async {
         await real.putAll(
             {'onboarding_complete': true, kFactoryResetPendingKey: true});
-        File(p.join(docs.path, 'pos_database.db')).writeAsStringSync('junk');
+        file.writeAsStringSync('junk');
       });
       settings.failDeletes = 999;
       await startFresh(tester);
       await pumpUntil(
-          tester, () => find.text(kResetChoiceTitle).evaluate().isNotEmpty);
+          tester, () => find.text(kStartFreshCannotSave).evaluate().isNotEmpty);
+      expect(
+          find.text("Open POS couldn't save a change. Free up some space on "
+              'this device, then try again.'),
+          findsOneWidget);
       expect(find.byType(POSApp), findsNothing);
+      expect(file.readAsStringSync(), 'junk', reason: 'not set aside');
+      expect(
+          docs.listSync().where((e) => e.path.contains('.broken-')), isEmpty);
       expect(real.containsKey(kFactoryResetPendingKey), isTrue);
       await done(tester);
+    });
+
+    test(
+        'kill-point: flag set, database set aside, flag not yet cleared — the '
+        'launch auto-finish never deletes the set-aside copy', () async {
+      // The state such a kill would leave (Start fresh now clears the flag
+      // before the set-aside, so it cannot happen there; this is the
+      // defence in depth).
+      await Hive.openBox<dynamic>('held_orders');
+      await Hive.openBox<dynamic>(kUsageBoxName);
+      final db = File(p.join(docs.path, 'pos_database.db'));
+      final copy = File('${db.path}.broken-20261101-090000')
+        ..writeAsStringSync('the real shop');
+      await real.put(kFactoryResetPendingKey, true);
+      final empty = AppDatabase(NativeDatabase.memory());
+      addTearDown(empty.close);
+      final r = await finishPendingFactoryResetOnLaunch(() => empty);
+      expect(r, PendingFactoryReset.finished);
+      expect(copy.existsSync(), isTrue,
+          reason: 'only a reset the user confirmed deletes it');
     });
   });
 }

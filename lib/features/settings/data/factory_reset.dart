@@ -9,7 +9,6 @@ import 'package:path/path.dart' as p;
 import 'package:pos_app/core/providers/hive_provider.dart'
     show kAutoBackupLastAt;
 import 'package:pos_app/core/database/app_database.dart';
-import 'package:pos_app/core/database/connection/native.dart' show databaseFile;
 import 'package:pos_app/features/backup/data/open_failure_recovery.dart'
     show deleteBrokenDatabaseCopies;
 import 'package:pos_app/core/providers/database_provider.dart';
@@ -302,7 +301,9 @@ Future<PendingFactoryReset> finishPendingFactoryResetOnLaunch(
       heldOrders: Hive.box<dynamic>('held_orders'),
       usage: usageBoxForReset,
       receipts: receiptsDir,
-      database: databaseFile,
+      // No `database`: an automatic finish never deletes the copies Start
+      // fresh set aside (they may be the shop's only data); only a reset
+      // the user confirmed does.
     );
 
 /// How [runFactoryReset] ended.

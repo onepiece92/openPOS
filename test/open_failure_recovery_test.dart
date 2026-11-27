@@ -18,6 +18,7 @@ import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/features/backup/data/open_failure_recovery.dart';
 import 'package:pos_app/features/backup/data/snapshot_providers.dart';
+import 'package:pos_app/features/backup/data/restore_journal.dart';
 import 'package:pos_app/features/backup/data/snapshot_service.dart';
 import 'package:pos_app/features/settings/data/factory_reset.dart'
     show kFactoryResetPendingKey;
@@ -103,8 +104,7 @@ void main() {
         '$kDatabaseFileName.broken-20261101-090000',
         '$kDatabaseFileName.broken-20261102-090000',
       });
-      expect(
-          File('${dbFile().path}.broken-20261101-090000').readAsStringSync(),
+      expect(File('${dbFile().path}.broken-20261101-090000').readAsStringSync(),
           'the real shop');
     });
 
@@ -623,5 +623,72 @@ void main() {
         reason: 'the whole set moved together');
     await tester.pump(const Duration(seconds: 9));
     await done(tester);
+  });
+
+  group('a restore journal on disk', () {
+    File journal() => SnapshotService.journalFileFor(dbFile());
+
+    testWidgets('Start fresh refuses and touches nothing', (tester) async {
+      await tester.runAsync(() async {
+        await openBoxes();
+        dbFile().writeAsStringSync('junk');
+        RestoreJournal.begin(journal(), plan: const [], staged: const []);
+      });
+      await tester.pumpWidget(AppRoot(
+          startupDbError: SqliteException(26, 'file is not a database')));
+      final state = tester.state<AppRootState>(find.byType(AppRoot));
+      await tester.runAsync(() => state.startFresh());
+      await tester.pump();
+      expect(find.text(kStartFreshRestorePending), findsOneWidget);
+      expect(dbFile().readAsStringSync(), 'junk');
+      expect(
+          docs.listSync().where((e) => e.path.contains('.broken-')), isEmpty);
+      await done(tester);
+    });
+
+    testWidgets(
+        'a restore from the screen that fails and leaves its journal: Try '
+        'again only, and the merge marker stays', (tester) async {
+      final marker = File(p.join(docs.path, 'restore_merge.json'));
+      await tester.runAsync(openBoxes);
+      await tester.pumpWidget(AppRoot(
+        startupDbError: DatabaseMissingError(dbFile().path),
+        recoverForRetry: () async => RestoreRecovery.none,
+        // As snapshot_service does when neither the backup nor the old data
+        // reopens: the journal and the merge marker stay on disk.
+        restoreForTest: (_) async {
+          marker.writeAsStringSync('{}');
+          RestoreJournal.begin(journal(), plan: const [], staged: const []);
+          throw StateError('restore fatal');
+        },
+      ));
+      expect(find.text(kStartFreshButton), findsOneWidget);
+      final state = tester.state<AppRootState>(find.byType(AppRoot));
+      await tester.runAsync(() => state.restoreFromErrorScreen(File('x.zip')));
+      await tester.pump();
+      expect(find.text('Try again'), findsOneWidget);
+      expect(find.text(kRestoreLatestBackupButton), findsNothing);
+      expect(find.text(kStartFreshButton), findsNothing);
+      expect(find.text(kBackupRestoreFailedTryAnother), findsNothing);
+      expect(marker.existsSync(), isTrue,
+          reason: 'kept for the recovery that settles the journal');
+      await done(tester);
+    });
+
+    testWidgets('without a journal the same failure re-offers both exits',
+        (tester) async {
+      await tester.runAsync(openBoxes);
+      await tester.pumpWidget(AppRoot(
+        startupDbError: DatabaseMissingError(dbFile().path),
+        restoreForTest: (_) async => throw StateError('rejected'),
+      ));
+      final state = tester.state<AppRootState>(find.byType(AppRoot));
+      await tester.runAsync(() => state.restoreFromErrorScreen(File('x.zip')));
+      await tester.pump();
+      expect(find.text(kStartFreshButton), findsOneWidget);
+      expect(find.text(kBackupRestoreFailedTryAnother), findsWidgets);
+      await tester.pump(const Duration(seconds: 1));
+      await done(tester);
+    });
   });
 }

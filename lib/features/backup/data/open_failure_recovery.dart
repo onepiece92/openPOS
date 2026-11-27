@@ -26,6 +26,14 @@ const kStartFreshMessage = 'This creates a new, empty database. The sales '
     'file is kept on this device for support.';
 const kStartFreshProgress = 'Starting fresh…';
 
+/// Start fresh refused: a restore's journal is still on disk.
+const kStartFreshRestorePending =
+    'A restore is still being finished. Tap Try again first.';
+
+/// Start fresh refused: a pending factory reset could not be cleared first.
+const kStartFreshCannotSave = "Open POS couldn't save a change. Free up some "
+    'space on this device, then try again.';
+
 /// Start fresh refused: the stores it needs are not open (nothing touched).
 const kStartFreshNeedsStores =
     "Open POS can't start fresh right now. Tap Try again first.";

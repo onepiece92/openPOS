@@ -42,6 +42,7 @@ class AppRoot extends StatefulWidget {
     this.startupDbError,
     this.recoverForRetry,
     this.settingsBoxForTest,
+    this.restoreForTest,
   });
 
   /// The container the startup DB check ran on (so its connection is
@@ -76,6 +77,11 @@ class AppRoot extends StatefulWidget {
   /// cleared (tests simulate a full disk with it).
   @visibleForTesting
   final Box<dynamic>? settingsBoxForTest;
+
+  /// Stands in for [AppRootState.restoreFrom] in the open-failure screen's
+  /// restore (tests simulate a restore that leaves its journal behind).
+  @visibleForTesting
+  final Future<void> Function(File zip)? restoreForTest;
 
   static AppRootState of(BuildContext context) =>
       context.findAncestorStateOfType<AppRootState>()!;
@@ -660,7 +666,7 @@ class AppRootState extends State<AppRoot> {
     final openError = _openError;
     await _dropFailedContainer();
     try {
-      await restoreFrom(zip);
+      await (widget.restoreForTest ?? restoreFrom)(zip);
       return;
     } catch (e) {
       debugPrint('Restore from the open-failure screen failed: $e');
@@ -670,6 +676,20 @@ class AppRootState extends State<AppRoot> {
     // never "Restore failed" with raw text. A restore that left the app
     // running on its data keeps that.
     if (!mounted || _fatal == null || openError == null) return;
+    // A journal still on disk (the restore's commit may be recorded but
+    // not confirmed): only Try again — whose recovery settles it — may
+    // run now. Re-offering Start fresh would create a database that the
+    // next recovery rolls the .bak files back over; the merge marker stays
+    // for that recovery to finish.
+    if (await _restorePending()) {
+      if (mounted) {
+        setState(() {
+          _dbFileDamaged = false; // hides both exits; Try again stays
+          _errorNote = null;
+        });
+      }
+      return;
+    }
     deleteRestoreMergeMarker(); // nothing was merged; don't replay it later
     setState(() {
       _showDbOpenFailure(openError);
@@ -677,6 +697,19 @@ class AppRootState extends State<AppRoot> {
       _errorNote = kBackupRestoreFailedTryAnother;
       _pickAgain = true;
     });
+  }
+
+  /// Whether an interrupted restore's journal is still on disk.
+  Future<bool> _restorePending() async {
+    try {
+      SnapshotService.assertNoPendingRestore(
+          SnapshotService.journalFileFor(await databaseFile()));
+      return false;
+    } on PendingRestoreException {
+      return true;
+    } catch (_) {
+      return true; // can't tell: the safe answer
+    }
   }
 
   /// "Start fresh" (confirmed): sets the database that would not open
@@ -691,30 +724,39 @@ class AppRootState extends State<AppRoot> {
       setState(() => _errorNote = kStartFreshNeedsStores);
       return;
     }
+    // An unsettled restore owns the files until recovery has run.
+    if (await _restorePending()) {
+      if (mounted) setState(() => _errorNote = kStartFreshRestorePending);
+      return;
+    }
+    // A pending factory reset is cleared FIRST: left set, a kill after the
+    // set-aside would let the next launch finish the reset on the new,
+    // empty database. If it will not clear, nothing is touched.
+    final settings = _settingsBox();
+    if (isFactoryResetPending(settings) &&
+        !await clearFactoryResetPendingConfirmed(settings)) {
+      if (mounted) setState(() => _errorNote = kStartFreshCannotSave);
+      return;
+    }
+    if (!mounted) return;
     setState(() {
       _errorNote = null;
       _restoring = true;
       _splashMessage = kStartFreshProgress;
     });
     Object? error;
-    var choice = false;
     try {
       await _dropFailedContainer();
       await setAsideDatabaseFile(await databaseFile(), DateTime.now());
       // Created directly: checkDatabaseFileBeforeOpen would (rightly)
       // refuse a missing file under a finished onboarding.
       await _container.read(databaseProvider).customSelect('SELECT 1').get();
-      // A reset flag left from before must not let the next launch wipe
-      // the settings and held tickets because the new database is empty.
-      final settings = _settingsBox();
       // Keep the automatic backups of the shop that was set aside: pause
       // their pruning until a restore or a Dismiss (best effort).
       try {
         await settings.put(kStartFreshAtKey, DateTime.now().toIso8601String());
         await settings.flush();
       } catch (_) {}
-      choice = isFactoryResetPending(settings) &&
-          !await clearFactoryResetPendingConfirmed(settings);
     } catch (e) {
       error = e;
     }
@@ -724,13 +766,12 @@ class AppRootState extends State<AppRoot> {
       if (error == null) {
         _fatal = null;
         _dbOpenFailure = false;
-        _resetChoice = choice;
-        _notice = choice ? null : kStartFreshDoneNotice;
+        _notice = kStartFreshDoneNotice;
       } else {
         _showDbOpenFailure(error);
       }
     });
-    if (error == null && !choice && _autoBackupTimer == null) {
+    if (error == null && _autoBackupTimer == null) {
       _autoBackupTimer = Timer(autoBackupDelay, _startAutoBackup);
     }
   }

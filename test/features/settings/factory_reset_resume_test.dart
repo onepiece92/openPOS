@@ -11,7 +11,7 @@ import 'package:pos_app/core/providers/hive_provider.dart'
     show kAutoBackupLastAt;
 import 'package:pos_app/core/services/audit_service.dart';
 import 'package:pos_app/features/backup/data/snapshot_providers.dart'
-    show hasUserData;
+    show hasShopData, hasUserData;
 import 'package:pos_app/features/backup/data/snapshot_service.dart';
 import 'package:pos_app/features/cart/data/ticket_sequence.dart';
 import 'package:pos_app/features/cart/domain/held_order.dart';
@@ -98,7 +98,6 @@ void main() {
       held.containsKey('t1'),
       usage.containsKey(kUsageDisclosureShownKey),
       receipts().existsSync(),
-      broken().existsSync(),
     ];
     if (old.every((x) => x)) {
       return isFactoryResetPending(settings) ? 'old, asking' : 'old';
@@ -312,5 +311,27 @@ void main() {
       finishFactoryReset: () async => throw StateError('disk'),
     );
     expect(r.dbError, isA<StateError>());
+  });
+
+  test(
+      'a confirmed reset deletes the set-aside copies; a launch finish '
+      'does not', () async {
+    expect(await reset(), FactoryResetOutcome.done);
+    expect(broken().existsSync(), isFalse, reason: 'the user confirmed');
+
+    broken().writeAsStringSync('old sales');
+    await markFactoryResetPending(settings);
+    await relaunch();
+    expect(
+        await finishPendingFactoryReset(
+          settings: settings,
+          databaseHasUserData: () => hasShopData(db),
+          eraseDatabase: db.eraseAllData,
+          heldOrders: held,
+          usage: () async => usage,
+          receipts: () async => receipts(),
+        ),
+        PendingFactoryReset.finished);
+    expect(broken().existsSync(), isTrue);
   });
 }
