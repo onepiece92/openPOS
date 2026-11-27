@@ -97,6 +97,60 @@ void main() {
       expect(brokenNames(), {'$kDatabaseFileName.broken-20261102-090000'});
     });
 
+    test('two set-asides in the same second get distinct names', () async {
+      final now = DateTime(2026, 11, 1, 9);
+      dbFile().writeAsStringSync('the real shop');
+      File('${dbFile().path}-wal').writeAsStringSync('w');
+      await setAsideDatabaseFile(dbFile(), now);
+      dbFile().writeAsStringSync('tiny');
+      final second = await setAsideDatabaseFile(dbFile(), now);
+      expect(p.basename(second!.path),
+          '$kDatabaseFileName.broken-20261101-090000-2');
+      expect(brokenNames(), {
+        '$kDatabaseFileName.broken-20261101-090000',
+        '$kDatabaseFileName.broken-20261101-090000-wal',
+        '$kDatabaseFileName.broken-20261101-090000-2',
+      });
+      expect(File('${dbFile().path}.broken-20261101-090000').readAsStringSync(),
+          'the real shop',
+          reason: 'not replaced');
+    });
+
+    test(
+        'an orphan journal (its main copy missing) is never deleted and '
+        'counts toward the newest set', () async {
+      // A kill split an earlier set: its -wal moved, its main did not.
+      File('${dbFile().path}.broken-20261030-090000-wal')
+          .writeAsStringSync('w' * 4096);
+      // An older complete set, and the one before it.
+      File('${dbFile().path}.broken-20261029-090000').writeAsStringSync('a');
+      File('${dbFile().path}.broken-20261031-090000').writeAsStringSync('b');
+      dbFile().writeAsStringSync('a new damaged database');
+      await setAsideDatabaseFile(dbFile(), DateTime(2026, 11, 2, 9));
+      final left = brokenNames();
+      expect(left, contains('$kDatabaseFileName.broken-20261030-090000-wal'),
+          reason: 'orphans are never deleted');
+      expect(left, contains('$kDatabaseFileName.broken-20261102-090000'));
+      expect(left, isNot(contains('$kDatabaseFileName.broken-20261029-090000')),
+          reason: 'a small older set still goes');
+      // The orphan's 4 KB counts toward the newest set that has a main
+      // copy — here the one just made, which is kept anyway.
+    });
+
+    test("the orphan's size can keep the newest older set", () async {
+      File('${dbFile().path}.broken-20261030-090000-wal')
+          .writeAsStringSync('w' * 4096);
+      File('${dbFile().path}.broken-20261031-090000').writeAsStringSync('b');
+      // Deleting with a keep threshold, as a set-aside would: the newest
+      // set with a main copy is 20261031, and the orphan counts toward it.
+      await deleteBrokenDatabaseCopies(dbFile(),
+          keepStamp: 'none', keepLargerThan: 100);
+      expect(brokenNames(), {
+        '$kDatabaseFileName.broken-20261030-090000-wal',
+        '$kDatabaseFileName.broken-20261031-090000',
+      });
+    });
+
     test('a second Start fresh with the main file missing keeps the copy',
         () async {
       dbFile().writeAsStringSync('the real shop');
