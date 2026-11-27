@@ -83,6 +83,15 @@ void main() {
             if (p.basename(e.path).contains('.broken-')) p.basename(e.path)
         };
 
+    test('an older set smaller in total is replaced', () async {
+      dbFile().writeAsStringSync('a');
+      File('${dbFile().path}-wal').writeAsStringSync('w');
+      await setAsideDatabaseFile(dbFile(), DateTime(2026, 11, 1, 9));
+      dbFile().writeAsStringSync('a bigger damaged database');
+      await setAsideDatabaseFile(dbFile(), DateTime(2026, 11, 2, 9));
+      expect(brokenNames(), {'$kDatabaseFileName.broken-20261102-090000'});
+    });
+
     test('a second Start fresh with the main file missing keeps the copy',
         () async {
       dbFile().writeAsStringSync('the real shop');
@@ -108,11 +117,15 @@ void main() {
           'the real shop');
     });
 
-    test('an older copy larger than the new one is never deleted', () async {
-      dbFile().writeAsStringSync('the real shop, years of sales');
-      File('${dbFile().path}-wal').writeAsStringSync('w');
+    test(
+        'an older set larger than the new one is never deleted, counting '
+        'its hot WAL', () async {
+      // Most of the old shop's data sits in its WAL; its main file alone is
+      // smaller than the new main file.
+      dbFile().writeAsStringSync('a');
+      File('${dbFile().path}-wal').writeAsStringSync('w' * 4096);
       await setAsideDatabaseFile(dbFile(), DateTime(2026, 11, 1, 9));
-      dbFile().writeAsStringSync('tiny');
+      dbFile().writeAsStringSync('a new, mostly empty database');
       await setAsideDatabaseFile(dbFile(), DateTime(2026, 11, 2, 9));
       expect(brokenNames(), {
         '$kDatabaseFileName.broken-20261101-090000',

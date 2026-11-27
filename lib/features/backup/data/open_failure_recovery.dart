@@ -78,8 +78,12 @@ Future<File?> setAsideDatabaseFile(File db, DateTime now) async {
   // empty main file (e.g. a second Start fresh after the first one's new
   // database never got written) must never cost the only real copy — and
   // no older copy bigger than the one just kept is ever deleted.
-  final keptSize = moved == null ? 0 : await moved.length();
-  if (keptSize > 0) {
+  if (moved != null && await moved.length() > 0) {
+    var keptSize = 0;
+    for (final suffix in ['', '-wal', '-shm', '-journal']) {
+      final f = File('$prefix$suffix');
+      if (await f.exists()) keptSize += await f.length();
+    }
     await deleteBrokenDatabaseCopies(db,
         keepPrefix: prefix, keepLargerThan: keptSize);
   }
@@ -91,8 +95,8 @@ const kBrokenCopyInfix = '.broken-';
 
 /// Deletes the set-aside copies of [db] (`<name>.broken-<time>` plus its
 /// `-wal`/`-shm`/`-journal`), except the set starting with [keepPrefix] and
-/// any set whose main copy is larger than [keepLargerThan] bytes. Returns
-/// how many files were deleted.
+/// any set larger in total (main + journals: a hot WAL can hold most of the
+/// data) than [keepLargerThan] bytes. Returns how many files were deleted.
 Future<int> deleteBrokenDatabaseCopies(
   File db, {
   String? keepPrefix,
@@ -113,10 +117,11 @@ Future<int> deleteBrokenDatabaseCopies(
   var deleted = 0;
   for (final entry in sets.entries) {
     if (keepLargerThan != null) {
-      final main = File('$start${entry.key}');
-      if (await main.exists() && await main.length() > keepLargerThan) {
-        continue;
+      var size = 0;
+      for (final f in entry.value) {
+        size += await f.length();
       }
+      if (size > keepLargerThan) continue;
     }
     for (final f in entry.value) {
       await f.delete();
