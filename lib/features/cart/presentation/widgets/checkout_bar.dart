@@ -116,12 +116,12 @@ class CheckoutBar extends ConsumerWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Icon(Icons.shopping_cart_checkout_rounded,
-                        color: cs.onPrimary),
+                    const Icon(Icons.shopping_cart_checkout_rounded,
+                        color: AppTheme.onBrandOrange),
                     Text(
                       '$itemCount',
                       style: tt.titleSmall?.copyWith(
-                        color: cs.onPrimary.withValues(alpha: 0.8),
+                        color: AppTheme.onBrandOrange.withValues(alpha: 0.8),
                         fontWeight: FontWeight.w700,
                       ),
                     ),

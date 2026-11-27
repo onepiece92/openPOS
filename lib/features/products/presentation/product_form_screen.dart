@@ -259,6 +259,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
           FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
             ),
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Delete'),

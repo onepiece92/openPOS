@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pos_app/core/theme/app_theme.dart';
 import 'package:intl/intl.dart';
 
 import 'package:pos_app/core/theme/tokens.dart';
@@ -269,7 +270,7 @@ class DashboardBody extends StatelessWidget {
           label: 'Net Profit',
           value: '$symbol ${_fmt(data.profit)}',
           icon: Icons.account_balance_rounded,
-          color: data.profit >= 0 ? const Color(0xFF16A34A) : cs.error,
+          color: data.profit >= 0 ? StatusColors.success(cs) : cs.error,
           cs: cs,
         ),
       KpiCard(

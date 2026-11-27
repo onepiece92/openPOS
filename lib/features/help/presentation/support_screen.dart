@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pos_app/core/theme/app_theme.dart';
 import 'package:pos_app/core/whats_new/release_notes.dart';
 import 'package:pos_app/core/whats_new/whats_new_dialog.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -72,7 +73,7 @@ class SupportScreen extends ConsumerWidget {
             icon: Icons.rocket_launch_rounded,
             title: 'RebuzzPOS',
             subtitle: 'Online POS with 40+ additional features',
-            gradient: const [Color(0xFF6B68FF), Color(0xFF00B8C8)],
+            gradient: const [AppTheme.matteBlack, AppTheme.stormGrey],
             cs: cs,
             tt: tt,
             onTap: () => openRebuzzSiteOrExplain(context),

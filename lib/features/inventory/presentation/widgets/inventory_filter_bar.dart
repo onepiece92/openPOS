@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pos_app/core/theme/app_theme.dart';
 
 class InventoryFilterBar extends StatelessWidget {
   const InventoryFilterBar({super.key, 
@@ -34,7 +35,7 @@ class InventoryFilterBar extends StatelessWidget {
           _Chip(
             label: 'Low ($lowCount)',
             selected: selected == 'low',
-            color: const Color(0xFFD97706),
+            color: StatusColors.warning(cs),
             onTap: () => onSelect(selected == 'low' ? null : 'low'),
           ),
           _Chip(
