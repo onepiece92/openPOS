@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:pos_app/features/cart/presentation/clear_cart.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/services/demo_data_service.dart';
@@ -82,7 +83,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                 case 'customers':
                   await context.push('/customers');
                 case 'clear_cart':
-                  ref.read(cartProvider.notifier).clear();
+                  clearCartWithUndo(context, ref);
               }
             },
             itemBuilder: (_) {
@@ -146,7 +147,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
             if (ref.read(cartProvider).isNotEmpty) context.push('/cart');
           },
           const SingleActivator(LogicalKeyboardKey.keyK, meta: true): () {
-            ref.read(cartProvider.notifier).clear();
+            clearCartWithUndo(context, ref);
           },
           const SingleActivator(LogicalKeyboardKey.keyG, meta: true): () {
             filterN.toggleView();
@@ -303,8 +304,7 @@ class _ClearCartButton extends ConsumerWidget {
     return IconButton(
       icon: const Icon(Icons.remove_shopping_cart_rounded),
       tooltip: 'Clear cart',
-      onPressed:
-          cartEmpty ? null : () => ref.read(cartProvider.notifier).clear(),
+      onPressed: cartEmpty ? null : () => clearCartWithUndo(context, ref),
     );
   }
 }

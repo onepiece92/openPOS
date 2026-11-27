@@ -48,6 +48,10 @@ class CartSessionNotifier extends Notifier<CartSession> {
       state = state.copyWith(loyaltyPointsToRedeem: points.clamp(0, 999999));
   void reset() => state = CartSession.fresh(_nextTicketNumber());
 
+  /// Puts back a session taken before a clear (its number included), for
+  /// "Undo" on Clear cart. No counter value is consumed.
+  void restore(CartSession session) => state = session;
+
   /// Rebinds the cart to an existing held ticket, adopting its number and
   /// metadata so a later save updates that ticket rather than minting a new
   /// one. No counter value is consumed — the ticket already owns its number.
@@ -260,7 +264,32 @@ class CartNotifier extends Notifier<List<CartItem>> {
     ref.read(cartSessionProvider.notifier).reset();
   }
 
+  /// Everything [clear] throws away: lines, session (number, held ticket,
+  /// customer, table, discounts, tax switch, points) and the tax rate.
+  CartSnapshot snapshot() => CartSnapshot(
+        items: [...state],
+        session: ref.read(cartSessionProvider),
+        taxRateIds: [...ref.read(selectedTaxRatesProvider)],
+      );
+
+  /// Puts back exactly the cart [s] was taken from, replacing what is in
+  /// the cart now.
+  void restoreSnapshot(CartSnapshot s) {
+    state = [...s.items];
+    ref.read(cartSessionProvider.notifier).restore(s.session);
+    ref.read(selectedTaxRatesProvider.notifier).restore(s.taxRateIds);
+  }
+
   int get itemCount => state.fold(0, (sum, i) => sum + i.quantity);
+}
+
+/// A cart as it was before Clear cart, for "Undo" ([CartNotifier.snapshot]).
+class CartSnapshot {
+  const CartSnapshot(
+      {required this.items, required this.session, required this.taxRateIds});
+  final List<CartItem> items;
+  final CartSession session;
+  final List<int> taxRateIds;
 }
 
 final cartProvider =

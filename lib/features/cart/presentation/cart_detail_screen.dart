@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:pos_app/core/theme/app_theme.dart';
+import 'package:pos_app/features/cart/presentation/clear_cart.dart';
 import 'package:pos_app/features/cart/presentation/providers/cart_notifier.dart';
 import 'package:pos_app/features/cart/presentation/widgets/cart_line_item.dart';
 import 'package:pos_app/features/cart/presentation/widgets/order_summary.dart';
@@ -32,7 +33,7 @@ class CartDetailScreen extends ConsumerWidget {
         actions: [
           if (cart.isNotEmpty)
             TextButton(
-              onPressed: () => ref.read(cartProvider.notifier).clear(),
+              onPressed: () => clearCartWithUndo(context, ref),
               child: const Text('Clear'),
             ),
         ],
