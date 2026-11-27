@@ -19,6 +19,8 @@ import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/features/backup/data/open_failure_recovery.dart';
 import 'package:pos_app/features/backup/data/snapshot_providers.dart';
 import 'package:pos_app/features/backup/data/snapshot_service.dart';
+import 'package:pos_app/features/settings/data/factory_reset.dart'
+    show kFactoryResetPendingKey;
 
 import '_support/sales.dart';
 import 'app_root_retry_test.dart' show pumpUntil;
@@ -253,13 +255,18 @@ void main() {
     expect(find.text("Open POS couldn't open its data."), findsOneWidget);
     expect(dbFile().readAsStringSync(), startsWith('this is not'));
 
-    await tester.tap(find.text(kStartFreshButton));
-    await tester.pumpAndSettle();
-    await tester.runAsync(
-        () => tester.tap(find.widgetWithText(FilledButton, kStartFreshButton)));
+    // Confirmed. (Run on the real clock, not awaited — its Hive writes
+    // would otherwise stay pending in the fake-async zone. The confirm
+    // button's wiring is covered by the "refuses" test above.)
+    final state = tester.state<AppRootState>(find.byType(AppRoot));
+    await tester.runAsync(() async {
+      unawaited(state.startFresh());
+    });
     await pumpUntil(tester, () => find.byType(POSApp).evaluate().isNotEmpty);
     expect(find.text(kStartFreshDoneNotice), findsOneWidget);
     expect(dbFile().lengthSync(), greaterThan(0));
+    expect(autoBackupPrunePausedSince(), isNotNull,
+        reason: 'the backups from before Start fresh are kept');
     final aside = docs
         .listSync()
         .where((e) => p.basename(e.path).contains('.broken-'))
@@ -451,6 +458,126 @@ void main() {
         reason: 'the note stays on the screen');
     expect(find.text(kRestoreLatestBackupButton), findsOneWidget);
     expect(find.text(kStartFreshButton), findsOneWidget);
+    await done(tester);
+  });
+
+  testWidgets(
+      'a restore drops the reset flag and the Start fresh pause a backup '
+      'carries', (tester) async {
+    late File zip;
+    await tester.runAsync(() async {
+      await openBoxes();
+      final db = AppDatabase(NativeDatabase(dbFile()));
+      await seedProduct(db, sku: 'KEPT');
+      await db.close();
+      final settings = Hive.box<dynamic>('settings');
+      // An older-style backup, written without stripping.
+      await settings.putAll({
+        kFactoryResetPendingKey: true,
+        kStartFreshAtKey: DateTime(2026, 11, 1).toIso8601String(),
+      });
+      await settings.flush();
+      zip = await const SnapshotService().create(
+        dbFile: dbFile(),
+        hiveBoxFiles: snapshotHiveBoxFiles(),
+        outDir: autoDir(),
+        schemaVersion: AppDatabase.currentSchemaVersion,
+        includePhotos: false,
+      );
+      for (final s in ['', '-wal', '-shm']) {
+        final f = File('${dbFile().path}$s');
+        if (f.existsSync()) f.deleteSync();
+      }
+    });
+    await tester.pumpWidget(AppRoot(
+        startupDbError: DatabaseMissingError(dbFile().path),
+        recoverForRetry: () async => RestoreRecovery.none));
+    final state = tester.state<AppRootState>(find.byType(AppRoot));
+    await tester.runAsync(() async {
+      unawaited(state.restoreFromErrorScreen(zip));
+    });
+    await pumpUntil(tester, () => find.byType(POSApp).evaluate().isNotEmpty);
+    final settings = Hive.box<dynamic>('settings');
+    expect(settings.containsKey(kFactoryResetPendingKey), isFalse,
+        reason: 'restored data must not re-arm an erase');
+    expect(settings.containsKey(kStartFreshAtKey), isFalse,
+        reason: 'a restore ends the pruning pause');
+    final db = state.containerForTest.read(databaseProvider);
+    final skus = await tester
+        .runAsync(() => db.select(db.products).map((r) => r.sku).get());
+    expect(skus, ['KEPT']);
+    await tester.pump(const Duration(seconds: 9));
+    await done(tester);
+  });
+
+  testWidgets(
+      'probe: a damaged main file with a hot WAL gets both exits, and Start '
+      'fresh moves db, wal and shm aside together', (tester) async {
+    late Object openError;
+    final copied = <String>[];
+    await tester.runAsync(() async {
+      await openBoxes();
+      // A live WAL database, copied while open: main + -wal + -shm.
+      final live = Directory(p.join(docs.path, 'live'))..createSync();
+      final liveFile = File(p.join(live.path, kDatabaseFileName));
+      final db = AppDatabase(NativeDatabase(liveFile));
+      await seedProduct(db, sku: 'A');
+      for (final s in ['', '-wal', '-shm']) {
+        final f = File('${liveFile.path}$s');
+        if (f.existsSync()) {
+          f.copySync('${dbFile().path}$s');
+          copied.add(s);
+        }
+      }
+      await db.close();
+      // Damage the main file's header. (The WAL's own header is damaged
+      // too: a valid WAL that holds page 1 would mask the main header and
+      // the file would open — that case surfaces later, as a CORRUPT
+      // query, not on this screen.)
+      final bytes = dbFile().readAsBytesSync()
+        ..setRange(0, 100, List.filled(100, 0x41));
+      dbFile().writeAsBytesSync(bytes, flush: true);
+      final wal = File('${dbFile().path}-wal');
+      final walBytes = wal.readAsBytesSync()
+        ..setRange(0, 32, List.filled(32, 0));
+      wal.writeAsBytesSync(walBytes, flush: true);
+      final broken = AppDatabase(NativeDatabase(dbFile()));
+      Object? error;
+      try {
+        await broken.customSelect('SELECT 1').get();
+      } catch (e) {
+        error = e;
+      }
+      expect(error, isNotNull, reason: 'the damaged file must not open');
+      openError = error!;
+      try {
+        await broken.close();
+      } catch (_) {}
+    });
+    expect(copied, containsAll(['', '-wal']), reason: 'a hot WAL');
+    expect(isDatabaseFileDamaged(openError), isTrue, reason: '$openError');
+
+    await tester.pumpWidget(AppRoot(startupDbError: openError));
+    expect(find.text(kRestoreLatestBackupButton), findsOneWidget);
+    expect(find.text(kStartFreshButton), findsOneWidget);
+    final state = tester.state<AppRootState>(find.byType(AppRoot));
+    await tester.runAsync(() async {
+      unawaited(state.startFresh());
+    });
+    await pumpUntil(tester, () => find.byType(POSApp).evaluate().isNotEmpty);
+    final stamp = RegExp(r'broken-\d{8}-\d{6}');
+    final aside = {
+      for (final e in docs.listSync())
+        if (p.basename(e.path).contains('.broken-'))
+          p.basename(e.path).replaceFirst(stamp, 'broken')
+    };
+    expect(
+        aside,
+        {
+          for (final s in copied) '$kDatabaseFileName.broken$s',
+        },
+        reason: 'the whole set moved together');
+    await tester.pump(const Duration(seconds: 9));
     await done(tester);
   });
 }
