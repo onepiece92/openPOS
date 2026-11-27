@@ -533,6 +533,11 @@ void main() {
         schemaVersion: AppDatabase.currentSchemaVersion,
         includePhotos: false,
       );
+      // The device's own box no longer has them: anything found after the
+      // restore came from the backup's box.
+      await settings
+          .deleteAll([kFactoryResetPendingKey, kStartFreshKeptBackupsKey]);
+      await settings.flush();
       for (final s in ['', '-wal', '-shm']) {
         final f = File('${dbFile().path}$s');
         if (f.existsSync()) f.deleteSync();
