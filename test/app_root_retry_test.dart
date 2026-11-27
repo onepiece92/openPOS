@@ -64,7 +64,8 @@ void main() {
         recoverForRetry: () async => RestoreRecovery.rolledBack,
       ));
       await tester.runAsync(() => tester.tap(find.text('Try again')));
-      final refused = find.textContaining('has not been undone');
+      // Plain words only (the reason goes to the log).
+      final refused = find.text(kStillUnableMessage);
       await pumpUntil(tester, () => refused.evaluate().isNotEmpty);
 
       expect(refused, findsOneWidget);
@@ -190,7 +191,8 @@ void main() {
     expect(recoveries, 1);
     // Recovery failed again: still on the error screen, nothing opened.
     expect(find.text('Restore failed'), findsOneWidget);
-    expect(find.textContaining('could not be undone'), findsOneWidget);
+    expect(find.text(kStillUnableMessage), findsOneWidget);
+    expect(find.textContaining('could not be undone'), findsNothing);
     expect(Hive.isBoxOpen('settings'), isFalse);
 
     await tester.tap(find.text('Try again'));

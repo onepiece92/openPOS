@@ -15,6 +15,10 @@ const kPickBackupTitle = 'Restore which backup?';
 const kNoAutoBackups = 'There are no automatic backups on this device.';
 const kNewestBackupTag = ' (newest)';
 
+/// A backup picked on that screen could not be restored.
+const kBackupRestoreFailedTryAnother =
+    "That backup couldn't be restored. Try another one.";
+
 const kStartFreshButton = 'Start fresh';
 const kStartFreshTitle = 'Start fresh?';
 const kStartFreshMessage = 'This creates a new, empty database. The sales '

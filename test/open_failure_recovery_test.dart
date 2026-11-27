@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:drift/native.dart';
@@ -305,6 +306,127 @@ void main() {
     expect(skus, containsAll(['OLD', 'NEW']));
     expect(newest.existsSync(), isTrue, reason: 'the backup itself is kept');
     await tester.pump(const Duration(seconds: 9));
+    await done(tester);
+  });
+
+  testWidgets(
+      'a picked backup that fails: same screen and exits, plain words, the '
+      'picker again; an older good one then restores', (tester) async {
+    await tester.runAsync(() async {
+      await openBoxes();
+      final db = AppDatabase(NativeDatabase(dbFile()));
+      final c = ProviderContainer(
+          overrides: [databaseProvider.overrideWithValue(db)]);
+      await seedProduct(db, sku: 'GOOD');
+      (await c
+              .read(snapshotCoordinatorProvider)
+              .create(autoDir(), includePhotos: false))
+          .setLastModifiedSync(DateTime(2026, 11, 1));
+      c.dispose();
+      await db.close();
+      // The newest automatic backup is damaged.
+      File(p.join(autoDir().path,
+          '${SnapshotService.filePrefix}20261120_090000${SnapshotService.fileSuffix}'))
+        ..writeAsStringSync('not a zip')
+        ..setLastModifiedSync(DateTime(2026, 11, 20));
+      for (final s in ['', '-wal', '-shm']) {
+        final f = File('${dbFile().path}$s');
+        if (f.existsSync()) f.deleteSync();
+      }
+    });
+
+    await tester.pumpWidget(AppRoot(
+        startupDbError: DatabaseMissingError(dbFile().path),
+        recoverForRetry: () async => RestoreRecovery.none));
+    await tester
+        .runAsync(() => tester.tap(find.text(kRestoreLatestBackupButton)));
+    await pumpUntil(
+        tester, () => find.text(kPickBackupTitle).evaluate().isNotEmpty);
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester
+        .runAsync(() => tester.tap(find.textContaining(kNewestBackupTag)));
+
+    // Back on the open-failure screen, the picker open again with the note.
+    await pumpUntil(tester,
+        () => find.text(kBackupRestoreFailedTryAnother).evaluate().length == 2);
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text(kPickBackupTitle), findsOneWidget);
+    expect(find.text("Open POS couldn't open its data."), findsOneWidget);
+    expect(find.text('Restore failed'), findsNothing);
+    expect(find.textContaining(docs.path), findsNothing, reason: 'no paths');
+    expect(find.textContaining('Exception'), findsNothing);
+    expect(File(p.join(docs.path, 'restore_merge.json')).existsSync(), isFalse,
+        reason: 'no leftover merge marker');
+
+    // The older one is listed and works. (Picked through the same entry
+    // point on the real clock: the re-opened picker lives in the fake-async
+    // zone, where the restore's file and isolate work would not finish.)
+    final older = find.descendant(
+        of: find.byType(SimpleDialogOption),
+        matching: find.textContaining('Nov 1, 2026'));
+    expect(older, findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    for (var i = 0;
+        i < 50 && find.byType(SimpleDialog).evaluate().isNotEmpty;
+        i++) {
+      await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 5)));
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(find.byType(SimpleDialog), findsNothing);
+    final good = (await tester.runAsync(listAutoBackups))!.last.$1;
+    final state0 = tester.state<AppRootState>(find.byType(AppRoot));
+    // Started on the real clock, not awaited: it waits for a frame, which
+    // pumpUntil pumps.
+    await tester.runAsync(() async {
+      unawaited(state0.restoreFromErrorScreen(good));
+    });
+    await pumpUntil(tester, () => find.byType(POSApp).evaluate().isNotEmpty);
+    expect(find.text('Backup restored'), findsOneWidget);
+    final state = tester.state<AppRootState>(find.byType(AppRoot));
+    final db = state.containerForTest.read(databaseProvider);
+    final skus = await tester
+        .runAsync(() => db.select(db.products).map((r) => r.sku).get());
+    expect(skus, ['GOOD']);
+    await tester.pump(const Duration(seconds: 9));
+    await done(tester);
+  });
+
+  testWidgets('cancelling the second picker keeps both exits and the note',
+      (tester) async {
+    await tester.runAsync(() async {
+      await openBoxes();
+      autoDir().createSync(recursive: true);
+      File(p.join(autoDir().path,
+              '${SnapshotService.filePrefix}20261120_090000${SnapshotService.fileSuffix}'))
+          .writeAsStringSync('not a zip');
+    });
+    await tester.pumpWidget(AppRoot(
+        startupDbError: DatabaseMissingError(dbFile().path),
+        recoverForRetry: () async => RestoreRecovery.none));
+    await tester
+        .runAsync(() => tester.tap(find.text(kRestoreLatestBackupButton)));
+    await pumpUntil(
+        tester, () => find.text(kPickBackupTitle).evaluate().isNotEmpty);
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester
+        .runAsync(() => tester.tap(find.textContaining(kNewestBackupTag)));
+    await pumpUntil(tester,
+        () => find.text(kBackupRestoreFailedTryAnother).evaluate().length == 2);
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.tap(find.text('Cancel'));
+    for (var i = 0;
+        i < 50 && find.byType(SimpleDialog).evaluate().isNotEmpty;
+        i++) {
+      await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 5)));
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(find.byType(SimpleDialog), findsNothing);
+    expect(find.text(kBackupRestoreFailedTryAnother), findsOneWidget,
+        reason: 'the note stays on the screen');
+    expect(find.text(kRestoreLatestBackupButton), findsOneWidget);
+    expect(find.text(kStartFreshButton), findsOneWidget);
     await done(tester);
   });
 }

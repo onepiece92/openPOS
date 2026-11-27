@@ -97,6 +97,12 @@ class AppRootState extends State<AppRoot> {
   bool _dbFileDamaged = false;
   // One plain line under the error message (e.g. why Start fresh refused).
   String? _errorNote;
+  // The error behind the open-failure screen, to come back to it after a
+  // restore started from there fails.
+  Object? _openError;
+  // Show the backup picker again as the screen comes back (that restore
+  // failed); one-shot.
+  bool _pickAgain = false;
   // A factory reset is pending on data that is still there: the blocking
   // "Finish erasing" / "Keep my data" question is showing.
   bool _resetChoice = false;
@@ -210,6 +216,7 @@ class AppRootState extends State<AppRoot> {
     _dbOpenFailure = true;
     _dbFileDamaged = isDatabaseFileDamaged(error);
     _errorNote = null;
+    _openError = error;
   }
 
   /// Fires once, [autoBackupDelay] after the first frame. Skipped when the
@@ -328,11 +335,13 @@ class AppRootState extends State<AppRoot> {
         released = true;
       } catch (e) {
         error = e;
-        notice = 'Restore failed: $e. Your data was not changed.';
+        debugPrint('Restore: releasing the stores failed: $e');
+        notice = kRestoreRejectedNotice;
         try {
           await _reopenStores();
         } catch (e2) {
-          fatal = '${RestoreFatalException(cause: e, reopenError: e2)}';
+          debugPrint('Restore: reopening failed: $e2');
+          fatal = kRestoreReopenFailedMessage;
         }
       }
 
@@ -356,23 +365,27 @@ class AppRootState extends State<AppRoot> {
               .record(UsageEvent.backupRestored);
         } on RestoreFatalException catch (e) {
           error = e;
-          fatal = '$e';
+          debugPrint('Restore: $e');
+          fatal = kRestoreReopenFailedMessage;
           // The disk may hold the backup: the merge marker stays for
           // _retryOpen / the next launch.
         } on RestoreRolledBackException catch (e) {
           error = e;
-          notice = 'Restore failed: $e';
+          debugPrint('Restore: $e');
+          notice = kRestoreRolledBackNotice;
           // Back on the old box: the merge finds nothing to change.
           await mergeReviewStateAfterRestore(reviewBefore);
           await mergeUsageAfterRestore(usageBefore);
         } catch (e) {
           error = e;
-          notice = 'Restore failed: $e. Your data was not changed.';
+          debugPrint('Restore rejected: $e');
+          notice = kRestoreRejectedNotice;
         }
       }
     } catch (e) {
       error ??= e;
-      fatal ??= 'Restore failed: $e';
+      debugPrint('Restore: $e');
+      fatal ??= kRestoreReopenFailedMessage;
     } finally {
       // Merged (or nothing was swapped): the marker has done its job.
       if (fatal == null) deleteRestoreMergeMarker();
@@ -581,7 +594,8 @@ class AppRootState extends State<AppRoot> {
       }
     } catch (e) {
       dbError = e;
-      fatal = 'Still unable to open the app data: $e';
+      debugPrint('Try again: still unable to open the data: $e');
+      fatal = kStillUnableMessage;
     } finally {
       if (mounted) {
         setState(() {
@@ -613,8 +627,10 @@ class AppRootState extends State<AppRoot> {
       if (old.exists(databaseProvider)) {
         await old.read(databaseProvider).close();
       }
-    } catch (_) {/* it never opened */}
-    old.dispose();
+    } catch (_) {/* it never opened, or a failed restore disposed it */}
+    try {
+      old.dispose();
+    } catch (_) {/* already disposed */}
     _container = ProviderContainer();
   }
 
@@ -623,10 +639,26 @@ class AppRootState extends State<AppRoot> {
   @visibleForTesting
   Future<void> restoreFromErrorScreen(File zip) async {
     if (_restoring) return;
+    final openError = _openError;
     await _dropFailedContainer();
     try {
       await restoreFrom(zip);
-    } catch (_) {/* restoreFrom has already put the outcome on screen */}
+      return;
+    } catch (e) {
+      debugPrint('Restore from the open-failure screen failed: $e');
+    }
+    // Still no data that opens (the old file is the damaged one): back to
+    // the same screen with both exits, the picker again and plain words —
+    // never "Restore failed" with raw text. A restore that left the app
+    // running on its data keeps that.
+    if (!mounted || _fatal == null || openError == null) return;
+    deleteRestoreMergeMarker(); // nothing was merged; don't replay it later
+    setState(() {
+      _showDbOpenFailure(openError);
+      _notice = null;
+      _errorNote = kBackupRestoreFailedTryAnother;
+      _pickAgain = true;
+    });
   }
 
   /// "Start fresh" (confirmed): sets the database that would not open
@@ -704,6 +736,8 @@ class AppRootState extends State<AppRoot> {
         title: _fatalTitle,
         message: _fatal!,
         note: recoverable ? _errorNote : null,
+        pickAgain: recoverable && _pickAgain,
+        onPickerShown: () => _pickAgain = false,
         onRetry: _fatalCanRetry ? _retryOpen : null,
         onRestoreBackup: recoverable ? restoreFromErrorScreen : null,
         onStartFresh: recoverable ? startFresh : null,
@@ -796,6 +830,16 @@ class StartupSurface extends StatelessWidget {
     );
   }
 }
+
+/// Plain restore outcomes: the details go to the log, never on screen.
+const kRestoreRejectedNotice =
+    "That backup couldn't be restored. Your data was not changed.";
+const kRestoreRolledBackNotice =
+    "That backup couldn't be opened, so your previous data was put back.";
+const kRestoreReopenFailedMessage = "Open POS couldn't reopen its data "
+    'after the restore. Try again; if this keeps happening, contact support.';
+const kStillUnableMessage = "Open POS still couldn't open its data. Try "
+    'again; if this keeps happening, contact support.';
 
 /// The splash shown while a backup is restored.
 const kRestoringSplashText = 'Restoring backup…';
@@ -909,15 +953,49 @@ class _ResetChoiceScreenState extends State<_ResetChoiceScreen> {
       );
 }
 
+/// Runs [run] once, after its first frame, with a context under the
+/// screen's Navigator.
+class _OnFirstBuild extends StatefulWidget {
+  const _OnFirstBuild({required this.run, required this.child});
+  final void Function(BuildContext context)? run;
+  final Widget child;
+
+  @override
+  State<_OnFirstBuild> createState() => _OnFirstBuildState();
+}
+
+class _OnFirstBuildState extends State<_OnFirstBuild> {
+  @override
+  void initState() {
+    super.initState();
+    final run = widget.run;
+    if (run != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) run(context);
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
+
 class _RestoreFailedScreen extends StatelessWidget {
   const _RestoreFailedScreen({
     required this.title,
     required this.message,
     required this.onRetry,
     this.note,
+    this.pickAgain = false,
+    this.onPickerShown,
     this.onRestoreBackup,
     this.onStartFresh,
   });
+
+  /// Open the backup picker as soon as the screen shows (the backup picked
+  /// before could not be restored), with [kBackupRestoreFailedTryAnother].
+  final bool pickAgain;
+  final VoidCallback? onPickerShown;
 
   /// An extra plain line under [message].
   final String? note;
@@ -927,7 +1005,8 @@ class _RestoreFailedScreen extends StatelessWidget {
   final Future<void> Function(File zip)? onRestoreBackup;
   final Future<void> Function()? onStartFresh;
 
-  Future<void> _pickBackup(BuildContext context) async {
+  Future<void> _pickBackup(BuildContext context, {String? note}) async {
+    onPickerShown?.call();
     final backups = await listAutoBackups();
     if (!context.mounted) return;
     if (backups.isEmpty) {
@@ -950,6 +1029,11 @@ class _RestoreFailedScreen extends StatelessWidget {
       builder: (ctx) => SimpleDialog(
         title: const Text(kPickBackupTitle),
         children: [
+          if (note != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+              child: Text(note),
+            ),
           for (var i = 0; i < backups.length; i++)
             SimpleDialogOption(
               onPressed: () => Navigator.pop(ctx, backups[i].$1),
@@ -1027,10 +1111,16 @@ class _RestoreFailedScreen extends StatelessWidget {
                       const SizedBox(height: 8),
                     ],
                     if (onRestoreBackup != null) ...[
-                      Builder(
-                        builder: (context) => OutlinedButton(
-                          onPressed: () => _pickBackup(context),
-                          child: const Text(kRestoreLatestBackupButton),
+                      _OnFirstBuild(
+                        run: pickAgain
+                            ? (context) => _pickBackup(context,
+                                note: kBackupRestoreFailedTryAnother)
+                            : null,
+                        child: Builder(
+                          builder: (context) => OutlinedButton(
+                            onPressed: () => _pickBackup(context),
+                            child: const Text(kRestoreLatestBackupButton),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 8),
