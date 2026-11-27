@@ -93,6 +93,19 @@ void main() {
           reason: 'LaunchScreen.storyboard is always white');
     });
 
+    testWidgets('a 490 ms launch shows no text and is not held back',
+        (tester) async {
+      final pending = Completer<StartupResult>();
+      await tester.pumpWidget(AppRoot(startup: pending.future));
+      await tester.pump(const Duration(milliseconds: 490));
+      pending.complete(const StartupResult(fatal: 'x'));
+      await tester.pump();
+      await tester.pump();
+      expect(find.byType(StartupSurface), findsNothing);
+      expect(find.text(kOpeningAppText), findsNothing);
+      await tester.pump(const Duration(seconds: 1));
+    });
+
     testWidgets('a fast check never shows any text', (tester) async {
       final pending = Completer<StartupResult>();
       await tester.pumpWidget(AppRoot(startup: pending.future));
@@ -108,7 +121,8 @@ void main() {
         (tester) async {
       final pending = Completer<StartupResult>();
       await tester.pumpWidget(AppRoot(startup: pending.future));
-      await tester.pump(const Duration(milliseconds: 290));
+      expect(kStartupLineDelay, const Duration(milliseconds: 500));
+      await tester.pump(const Duration(milliseconds: 490));
       expect(find.byType(Text), findsNothing);
       await tester.pump(const Duration(milliseconds: 20));
       expect(find.text('Opening Open POS…'), findsOneWidget);
@@ -137,14 +151,15 @@ void main() {
       await tester.pumpWidget(AppRoot(startup: pending.future));
       await tester.pump(kStartupLineDelay + const Duration(milliseconds: 1));
       expect(find.text(kOpeningAppText), findsOneWidget);
-      // Startup finishes 40 ms later (a 340 ms launch).
+      expect(kStartupLineMinVisible, const Duration(milliseconds: 250));
+      // Startup finishes 40 ms later (a 540 ms launch).
       await tester.pump(const Duration(milliseconds: 40));
       pending.complete(const StartupResult(fatal: 'x'));
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
+      await tester.pump(const Duration(milliseconds: 190));
       expect(find.text(kOpeningAppText), findsOneWidget,
           reason: 'still within the minimum');
-      await tester.pump(const Duration(milliseconds: 70));
+      await tester.pump(const Duration(milliseconds: 30));
       await tester.pump();
       expect(find.byType(StartupSurface), findsNothing);
       expect(find.text('x'), findsOneWidget);

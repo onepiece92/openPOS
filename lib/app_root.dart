@@ -789,12 +789,12 @@ class AppRootState extends State<AppRoot> {
 }
 
 /// How long the launch surface stays blank before it says what it is
-/// waiting for. A normal open takes a few milliseconds and shows nothing.
-const kStartupLineDelay = Duration(milliseconds: 300);
+/// waiting for. A launch under this shows nothing and waits no longer.
+const kStartupLineDelay = Duration(milliseconds: 500);
 
-/// Once shown, the line stays at least this long (no flash when startup
-/// takes 300–400 ms).
-const kStartupLineMinVisible = Duration(milliseconds: 500);
+/// Once shown, the line stays at least this long, so it never flashes:
+/// a slower launch is held back by at most this much.
+const kStartupLineMinVisible = Duration(milliseconds: 250);
 
 /// The launch surface's line while the database opens…
 const kOpeningAppText = 'Opening Open POS…';
