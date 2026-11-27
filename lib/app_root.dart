@@ -471,6 +471,8 @@ class AppRootState extends State<AppRoot> {
         await clearFactoryResetPendingConfirmed(Hive.box<dynamic>('settings'),
             attempts: 1);
       } catch (_) {}
+      // A restore also ends the Start fresh pruning pause.
+      await endAutoBackupPrunePause();
     }
     await checkDatabaseFileBeforeOpen();
     final c = ProviderContainer();
@@ -705,6 +707,12 @@ class AppRootState extends State<AppRoot> {
       // A reset flag left from before must not let the next launch wipe
       // the settings and held tickets because the new database is empty.
       final settings = _settingsBox();
+      // Keep the automatic backups of the shop that was set aside: pause
+      // their pruning until a restore or a Dismiss (best effort).
+      try {
+        await settings.put(kStartFreshAtKey, DateTime.now().toIso8601String());
+        await settings.flush();
+      } catch (_) {}
       choice = isFactoryResetPending(settings) &&
           !await clearFactoryResetPendingConfirmed(settings);
     } catch (e) {

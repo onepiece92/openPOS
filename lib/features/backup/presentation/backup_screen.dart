@@ -284,6 +284,31 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
             onTap: _isSnapshotting ? null : (_) => _restoreFromFile(),
           ),
           _AutoBackupTile(onOpen: _showLocalSnapshots),
+          if (autoBackupPrunePausedSince() != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(kPrunePausedNotice),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: () async {
+                            await endAutoBackupPrunePause();
+                            if (mounted) setState(() {});
+                          },
+                          child: const Text('Dismiss'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           const SizedBox(height: 20),
           _buildInfoCard(cs, tt),
           if (csv) ...[

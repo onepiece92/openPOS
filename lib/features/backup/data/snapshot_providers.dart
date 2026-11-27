@@ -33,6 +33,65 @@ const kSnapshotHiveBoxes = [...kStartupHiveBoxes, kUsageBoxName];
 
 /// How many automatic snapshots to keep on-device.
 const kAutoBackupKeep = 7;
+
+/// Settings key: when "Start fresh" ran (ISO 8601). While set, automatic
+/// backups made BEFORE then are never pruned — they are the only copies of
+/// the shop that was set aside — and the daily backup keeps the newest
+/// [kAutoBackupKeep] of the newer ones only. Restoring any backup, the
+/// Backup & Restore screen's "Dismiss", or a factory reset ends it.
+const kStartFreshAtKey = 'start_fresh_at';
+
+/// The Backup & Restore line while pruning is paused.
+const kPrunePausedNotice = 'Backups from before Start fresh are kept. '
+    'Restore one, or dismiss to let new backups replace them.';
+
+/// When pruning was paused by "Start fresh", or null (one key read).
+DateTime? autoBackupPrunePausedSince() {
+  if (!Hive.isBoxOpen('settings')) return null;
+  final v = Hive.box<dynamic>('settings').get(kStartFreshAtKey);
+  return v is String ? DateTime.tryParse(v) : null;
+}
+
+/// Ends the pause (restore, Dismiss). Never throws.
+Future<void> endAutoBackupPrunePause() async {
+  try {
+    if (!Hive.isBoxOpen('settings')) return;
+    final s = Hive.box<dynamic>('settings');
+    if (!s.containsKey(kStartFreshAtKey)) return;
+    await s.delete(kStartFreshAtKey);
+    await s.flush();
+  } catch (_) {/* best effort; the next restore or Dismiss tries again */}
+}
+
+/// Prunes `backups/auto` to the newest [kAutoBackupKeep], never deleting
+/// [protect] — except while paused ([autoBackupPrunePausedSince]): then
+/// only backups made after the pause count and are pruned; older ones are
+/// all kept. Returns how many were deleted.
+Future<int> pruneAutoBackups(Directory dir, {required File protect}) async {
+  const svc = SnapshotService();
+  final since = autoBackupPrunePausedSince();
+  if (since == null) {
+    return svc.prune(dir, keep: kAutoBackupKeep, protect: protect);
+  }
+  final keepPath = p.canonicalize(protect.path);
+  final newer = <File>[];
+  for (final f in await svc.listLocal(dir)) {
+    if ((await f.lastModified()).isAfter(since)) newer.add(f);
+  }
+  var kept = 1; // protect
+  var deleted = 0;
+  for (final f in newer) {
+    if (p.canonicalize(f.path) == keepPath) continue;
+    if (kept < kAutoBackupKeep) {
+      kept++;
+      continue;
+    }
+    await f.delete();
+    deleted++;
+  }
+  return deleted;
+}
+
 const kAutoBackupInterval = Duration(hours: 24);
 
 /// `box name → file path` for every open snapshot box. Resolved from the
@@ -234,7 +293,7 @@ class SnapshotCoordinator {
       final dir = await autoBackupDir();
       // Owner decision: automatic backups never carry receipt photos.
       final zip = await create(dir, includePhotos: false);
-      await _svc.prune(dir, keep: kAutoBackupKeep, protect: zip);
+      await pruneAutoBackups(dir, protect: zip);
       await _ref.read(settingsProvider.notifier).markAutoBackupRun(t);
       autoBackupLastError.value = null;
       return zip;

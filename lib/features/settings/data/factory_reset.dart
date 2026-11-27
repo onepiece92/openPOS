@@ -14,7 +14,6 @@ import 'package:pos_app/features/backup/data/open_failure_recovery.dart'
     show deleteBrokenDatabaseCopies;
 import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/features/backup/data/snapshot_providers.dart';
-import 'package:pos_app/features/backup/data/snapshot_service.dart';
 import 'package:pos_app/features/cart/data/ticket_sequence.dart';
 import 'package:pos_app/features/usage/data/usage_counter.dart';
 
@@ -96,8 +95,7 @@ final preResetBackupProvider = Provider<Future<File?> Function()>(
     final zip = await ref
         .read(snapshotCoordinatorProvider)
         .create(dir, includePhotos: false);
-    await const SnapshotService()
-        .prune(dir, keep: kAutoBackupKeep, protect: zip);
+    await pruneAutoBackups(dir, protect: zip);
     return zip;
   },
 );
