@@ -23,7 +23,7 @@ enum Feature {
   tips('Tips', 'Add a tip at payment and track tips in reports.',
       defaultOn: false),
   endOfDay('End-of-day close',
-      'Count the cash drawer and close the day with a printed summary.',
+      'Count the cash drawer, close the day and see or share a summary.',
       defaultOn: false),
   stockTracking('Stock tracking',
       'Count stock, take it off on each sale, and show low-stock badges.'),

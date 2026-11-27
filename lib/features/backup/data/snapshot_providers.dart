@@ -255,6 +255,10 @@ class SnapshotCoordinator {
     // open connection — unlike copying the live file, it can't catch a
     // half-applied write or miss pages still in the WAL.
     final tmpDir = await getTemporaryDirectory();
+    // The OS (or the user) can clear the cache folder between launches, and
+    // a fresh macOS container may not have it yet: VACUUM INTO can't create
+    // the parent folder, so make sure it exists.
+    await tmpDir.create(recursive: true);
     final copy = File(
         p.join(tmpDir.path, 'pos_snapshot_${now.microsecondsSinceEpoch}.db'));
     if (await copy.exists()) await copy.delete();

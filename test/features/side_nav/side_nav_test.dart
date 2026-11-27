@@ -162,7 +162,7 @@ void main() {
   test('Features row text', () {
     expect(Feature.endOfDay.label, 'End-of-day close');
     expect(Feature.endOfDay.description,
-        'Count the cash drawer and close the day with a printed summary.');
+        'Count the cash drawer, close the day and see or share a summary.');
     expect(Feature.endOfDay.defaultOn, isFalse);
     expect(Feature.endOfDay.parent, isNull);
   });
