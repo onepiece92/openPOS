@@ -95,6 +95,33 @@ void main() {
     expect(picked.existsSync(), isFalse);
   });
 
+  test('the form closed while saving (P1 saved, P2 picked): P2 is kept and '
+      'only P1 goes once the row is written', () async {
+    final p1 = file(receipts, 'p1.jpg');
+    final d = ReceiptPhotoDraft(saved: p1.path, receiptsDir: receipts);
+    final p2 = file(receipts, 'p2.jpg');
+    await d.pick(p2.path);
+    d.beginSave();
+    await d.discard(); // the sheet was swiped away mid-save (dispose)
+    expect(p2.existsSync(), isTrue, reason: 'the row is about to use it');
+    expect(p1.existsSync(), isTrue);
+    await d.committed();
+    expect(p2.existsSync(), isTrue);
+    expect(p1.existsSync(), isFalse);
+  });
+
+  test('a failed save ends the hold: leaving then drops the pick', () async {
+    final p1 = file(receipts, 'p1.jpg');
+    final d = ReceiptPhotoDraft(saved: p1.path, receiptsDir: receipts);
+    final p2 = file(receipts, 'p2.jpg');
+    await d.pick(p2.path);
+    d.beginSave();
+    d.saveFailed();
+    await d.discard();
+    expect(p2.existsSync(), isFalse);
+    expect(p1.existsSync(), isTrue);
+  });
+
   group('importPickedPhoto', () {
     test("copies into receipts/ and deletes the picker's temp file",
         () async {

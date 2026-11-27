@@ -82,6 +82,15 @@ class ReceiptPhotoDraft {
   /// Photos copied into receipts/ by this form, not yet saved.
   final Set<String> _picked = {};
   bool _done = false;
+  bool _saving = false;
+
+  /// The expense is being written with [current]: until [committed] or
+  /// [saveFailed], leaving the form ([discard]) deletes nothing — the row
+  /// may be about to point at the picked photo.
+  void beginSave() => _saving = true;
+
+  /// The write failed: the form may be left (or saved again) as before.
+  void saveFailed() => _saving = false;
 
   /// A new photo [path] (already in receipts/) replaces the current one.
   Future<void> pick(String path) async {
@@ -107,6 +116,7 @@ class ReceiptPhotoDraft {
   /// is deleted.
   Future<void> committed() async {
     _done = true;
+    _saving = false;
     _picked.clear();
     if (saved != null && saved != current) {
       await deleteReceiptPhoto(saved, receiptsDir);
@@ -130,7 +140,7 @@ class ReceiptPhotoDraft {
   /// The form was left without saving: photos picked in it are deleted,
   /// the saved photo is kept.
   Future<void> discard() async {
-    if (_done) return;
+    if (_done || _saving) return;
     _done = true;
     final picked = [..._picked];
     _picked.clear();

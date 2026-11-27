@@ -517,6 +517,11 @@ class _ExpenseFormState extends ConsumerState<_ExpenseForm> {
     final destPath = await importPickedPhoto(xFile.path, draft.receiptsDir,
         tempDir: await getTemporaryDirectory(),
         name: '${const Uuid().v4()}.jpg');
+    if (!mounted) {
+      // The form was closed while the photo was copied: nothing keeps it.
+      await deleteReceiptPhoto(destPath, draft.receiptsDir);
+      return;
+    }
     await draft.pick(destPath);
     if (mounted) setState(() {});
   }
@@ -595,6 +600,10 @@ class _ExpenseFormState extends ConsumerState<_ExpenseForm> {
       receiptImagePath: Value(_imagePath),
     );
 
+    // While the row is written, leaving the form must not delete the photo
+    // it is about to point at (the sheet is also held open meanwhile).
+    final draft = _photo;
+    draft?.beginSave();
     final saved = await withErrorSnackbar(
       context,
       () async {
@@ -610,7 +619,13 @@ class _ExpenseFormState extends ConsumerState<_ExpenseForm> {
     );
 
     // Written: only now may the photo it replaced be deleted.
-    if (saved == true) await _photo?.committed();
+    if (saved == true) {
+      await draft?.committed();
+    } else {
+      draft?.saveFailed();
+      // Closed while saving, and the save failed: drop the picked photos.
+      if (!mounted) await draft?.discard();
+    }
     if (!mounted) return;
     setState(() => _loading = false);
     if (saved == true) Navigator.pop(context);
@@ -660,6 +675,19 @@ class _ExpenseFormState extends ConsumerState<_ExpenseForm> {
     final categoriesAsync = ref.watch(expenseCategoriesStreamProvider);
     final cs = Theme.of(context).colorScheme;
 
+    // Held open while saving: no back / barrier tap (PopScope) and no
+    // swipe down (this detector wins the drag over the sheet's own).
+    return PopScope(
+      canPop: !_loading,
+      child: GestureDetector(
+        onVerticalDragStart: _loading ? (_) {} : null,
+        child: _formBody(context, categoriesAsync, cs),
+      ),
+    );
+  }
+
+  Widget _formBody(BuildContext context,
+      AsyncValue<List<ExpenseCategory>> categoriesAsync, ColorScheme cs) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
       child: Form(
