@@ -314,8 +314,8 @@ void main() {
   });
 
   test(
-      'a confirmed reset deletes the set-aside copies; a launch finish '
-      'does not', () async {
+      'a confirmed reset deletes the set-aside copies, and so does the '
+      'launch finish of one that was interrupted', () async {
     expect(await reset(), FactoryResetOutcome.done);
     expect(broken().existsSync(), isFalse, reason: 'the user confirmed');
 
@@ -330,8 +330,10 @@ void main() {
           heldOrders: held,
           usage: () async => usage,
           receipts: () async => receipts(),
+          database: () async => dbFile(),
         ),
         PendingFactoryReset.finished);
-    expect(broken().existsSync(), isTrue);
+    expect(broken().existsSync(), isFalse,
+        reason: "the old shop's sales go with the reset it confirmed");
   });
 }
