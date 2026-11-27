@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:path/path.dart' as p;
 
 import 'package:pos_app/app.dart';
 import 'package:pos_app/core/database/app_database.dart';
@@ -751,12 +752,14 @@ class AppRootState extends State<AppRoot> {
       // Created directly: checkDatabaseFileBeforeOpen would (rightly)
       // refuse a missing file under a finished onboarding.
       await _container.read(databaseProvider).customSelect('SELECT 1').get();
-      // Keep the automatic backups of the shop that was set aside: pause
-      // their pruning until a restore or a Dismiss (best effort).
+      // Keep the automatic backups of the shop that was set aside: they are
+      // not pruned until a restore or a Dismiss (best effort, logged).
       try {
-        await settings.put(kStartFreshAtKey, DateTime.now().toIso8601String());
-        await settings.flush();
-      } catch (_) {}
+        await keepAutoBackupsForStartFresh(
+            [for (final b in await listAutoBackups()) p.basename(b.$1.path)]);
+      } catch (e) {
+        debugPrint('Start fresh: could not record the kept backups: $e');
+      }
     } catch (e) {
       error = e;
     }

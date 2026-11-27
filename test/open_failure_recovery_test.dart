@@ -283,9 +283,14 @@ void main() {
   testWidgets(
       'Start fresh: Cancel changes nothing; confirmed, the broken file is '
       'set aside and the app opens on an empty database', (tester) async {
+    late String olderBackup;
     await tester.runAsync(() async {
       await openBoxes();
       dbFile().writeAsStringSync('this is not a database' * 100);
+      autoDir().createSync(recursive: true);
+      olderBackup =
+          '${SnapshotService.filePrefix}20261101_090000${SnapshotService.fileSuffix}';
+      File(p.join(autoDir().path, olderBackup)).writeAsBytesSync([1]);
     });
     await tester.pumpWidget(
         AppRoot(startupDbError: SqliteException(26, 'file is not a database')));
@@ -309,8 +314,8 @@ void main() {
     await pumpUntil(tester, () => find.byType(POSApp).evaluate().isNotEmpty);
     expect(find.text(kStartFreshDoneNotice), findsOneWidget);
     expect(dbFile().lengthSync(), greaterThan(0));
-    expect(autoBackupPrunePausedSince(), isNotNull,
-        reason: 'the backups from before Start fresh are kept');
+    expect(autoBackupsKeptByStartFresh(), {olderBackup},
+        reason: 'the backups from before Start fresh are kept, by name');
     final aside = docs
         .listSync()
         .where((e) => p.basename(e.path).contains('.broken-'))
@@ -518,7 +523,7 @@ void main() {
       // An older-style backup, written without stripping.
       await settings.putAll({
         kFactoryResetPendingKey: true,
-        kStartFreshAtKey: DateTime(2026, 11, 1).toIso8601String(),
+        kStartFreshKeptBackupsKey: ['pos_backup_x.zip'],
       });
       await settings.flush();
       zip = await const SnapshotService().create(
@@ -544,7 +549,7 @@ void main() {
     final settings = Hive.box<dynamic>('settings');
     expect(settings.containsKey(kFactoryResetPendingKey), isFalse,
         reason: 'restored data must not re-arm an erase');
-    expect(settings.containsKey(kStartFreshAtKey), isFalse,
+    expect(settings.containsKey(kStartFreshKeptBackupsKey), isFalse,
         reason: 'a restore ends the pruning pause');
     final db = state.containerForTest.read(databaseProvider);
     final skus = await tester

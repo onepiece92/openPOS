@@ -57,14 +57,18 @@ void main() {
     expect(names(), contains('latest'));
   });
 
+  String fileName(String n) =>
+      '${SnapshotService.filePrefix}$n${SnapshotService.fileSuffix}';
+
   test(
-      'paused: older backups are never pruned; the newest '
-      '$kAutoBackupKeep newer ones are kept', () async {
-    await settings.put(kStartFreshAtKey, pause.toIso8601String());
-    expect(autoBackupPrunePausedSince(), pause);
+      'kept by Start fresh: those backups are never pruned; the newest '
+      '$kAutoBackupKeep of the others are kept', () async {
     for (var i = 0; i < 6; i++) {
       backup('old$i', pause.subtract(Duration(days: i + 1)));
     }
+    await keepAutoBackupsForStartFresh(
+        [for (var i = 0; i < 6; i++) fileName('old$i')]);
+    expect(autoBackupsKeptByStartFresh(), hasLength(6));
     for (var i = 0; i < 9; i++) {
       backup('new$i', pause.add(Duration(days: i + 1)));
     }
@@ -79,17 +83,41 @@ void main() {
     expect(left, isNot(contains('new0')));
   });
 
+  test('a clock set back still prunes the new backups', () async {
+    // Kept backups dated in the "future"; the new ones older than them.
+    for (var i = 0; i < 3; i++) {
+      backup('old$i', DateTime(2030, 1, 1 + i));
+    }
+    await keepAutoBackupsForStartFresh(
+        [for (var i = 0; i < 3; i++) fileName('old$i')]);
+    for (var i = 0; i < 10; i++) {
+      backup('new$i', DateTime(2026, 11, 1 + i));
+    }
+    final latest = backup('latest', DateTime(2026, 11, 20));
+    expect(await pruneAutoBackups(auto, protect: latest), 4);
+    final left = names();
+    expect(left, containsAll(['old0', 'old1', 'old2', 'latest']));
+    expect(
+        left.where((n) => n.startsWith('new')), hasLength(kAutoBackupKeep - 1));
+  });
+
+  test('nothing to keep: no pause is recorded', () async {
+    await keepAutoBackupsForStartFresh(const []);
+    expect(settings.containsKey(kStartFreshKeptBackupsKey), isFalse);
+    expect(autoBackupsKeptByStartFresh(), isNull);
+  });
+
   test('ending the pause lets pruning take the old ones again', () async {
-    await settings.put(kStartFreshAtKey, pause.toIso8601String());
+    await keepAutoBackupsForStartFresh([fileName('x')]);
     await endAutoBackupPrunePause();
-    expect(settings.containsKey(kStartFreshAtKey), isFalse);
-    expect(autoBackupPrunePausedSince(), isNull);
+    expect(settings.containsKey(kStartFreshKeptBackupsKey), isFalse);
+    expect(autoBackupsKeptByStartFresh(), isNull);
   });
 
   testWidgets(
       'Backup & Restore shows the paused line once; Dismiss ends the pause',
       (tester) async {
-    await settings.put(kStartFreshAtKey, pause.toIso8601String());
+    await keepAutoBackupsForStartFresh([fileName('x')]);
     final db = openInMemoryDatabase();
     addTearDown(db.close);
     await tester.pumpWidget(ProviderScope(
@@ -107,7 +135,7 @@ void main() {
     await tester.runAsync(() => tester.tap(find.text('Dismiss')));
     await tester.pump();
     expect(find.text(kPrunePausedNotice), findsNothing);
-    expect(settings.containsKey(kStartFreshAtKey), isFalse);
+    expect(settings.containsKey(kStartFreshKeptBackupsKey), isFalse);
   });
 
   testWidgets('no pause: no line', (tester) async {

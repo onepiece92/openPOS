@@ -34,22 +34,34 @@ const kSnapshotHiveBoxes = [...kStartupHiveBoxes, kUsageBoxName];
 /// How many automatic snapshots to keep on-device.
 const kAutoBackupKeep = 7;
 
-/// Settings key: when "Start fresh" ran (ISO 8601). While set, automatic
-/// backups made BEFORE then are never pruned — they are the only copies of
-/// the shop that was set aside — and the daily backup keeps the newest
-/// [kAutoBackupKeep] of the newer ones only. Restoring any backup, the
+/// Settings key: the NAMES of the automatic backups that existed when
+/// "Start fresh" ran — the only copies of the shop that was set aside.
+/// While set, those files are never pruned; pruning carries on as usual
+/// (newest [kAutoBackupKeep]) among all the others. Names, not times, so a
+/// clock set back cannot stop pruning for good. Restoring any backup, the
 /// Backup & Restore screen's "Dismiss", or a factory reset ends it.
-const kStartFreshAtKey = 'start_fresh_at';
+const kStartFreshKeptBackupsKey = 'start_fresh_kept_backups';
 
-/// The Backup & Restore line while pruning is paused.
+/// The Backup & Restore line while those backups are kept.
 const kPrunePausedNotice = 'Backups from before Start fresh are kept. '
     'Restore one, or dismiss to let new backups replace them.';
 
-/// When pruning was paused by "Start fresh", or null (one key read).
-DateTime? autoBackupPrunePausedSince() {
+/// The backups kept by "Start fresh", or null when none are (one key read).
+Set<String>? autoBackupsKeptByStartFresh() {
   if (!Hive.isBoxOpen('settings')) return null;
-  final v = Hive.box<dynamic>('settings').get(kStartFreshAtKey);
-  return v is String ? DateTime.tryParse(v) : null;
+  final v = Hive.box<dynamic>('settings').get(kStartFreshKeptBackupsKey);
+  if (v is! List || v.isEmpty) return null;
+  return {for (final n in v) '$n'};
+}
+
+/// Records [names] as kept (Start fresh). Throws on a failed write; the
+/// caller logs it.
+Future<void> keepAutoBackupsForStartFresh(Iterable<String> names) async {
+  final list = names.toList();
+  if (list.isEmpty) return; // nothing from before to protect
+  final s = Hive.box<dynamic>('settings');
+  await s.put(kStartFreshKeptBackupsKey, list);
+  await s.flush();
 }
 
 /// Ends the pause (restore, Dismiss). Never throws.
@@ -57,33 +69,29 @@ Future<void> endAutoBackupPrunePause() async {
   try {
     if (!Hive.isBoxOpen('settings')) return;
     final s = Hive.box<dynamic>('settings');
-    if (!s.containsKey(kStartFreshAtKey)) return;
-    await s.delete(kStartFreshAtKey);
+    if (!s.containsKey(kStartFreshKeptBackupsKey)) return;
+    await s.delete(kStartFreshKeptBackupsKey);
     await s.flush();
   } catch (_) {/* best effort; the next restore or Dismiss tries again */}
 }
 
 /// Prunes `backups/auto` to the newest [kAutoBackupKeep], never deleting
-/// [protect] — except while paused ([autoBackupPrunePausedSince]): then
-/// only backups made after the pause count and are pruned; older ones are
-/// all kept. Returns how many were deleted.
+/// [protect] nor any backup [autoBackupsKeptByStartFresh] names (those do
+/// not count toward the seven). Returns how many were deleted.
 Future<int> pruneAutoBackups(Directory dir, {required File protect}) async {
   const svc = SnapshotService();
-  final since = autoBackupPrunePausedSince();
-  if (since == null) {
+  final kept = autoBackupsKeptByStartFresh();
+  if (kept == null) {
     return svc.prune(dir, keep: kAutoBackupKeep, protect: protect);
   }
   final keepPath = p.canonicalize(protect.path);
-  final newer = <File>[];
-  for (final f in await svc.listLocal(dir)) {
-    if ((await f.lastModified()).isAfter(since)) newer.add(f);
-  }
-  var kept = 1; // protect
+  var kept7 = 1; // protect
   var deleted = 0;
-  for (final f in newer) {
+  for (final f in await svc.listLocal(dir)) {
+    if (kept.contains(p.basename(f.path))) continue;
     if (p.canonicalize(f.path) == keepPath) continue;
-    if (kept < kAutoBackupKeep) {
-      kept++;
+    if (kept7 < kAutoBackupKeep) {
+      kept7++;
       continue;
     }
     await f.delete();

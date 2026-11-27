@@ -284,7 +284,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
             onTap: _isSnapshotting ? null : (_) => _restoreFromFile(),
           ),
           _AutoBackupTile(onOpen: _showLocalSnapshots),
-          if (autoBackupPrunePausedSince() != null)
+          if (autoBackupsKeptByStartFresh() != null)
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Card(
