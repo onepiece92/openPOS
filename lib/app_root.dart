@@ -91,6 +91,12 @@ class AppRootState extends State<AppRoot> {
   // The error screen is showing a database-open failure (not a restore):
   // a failed retry keeps the plain wording.
   bool _dbOpenFailure = false;
+  // …and the error says the FILE is missing or damaged
+  // ([isDatabaseFileDamaged]): only then are "Restore latest automatic
+  // backup" and "Start fresh" offered.
+  bool _dbFileDamaged = false;
+  // One plain line under the error message (e.g. why Start fresh refused).
+  String? _errorNote;
   // A factory reset is pending on data that is still there: the blocking
   // "Finish erasing" / "Keep my data" question is showing.
   bool _resetChoice = false;
@@ -202,6 +208,8 @@ class AppRootState extends State<AppRoot> {
     _fatalTitle = f.title;
     _fatalCanRetry = f.canRetry;
     _dbOpenFailure = true;
+    _dbFileDamaged = isDatabaseFileDamaged(error);
+    _errorNote = null;
   }
 
   /// Fires once, [autoBackupDelay] after the first frame. Skipped when the
@@ -627,7 +635,14 @@ class AppRootState extends State<AppRoot> {
   @visibleForTesting
   Future<void> startFresh() async {
     if (_restoring) return;
+    // Its follow-up writes need the settings and held-tickets boxes; never
+    // touch the database file unless they are open.
+    if (!kStartupHiveBoxes.every(Hive.isBoxOpen)) {
+      setState(() => _errorNote = kStartFreshNeedsStores);
+      return;
+    }
     setState(() {
+      _errorNote = null;
       _restoring = true;
       _splashMessage = kStartFreshProgress;
     });
@@ -684,10 +699,11 @@ class AppRootState extends State<AppRoot> {
     if (_fatal != null) {
       // A database that would not open (missing, empty, corrupt) — not
       // one from a newer app — offers the two ways out besides Try again.
-      final recoverable = _dbOpenFailure && _fatalCanRetry;
+      final recoverable = _dbOpenFailure && _dbFileDamaged && _fatalCanRetry;
       return _RestoreFailedScreen(
         title: _fatalTitle,
         message: _fatal!,
+        note: recoverable ? _errorNote : null,
         onRetry: _fatalCanRetry ? _retryOpen : null,
         onRestoreBackup: recoverable ? restoreFromErrorScreen : null,
         onStartFresh: recoverable ? startFresh : null,
@@ -898,9 +914,13 @@ class _RestoreFailedScreen extends StatelessWidget {
     required this.title,
     required this.message,
     required this.onRetry,
+    this.note,
     this.onRestoreBackup,
     this.onStartFresh,
   });
+
+  /// An extra plain line under [message].
+  final String? note;
 
   /// Null hides "Restore latest automatic backup" / "Start fresh" (only a
   /// database that would not open offers them).
@@ -994,6 +1014,10 @@ class _RestoreFailedScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                     Text(message, textAlign: TextAlign.center),
+                    if (note != null) ...[
+                      const SizedBox(height: 12),
+                      Text(note!, textAlign: TextAlign.center),
+                    ],
                     const SizedBox(height: 24),
                     if (onRetry != null) ...[
                       FilledButton(

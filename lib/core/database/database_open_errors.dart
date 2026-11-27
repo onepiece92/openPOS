@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:sqlite3/sqlite3.dart' show SqliteException;
+
 /// Thrown by the migration when the file on disk was written by a newer
 /// app (its schema version is above ours). A [StateError] so existing
 /// handlers still see it as one.
@@ -52,4 +54,32 @@ Future<void> assertDatabaseFilePresent({
   if (!await file.exists() || await file.length() == 0) {
     throw DatabaseMissingError(file.path);
   }
+}
+
+/// SQLite's primary result codes for a damaged file: SQLITE_CORRUPT (11)
+/// and SQLITE_NOTADB (26). Extended codes carry the primary one in their
+/// low byte (e.g. SQLITE_CORRUPT_VTAB 267 & 0xFF == 11).
+const kSqliteCorrupt = 11;
+const kSqliteNotADb = 26;
+
+/// The primary SQLite result code behind [error], or null when it is not
+/// a SQLite error. An error that crossed drift's background isolate arrives
+/// wrapped (its text is the original's), so `SqliteException(N)` in the
+/// text counts too.
+int? sqlitePrimaryResultCode(Object error) {
+  if (error is SqliteException) return error.resultCode;
+  final m = RegExp(r'SqliteException\((\d+)\)').firstMatch('$error');
+  return m == null ? null : int.parse(m.group(1)!) & 0xFF;
+}
+
+/// Whether [error] means the database FILE is gone or damaged — missing or
+/// 0 bytes ([DatabaseMissingError]), not a database (26) or corrupt (11) —
+/// so that restoring a backup or starting fresh is a sensible offer. Any
+/// other failure (locked, busy, I/O, a full disk, a migration bug…) may
+/// well be on a healthy file: those get Try again and support only, never
+/// an exit that sets the file aside.
+bool isDatabaseFileDamaged(Object error) {
+  if (error is DatabaseMissingError) return true;
+  final code = sqlitePrimaryResultCode(error);
+  return code == kSqliteCorrupt || code == kSqliteNotADb;
 }

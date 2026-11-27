@@ -20,6 +20,10 @@ const kStartFreshTitle = 'Start fresh?';
 const kStartFreshMessage = 'This creates a new, empty database. The sales '
     'data on this device is gone unless you restore a backup.';
 const kStartFreshProgress = 'Starting fresh…';
+
+/// Start fresh refused: the stores it needs are not open (nothing touched).
+const kStartFreshNeedsStores =
+    "Open POS can't start fresh right now. Tap Try again first.";
 const kStartFreshDoneNotice = 'Started with an empty database. Earlier '
     'sales are gone unless you restore a backup.';
 

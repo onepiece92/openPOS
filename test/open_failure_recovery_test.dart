@@ -106,10 +106,59 @@ void main() {
       await tester.pumpWidget(const SizedBox());
     });
 
-    for (final (label, error) in <(String, Object)>[
+    // The classification: only a missing/empty or damaged FILE gets the
+    // two exits; anything that may happen to a healthy file does not.
+    final damaged = <(String, Object)>[
       ('missing', DatabaseMissingError('x')),
-      ('corrupt', Exception('SqliteException(26): file is not a database')),
-    ]) {
+      ('0-byte (same error)', DatabaseMissingError('empty')),
+      ('NOTADB (26)', SqliteException(26, 'file is not a database')),
+      ('CORRUPT (11)', SqliteException(11, 'database disk image is malformed')),
+      ('CORRUPT_VTAB (267)', SqliteException(267, 'corrupt vtab')),
+      ('CORRUPT_INDEX (779)', SqliteException(779, 'corrupt index')),
+      (
+        'NOTADB across the isolate (text only)',
+        Exception('SqliteException(26): file is not a database')
+      ),
+    ];
+    final notDamaged = <(String, Object)>[
+      (
+        'BUSY (5, "database is locked")',
+        SqliteException(5, 'database is locked')
+      ),
+      ('LOCKED (6)', SqliteException(6, 'database table is locked')),
+      ('I/O error (10)', SqliteException(10, 'disk I/O error')),
+      ('IOERR_SHORT_READ (522)', SqliteException(522, 'short read')),
+      ('FULL (13)', SqliteException(13, 'database or disk is full')),
+      ('CANTOPEN (14)', SqliteException(14, 'unable to open database file')),
+      (
+        'locked across the isolate (text only)',
+        Exception('SqliteException(5): database is locked')
+      ),
+      ('a plain error', StateError('migration bug')),
+    ];
+
+    test('isDatabaseFileDamaged', () {
+      for (final (label, e) in damaged) {
+        expect(isDatabaseFileDamaged(e), isTrue, reason: label);
+      }
+      for (final (label, e) in notDamaged) {
+        expect(isDatabaseFileDamaged(e), isFalse, reason: label);
+      }
+    });
+
+    for (final (label, error) in notDamaged) {
+      testWidgets('$label: Try again and support only', (tester) async {
+        await tester.pumpWidget(AppRoot(startupDbError: error));
+        expect(find.text("Open POS couldn't open its data."), findsOneWidget);
+        expect(find.text('Try again'), findsOneWidget);
+        expect(find.textContaining('WhatsApp'), findsOneWidget);
+        expect(find.text(kRestoreLatestBackupButton), findsNothing);
+        expect(find.text(kStartFreshButton), findsNothing);
+        await tester.pumpWidget(const SizedBox());
+      });
+    }
+
+    for (final (label, error) in damaged) {
       testWidgets('a $label database offers restore and start fresh',
           (tester) async {
         await tester.pumpWidget(AppRoot(startupDbError: error));
@@ -137,6 +186,30 @@ void main() {
   });
 
   testWidgets(
+      'Start fresh refuses, touching nothing, while the stores are not open',
+      (tester) async {
+    // A healthy-looking file, and no Hive box open.
+    await tester.runAsync(() async {
+      final db = AppDatabase(NativeDatabase(dbFile()));
+      await seedProduct(db, sku: 'KEEP');
+      await db.close();
+    });
+    final before = dbFile().readAsBytesSync();
+    await tester.pumpWidget(
+        AppRoot(startupDbError: SqliteException(26, 'file is not a database')));
+    await tester.tap(find.text(kStartFreshButton));
+    await tester.pumpAndSettle();
+    await tester.runAsync(
+        () => tester.tap(find.widgetWithText(FilledButton, kStartFreshButton)));
+    await tester.pumpAndSettle();
+    expect(find.text(kStartFreshNeedsStores), findsOneWidget);
+    expect(find.text("Open POS couldn't open its data."), findsOneWidget);
+    expect(dbFile().readAsBytesSync(), before, reason: 'file untouched');
+    expect(docs.listSync().where((e) => e.path.contains('.broken-')), isEmpty);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets(
       'Start fresh: Cancel changes nothing; confirmed, the broken file is '
       'set aside and the app opens on an empty database', (tester) async {
     await tester.runAsync(() async {
@@ -144,7 +217,7 @@ void main() {
       dbFile().writeAsStringSync('this is not a database' * 100);
     });
     await tester.pumpWidget(
-        AppRoot(startupDbError: Exception('file is not a database')));
+        AppRoot(startupDbError: SqliteException(26, 'file is not a database')));
 
     await tester.tap(find.text(kStartFreshButton));
     await tester.pumpAndSettle();
