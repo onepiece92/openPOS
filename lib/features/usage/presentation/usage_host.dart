@@ -7,6 +7,8 @@ import 'package:path/path.dart' as p;
 
 import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/core/restart_notice.dart';
+import 'package:pos_app/core/whats_new/whats_new_dialog.dart'
+    show whatsNewShowing;
 import 'package:pos_app/features/usage/application/usage_ask_controller.dart';
 import 'package:pos_app/features/usage/data/usage_counter.dart';
 import 'package:pos_app/features/usage/usage_constants.dart';
@@ -78,6 +80,7 @@ class _UsageHostState extends ConsumerState<UsageHost> {
     _lifecycle = AppLifecycleListener(onStateChange: _counter.onLifecycle);
     _ask.pending.addListener(_onAsk);
     restartNoticeShowing.addListener(_onRestartNotice);
+    whatsNewShowing.addListener(_onRestartNotice);
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _counter.ensureLoaded();
       if (!mounted) return;
@@ -91,6 +94,7 @@ class _UsageHostState extends ConsumerState<UsageHost> {
     _lifecycle?.dispose();
     _ask.pending.removeListener(_onAsk);
     restartNoticeShowing.removeListener(_onRestartNotice);
+    whatsNewShowing.removeListener(_onRestartNotice);
     super.dispose();
   }
 
@@ -113,6 +117,7 @@ class _UsageHostState extends ConsumerState<UsageHost> {
   void _maybeDisclose() {
     if (!kUsageFirstRunDisclosure || _disclosing || !mounted) return;
     if (restartNoticeShowing.value) return; // retried when it ends
+    if (whatsNewShowing.value) return; // retried when the pop-up closes
     if (!_counter.isLoaded || _counter.disclosureShown) return;
     if (!ref.read(onboardingCompleteProvider)) return;
     // Nothing is counted: nothing to disclose yet. Switching counting on

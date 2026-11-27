@@ -1,6 +1,7 @@
 import 'dart:async' show Completer, unawaited;
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show listEquals, ValueNotifier;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -10,6 +11,11 @@ import 'package:pos_app/core/restart_notice.dart';
 import 'package:pos_app/core/whats_new/release_notes.dart';
 
 const kWhatsNewGotIt = 'Got it';
+
+/// True from the moment the pop-up is decided on until it is closed. The
+/// usage disclosure waits on it, so its snackbar is not shown (and marked
+/// shown) behind the dialog's barrier.
+final whatsNewShowing = ValueNotifier<bool>(false);
 
 /// Checks once whether to show the notes; call after the first frame, from
 /// the first normal screen. One settings read, and one small write when the
@@ -41,12 +47,21 @@ Future<void> maybeShowWhatsNew(BuildContext context, WidgetRef ref) async {
       switchOn: ref.read(featureOnProvider(Feature.whatsNew)),
     );
     final write = plan.writeSeen;
+    final willShow = plan.show.isNotEmpty;
+    // Before the first await, so nothing slips in ahead of the dialog.
+    if (willShow) whatsNewShowing.value = true;
     if (write != null) await box.put(kWhatsNewSeenKey, write);
-    if (plan.show.isEmpty || !context.mounted) return;
+    if (!willShow) return;
+    if (!context.mounted) {
+      whatsNewShowing.value = false;
+      return;
+    }
     // Not awaited: the dialog stays open until the user closes it.
     unawaited(showWhatsNewDialog(context,
-        notes: plan.show, headline: 'Updated to $kAppVersion'));
+            notes: plan.show, headline: 'Updated to $kAppVersion')
+        .whenComplete(() => whatsNewShowing.value = false));
   } catch (e) {
+    whatsNewShowing.value = false;
     debugPrint('What\'s new check skipped: $e');
   }
 }
@@ -80,6 +95,7 @@ class _WhatsNewDialogState extends State<WhatsNewDialog>
   /// Created only when motion is allowed: with reduced motion there is no
   /// controller at all.
   AnimationController? _ctrl;
+  BurstPainter? _painter;
   bool _started = false;
   bool _motion = false;
 
@@ -94,6 +110,15 @@ class _WhatsNewDialogState extends State<WhatsNewDialog>
       _ctrl = AnimationController(
           vsync: this, duration: const Duration(milliseconds: 1000))
         ..forward();
+      final cs = Theme.of(context).colorScheme;
+      _painter = BurstPainter(progress: _ctrl!, colors: [
+        cs.primary,
+        cs.secondary,
+        cs.tertiary,
+        const Color(0xFFFFB300),
+        const Color(0xFF26A69A),
+        const Color(0xFFEF5350),
+      ]);
     }
   }
 
@@ -190,17 +215,7 @@ class _WhatsNewDialogState extends State<WhatsNewDialog>
                       child: RepaintBoundary(
                         child: CustomPaint(
                           key: const ValueKey('whats-new-burst'),
-                          painter: BurstPainter(
-                            progress: ctrl,
-                            colors: [
-                              cs.primary,
-                              cs.secondary,
-                              cs.tertiary,
-                              const Color(0xFFFFB300),
-                              const Color(0xFF26A69A),
-                              const Color(0xFFEF5350),
-                            ],
-                          ),
+                          painter: _painter,
                         ),
                       ),
                     ),
@@ -260,5 +275,5 @@ class BurstPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(BurstPainter old) =>
-      old.progress != progress || old.colors != colors;
+      old.progress != progress || !listEquals(old.colors, colors);
 }

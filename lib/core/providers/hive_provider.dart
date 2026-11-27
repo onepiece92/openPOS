@@ -345,14 +345,16 @@ class SettingsNotifier extends Notifier<AppSettings> {
   }
 
   // Onboarding / theme
-  Future<void> setOnboardingComplete(bool v) =>
-      _write(state.copyWith(onboardingComplete: v), {
-        _kOnboardingComplete: v,
-        // A shop set up on this version has nothing "new" to be told: the
-        // What's new check treats a missing value as an upgrade.
-        if (v && _box.get(kWhatsNewSeenKey) == null)
-          kWhatsNewSeenKey: kAppVersion,
-      });
+  Future<void> setOnboardingComplete(bool v) async {
+    // First, and flushed before the state flips (the router reacts to the
+    // state): a shop set up on this version has nothing "new" to be told,
+    // and the What's new check treats a missing value as an upgrade.
+    if (v && _box.get(kWhatsNewSeenKey) == null) {
+      await _box.put(kWhatsNewSeenKey, kAppVersion);
+    }
+    await _write(
+        state.copyWith(onboardingComplete: v), {_kOnboardingComplete: v});
+  }
   Future<void> setThemeMode(ThemeMode mode) => _write(
       state.copyWith(themeMode: mode),
       {_kThemeMode: AppSettings._themeModeTo(mode)});

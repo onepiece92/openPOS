@@ -15,6 +15,8 @@ import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/app_root.dart' show RestartNoticeOverlay;
 import 'package:pos_app/core/restart_notice.dart';
+import 'package:pos_app/core/whats_new/whats_new_dialog.dart'
+    show whatsNewShowing;
 import 'package:pos_app/features/backup/data/snapshot_providers.dart'
     show restartNoticeDuration;
 import 'package:pos_app/features/help/presentation/support_screen.dart';
@@ -156,6 +158,19 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text(kUsageDisclosureText), findsNothing);
       expect(usageBox.get(kUsageDisclosureShownKey), isTrue);
+    });
+
+    testWidgets("waits for the What's new pop-up to close", (tester) async {
+      whatsNewShowing.value = true;
+      addTearDown(() => whatsNewShowing.value = false);
+      await pump(tester);
+      expect(find.text(kUsageDisclosureText), findsNothing);
+      expect(usageBox.get(kUsageDisclosureShownKey), isNull);
+      // "Got it" closes the dialog; the flag drops with it.
+      whatsNewShowing.value = false;
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 800));
+      expect(find.text(kUsageDisclosureText), findsOneWidget);
     });
 
     testWidgets('waits for a restart notice to end', (tester) async {

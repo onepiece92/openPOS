@@ -185,5 +185,29 @@ void main() {
       await tester.pump();
       expect(done, isTrue);
     });
+
+    testWidgets('onboarding writes the version before the router can see it',
+        (tester) async {
+      final c = ProviderContainer(
+          overrides: [settingsBoxProvider.overrideWithValue(box)]);
+      addTearDown(c.dispose);
+      Object? seenWhenOnboarded = 'unset';
+      c.listen(settingsProvider, (_, next) {
+        if (next.onboardingComplete) {
+          seenWhenOnboarded = box.get(kWhatsNewSeenKey);
+        }
+      });
+      await tester.runAsync(
+          () => c.read(settingsProvider.notifier).setOnboardingComplete(true));
+      expect(seenWhenOnboarded, kAppVersion,
+          reason: 'the key is stored before onboarded flips');
+      // So the check that follows the router change shows nothing.
+      final plan = planWhatsNew(
+          current: kAppVersion,
+          lastSeen: seenWhenOnboarded as String?,
+          onboarded: true,
+          switchOn: true);
+      expect(plan.show, isEmpty);
+    });
   });
 }
