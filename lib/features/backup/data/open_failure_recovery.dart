@@ -66,25 +66,54 @@ Future<File?> setAsideDatabaseFile(File db, DateTime now) async {
     final to = await f.rename('$prefix$suffix');
     if (suffix.isEmpty) moved = to;
   }
-  await deleteBrokenDatabaseCopies(db, keepPrefix: prefix);
+  // Older copies go only when this call kept something real: a missing or
+  // empty main file (e.g. a second Start fresh after the first one's new
+  // database never got written) must never cost the only real copy — and
+  // no older copy bigger than the one just kept is ever deleted.
+  final keptSize = moved == null ? 0 : await moved.length();
+  if (keptSize > 0) {
+    await deleteBrokenDatabaseCopies(db,
+        keepPrefix: prefix, keepLargerThan: keptSize);
+  }
   return moved;
 }
 
 /// What a set-aside copy's name carries after the database file's name.
 const kBrokenCopyInfix = '.broken-';
 
-/// Deletes the set-aside copies of [db] (`<name>.broken-*`), except those
-/// starting with [keepPrefix]. Returns how many were deleted.
-Future<int> deleteBrokenDatabaseCopies(File db, {String? keepPrefix}) async {
+/// Deletes the set-aside copies of [db] (`<name>.broken-<time>` plus its
+/// `-wal`/`-shm`/`-journal`), except the set starting with [keepPrefix] and
+/// any set whose main copy is larger than [keepLargerThan] bytes. Returns
+/// how many files were deleted.
+Future<int> deleteBrokenDatabaseCopies(
+  File db, {
+  String? keepPrefix,
+  int? keepLargerThan,
+}) async {
   final dir = db.parent;
   if (!await dir.exists()) return 0;
   final start = '${db.path}$kBrokenCopyInfix';
-  var deleted = 0;
+  // Group each set by its stamp: `<start><yyyyMMdd-HHmmss>[suffix]`.
+  final sets = <String, List<File>>{};
   await for (final e in dir.list()) {
     if (e is! File || !e.path.startsWith(start)) continue;
     if (keepPrefix != null && e.path.startsWith(keepPrefix)) continue;
-    await e.delete();
-    deleted++;
+    final rest = e.path.substring(start.length);
+    final stamp = rest.length >= 15 ? rest.substring(0, 15) : rest;
+    (sets[stamp] ??= []).add(e);
+  }
+  var deleted = 0;
+  for (final entry in sets.entries) {
+    if (keepLargerThan != null) {
+      final main = File('$start${entry.key}');
+      if (await main.exists() && await main.length() > keepLargerThan) {
+        continue;
+      }
+    }
+    for (final f in entry.value) {
+      await f.delete();
+      deleted++;
+    }
   }
   return deleted;
 }

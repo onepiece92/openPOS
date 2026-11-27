@@ -77,6 +77,50 @@ void main() {
       expect(File('${moved.path}-wal').existsSync(), isTrue);
     });
 
+    Set<String> brokenNames() => {
+          for (final e in docs.listSync())
+            if (p.basename(e.path).contains('.broken-')) p.basename(e.path)
+        };
+
+    test('a second Start fresh with the main file missing keeps the copy',
+        () async {
+      dbFile().writeAsStringSync('the real shop');
+      await setAsideDatabaseFile(dbFile(), DateTime(2026, 11, 1, 9));
+      // The new database was never written; the app died; Start fresh again.
+      final moved =
+          await setAsideDatabaseFile(dbFile(), DateTime(2026, 11, 2, 9));
+      expect(moved, isNull);
+      expect(brokenNames(), {'$kDatabaseFileName.broken-20261101-090000'});
+    });
+
+    test('a second Start fresh on a 0-byte main file keeps the older copy',
+        () async {
+      dbFile().writeAsStringSync('the real shop');
+      await setAsideDatabaseFile(dbFile(), DateTime(2026, 11, 1, 9));
+      dbFile().writeAsBytesSync([]);
+      await setAsideDatabaseFile(dbFile(), DateTime(2026, 11, 2, 9));
+      expect(brokenNames(), {
+        '$kDatabaseFileName.broken-20261101-090000',
+        '$kDatabaseFileName.broken-20261102-090000',
+      });
+      expect(
+          File('${dbFile().path}.broken-20261101-090000').readAsStringSync(),
+          'the real shop');
+    });
+
+    test('an older copy larger than the new one is never deleted', () async {
+      dbFile().writeAsStringSync('the real shop, years of sales');
+      File('${dbFile().path}-wal').writeAsStringSync('w');
+      await setAsideDatabaseFile(dbFile(), DateTime(2026, 11, 1, 9));
+      dbFile().writeAsStringSync('tiny');
+      await setAsideDatabaseFile(dbFile(), DateTime(2026, 11, 2, 9));
+      expect(brokenNames(), {
+        '$kDatabaseFileName.broken-20261101-090000',
+        '$kDatabaseFileName.broken-20261101-090000-wal',
+        '$kDatabaseFileName.broken-20261102-090000',
+      });
+    });
+
     test('only the newest set-aside set is kept', () async {
       dbFile().writeAsStringSync('first');
       File('${dbFile().path}-wal').writeAsStringSync('w1');
