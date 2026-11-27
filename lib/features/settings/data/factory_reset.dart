@@ -235,7 +235,9 @@ Future<void> eraseLocalStores({
   afterStep?.call(FactoryResetStep.receiptsDeleted);
   // Copies of a damaged database set aside by "Start fresh" hold the
   // shop's old sales: they go too.
-  if (database != null) await deleteBrokenDatabaseCopies(database);
+  if (database != null) {
+    await deleteBrokenDatabaseCopies(database, everything: true);
+  }
   afterStep?.call(FactoryResetStep.brokenCopiesDeleted);
   final doomed = [
     for (final k in settings.keys)

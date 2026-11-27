@@ -120,12 +120,16 @@ final _brokenName = RegExp(r'^(\d{8}-\d{6}(?:-\d+)?)(-wal|-shm|-journal)?$');
 /// [keepLargerThan] bytes. Returns how many files were deleted.
 ///
 /// A journal whose own main copy is missing (a kill split the set while
-/// it was being moved) is never deleted: it counts toward the newest set's
-/// size, so it can only make that set more likely to be kept.
+/// it was being moved) is never deleted here: it counts toward the newest
+/// set's size, so it can only make that set more likely to be kept — unless
+/// [everything] (a factory reset the user confirmed): then every
+/// `.broken-*` file goes, orphans included, since any of them can hold the
+/// old shop's sales.
 Future<int> deleteBrokenDatabaseCopies(
   File db, {
   String? keepStamp,
   int? keepLargerThan,
+  bool everything = false,
 }) async {
   final dir = db.parent;
   if (!await dir.exists()) return 0;
@@ -158,7 +162,9 @@ Future<int> deleteBrokenDatabaseCopies(
   var deleted = 0;
   for (final entry in sets.entries) {
     final stamp = entry.key;
-    if (!withMain.contains(stamp) || stamp == keepStamp) continue;
+    if (!everything && (!withMain.contains(stamp) || stamp == keepStamp)) {
+      continue;
+    }
     if (keepLargerThan != null) {
       final size =
           await sizeOf(entry.value) + (stamp == newest ? orphanSize : 0);

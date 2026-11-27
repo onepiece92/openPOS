@@ -184,6 +184,12 @@ void main() {
         File('${db.path}${kBrokenCopyInfix}20261101-090000$s')
             .writeAsStringSync('old');
       }
+      // An orphan journal (its main copy missing) and a same-second set:
+      // a confirmed reset takes them too — they can hold old sales.
+      File('${db.path}${kBrokenCopyInfix}20261030-090000-wal')
+          .writeAsStringSync('old wal');
+      File('${db.path}${kBrokenCopyInfix}20261101-090000-2')
+          .writeAsStringSync('old');
       final auto = Directory(p.join(dir.path, 'backups', 'auto'))
         ..createSync(recursive: true);
       await eraseLocalStores(

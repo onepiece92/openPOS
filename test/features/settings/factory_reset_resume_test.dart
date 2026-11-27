@@ -320,6 +320,8 @@ void main() {
     expect(broken().existsSync(), isFalse, reason: 'the user confirmed');
 
     broken().writeAsStringSync('old sales');
+    final orphan = File('${dbFile().path}.broken-20261030-090000-wal')
+      ..writeAsStringSync('old wal');
     await markFactoryResetPending(settings);
     await relaunch();
     expect(
@@ -335,5 +337,6 @@ void main() {
         PendingFactoryReset.finished);
     expect(broken().existsSync(), isFalse,
         reason: "the old shop's sales go with the reset it confirmed");
+    expect(orphan.existsSync(), isFalse, reason: 'orphan journals too');
   });
 }
