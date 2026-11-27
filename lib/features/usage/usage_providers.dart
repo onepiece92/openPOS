@@ -3,10 +3,10 @@ import 'dart:ui' show Rect;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart' show XFile;
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:pos_app/features/backup/data/temp_files.dart';
 import 'package:pos_app/core/app_version.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
@@ -78,9 +78,11 @@ typedef LinkLauncher = Future<bool> Function(Uri uri);
 final linkLauncherProvider = Provider<LinkLauncher>(
     (ref) => (uri) => launchUrl(uri, mode: LaunchMode.externalApplication));
 
-/// Folder for the .txt handed to the share sheet. Overridden in tests.
+/// Folder for the .txt handed to the share sheet: the share folder in temp
+/// ([shareTempDir]), swept at launch and by a factory reset. Overridden in
+/// tests.
 final usageTempDirProvider =
-    Provider<Future<Directory> Function()>((ref) => getTemporaryDirectory);
+    Provider<Future<Directory> Function()>((ref) => shareTempDir);
 
 /// How a summary left the app.
 enum UsageSendResult { launched, sharedAsFile, noApp }

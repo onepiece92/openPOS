@@ -9,6 +9,7 @@ import 'package:path/path.dart' as p;
 
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/services/audit_service.dart';
+import 'package:pos_app/features/backup/data/temp_files.dart';
 import 'package:pos_app/features/cart/data/ticket_sequence.dart';
 import 'package:pos_app/features/cart/domain/held_order.dart';
 import 'package:pos_app/features/settings/data/factory_reset.dart';
@@ -113,6 +114,51 @@ void main() {
       expect(usage.isEmpty, isTrue);
       expect(receipts.existsSync(), isFalse);
       expect(backup.existsSync(), isTrue);
+    });
+
+    test(
+        'deletes shared exports and backup working files in temp; keeps '
+        'every automatic backup and the pre-reset backup', () async {
+      final temp = Directory(p.join(docs.path, 'tmp'))..createSync();
+      final share = Directory(p.join(temp.path, kShareTempFolder))..createSync();
+      final sharedZip = File(p.join(share.path, 'pos_snapshot_1.zip'))
+        ..writeAsBytesSync([1]);
+      File(p.join(share.path, 'sales_report.csv')).writeAsStringSync('x');
+      final sharePlus = Directory(p.join(temp.path, kSharePlusTempFolder))
+        ..createSync();
+      File(p.join(sharePlus.path, 'copy.zip')).writeAsBytesSync([1]);
+      final vacuum = File(p.join(temp.path, 'pos_snapshot_99.db'))
+        ..writeAsBytesSync([1]);
+      final settingsCopy = File(p.join(temp.path, 'settings_snapshot_99.hive'))
+        ..writeAsBytesSync([1]);
+      final unrelated = File(p.join(temp.path, 'other.txt'))
+        ..writeAsStringSync('keep');
+      final auto = Directory(p.join(docs.path, 'backups', 'auto'))
+        ..createSync(recursive: true);
+      final autoFiles = [
+        for (final n in ['pos_snapshot_a.zip', 'pos_snapshot_b.zip'])
+          File(p.join(auto.path, n))..writeAsBytesSync([9]),
+      ];
+      // The one backup the reset takes just before the erase.
+      final preReset = File(p.join(auto.path, 'pos_snapshot_pre.zip'))
+        ..writeAsBytesSync([8]);
+
+      await eraseLocalStores(
+          settings: settings,
+          heldOrders: held,
+          usage: usage,
+          receipts: Directory(p.join(docs.path, 'receipts')),
+          temp: temp);
+
+      expect(share.existsSync(), isFalse);
+      expect(sharedZip.existsSync(), isFalse);
+      expect(sharePlus.existsSync(), isFalse);
+      expect(vacuum.existsSync(), isFalse);
+      expect(settingsCopy.existsSync(), isFalse);
+      expect(unrelated.existsSync(), isTrue, reason: 'only our leftovers');
+      for (final f in [...autoFiles, preReset]) {
+        expect(f.existsSync(), isTrue, reason: '${f.path} is kept');
+      }
     });
 
     test(

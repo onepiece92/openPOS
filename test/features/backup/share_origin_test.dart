@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as p;
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -15,6 +16,7 @@ import 'package:pos_app/core/utils/currency_formatter.dart';
 import 'package:pos_app/features/backup/data/backup_repository.dart';
 import 'package:pos_app/features/backup/data/share_files.dart';
 import 'package:pos_app/features/backup/data/snapshot_providers.dart';
+import 'package:pos_app/features/backup/data/temp_files.dart';
 import 'package:pos_app/features/backup/presentation/backup_screen.dart';
 import 'package:pos_app/features/receipts/presentation/receipt_body.dart';
 import 'package:pos_app/features/receipts/presentation/receipt_pdf_service.dart';
@@ -58,16 +60,20 @@ void main() {
     late AppDatabase db;
     late Directory tmp;
     final shared = <({List<XFile> files, Rect origin})>[];
+    final existedWhenShared = <bool>[];
     late BackupRepository repo;
 
     setUp(() async {
       db = openInMemoryDatabase();
       tmp = await Directory.systemTemp.createTemp('pos_share_');
       shared.clear();
+      existedWhenShared.clear();
       repo = BackupRepository(
         db,
-        share: (files, {subject, text, required sharePositionOrigin}) async =>
-            shared.add((files: files, origin: sharePositionOrigin)),
+        share: (files, {subject, text, required sharePositionOrigin}) async {
+          shared.add((files: files, origin: sharePositionOrigin));
+          existedWhenShared.add(File(files.single.path).existsSync());
+        },
         tempDirectory: () async => tmp,
       );
     });
@@ -91,8 +97,13 @@ void main() {
         await entry.value();
         expect(shared, hasLength(1));
         expect(shared.single.origin, origin);
-        expect(shared.single.files.single.path, endsWith(entry.key));
-        expect(File(shared.single.files.single.path).existsSync(), isTrue);
+        final path = shared.single.files.single.path;
+        expect(path, endsWith(entry.key));
+        expect(p.dirname(path), p.join(tmp.path, kShareTempFolder),
+            reason: 'in the share folder');
+        expect(existedWhenShared.single, isTrue);
+        expect(File(path).existsSync(), isFalse,
+            reason: 'deleted once the share returned');
       });
     }
 
@@ -123,15 +134,18 @@ void main() {
     });
     mockTempDirectory(tmp);
     final shared = <({List<XFile> files, String? subject, Rect origin})>[];
+    var existed = false;
     final c = ProviderContainer(overrides: [
       databaseProvider.overrideWithValue(db),
       shareFilesProvider.overrideWithValue(
-          (files, {subject, text, required sharePositionOrigin}) async =>
-              shared.add((
-                files: files,
-                subject: subject,
-                origin: sharePositionOrigin
-              ))),
+          (files, {subject, text, required sharePositionOrigin}) async {
+        shared.add((
+          files: files,
+          subject: subject,
+          origin: sharePositionOrigin
+        ));
+        existed = File(files.single.path).existsSync();
+      }),
     ]);
     addTearDown(c.dispose);
 
@@ -140,7 +154,12 @@ void main() {
         .read(snapshotCoordinatorProvider)
         .createAndShare(shareOrigin: origin);
 
-    expect(zip.existsSync(), isTrue);
+    expect(existed, isTrue, reason: 'there while the share sheet had it');
+    expect(p.dirname(zip.path), p.join(tmp.path, kShareTempFolder));
+    expect(zip.existsSync(), isFalse, reason: 'deleted after the share');
+    expect(tmp.listSync().map((e) => p.basename(e.path)),
+        isNot(contains(startsWith('pos_snapshot_'))),
+        reason: 'no working copy left in temp');
     expect(shared.single.origin, origin);
     expect(shared.single.files.single.path, zip.path);
     expect(shared.single.subject, endsWith('.zip'));

@@ -1,5 +1,6 @@
 import 'package:hive_flutter/hive_flutter.dart';
 
+import 'package:pos_app/features/backup/data/temp_files.dart';
 import 'package:pos_app/core/database/connection/native.dart';
 import 'package:pos_app/core/database/database_open_errors.dart';
 import 'package:pos_app/core/providers/hive_provider.dart'
@@ -54,8 +55,12 @@ Future<StartupResult> startUp({
   Future<void> Function()? openStores,
   Future<void> Function()? checkDatabase,
   Future<PendingFactoryReset> Function()? finishFactoryReset,
+  Future<void> Function()? sweepTemp,
 }) async {
   final recovery = await (recover ?? recoverInterruptedRestoreAtStartup)();
+  // Shared exports and backup working files a kill left in temp; before
+  // anything could be writing one. Never throws.
+  await (sweepTemp ?? sweepAppTempLeftovers)();
   await (initHive ?? () => Hive.initFlutter())();
   if (recovery == null) {
     return const StartupResult(fatal: kRecoveryFailedMessage);

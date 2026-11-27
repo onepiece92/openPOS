@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:uuid/uuid.dart';
 
+import 'package:pos_app/features/backup/data/temp_files.dart';
 import 'package:pos_app/core/utils/money.dart';
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/database/tables/orders_table.dart';
@@ -869,19 +870,24 @@ class BackupRepository {
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
+  /// In the share folder ([kShareTempFolder]) of the temporary directory.
   Future<File> _tempFile(String fileName) async {
-    final directory = await _tempDirectory();
-    if (!await directory.exists()) {
-      await directory.create(recursive: true);
-    }
+    final directory = await shareTempDir(temp: await _tempDirectory());
     return File(p.join(directory.path, fileName));
   }
 
-  Future<void> _shareFile(File file, Rect shareOrigin) => _share(
+  /// Shares [file], then deletes it (the launch sweep catches a kill).
+  Future<void> _shareFile(File file, Rect shareOrigin) async {
+    try {
+      await _share(
         [XFile(file.path)],
         text: 'POS Data Backup',
         sharePositionOrigin: shareOrigin,
       );
+    } finally {
+      await deleteShared(file);
+    }
+  }
 
   Future<void> _shareCsv(
       String content, String fileName, Rect shareOrigin) async {

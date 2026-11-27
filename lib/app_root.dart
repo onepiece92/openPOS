@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart' show getTemporaryDirectory;
 
 import 'package:pos_app/app.dart';
 import 'package:pos_app/core/database/app_database.dart';
@@ -543,6 +544,7 @@ class AppRootState extends State<AppRoot> {
         usage: usageBoxForReset,
         receipts: receiptsDir,
         database: databaseFile,
+        temp: getTemporaryDirectory,
       );
       switch (outcome) {
         case FactoryResetOutcome.done:

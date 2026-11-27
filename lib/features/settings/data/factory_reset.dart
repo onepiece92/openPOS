@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart' show getTemporaryDirectory;
 
 import 'package:pos_app/core/providers/hive_provider.dart'
     show kAutoBackupLastAt;
@@ -14,6 +15,7 @@ import 'package:pos_app/features/backup/data/open_failure_recovery.dart'
     show deleteBrokenDatabaseCopies;
 import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/features/backup/data/snapshot_providers.dart';
+import 'package:pos_app/features/backup/data/temp_files.dart';
 import 'package:pos_app/features/cart/data/ticket_sequence.dart';
 import 'package:pos_app/features/usage/data/usage_counter.dart';
 
@@ -140,6 +142,7 @@ enum FactoryResetStep {
   usageCleared,
   receiptsDeleted,
   brokenCopiesDeleted,
+  tempFilesDeleted,
   settingsCleared,
 }
 
@@ -207,7 +210,10 @@ const kResetKeptNotice = 'Your data was kept. Nothing was erased.';
 ///    numbers never repeat;
 /// 2. [usage] — counts and flags, so the first-run usage notice shows again;
 /// 3. the receipt photos folder [receipts];
-/// 4. LAST, [settings] (so onboarding shows again), except
+/// 4. when [temp] is given, the shared-file leftovers in it: the share
+///    folder, share_plus's copies and backup working files
+///    ([sweepTempLeftovers]) — copies of the shop's data;
+/// 5. LAST, [settings] (so onboarding shows again), except
 ///    [kSettingsKeptByReset], in one write whose final key is
 ///    [kFactoryResetPendingKey] — so the reset counts as done only once
 ///    everything else is gone, and the kept keys are never deleted (no
@@ -223,6 +229,7 @@ Future<void> eraseLocalStores({
   required Box<dynamic> usage,
   required Directory receipts,
   File? database,
+  Directory? temp,
   FactoryResetStepHook? afterStep,
 }) async {
   await clearHeldTicketsKeepingCounter(heldOrders);
@@ -239,6 +246,10 @@ Future<void> eraseLocalStores({
     await deleteBrokenDatabaseCopies(database, everything: true);
   }
   afterStep?.call(FactoryResetStep.brokenCopiesDeleted);
+  // Exports and full backups handed to the share sheet, and backup working
+  // files a kill left behind. Never anything in the backups folder.
+  if (temp != null) await sweepTempLeftovers(temp, sharePlusCache: true);
+  afterStep?.call(FactoryResetStep.tempFilesDeleted);
   final doomed = [
     for (final k in settings.keys)
       if (!kSettingsKeptByReset.contains(k) && k != kFactoryResetPendingKey) k,
@@ -279,6 +290,7 @@ Future<PendingFactoryReset> finishPendingFactoryReset({
   required Future<Box<dynamic>> Function() usage,
   required Future<Directory> Function() receipts,
   Future<File> Function()? database,
+  Future<Directory> Function()? temp,
 }) async {
   if (!isFactoryResetPending(settings)) return PendingFactoryReset.none;
   if (await databaseHasUserData()) return PendingFactoryReset.askUser;
@@ -289,6 +301,7 @@ Future<PendingFactoryReset> finishPendingFactoryReset({
     usage: await usage(),
     receipts: await receipts(),
     database: database == null ? null : await database(),
+    temp: await _tempOrNull(temp),
   );
   return PendingFactoryReset.finished;
 }
@@ -309,7 +322,19 @@ Future<PendingFactoryReset> finishPendingFactoryResetOnLaunch(
       // interrupted reset finishes the job: the old shop's set-aside copies
       // go too.
       database: databaseFile,
+      temp: getTemporaryDirectory,
     );
+
+/// [temp]'s folder, or null when there is none or it cannot be found
+/// (the temp sweep is then skipped, never the reset).
+Future<Directory?> _tempOrNull(Future<Directory> Function()? temp) async {
+  if (temp == null) return null;
+  try {
+    return await temp();
+  } catch (_) {
+    return null;
+  }
+}
 
 /// How [runFactoryReset] ended.
 enum FactoryResetOutcome {
@@ -349,6 +374,7 @@ Future<FactoryResetOutcome> runFactoryReset({
   required Future<Box<dynamic>> Function() usage,
   required Future<Directory> Function() receipts,
   Future<File> Function()? database,
+  Future<Directory> Function()? temp,
   FactoryResetStepHook? afterStep,
 }) async {
   // Nothing erased yet: "not changed" only once the flag is confirmed
@@ -387,6 +413,7 @@ Future<FactoryResetOutcome> runFactoryReset({
       usage: await usage(),
       receipts: await receipts(),
       database: database == null ? null : await database(),
+      temp: await _tempOrNull(temp),
       afterStep: afterStep,
     );
   } catch (_) {

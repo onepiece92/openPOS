@@ -15,6 +15,7 @@ import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/features/backup/data/share_files.dart';
 import 'package:pos_app/features/backup/data/snapshot_service.dart';
+import 'package:pos_app/features/backup/data/temp_files.dart';
 import 'package:pos_app/features/cart/data/ticket_sequence.dart'
     show kTicketSeqKey;
 import 'package:pos_app/features/settings/data/factory_reset.dart'
@@ -269,19 +270,26 @@ class SnapshotCoordinator {
     }
   }
 
-  /// User-initiated "Back up everything": zip to the temp dir and hand the
-  /// file to the OS share sheet (Files / Drive / AirDrop / mail…).
+  /// User-initiated "Back up everything": zip to the share folder in temp
+  /// ([shareTempDir]) and hand the file to the OS share sheet (Files /
+  /// Drive / AirDrop / mail…). The zip is deleted once the share returns
+  /// (Android's share sheet works on its own copy; iOS has finished with
+  /// the file by then) — a copy the user saved elsewhere is not touched.
   ///
   /// [shareOrigin] is the on-screen rectangle of the button that was tapped;
   /// iPad anchors the share sheet to it and refuses to share without one.
   Future<File> createAndShare({required Rect shareOrigin}) async {
-    final zip = await create(await getTemporaryDirectory());
-    await _ref.read(shareFilesProvider)(
-      [XFile(zip.path, mimeType: 'application/zip')],
-      subject: p.basename(zip.path),
-      text: 'POS full backup',
-      sharePositionOrigin: shareOrigin,
-    );
+    final zip = await create(await shareTempDir());
+    try {
+      await _ref.read(shareFilesProvider)(
+        [XFile(zip.path, mimeType: 'application/zip')],
+        subject: p.basename(zip.path),
+        text: 'POS full backup',
+        sharePositionOrigin: shareOrigin,
+      );
+    } finally {
+      await deleteShared(zip);
+    }
     return zip;
   }
 
