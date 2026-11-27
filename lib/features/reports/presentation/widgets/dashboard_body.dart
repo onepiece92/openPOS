@@ -355,7 +355,7 @@ class _SectionHeader extends StatelessWidget {
               fontSize: 11,
               fontWeight: FontWeight.bold,
               letterSpacing: 1.2,
-              color: cs.primary),
+              color: cs.onSurfaceVariant),
         ),
       );
 }

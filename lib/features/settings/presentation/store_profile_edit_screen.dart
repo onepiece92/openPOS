@@ -185,7 +185,7 @@ Widget _label(String text, TextTheme tt, ColorScheme cs) => Padding(
       child: Text(
         text.toUpperCase(),
         style: tt.labelSmall?.copyWith(
-          color: cs.primary,
+          color: cs.onSurfaceVariant,
           fontWeight: FontWeight.bold,
           letterSpacing: 1.1,
         ),

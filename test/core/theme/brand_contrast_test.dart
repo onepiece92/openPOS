@@ -59,6 +59,14 @@ void main() {
         _expectAA('outline on surface', cs.outline, cs.surface, min: 3);
       });
 
+      test('section headers (muted grey, not orange) pass 4.5:1 on the page',
+          () {
+        expect(cs.onSurfaceVariant, isNot(cs.primary));
+        _expectAA('section header', cs.onSurfaceVariant, cs.surface);
+        _expectAA('section header on card', cs.onSurfaceVariant,
+            mode == 'light' ? cs.surfaceContainerLowest : cs.surfaceContainer);
+      });
+
       test('on-colours pass 4.5:1 on their fills', () {
         _expectAA('onPrimary', cs.onPrimary, cs.primary);
         _expectAA(

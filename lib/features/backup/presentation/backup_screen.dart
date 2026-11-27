@@ -474,7 +474,7 @@ class _SectionHeader extends StatelessWidget {
       child: Text(
         title.toUpperCase(),
         style: tt.labelSmall?.copyWith(
-          color: cs.primary,
+          color: cs.onSurfaceVariant,
           fontWeight: FontWeight.bold,
           letterSpacing: 1.0,
         ),

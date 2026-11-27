@@ -108,7 +108,7 @@ abstract final class AppTheme {
       .textTheme
       .labelSmall!
       .copyWith(
-        color: Theme.of(ctx).colorScheme.primary,
+        color: Theme.of(ctx).colorScheme.onSurfaceVariant,
         fontWeight: FontWeight.bold,
         letterSpacing: 1.2,
       );
