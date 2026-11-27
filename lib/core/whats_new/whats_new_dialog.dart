@@ -124,6 +124,10 @@ class _WhatsNewDialogState extends State<WhatsNewDialog>
 
   @override
   void dispose() {
+    // The route's future never completes when the whole tree is replaced
+    // (a restore or reset swaps the app under an open dialog), so the flag
+    // is also cleared here. Listeners only schedule a post-frame retry.
+    whatsNewShowing.value = false;
     _ctrl?.dispose();
     super.dispose();
   }

@@ -9,6 +9,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path/path.dart' as p;
 
 import 'package:pos_app/app_root.dart';
+import 'package:pos_app/core/app_version.dart';
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/database/connection/native.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
@@ -54,6 +55,12 @@ void main() {
       await db.close();
       final settings = await Hive.openBox<dynamic>('settings');
       await settings.put('onboarding_complete', true);
+      // A shop already on this version. Without the key the first launch is
+      // an upgrade: the What's new check puts it inside this fake-async
+      // test, where a Hive write never completes, and whatsNewShowing
+      // (set before that write) would stay true for the rest of the test.
+      // The real-clock path is covered in whats_new_dialog_test.dart.
+      await settings.put(kWhatsNewSeenKey, kAppVersion);
       final held = await Hive.openBox<dynamic>('held_orders');
       await held.put(
           't1',

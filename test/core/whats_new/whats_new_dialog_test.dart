@@ -209,5 +209,28 @@ void main() {
           switchOn: true);
       expect(plan.show, isEmpty);
     });
+
+    testWidgets('an upgrade shows the pop-up; the flag drops on Got it',
+        (tester) async {
+      await put(tester, kOnboardingCompleteKey, true);
+      await put(tester, kWhatsNewSeenKey, '1.1.0');
+      await launch(tester);
+      expect(find.text(kWhatsNewGotIt), findsOneWidget);
+      expect(whatsNewShowing.value, isTrue);
+      expect(box.get(kWhatsNewSeenKey), kAppVersion);
+      await tester.tap(find.text(kWhatsNewGotIt));
+      await tester.pumpAndSettle();
+      expect(whatsNewShowing.value, isFalse);
+    });
+
+    testWidgets('the flag also drops when the app is replaced under the pop-up',
+        (tester) async {
+      await put(tester, kOnboardingCompleteKey, true);
+      await put(tester, kWhatsNewSeenKey, '1.1.0');
+      await launch(tester);
+      expect(whatsNewShowing.value, isTrue);
+      await tester.pumpWidget(const SizedBox());
+      expect(whatsNewShowing.value, isFalse);
+    });
   });
 }
