@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:drift/native.dart';
@@ -17,6 +18,7 @@ import 'package:pos_app/features/backup/data/snapshot_service.dart';
 import 'package:pos_app/features/onboarding/presentation/onboarding_screen.dart';
 import 'package:pos_app/features/settings/data/factory_reset.dart';
 import 'package:pos_app/features/usage/data/usage_counter.dart';
+import 'package:pos_app/features/backup/data/open_failure_recovery.dart';
 import 'package:pos_app/startup.dart';
 
 import '../../_support/sales.dart';
@@ -66,6 +68,24 @@ class _FlakyBox implements Box<dynamic> {
 
   @override
   Iterable<dynamic> get keys => inner.keys;
+
+  @override
+  Future<void> deleteAll(Iterable<dynamic> keys) async {
+    if (failDeletes > 0) {
+      failDeletes--;
+      _full();
+    }
+    await inner.deleteAll(keys);
+  }
+
+  @override
+  Future<void> putAll(Map<dynamic, dynamic> entries) async {
+    if (failPuts) _full();
+    await inner.putAll(entries);
+  }
+
+  @override
+  String? get path => inner.path;
 
   @override
   dynamic noSuchMethod(Invocation invocation) =>
@@ -175,6 +195,34 @@ void main() {
     });
 
     test('(b) the erase is refused and the clear fails: undecided', () async {
+      settings.failDeletes = 99;
+      expect(await reset(erase: eraseRefused), FactoryResetOutcome.undecided);
+      expect(real.containsKey(kFactoryResetPendingKey), isTrue);
+    });
+  });
+
+  group('"Finish erasing" on a pending reset', () {
+    test('does not write the flag again (a full disk cannot stop it)',
+        () async {
+      await real.put(kFactoryResetPendingKey, true);
+      settings.failPuts = true; // any put would throw
+      var erased = false;
+      final r = await runFactoryReset(
+        settings: settings,
+        eraseDatabase: () async => erased = true,
+        releaseDatabase: () async {},
+        heldOrders: await Hive.openBox<dynamic>('held_orders'),
+        usage: () async => Hive.openBox<dynamic>('usage'),
+        receipts: () async => Directory(p.join(docs.path, 'receipts')),
+      );
+      expect(erased, isTrue);
+      expect(r, FactoryResetOutcome.done);
+      expect(real.containsKey(kFactoryResetPendingKey), isFalse);
+    });
+
+    test('an erase that fails and a flag that will not clear: undecided',
+        () async {
+      await real.put(kFactoryResetPendingKey, true);
       settings.failDeletes = 99;
       expect(await reset(erase: eraseRefused), FactoryResetOutcome.undecided);
       expect(real.containsKey(kFactoryResetPendingKey), isTrue);
@@ -295,6 +343,106 @@ void main() {
       final fresh = state.containerForTest.read(databaseProvider);
       expect(await tester.runAsync(() => hasUserData(fresh)), isFalse);
       expect(real.containsKey(kFactoryResetPendingKey), isFalse);
+      await done(tester);
+    });
+  });
+
+  group('the app', () {
+    const channel = MethodChannel('plugins.flutter.io/path_provider');
+    setUp(() async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (_) async => docs.path);
+      await Hive.openBox<dynamic>('held_orders');
+      await Hive.openBox<dynamic>(kUsageBoxName);
+    });
+    tearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null);
+    });
+
+    Future<void> done(WidgetTester tester) => tester.runAsync(() async {
+          await tester.pumpWidget(const SizedBox());
+          await Future<void>.delayed(const Duration(milliseconds: 200));
+        });
+
+    testWidgets(
+        'Finish erasing that cannot write says so and keeps the question',
+        (tester) async {
+      late ProviderContainer c;
+      await tester.runAsync(() async {
+        final db = AppDatabase(NativeDatabase.memory());
+        await db.customSelect('SELECT 1').get();
+        await db.close(); // every erase now fails
+        c = ProviderContainer(
+            overrides: [databaseProvider.overrideWithValue(db)]);
+        await real.put(kFactoryResetPendingKey, true);
+      });
+      settings.failDeletes = 999; // and the flag will not clear
+      await tester.pumpWidget(AppRoot(
+        container: c,
+        startup: Future.value(const StartupResult(resetChoice: true)),
+        settingsBoxForTest: settings,
+      ));
+      await tester.pump();
+      await tester.pump();
+      expect(find.text(kResetChoiceTitle), findsOneWidget);
+      expect(find.text(kResetFinishFailed), findsNothing);
+
+      await tester.runAsync(() => tester.tap(find.text('Finish erasing')));
+      await pumpUntil(
+          tester, () => find.text(kResetFinishFailed).evaluate().isNotEmpty);
+      expect(
+          find.text(
+              "Couldn't finish erasing. Free up some space on this device, "
+              'then try again.'),
+          findsOneWidget);
+      expect(find.text(kResetChoiceTitle), findsOneWidget);
+      expect(real.containsKey(kFactoryResetPendingKey), isTrue);
+      await done(tester);
+    });
+
+    Future<void> startFresh(WidgetTester tester) async {
+      await tester.pumpWidget(AppRoot(
+        startupDbError: SqliteException(26, 'file is not a database'),
+        settingsBoxForTest: settings,
+      ));
+      expect(find.text(kStartFreshButton), findsOneWidget);
+      // Run on the real clock, not awaited (it waits for frames); the
+      // confirm dialog itself is covered in open_failure_recovery_test.
+      final state = tester.state<AppRootState>(find.byType(AppRoot));
+      await tester.runAsync(() async {
+        unawaited(state.startFresh());
+      });
+    }
+
+    testWidgets('Start fresh clears a leftover reset flag', (tester) async {
+      await tester.runAsync(() async {
+        await real.putAll(
+            {'onboarding_complete': true, kFactoryResetPendingKey: true});
+        File(p.join(docs.path, 'pos_database.db')).writeAsStringSync('junk');
+      });
+      await startFresh(tester);
+      await pumpUntil(tester, () => find.byType(POSApp).evaluate().isNotEmpty);
+      expect(real.containsKey(kFactoryResetPendingKey), isFalse,
+          reason: 'the next launch must not wipe the fresh shop settings');
+      expect(find.text(kStartFreshDoneNotice), findsOneWidget);
+      await tester.pump(const Duration(seconds: 9));
+      await done(tester);
+    });
+
+    testWidgets('… and asks the reset question when it cannot clear it',
+        (tester) async {
+      await tester.runAsync(() async {
+        await real.putAll(
+            {'onboarding_complete': true, kFactoryResetPendingKey: true});
+        File(p.join(docs.path, 'pos_database.db')).writeAsStringSync('junk');
+      });
+      settings.failDeletes = 999;
+      await startFresh(tester);
+      await pumpUntil(
+          tester, () => find.text(kResetChoiceTitle).evaluate().isNotEmpty);
+      expect(find.byType(POSApp), findsNothing);
+      expect(real.containsKey(kFactoryResetPendingKey), isTrue);
       await done(tester);
     });
   });

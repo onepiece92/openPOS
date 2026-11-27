@@ -196,6 +196,10 @@ const kResetChoiceKeep = 'Keep my data';
 const kResetKeepFailed = "Couldn't save your choice. Free up some space on "
     'this device, then tap Keep my data again.';
 
+/// "Finish erasing" could not write (a full disk): the question stays.
+const kResetFinishFailed = "Couldn't finish erasing. Free up some space on "
+    'this device, then try again.';
+
 /// After "Keep my data".
 const kResetKeptNotice = 'Your data was kept. Nothing was erased.';
 
@@ -349,11 +353,15 @@ Future<FactoryResetOutcome> runFactoryReset({
       await clearFactoryResetPendingConfirmed(settings)
           ? FactoryResetOutcome.refused
           : FactoryResetOutcome.undecided;
-  try {
-    await markFactoryResetPending(settings);
-  } catch (_) {
-    // The put may have reached the box even though the flush failed.
-    return unchanged();
+  // Already set ("Finish erasing" on a pending reset): writing it again
+  // could only fail on a full disk; go straight to the erase.
+  if (!isFactoryResetPending(settings)) {
+    try {
+      await markFactoryResetPending(settings);
+    } catch (_) {
+      // The put may have reached the box even though the flush failed.
+      return unchanged();
+    }
   }
   afterStep?.call(FactoryResetStep.flagWritten);
   try {

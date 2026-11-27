@@ -41,6 +41,7 @@ class AppRoot extends StatefulWidget {
     this.startupFatal,
     this.startupDbError,
     this.recoverForRetry,
+    this.settingsBoxForTest,
   });
 
   /// The container the startup DB check ran on (so its connection is
@@ -70,6 +71,11 @@ class AppRoot extends StatefulWidget {
   /// [recoverInterruptedRestoreAtStartup]. Null result = still failing.
   @visibleForTesting
   final Future<RestoreRecovery?> Function()? recoverForRetry;
+
+  /// Stands in for the settings box where the reset flag is written and
+  /// cleared (tests simulate a full disk with it).
+  @visibleForTesting
+  final Box<dynamic>? settingsBoxForTest;
 
   static AppRootState of(BuildContext context) =>
       context.findAncestorStateOfType<AppRootState>()!;
@@ -108,6 +114,11 @@ class AppRootState extends State<AppRoot> {
   bool _resetChoice = false;
   // "Keep my data" could not clear the flag yet.
   bool _resetKeepFailed = false;
+  // "Finish erasing" could not write (the question is back).
+  bool _resetFinishFailed = false;
+
+  Box<dynamic> _settingsBox() =>
+      widget.settingsBoxForTest ?? Hive.box<dynamic>('settings');
 
   /// How long after the first frame the daily auto-backup waits, so its
   /// `VACUUM INTO` + zip don't compete with startup work.
@@ -484,12 +495,14 @@ class AppRootState extends State<AppRoot> {
   /// flag. Also the question's "Finish erasing".
   Future<void> factoryReset() async {
     if (_restoring || _fatal != null) return;
+    final fromQuestion = _resetChoice;
     _autoBackupTimer?.cancel();
     _autoBackupTimer = null;
     setState(() {
       _restoring = true;
       _resetChoice = false;
       _resetKeepFailed = false;
+      _resetFinishFailed = false;
       _splashMessage = kFactoryResetProgress;
     });
     String? notice;
@@ -501,7 +514,7 @@ class AppRootState extends State<AppRoot> {
       await WidgetsBinding.instance.endOfFrame;
       final old = _container;
       final outcome = await runFactoryReset(
-        settings: Hive.box<dynamic>('settings'),
+        settings: _settingsBox(),
         eraseDatabase: () =>
             old.read(databaseProvider).eraseAllDataAndCompact(),
         releaseDatabase: () async {
@@ -529,6 +542,8 @@ class AppRootState extends State<AppRoot> {
           notice = kFactoryResetFailedNotice;
         case FactoryResetOutcome.undecided:
           choice = true;
+          // "Finish erasing" that could not write: say why.
+          _resetFinishFailed = fromQuestion;
         case FactoryResetOutcome.incomplete:
           fatal = kFactoryResetIncompleteNotice;
       }
@@ -680,12 +695,18 @@ class AppRootState extends State<AppRoot> {
       _splashMessage = kStartFreshProgress;
     });
     Object? error;
+    var choice = false;
     try {
       await _dropFailedContainer();
       await setAsideDatabaseFile(await databaseFile(), DateTime.now());
       // Created directly: checkDatabaseFileBeforeOpen would (rightly)
       // refuse a missing file under a finished onboarding.
       await _container.read(databaseProvider).customSelect('SELECT 1').get();
+      // A reset flag left from before must not let the next launch wipe
+      // the settings and held tickets because the new database is empty.
+      final settings = _settingsBox();
+      choice = isFactoryResetPending(settings) &&
+          !await clearFactoryResetPendingConfirmed(settings);
     } catch (e) {
       error = e;
     }
@@ -695,12 +716,13 @@ class AppRootState extends State<AppRoot> {
       if (error == null) {
         _fatal = null;
         _dbOpenFailure = false;
-        _notice = kStartFreshDoneNotice;
+        _resetChoice = choice;
+        _notice = choice ? null : kStartFreshDoneNotice;
       } else {
         _showDbOpenFailure(error);
       }
     });
-    if (error == null && _autoBackupTimer == null) {
+    if (error == null && !choice && _autoBackupTimer == null) {
       _autoBackupTimer = Timer(autoBackupDelay, _startAutoBackup);
     }
   }
@@ -709,9 +731,8 @@ class AppRootState extends State<AppRoot> {
   /// on its data only once that is confirmed — otherwise the question
   /// stays, with [kResetKeepFailed].
   Future<void> _keepData() async {
-    final kept = await clearFactoryResetPendingConfirmed(
-        Hive.box<dynamic>('settings'),
-        attempts: 5);
+    final kept =
+        await clearFactoryResetPendingConfirmed(_settingsBox(), attempts: 5);
     if (!mounted) return;
     setState(() {
       _resetKeepFailed = !kept;
@@ -747,6 +768,7 @@ class AppRootState extends State<AppRoot> {
     if (_resetChoice) {
       return _ResetChoiceScreen(
         keepFailed: _resetKeepFailed,
+        finishFailed: _resetFinishFailed,
         onFinish: factoryReset,
         onKeep: _keepData,
       );
@@ -888,10 +910,12 @@ class _RestoringSplash extends StatelessWidget {
 class _ResetChoiceScreen extends StatefulWidget {
   const _ResetChoiceScreen({
     required this.keepFailed,
+    this.finishFailed = false,
     required this.onFinish,
     required this.onKeep,
   });
   final bool keepFailed;
+  final bool finishFailed;
   final Future<void> Function() onFinish;
   final Future<void> Function() onKeep;
 
@@ -934,6 +958,11 @@ class _ResetChoiceScreenState extends State<_ResetChoiceScreen> {
                     if (widget.keepFailed) ...[
                       const SizedBox(height: 12),
                       const Text(kResetKeepFailed, textAlign: TextAlign.center),
+                    ],
+                    if (widget.finishFailed) ...[
+                      const SizedBox(height: 12),
+                      const Text(kResetFinishFailed,
+                          textAlign: TextAlign.center),
                     ],
                     const SizedBox(height: 24),
                     FilledButton(
