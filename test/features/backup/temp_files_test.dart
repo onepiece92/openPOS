@@ -50,6 +50,18 @@ void main() {
     expect(kept.first.existsSync(), isFalse, reason: 'reset only');
   });
 
+  test('after a share: deleted, except on macOS (left for the sweep)',
+      () async {
+    final mac = put('$kShareTempFolder/mac.zip');
+    await deleteShared(mac, macOS: true);
+    expect(mac.existsSync(), isTrue, reason: 'the transfer may still run');
+    final other = put('$kShareTempFolder/other.zip');
+    await deleteShared(other, macOS: false);
+    expect(other.existsSync(), isFalse);
+    await sweepTempLeftovers(temp);
+    expect(mac.existsSync(), isFalse, reason: 'the next launch sweeps it');
+  });
+
   test('a missing temp folder is not an error', () async {
     await sweepTempLeftovers(Directory(p.join(temp.path, 'none')));
   });

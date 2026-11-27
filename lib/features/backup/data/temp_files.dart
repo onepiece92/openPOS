@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
@@ -28,8 +29,15 @@ Future<Directory> shareTempDir({Directory? temp}) async {
   return dir;
 }
 
-/// Deletes [file] after it was shared; never throws.
-Future<void> deleteShared(File file) async {
+/// Tests on a Mac host set this to false to run the phone behaviour.
+@visibleForTesting
+bool? debugShareOnMacOS;
+
+/// Deletes [file] after it was shared; never throws. Not on macOS
+/// ([macOS], default the platform): its share picker returns before the
+/// chosen app has copied the file, so it is left for the launch sweep.
+Future<void> deleteShared(File file, {bool? macOS}) async {
+  if (macOS ?? debugShareOnMacOS ?? Platform.isMacOS) return;
   try {
     if (await file.exists()) await file.delete();
   } on FileSystemException {/* swept at the next launch */}

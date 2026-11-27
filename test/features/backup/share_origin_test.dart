@@ -34,6 +34,9 @@ import '../../_support/test_db.dart';
 /// that an iPad then shows the sheet can only be confirmed on an iPad.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  // The phone behaviour (macOS keeps shared files for the launch sweep).
+  setUp(() => debugShareOnMacOS = false);
+  tearDown(() => debugShareOnMacOS = null);
 
   /// path_provider has no platform side under `flutter test`.
   void mockTempDirectory(Directory dir) {
