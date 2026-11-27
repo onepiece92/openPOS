@@ -134,6 +134,31 @@ const kFactoryResetFinishedNotice = 'The factory reset was finished.';
 /// a mix of erased data and old settings.
 const kFactoryResetPendingKey = 'factory_reset_pending';
 
+/// Settings key written with [kFactoryResetPendingKey] (same write, same
+/// flush) when the user chose "Delete my backups too": `true`. Missing
+/// means keep them, the safe default. A reset finished at launch or by
+/// "Try again" reads it, so it honours the same choice; it goes in the
+/// reset's last settings write, with the flag.
+const kFactoryResetDeleteBackupsKey = 'factory_reset_delete_backups';
+
+/// The backups question in the confirm dialog.
+const kResetBackupsQuestion = 'What about the backups on this device?';
+const kResetKeepBackups = 'Keep my backups on this device';
+const kResetKeepBackupsMeans =
+    'Automatic backups stay on this device, so you can restore later.';
+const kResetDeleteBackups = 'Delete my backups too';
+const kResetDeleteBackupsMeans =
+    "All backups on this device are deleted too. This can't be undone. "
+    'Copies you saved elsewhere are not affected.';
+
+/// The extra step when "Delete my backups too" is chosen.
+const kResetDeleteBackupsConfirmTitle = 'Delete your backups too?';
+const kResetDeleteBackupsConfirmButton = 'Delete backups and erase';
+
+/// Whether the pending reset deletes the backups ([kFactoryResetDeleteBackupsKey]).
+bool resetDeletesBackups(Box<dynamic> settings) =>
+    settings.get(kFactoryResetDeleteBackupsKey) == true;
+
 /// The reset's steps, in order (for the kill-point tests).
 enum FactoryResetStep {
   flagWritten,
@@ -143,16 +168,31 @@ enum FactoryResetStep {
   receiptsDeleted,
   brokenCopiesDeleted,
   tempFilesDeleted,
+  backupsDeleted,
   settingsCleared,
 }
 
 /// Test hook run after each step; a throw there models a kill.
 typedef FactoryResetStepHook = void Function(FactoryResetStep step);
 
-/// Writes [kFactoryResetPendingKey] durably, before anything is erased.
-Future<void> markFactoryResetPending(Box<dynamic> settings) async {
-  await settings.put(kFactoryResetPendingKey, true);
+/// Writes [kFactoryResetPendingKey] durably, before anything is erased,
+/// together with the backups choice ([kFactoryResetDeleteBackupsKey]: set
+/// when [deleteBackups], absent otherwise), in one write. Throws unless a
+/// re-read confirms both.
+Future<void> markFactoryResetPending(Box<dynamic> settings,
+    {bool deleteBackups = false}) async {
+  if (!deleteBackups && settings.containsKey(kFactoryResetDeleteBackupsKey)) {
+    await settings.delete(kFactoryResetDeleteBackupsKey);
+  }
+  await settings.putAll({
+    if (deleteBackups) kFactoryResetDeleteBackupsKey: true,
+    kFactoryResetPendingKey: true,
+  });
   await settings.flush();
+  if (!isFactoryResetPending(settings) ||
+      resetDeletesBackups(settings) != deleteBackups) {
+    throw StateError('the factory reset choice was not saved');
+  }
 }
 
 /// Whether a factory reset was started and not finished.
@@ -172,6 +212,12 @@ Future<bool> clearFactoryResetPendingConfirmed(
 }) async {
   for (var i = 0; i < attempts; i++) {
     try {
+      // The backups choice belongs to the flag: it goes with it, first (a
+      // kill in between leaves the flag with no choice: keep, the safe
+      // side).
+      if (settings.containsKey(kFactoryResetDeleteBackupsKey)) {
+        await settings.delete(kFactoryResetDeleteBackupsKey);
+      }
       await settings.delete(kFactoryResetPendingKey);
       await settings.flush();
       if (!settings.containsKey(kFactoryResetPendingKey)) return true;
@@ -213,7 +259,11 @@ const kResetKeptNotice = 'Your data was kept. Nothing was erased.';
 /// 4. when [temp] is given, the shared-file leftovers in it: the share
 ///    folder, share_plus's copies and backup working files
 ///    ([sweepTempLeftovers]) — copies of the shop's data;
-/// 5. LAST, [settings] (so onboarding shows again), except
+/// 5. only when the user chose "Delete my backups too"
+///    ([resetDeletesBackups], read from [settings]) and [backups] is given:
+///    the whole backups folder (automatic backups and any other backup the
+///    app made there);
+/// 6. LAST, [settings] (so onboarding shows again), except
 ///    [kSettingsKeptByReset], in one write whose final key is
 ///    [kFactoryResetPendingKey] — so the reset counts as done only once
 ///    everything else is gone, and the kept keys are never deleted (no
@@ -231,6 +281,7 @@ Future<void> eraseLocalStores({
   required Directory receipts,
   File? database,
   Directory? temp,
+  Directory? backups,
   FactoryResetStepHook? afterStep,
 }) async {
   await clearHeldTicketsKeepingCounter(heldOrders);
@@ -251,6 +302,13 @@ Future<void> eraseLocalStores({
   // files a kill left behind. Never anything in the backups folder.
   if (temp != null) await sweepTempLeftovers(temp, sharePlusCache: true);
   afterStep?.call(FactoryResetStep.tempFilesDeleted);
+  // Kept unless the user asked for them to go (the default keeps them).
+  if (backups != null &&
+      resetDeletesBackups(settings) &&
+      await backups.exists()) {
+    await backups.delete(recursive: true);
+  }
+  afterStep?.call(FactoryResetStep.backupsDeleted);
   final doomed = [
     for (final k in settings.keys)
       if (!kSettingsKeptByReset.contains(k) && k != kFactoryResetPendingKey) k,
@@ -300,6 +358,7 @@ Future<PendingFactoryReset> finishPendingFactoryReset({
   required Future<Directory> Function() receipts,
   Future<File> Function()? database,
   Future<Directory> Function()? temp,
+  Future<Directory> Function()? backups,
 }) async {
   if (!isFactoryResetPending(settings)) return PendingFactoryReset.none;
   if (await databaseHasUserData()) return PendingFactoryReset.askUser;
@@ -311,6 +370,7 @@ Future<PendingFactoryReset> finishPendingFactoryReset({
     receipts: await receipts(),
     database: database == null ? null : await database(),
     temp: await _tempOrNull(temp),
+    backups: backups == null ? null : await backups(),
   );
   return PendingFactoryReset.finished;
 }
@@ -332,6 +392,8 @@ Future<PendingFactoryReset> finishPendingFactoryResetOnLaunch(
       // go too.
       database: databaseFile,
       temp: getTemporaryDirectory,
+      // The stored choice decides: a missing key keeps them.
+      backups: backupsDir,
     );
 
 /// [temp]'s folder, or null when there is none or it cannot be found
@@ -384,6 +446,8 @@ Future<FactoryResetOutcome> runFactoryReset({
   required Future<Directory> Function() receipts,
   Future<File> Function()? database,
   Future<Directory> Function()? temp,
+  Future<Directory> Function()? backups,
+  bool deleteBackups = false,
   FactoryResetStepHook? afterStep,
 }) async {
   // Nothing erased yet: "not changed" only once the flag is confirmed
@@ -394,9 +458,11 @@ Future<FactoryResetOutcome> runFactoryReset({
           : FactoryResetOutcome.undecided;
   // Already set ("Finish erasing" on a pending reset): writing it again
   // could only fail on a full disk; go straight to the erase.
+  // [deleteBackups] is saved with the flag; a reset already pending keeps
+  // the choice it was started with.
   if (!isFactoryResetPending(settings)) {
     try {
-      await markFactoryResetPending(settings);
+      await markFactoryResetPending(settings, deleteBackups: deleteBackups);
     } catch (_) {
       // The put may have reached the box even though the flush failed.
       return unchanged();
@@ -423,6 +489,7 @@ Future<FactoryResetOutcome> runFactoryReset({
       receipts: await receipts(),
       database: database == null ? null : await database(),
       temp: await _tempOrNull(temp),
+      backups: backups == null ? null : await backups(),
       afterStep: afterStep,
     );
   } catch (_) {

@@ -19,7 +19,7 @@ import 'package:pos_app/features/backup/data/temp_files.dart';
 import 'package:pos_app/features/cart/data/ticket_sequence.dart'
     show kTicketSeqKey;
 import 'package:pos_app/features/settings/data/factory_reset.dart'
-    show kFactoryResetPendingKey;
+    show kFactoryResetDeleteBackupsKey, kFactoryResetPendingKey;
 import 'package:pos_app/features/usage/data/usage_counter.dart';
 import 'package:pos_app/features/usage/usage_providers.dart';
 
@@ -211,6 +211,13 @@ Future<Directory> receiptsDir() async {
   return Directory(p.join(docs.path, kReceiptsDirName));
 }
 
+/// The folder every backup the app keeps lives in (`backups/`, with the
+/// automatic ones in `backups/auto`).
+Future<Directory> backupsDir() async {
+  final docs = await getApplicationDocumentsDirectory();
+  return Directory(p.join(docs.path, 'backups'));
+}
+
 Future<Directory> autoBackupDir() async {
   final docs = await getApplicationDocumentsDirectory();
   return Directory(p.join(docs.path, 'backups', 'auto'));
@@ -366,7 +373,8 @@ Future<File?> settingsCopyWithoutResetFlag(
   try {
     await copy.putAll({
       for (final k in settings.keys)
-        if (k != kFactoryResetPendingKey) k: settings.get(k),
+        if (k != kFactoryResetPendingKey && k != kFactoryResetDeleteBackupsKey)
+          k: settings.get(k),
     });
     await copy.flush();
     return File(copy.path!);

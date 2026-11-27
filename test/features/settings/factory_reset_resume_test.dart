@@ -114,8 +114,13 @@ void main() {
     fail('a mix of old and erased data: $old');
   }
 
-  Future<FactoryResetOutcome> reset({FactoryResetStep? killAt}) =>
+  Directory backups() => Directory(p.join(docs.path, 'backups'));
+
+  Future<FactoryResetOutcome> reset(
+          {FactoryResetStep? killAt, bool deleteBackups = false}) =>
       runFactoryReset(
+        deleteBackups: deleteBackups,
+        backups: () async => backups(),
         settings: settings,
         eraseDatabase: db.eraseAllData,
         releaseDatabase: () async {},
@@ -137,6 +142,7 @@ void main() {
         usage: () async => usage,
         receipts: () async => receipts(),
         database: () async => dbFile(),
+        backups: () async => backups(),
       );
 
   test('killed before the reset started: the old shop, untouched', () async {
@@ -338,5 +344,107 @@ void main() {
     expect(broken().existsSync(), isFalse,
         reason: "the old shop's sales go with the reset it confirmed");
     expect(orphan.existsSync(), isFalse, reason: 'orphan journals too');
+  });
+
+  group('the backups choice', () {
+    late List<File> backupFiles;
+    setUp(() {
+      backupFiles = [
+        for (final n in ['auto/pos_snapshot_a.zip', 'auto/pos_snapshot_b.zip',
+            'pos_backup_manual.zip'])
+          File(p.join(backups().path, n))
+            ..parent.createSync(recursive: true)
+            ..writeAsBytesSync([1]),
+      ];
+    });
+
+    void expectKept() {
+      for (final f in backupFiles) {
+        expect(f.existsSync(), isTrue, reason: '${f.path} kept');
+      }
+    }
+
+    void expectDeleted() {
+      expect(
+          !backups().existsSync() || backups().listSync().isEmpty, isTrue,
+          reason: 'the backups folder is emptied');
+    }
+
+    test('keep: every backup survives the reset', () async {
+      expect(await reset(), FactoryResetOutcome.done);
+      expect(await shopState(), 'fresh');
+      expectKept();
+    });
+
+    test('delete: the backups folder is emptied, nothing outside it is '
+        'touched', () async {
+      final outside = File(p.join(docs.path, 'elsewhere.zip'))
+        ..writeAsBytesSync([1]);
+      expect(await reset(deleteBackups: true), FactoryResetOutcome.done);
+      expect(await shopState(), 'fresh');
+      expectDeleted();
+      expect(outside.existsSync(), isTrue);
+      expect(settings.containsKey(kFactoryResetDeleteBackupsKey), isFalse,
+          reason: 'the choice goes with the flag');
+    });
+
+    test('the choice is saved with the flag, before anything is erased',
+        () async {
+      try {
+        await reset(deleteBackups: true, killAt: FactoryResetStep.flagWritten);
+      } on _Kill {/* the app died here */}
+      await relaunch();
+      expect(isFactoryResetPending(settings), isTrue);
+      expect(resetDeletesBackups(settings), isTrue);
+      expectKept(); // nothing erased yet
+    });
+
+    for (final killAt in [
+      FactoryResetStep.databaseErased,
+      FactoryResetStep.receiptsDeleted,
+    ]) {
+      test('an interrupted delete-reset (${killAt.name}) finished at launch '
+          'deletes them', () async {
+        try {
+          await reset(deleteBackups: true, killAt: killAt);
+        } on _Kill {/* the app died here */}
+        await relaunch();
+        expect(await finishOnLaunch(), PendingFactoryReset.finished);
+        expect(await shopState(), 'fresh');
+        expectDeleted();
+      });
+
+      test('an interrupted keep-reset (${killAt.name}) finished at launch '
+          'keeps them', () async {
+        try {
+          await reset(killAt: killAt);
+        } on _Kill {/* the app died here */}
+        await relaunch();
+        expect(await finishOnLaunch(), PendingFactoryReset.finished);
+        expect(await shopState(), 'fresh');
+        expectKept();
+      });
+    }
+
+    test('a missing choice key (a reset started by an older build) keeps '
+        'them', () async {
+      await settings.put(kFactoryResetPendingKey, true);
+      await settings.flush();
+      await db.eraseAllData();
+      await relaunch();
+      expect(resetDeletesBackups(settings), isFalse);
+      expect(await finishOnLaunch(), PendingFactoryReset.finished);
+      expectKept();
+    });
+
+    test('Keep my data on a pending delete-reset clears the choice too',
+        () async {
+      await markFactoryResetPending(settings, deleteBackups: true);
+      expect(await clearFactoryResetPendingConfirmed(settings), isTrue);
+      expect(settings.containsKey(kFactoryResetDeleteBackupsKey), isFalse);
+      // A later keep-reset is not affected by the earlier choice.
+      expect(await reset(), FactoryResetOutcome.done);
+      expectKept();
+    });
   });
 }

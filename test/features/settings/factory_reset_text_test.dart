@@ -266,7 +266,9 @@ void main() {
         ],
         child: MaterialApp(
           home: Scaffold(
-            body: DangerSection(onErase: (_) async => log.add('erase')),
+            body: DangerSection(
+                onErase: (_, deleteBackups) async =>
+                    log.add(deleteBackups ? 'erase+backups' : 'erase')),
           ),
         ),
       ));
@@ -349,6 +351,52 @@ void main() {
       expect(log, ['backup', 'erase']);
       expect(find.text(kSavingBackupFirst), findsNothing);
       expect(find.text(kBackupFirstFailed), findsNothing);
+    });
+
+    testWidgets(
+        'the backups question: keep is preselected and explained; keeping '
+        'backs up first', (tester) async {
+      final log = <String>[];
+      await pump(tester, log, backup: () async => File('x.zip'));
+      await openDialog(tester);
+      expect(find.text(kResetBackupsQuestion), findsOneWidget);
+      expect(find.text(kResetKeepBackups), findsOneWidget);
+      expect(find.text(kResetKeepBackupsMeans), findsOneWidget);
+      expect(find.text(kResetDeleteBackups), findsOneWidget);
+      expect(find.text(kResetDeleteBackupsMeans), findsOneWidget);
+      expect(kResetKeepBackupsMeans,
+          'Automatic backups stay on this device, so you can restore later.');
+      expect(
+          kResetDeleteBackupsMeans,
+          "All backups on this device are deleted too. This can't be undone. "
+          'Copies you saved elsewhere are not affected.');
+      final group =
+          tester.widget<RadioGroup<bool>>(find.byType(RadioGroup<bool>));
+      expect(group.groupValue, isFalse, reason: 'keep is the default');
+      await tapAndSettle(tester, 'Erase everything');
+      expect(log, ['backup', 'erase']);
+    });
+
+    testWidgets(
+        'Delete my backups too: one more confirm, no backup first; Cancel '
+        'there erases nothing', (tester) async {
+      final log = <String>[];
+      await pump(tester, log, backup: () async => File('x.zip'));
+      await openDialog(tester);
+      await tapAndSettle(tester, kResetDeleteBackups);
+      // Nothing is kept or saved first, so neither is promised.
+      expect(find.textContaining(kFactoryResetNoBackups), findsNothing);
+      expect(find.textContaining(kFactoryResetWillBackUp), findsNothing);
+      await tapAndSettle(tester, 'Erase everything');
+      expect(find.text(kResetDeleteBackupsConfirmTitle), findsOneWidget);
+      await tapAndSettle(tester, 'Cancel');
+      expect(log, isEmpty);
+
+      await openDialog(tester);
+      await tapAndSettle(tester, kResetDeleteBackups);
+      await tapAndSettle(tester, 'Erase everything');
+      await tapAndSettle(tester, kResetDeleteBackupsConfirmButton);
+      expect(log, ['erase+backups'], reason: 'no pre-reset backup');
     });
 
     testWidgets('a failed backup asks again; Cancel there keeps the shop',

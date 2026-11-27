@@ -503,7 +503,11 @@ class AppRootState extends State<AppRoot> {
   /// screen, whose "Try again" (like the next launch) finishes the reset.
   /// Never an app on half-erased stores, never "not changed" with a stale
   /// flag. Also the question's "Finish erasing".
-  Future<void> factoryReset() async {
+  ///
+  /// [deleteBackups]: the user chose "Delete my backups too" — saved with
+  /// the pending flag, so a reset finished later honours it. A reset that
+  /// is already pending ("Finish erasing") keeps the choice it started with.
+  Future<void> factoryReset({bool deleteBackups = false}) async {
     if (_restoring || _fatal != null) return;
     final fromQuestion = _resetChoice;
     _autoBackupTimer?.cancel();
@@ -545,6 +549,8 @@ class AppRootState extends State<AppRoot> {
         receipts: receiptsDir,
         database: databaseFile,
         temp: getTemporaryDirectory,
+        backups: backupsDir,
+        deleteBackups: deleteBackups,
       );
       switch (outcome) {
         case FactoryResetOutcome.done:
