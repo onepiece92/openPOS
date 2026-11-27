@@ -38,7 +38,7 @@ class ReceiptBody extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final order = data.order;
     final dateFmt = DateFormat('MM/dd/yyyy hh:mm:ss a');
-    final customerName = data.customer?.name ?? 'Walk-in';
+    final customerName = receiptCustomerName(order, data.customer);
     final symbolLabel = fmt.symbol.trim();
 
     const bodyStyle = TextStyle(fontSize: 13.5, height: 1.5, fontFamily: AppFonts.mono, fontFamilyFallback: AppFonts.monoFallback);
@@ -75,8 +75,10 @@ class ReceiptBody extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
-                      child: Text(customerName,
-                          style: bodyStyle.copyWith(color: cs.onSurface)),
+                      child: customerName == null
+                          ? const SizedBox.shrink()
+                          : Text(customerName,
+                              style: bodyStyle.copyWith(color: cs.onSurface)),
                     ),
                     Text(
                       'Paid Bill No.: ${order.displayNo}',
@@ -143,12 +145,13 @@ class ReceiptBody extends StatelessWidget {
                   labelStyle: labelStyle.copyWith(color: cs.onSurface),
                   valueStyle: bodyStyle.copyWith(color: cs.onSurface),
                 ),
-                _BillRow(
-                  label: 'Discount',
-                  value: fmt.format(order.discountTotal),
-                  labelStyle: labelStyle.copyWith(color: cs.onSurface),
-                  valueStyle: bodyStyle.copyWith(color: cs.onSurface),
-                ),
+                if (order.showsDiscount)
+                  _BillRow(
+                    label: 'Discount',
+                    value: fmt.format(order.discountTotal),
+                    labelStyle: labelStyle.copyWith(color: cs.onSurface),
+                    valueStyle: bodyStyle.copyWith(color: cs.onSurface),
+                  ),
                 if (data.taxes.isNotEmpty) ...[
                   ...data.taxes.map((t) => _BillRow(
                         label: taxLineLabel(t),
@@ -219,7 +222,7 @@ class ReceiptBody extends StatelessWidget {
                 divider,
 
                 // ── Loyalty points ────────────────────────────────────────
-                if (data.customer != null) ...[
+                if (order.showsLoyalty) ...[
                   Text('Loyalty Points',
                       style: headerStyle.copyWith(color: cs.onSurface)),
                   const SizedBox(height: 6),
@@ -238,12 +241,13 @@ class ReceiptBody extends StatelessWidget {
                       labelStyle: labelStyle.copyWith(color: cs.onSurface),
                       valueStyle: bodyStyle.copyWith(color: cs.onSurface),
                     ),
-                  _BillRow(
-                    label: 'Balance',
-                    value: '${data.customer!.loyaltyPoints} pts',
-                    labelStyle: labelStyle.copyWith(color: cs.onSurface),
-                    valueStyle: bodyStyle.copyWith(color: cs.onSurface),
-                  ),
+                  if (data.customer != null)
+                    _BillRow(
+                      label: 'Balance',
+                      value: '${data.customer!.loyaltyPoints} pts',
+                      labelStyle: labelStyle.copyWith(color: cs.onSurface),
+                      valueStyle: bodyStyle.copyWith(color: cs.onSurface),
+                    ),
                   const SizedBox(height: 32),
                 ] else ...[
                   const SizedBox(height: 16),

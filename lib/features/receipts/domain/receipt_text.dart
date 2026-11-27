@@ -11,13 +11,13 @@ String buildReceiptText(ReceiptBodyData data, CurrencyFormatter fmt) {
   final lines = <String>[
     data.businessName,
     'Bill ${o.billNo} · ${dateFmt.format(o.createdAt)}',
-    if (data.customer != null) data.customer!.name else 'Walk-in',
+    if (receiptCustomerName(o, data.customer) case final name?) name,
     '',
     for (final i in data.items)
       '${i.productName} x${i.quantity} @ ${fmt.formatPlain(i.unitPrice)} = ${fmt.formatPlain(i.lineTotal)}',
     '',
     'Subtotal: ${fmt.format(o.subtotal)}',
-    if (o.discountTotal > 0) 'Discount: -${fmt.format(o.discountTotal)}',
+    if (o.showsDiscount) 'Discount: -${fmt.format(o.discountTotal)}',
     // One row per tax, labelled like the printed receipt (inclusive tax is
     // marked as such). Orders with a tax total but no breakdown — CSV
     // imports — fall back to the single figure.

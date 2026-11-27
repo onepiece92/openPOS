@@ -48,15 +48,21 @@ Future<List<int>> renderReceiptBytes(
   }
 
   // ── Customer + Bill no. ────────────────────────────────────────────────
-  final customerName = data.customer?.name ?? 'Walk-in';
-  bytes.addAll(g.row([
-    PosColumn(text: customerName, width: 6),
-    PosColumn(
-      text: 'Bill ${data.order.billNo}',
-      width: 6,
-      styles: const PosStyles(align: PosAlign.right),
-    ),
-  ]));
+  final customerName = receiptCustomerName(data.order, data.customer);
+  if (customerName == null) {
+    // No customer: no line for one, the bill number alone.
+    bytes.addAll(g.text('Bill ${data.order.billNo}',
+        styles: const PosStyles(align: PosAlign.right)));
+  } else {
+    bytes.addAll(g.row([
+      PosColumn(text: customerName, width: 6),
+      PosColumn(
+        text: 'Bill ${data.order.billNo}',
+        width: 6,
+        styles: const PosStyles(align: PosAlign.right),
+      ),
+    ]));
+  }
   if (data.table != null) {
     bytes.addAll(g.text('Table: ${data.table!.name}'));
   }
@@ -98,7 +104,7 @@ Future<List<int>> renderReceiptBytes(
 
   // ── Totals ─────────────────────────────────────────────────────────────
   bytes.addAll(_kv(g, 'Subtotal', fmt.format(data.order.subtotal)));
-  if (data.order.discountTotal > 0) {
+  if (data.order.showsDiscount) {
     bytes.addAll(
         _kv(g, 'Discount', '- ${fmt.format(data.order.discountTotal)}'));
   }
@@ -136,7 +142,7 @@ Future<List<int>> renderReceiptBytes(
   }
 
   // ── Loyalty (optional) ─────────────────────────────────────────────────
-  if (data.customer != null) {
+  if (data.order.showsLoyalty) {
     bytes.addAll(g.hr());
     if (data.order.pointsRedeemed > 0) {
       bytes.addAll(_kv(
@@ -148,7 +154,9 @@ Future<List<int>> renderReceiptBytes(
     if (data.order.pointsEarned > 0) {
       bytes.addAll(_kv(g, 'Pts Earned', '+${data.order.pointsEarned}'));
     }
-    bytes.addAll(_kv(g, 'Balance', '${data.customer!.loyaltyPoints} pts'));
+    if (data.customer != null) {
+      bytes.addAll(_kv(g, 'Balance', '${data.customer!.loyaltyPoints} pts'));
+    }
   }
 
   // ── Footer ─────────────────────────────────────────────────────────────

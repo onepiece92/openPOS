@@ -40,7 +40,7 @@ Future<pw.Document> buildReceiptPdf(
   final titleStyle = pw.TextStyle(fontSize: 14, font: fontBold, fontWeight: pw.FontWeight.bold, fontFallback: boldFallback);
 
   final order = data.order;
-  final customerName = data.customer?.name ?? 'Walk-in';
+  final customerName = receiptCustomerName(order, data.customer);
 
   pw.Widget divider() => pw.Divider(thickness: 0.5, color: PdfColors.grey400);
 
@@ -79,7 +79,10 @@ Future<pw.Document> buildReceiptPdf(
           // ── Customer + bill number ──────────────────────────────────────
           pw.Row(
             children: [
-              pw.Expanded(child: pw.Text(customerName, style: baseStyle)),
+              pw.Expanded(
+                  child: customerName == null
+                      ? pw.SizedBox()
+                      : pw.Text(customerName, style: baseStyle)),
               pw.Text('Paid Bill No.: ${order.displayNo}', style: baseStyle),
             ],
           ),
@@ -132,7 +135,8 @@ Future<pw.Document> buildReceiptPdf(
 
           // ── Subtotals ───────────────────────────────────────────────────
           billRow('Total', fmt.format(order.subtotal)),
-          billRow('Discount', fmt.format(order.discountTotal)),
+          if (order.showsDiscount)
+            billRow('Discount', fmt.format(order.discountTotal)),
           ...data.taxes.map((t) => billRow(
                 taxLineLabel(t),
                 fmt.format(t.taxAmount),
@@ -171,7 +175,7 @@ Future<pw.Document> buildReceiptPdf(
           divider(),
 
           // ── Loyalty points ──────────────────────────────────────────────
-          if (data.customer != null) ...[
+          if (order.showsLoyalty) ...[
             pw.Text('Loyalty Points', style: headerStyle),
             pw.SizedBox(height: 4),
             if (order.pointsRedeemed > 0)
@@ -181,7 +185,8 @@ Future<pw.Document> buildReceiptPdf(
               ),
             if (order.pointsEarned > 0)
               billRow('Earned (this sale)', '+${order.pointsEarned} pts'),
-            billRow('Balance', '${data.customer!.loyaltyPoints} pts'),
+            if (data.customer != null)
+              billRow('Balance', '${data.customer!.loyaltyPoints} pts'),
             pw.SizedBox(height: 20),
           ] else
             pw.SizedBox(height: 12),

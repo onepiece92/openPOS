@@ -89,7 +89,10 @@ Future<pw.Document> buildReceiptRollPdf(
           pw.Row(
             children: [
               pw.Expanded(
-                child: pw.Text(data.customer?.name ?? 'Walk-in', style: body),
+                child: switch (receiptCustomerName(order, data.customer)) {
+                  null => pw.SizedBox(),
+                  final name => pw.Text(name, style: body),
+                },
               ),
               pw.Text('Bill ${order.billNo}', style: body),
             ],
@@ -142,7 +145,7 @@ Future<pw.Document> buildReceiptRollPdf(
 
           // ── Totals ─────────────────────────────────────────────────────
           kv('Subtotal', fmt.format(order.subtotal)),
-          if (order.discountTotal > 0)
+          if (order.showsDiscount)
             kv('Discount', '- ${fmt.format(order.discountTotal)}'),
           ...data.taxes.map((t) => kv(
                 taxLineLabel(t),
@@ -165,14 +168,15 @@ Future<pw.Document> buildReceiptRollPdf(
           ],
 
           // ── Loyalty ────────────────────────────────────────────────────
-          if (data.customer != null) ...[
+          if (order.showsLoyalty) ...[
             rule(),
             if (order.pointsRedeemed > 0)
               kv('Pts Redeemed',
                   '${order.pointsRedeemed} (${fmt.format(order.loyaltyDiscount)})'),
             if (order.pointsEarned > 0)
               kv('Pts Earned', '+${order.pointsEarned}'),
-            kv('Balance', '${data.customer!.loyaltyPoints} pts'),
+            if (data.customer != null)
+              kv('Balance', '${data.customer!.loyaltyPoints} pts'),
           ],
 
           // ── Footer ─────────────────────────────────────────────────────
