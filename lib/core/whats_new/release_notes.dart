@@ -28,7 +28,7 @@ class ReleaseNote {
 
 /// Shown under the bullets of every release.
 const kWhatsNewOfflineLine =
-    'Everything still stays on this device. No account, no internet needed.';
+    'Your data stays on this device. No account, no internet needed.';
 
 /// The releases, in any order ([planWhatsNew] sorts). Add an entry per
 /// release; flag it `major: true` only when it brings major changes, since
@@ -40,15 +40,14 @@ const kReleaseNotes = <ReleaseNote>[
     title: 'Tips, end-of-day close and feature switches',
     bullets: [
       'Tips: add a tip at payment. Tips show on receipts and in reports. '
-          'Off until you switch it on in Features.',
-      'End-of-day close: count the cash drawer and print a summary. '
-          'Off until you switch it on in Features.',
-      'Features: turn off the parts of the app your shop does not use.',
-      'Refunds and voids can put sold items back in stock, using the sale\'s '
-          'own stock records.',
-      'Faster start-up: the first screen appears at once.',
-      'Safer reset: a backup is taken before a factory reset, and a reset '
-          'that was interrupted can be finished.',
+          'Off until you turn it on in Features.',
+      'End-of-day close: count the cash drawer and see the day\'s summary. '
+          'Off until you turn it on in Features.',
+      'Features: turn off the parts of the app your shop doesn\'t use.',
+      'Refunds and voids can put sold items back in stock.',
+      'Opens faster: the first screen appears sooner.',
+      'Safer reset: the app makes a backup before a factory reset, and can '
+          'finish a reset that was interrupted.',
     ],
   ),
 ];
