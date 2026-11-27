@@ -629,7 +629,7 @@ abstract final class StatusColors {
       ? const Color(0xFF4ADE80)
       : const Color(0xFF166534);
 
-  /// Warning / low stock. 5.0:1 (light, on tint) and 5.7:1 (dark, on tint).
+  /// Warning / low stock. 5.0:1 (light, on tint) and 6.0:1 (dark, on tint).
   static Color warning(ColorScheme cs) => cs.brightness == Brightness.dark
       ? const Color(0xFFEFD13A)
       : const Color(0xFF7A5E00);

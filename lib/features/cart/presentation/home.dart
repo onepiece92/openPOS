@@ -291,10 +291,8 @@ class _CartScreenState extends ConsumerState<CartScreen> {
   }
 }
 
-// ─── Clear-cart button ────────────────────────────────────────────────────────
+// ─── Day/night button ─────────────────────────────────────────────────────────
 
-/// The only part of the app bar that cares about the cart, and only about
-/// whether it is empty.
 /// Day/night switch: sets an explicit light or dark, opposite to what shows.
 /// Settings > Appearance stays the way back to System. Not built when its
 /// Features switch is off.
@@ -325,6 +323,10 @@ class _ThemeToggleButton extends ConsumerWidget {
   }
 }
 
+// ─── Clear-cart button ────────────────────────────────────────────────────────
+
+/// The only part of the app bar that cares about the cart, and only about
+/// whether it is empty.
 class _ClearCartButton extends ConsumerWidget {
   const _ClearCartButton();
 
