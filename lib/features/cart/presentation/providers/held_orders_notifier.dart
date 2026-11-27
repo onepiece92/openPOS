@@ -420,6 +420,11 @@ class HeldOrdersNotifier extends Notifier<List<HeldOrder>> {
     return check;
   }
 
+  /// Whether ticket [id] is still stored and not being (or already) paid:
+  /// a cart may be bound to it again.
+  bool isResumable(String id) =>
+      _box.containsKey(id) && _raw(id)?[_kPayingField] == null;
+
   /// How many held tickets have a line for [productId] (one scan of the
   /// in-memory list). Used to warn before a product is deleted.
   int ticketsWithProduct(int productId) =>

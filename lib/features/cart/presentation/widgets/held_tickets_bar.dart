@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import 'package:pos_app/features/cart/presentation/clear_cart.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/core/theme/tron_border.dart';
 import 'package:pos_app/core/utils/currency_formatter.dart';
@@ -440,6 +441,8 @@ class _HeldTicketsSheetState extends ConsumerState<_HeldTicketsSheet>
       return;
     }
     final ticket = check.ticket;
+    // The cart is about to be replaced: an earlier Clear cart's Undo goes.
+    cancelCartUndo();
     final notifier = ref.read(cartProvider.notifier);
     // clearItems, not clear: clear() would open a fresh session and burn a new
     // ticket number, which is exactly what resumeTicket is about to undo.

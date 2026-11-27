@@ -14,6 +14,7 @@ import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/core/theme/app_theme.dart';
 import 'package:pos_app/core/theme/tokens.dart';
 import 'package:pos_app/core/utils/currency_formatter.dart';
+import 'package:pos_app/features/cart/presentation/clear_cart.dart';
 import 'package:pos_app/features/cart/presentation/providers/cart_notifier.dart';
 import 'package:pos_app/features/cart/presentation/providers/held_orders_notifier.dart';
 import 'package:pos_app/features/cart/data/place_order.dart';
@@ -247,6 +248,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       } catch (_) {}
     }
     cartNotifier.clear();
+    // An Undo from an earlier Clear cart must not bring back sold lines.
+    cancelCartUndo();
 
     // Fire-and-forget print. Failures surface via snackbar but don't block
     // navigation to the receipt screen — receipts work paperless too.

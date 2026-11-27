@@ -15,6 +15,7 @@ import 'package:pos_app/core/providers/database_provider.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/core/services/audit_service.dart';
 import 'package:pos_app/features/cart/domain/cart_item.dart';
+import 'package:pos_app/features/cart/presentation/clear_cart.dart';
 import 'package:pos_app/features/cart/presentation/payment_screen.dart';
 import 'package:pos_app/features/cart/presentation/providers/cart_notifier.dart';
 import 'package:pos_app/features/cart/presentation/providers/held_orders_notifier.dart';
@@ -148,6 +149,54 @@ void main() {
     expect(c.read(heldOrdersProvider), isEmpty,
         reason: 'the sale retires the held ticket');
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a sale withdraws an earlier Clear cart Undo', (tester) async {
+    final cart = c.read(cartProvider.notifier);
+    CartItem tea(int q) => CartItem(
+        productId: productId,
+        name: 'Tea',
+        unitPrice: 10,
+        quantity: q,
+        isTaxable: false);
+    cart.restoreItem(tea(1));
+    final showPayment = ValueNotifier(false);
+    final router = GoRouter(routes: [
+      GoRoute(
+        path: '/',
+        builder: (_, __) => Scaffold(
+          body: ValueListenableBuilder<bool>(
+            valueListenable: showPayment,
+            builder: (_, show, __) => show
+                ? const PaymentScreen()
+                : Consumer(
+                    builder: (context, ref, _) => TextButton(
+                        onPressed: () => clearCartWithUndo(context, ref),
+                        child: const Text('clear'))),
+          ),
+        ),
+      ),
+      // A Scaffold, so a SnackBar still up would be found here.
+      GoRoute(
+          path: '/receipt/:id',
+          builder: (_, s) => Scaffold(
+              body: Text('receipt ${s.pathParameters['id']}'))),
+    ]);
+    await tester.pumpWidget(UncontrolledProviderScope(
+        container: c, child: MaterialApp.router(routerConfig: router)));
+    await tester.tap(find.text('clear'));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.text(kCartClearedUndo), findsOneWidget);
+
+    cart.restoreItem(tea(2)); // a new sale, rung up within the 5 s
+    showPayment.value = true;
+    await tester.pump();
+    await tester.tap(confirm());
+    await settle(tester);
+
+    expect(find.text(kCartClearedUndo), findsNothing,
+        reason: 'the Undo of the cleared cart is gone after the sale');
+    expect(c.read(cartProvider), isEmpty);
   });
 
   testWidgets('a second tap on Confirm while placing does not sell twice',

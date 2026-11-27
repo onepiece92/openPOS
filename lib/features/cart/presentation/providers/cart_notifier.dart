@@ -290,6 +290,12 @@ class CartSnapshot {
   final List<CartItem> items;
   final CartSession session;
   final List<int> taxRateIds;
+
+  /// The same cart, no longer bound to its held ticket.
+  CartSnapshot withoutHeldTicket() => CartSnapshot(
+      items: items,
+      session: session.copyWith(clearHeldTicket: true),
+      taxRateIds: taxRateIds);
 }
 
 final cartProvider =
