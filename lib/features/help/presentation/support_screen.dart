@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:pos_app/core/whats_new/release_notes.dart';
+import 'package:pos_app/core/whats_new/whats_new_dialog.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pos_app/core/app_version.dart';
@@ -80,6 +82,18 @@ class SupportScreen extends ConsumerWidget {
           _InfoRow(label: 'Version', value: kAppVersion, cs: cs, tt: tt),
           _InfoRow(label: 'Build', value: kAppBuildNumber, cs: cs, tt: tt),
           const SizedBox(height: 8),
+          if (currentReleaseNote(kAppVersion) case final note?)
+            _SupportTile(
+              icon: Icons.celebration_outlined,
+              title: "What's new",
+              subtitle: 'Changes in version ${note.version}',
+              cs: cs,
+              tt: tt,
+              onTap: () => showWhatsNewDialog(context,
+                  notes: [note], headline: "What's new in ${note.version}"),
+            ),
+          if (currentReleaseNote(kAppVersion) != null)
+            const SizedBox(height: 8),
           _SupportTile(
             icon: Icons.description_outlined,
             title: 'Open-source licences',

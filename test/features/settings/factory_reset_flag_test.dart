@@ -11,8 +11,10 @@ import 'package:path/path.dart' as p;
 
 import 'package:pos_app/app.dart';
 import 'package:pos_app/app_root.dart';
+import 'package:pos_app/core/app_version.dart';
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/providers/database_provider.dart';
+import 'package:pos_app/core/providers/hive_provider.dart' show kWhatsNewSeenKey;
 import 'package:pos_app/features/backup/data/snapshot_providers.dart';
 import 'package:pos_app/features/backup/data/snapshot_service.dart';
 import 'package:pos_app/features/onboarding/presentation/onboarding_screen.dart';
@@ -283,6 +285,9 @@ void main() {
         await seedProduct(db, sku: 'A');
         await real.putAll({
           'onboarding_complete': true,
+          // A shop already on this version: the What's new check writes
+          // nothing, so no Hive write is left pending in the fake zone.
+          kWhatsNewSeenKey: kAppVersion,
           kFactoryResetPendingKey: true,
         });
         c = ProviderContainer(

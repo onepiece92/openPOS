@@ -79,7 +79,8 @@ void main() {
     const app = {
       Feature.autoPrint,
       Feature.reviewReminder,
-      Feature.usageCounting
+      Feature.usageCounting,
+      Feature.whatsNew,
     };
     final expected = <BusinessType, Set<Feature>>{
       BusinessType.foodTruck: {
@@ -128,6 +129,7 @@ void main() {
       BusinessType.marketStall: {
         Feature.reviewReminder,
         Feature.usageCounting,
+        Feature.whatsNew,
         Feature.endOfDay,
       },
       BusinessType.services: {
@@ -138,7 +140,11 @@ void main() {
         Feature.taxes,
         Feature.expenses,
       },
-      BusinessType.other: {Feature.reviewReminder, Feature.usageCounting},
+      BusinessType.other: {
+        Feature.reviewReminder,
+        Feature.usageCounting,
+        Feature.whatsNew,
+      },
     };
 
     for (final t in BusinessType.values) {
@@ -179,7 +185,9 @@ void main() {
       final flags = c.read(featureFlagsProvider);
       for (final f in Feature.values) {
         expect(flags.isOn(f),
-            f == Feature.reviewReminder || f == Feature.usageCounting,
+            f == Feature.reviewReminder ||
+                f == Feature.usageCounting ||
+                f == Feature.whatsNew,
             reason: f.name);
       }
       expect(flags.autoPrint, isFalse);

@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
 import 'package:pos_app/core/database/app_database.dart';
 import 'package:pos_app/core/services/demo_data_service.dart';
+import 'package:pos_app/core/whats_new/whats_new_dialog.dart';
 import 'package:pos_app/features/cart/presentation/providers/cart_notifier.dart';
 import 'package:pos_app/features/cart/domain/pos_catalog_provider.dart';
 import 'package:pos_app/features/cart/domain/pos_filter_provider.dart';
@@ -36,7 +37,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     super.initState();
     _searchCtrl.text = ref.read(posFilterProvider).search;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _shortcutsFocus.requestFocus();
+      if (!mounted) return;
+      _shortcutsFocus.requestFocus();
+      maybeShowWhatsNew(context, ref);
     });
   }
 

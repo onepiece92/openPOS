@@ -27,7 +27,11 @@ BusinessType? parseBusinessType(Object? raw) =>
 
 /// On in EVERY preset, the minimal ones and "Start minimal" included
 /// (owner decision).
-const kAlwaysSuggested = {Feature.reviewReminder, Feature.usageCounting};
+const kAlwaysSuggested = {
+  Feature.reviewReminder,
+  Feature.usageCounting,
+  Feature.whatsNew,
+};
 
 /// The non-minimal presets also print automatically.
 const _app = {...kAlwaysSuggested, Feature.autoPrint};

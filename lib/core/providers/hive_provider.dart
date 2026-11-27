@@ -3,6 +3,7 @@ import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
+import 'package:pos_app/core/app_version.dart';
 import 'package:pos_app/core/providers/feature_flags.dart';
 import 'package:pos_app/core/utils/invoice_prefix.dart'
     show invoicePrefixError;
@@ -21,6 +22,9 @@ export 'package:pos_app/core/providers/feature_flags.dart';
 /// under a finished onboarding (see `checkDatabaseFileBeforeOpen`).
 const kOnboardingCompleteKey = 'onboarding_complete';
 const _kOnboardingComplete = kOnboardingCompleteKey;
+
+/// Last version whose "What's new" was handled (see core/whats_new).
+const kWhatsNewSeenKey = 'whats_new_seen_version';
 const _kThemeMode = 'theme_mode'; // 'dark' | 'light' | 'system'
 const _kDefaultTaxId = 'default_tax_id';
 const _kLowStockThreshold = 'low_stock_threshold';
@@ -341,8 +345,14 @@ class SettingsNotifier extends Notifier<AppSettings> {
   }
 
   // Onboarding / theme
-  Future<void> setOnboardingComplete(bool v) => _write(
-      state.copyWith(onboardingComplete: v), {_kOnboardingComplete: v});
+  Future<void> setOnboardingComplete(bool v) =>
+      _write(state.copyWith(onboardingComplete: v), {
+        _kOnboardingComplete: v,
+        // A shop set up on this version has nothing "new" to be told: the
+        // What's new check treats a missing value as an upgrade.
+        if (v && _box.get(kWhatsNewSeenKey) == null)
+          kWhatsNewSeenKey: kAppVersion,
+      });
   Future<void> setThemeMode(ThemeMode mode) => _write(
       state.copyWith(themeMode: mode),
       {_kThemeMode: AppSettings._themeModeTo(mode)});

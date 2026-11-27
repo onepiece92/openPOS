@@ -42,7 +42,9 @@ enum Feature {
   reviewReminder('Review reminder',
       'Now and then, after a sale, ask for a store review or for feedback.'),
   usageCounting('Usage counting',
-      'Count which features you use. The counts stay on this device.');
+      'Count which features you use. The counts stay on this device.'),
+  whatsNew('Show what\'s new after updates',
+      'After a big update, show what changed, once. What\'s new in Support always works.');
 
   const Feature(
     this.label,
@@ -157,6 +159,8 @@ class FeatureFlags {
   int get hashCode => Object.hashAll(_own);
 
   @override
-  String toString() =>
-      'FeatureFlags(${[for (final f in Feature.values) if (isOn(f)) f.name].join(', ')})';
+  String toString() => 'FeatureFlags(${[
+        for (final f in Feature.values)
+          if (isOn(f)) f.name
+      ].join(', ')})';
 }

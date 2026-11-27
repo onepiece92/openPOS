@@ -8,7 +8,7 @@ import 'package:pos_app/features/usage/usage_constants.dart';
 
 void main() {
   testWidgets(
-      'rows: WhatsApp, Email, feedback, Rate, licences; RebuzzPOS card; '
+      'rows: WhatsApp, Email, feedback, Rate, What is new, licences; RebuzzPOS card; '
       'the old bug / feature / docs / ordering rows are gone', (tester) async {
     tester.view.physicalSize = const Size(800, 3000);
     tester.view.devicePixelRatio = 1;
@@ -22,6 +22,7 @@ void main() {
       'Email Support',
       kFeedbackSupportRowTitle,
       if (storeReviewSupported) 'Rate Open POS',
+      "What's new",
       'Open-source licences',
     ];
     final titles = [
