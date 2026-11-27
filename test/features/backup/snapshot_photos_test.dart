@@ -215,6 +215,25 @@ void main() {
     expect(ok.existsSync(), isFalse);
   });
 
+  test('a stale absolute path (another iOS container) is found by its name '
+      'in receipts/, under the same guard', () async {
+    final dir = receiptsIn(live);
+    final here = photo(dir, 'k.jpg', 'K');
+    const stale =
+        '/var/mobile/Containers/Data/Application/OLD/Documents/receipts/k.jpg';
+    expect(resolveReceiptPhoto(stale, dir), here.path);
+    // A stale name that is not a photo here, or a ../ path: nothing.
+    expect(resolveReceiptPhoto('/old/receipts/none.jpg', dir), isNull);
+    expect(resolveReceiptPhoto('/old/receipts/../k.jpg', dir), isNull);
+    // A stale name that is a link out of receipts/: nothing.
+    final secret = photo(live, 'secret.db', 'S');
+    Link(p.join(dir.path, 'l.jpg')).createSync(secret.path);
+    expect(await deleteReceiptPhoto('/old/receipts/l.jpg', dir), isFalse);
+    expect(secret.existsSync(), isTrue);
+    expect(await deleteReceiptPhoto(stale, dir), isTrue);
+    expect(here.existsSync(), isFalse);
+  });
+
   test('a referenced photo that no longer exists is skipped', () async {
     final a = photo(receiptsIn(live), 'a.jpg', 'photo A');
     await seed(live, receiptPaths: [

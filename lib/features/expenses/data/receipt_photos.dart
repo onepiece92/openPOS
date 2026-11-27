@@ -2,34 +2,50 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
-/// Whether [path] names a regular file directly inside [receiptsDir], after
-/// symbolic links are resolved on both sides. A path with a `..` part, a
-/// relative path, a link that leads elsewhere, a folder or a missing file
-/// all answer false. Receipt photo paths come from the database, which a
-/// restored backup may have crafted: nothing outside the receipts folder is
-/// ever treated as a photo.
-bool isReceiptPhotoFile(String path, Directory receiptsDir) {
-  if (!p.isAbsolute(path)) return false;
-  if (p.split(path).contains('..')) return false;
+/// The receipt photo [path] stands for on this device, or null when it
+/// is not one. A stored path whose file is gone is looked for by its file
+/// name in [receiptsDir] (iOS moves the app's container between installs,
+/// so yesterday's absolute path no longer exists). Either way the answer
+/// must be a regular file directly inside [receiptsDir], after symbolic
+/// links are resolved on both sides: a path with a `..` part, a relative
+/// path, a link that leads elsewhere, a folder or a missing file all give
+/// null. Receipt photo paths come from the database, which a restored
+/// backup may have crafted: nothing outside the receipts folder is ever
+/// treated as a photo.
+String? resolveReceiptPhoto(String path, Directory receiptsDir) {
+  if (!p.isAbsolute(path)) return null;
+  if (p.split(path).contains('..')) return null;
+  var candidate = path;
   try {
-    if (FileSystemEntity.typeSync(path) != FileSystemEntityType.file) {
-      return false;
+    if (FileSystemEntity.typeSync(path, followLinks: false) ==
+        FileSystemEntityType.notFound) {
+      final name = path.split(RegExp(r'[/\\]')).last;
+      if (name.isEmpty || name == '.' || name == '..') return null;
+      candidate = p.join(receiptsDir.path, name);
     }
-    final real = File(path).resolveSymbolicLinksSync();
+    if (FileSystemEntity.typeSync(candidate) != FileSystemEntityType.file) {
+      return null;
+    }
+    final real = File(candidate).resolveSymbolicLinksSync();
     final dir = receiptsDir.resolveSymbolicLinksSync();
-    return p.equals(p.dirname(real), dir);
+    return p.equals(p.dirname(real), dir) ? candidate : null;
   } on FileSystemException {
-    return false;
+    return null;
   }
 }
 
-/// Deletes the receipt photo at [path] when it is one ([isReceiptPhotoFile]);
+/// Whether [path] is a receipt photo on this device ([resolveReceiptPhoto]).
+bool isReceiptPhotoFile(String path, Directory receiptsDir) =>
+    resolveReceiptPhoto(path, receiptsDir) != null;
+
+/// Deletes the receipt photo [path] stands for ([resolveReceiptPhoto]);
 /// anything else is left alone. Returns whether a file was deleted. Never
 /// throws.
 Future<bool> deleteReceiptPhoto(String? path, Directory receiptsDir) async {
-  if (path == null || !isReceiptPhotoFile(path, receiptsDir)) return false;
+  final photo = path == null ? null : resolveReceiptPhoto(path, receiptsDir);
+  if (photo == null) return false;
   try {
-    await File(path).delete();
+    await File(photo).delete();
     return true;
   } on FileSystemException {
     return false;
