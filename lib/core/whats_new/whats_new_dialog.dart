@@ -1,4 +1,4 @@
-import 'dart:async' show unawaited;
+import 'dart:async' show Completer, unawaited;
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:pos_app/core/app_version.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
+import 'package:pos_app/core/restart_notice.dart';
 import 'package:pos_app/core/whats_new/release_notes.dart';
 
 const kWhatsNewGotIt = 'Got it';
@@ -15,6 +16,22 @@ const kWhatsNewGotIt = 'Got it';
 /// stored version changes. Never throws.
 Future<void> maybeShowWhatsNew(BuildContext context, WidgetRef ref) async {
   try {
+    // A restart or refusal note from AppRoot (after a restore, a reset, a
+    // recovery) is on screen: wait for it to go, never stack on top of it.
+    if (restartNoticeShowing.value) {
+      final gone = Completer<void>();
+      void listener() {
+        if (!restartNoticeShowing.value && !gone.isCompleted) gone.complete();
+      }
+
+      restartNoticeShowing.addListener(listener);
+      try {
+        await gone.future;
+      } finally {
+        restartNoticeShowing.removeListener(listener);
+      }
+      if (!context.mounted) return;
+    }
     final box = ref.read(settingsBoxProvider);
     final stored = box.get(kWhatsNewSeenKey);
     final plan = planWhatsNew(

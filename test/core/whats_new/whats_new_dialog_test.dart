@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -6,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:pos_app/core/app_version.dart';
 import 'package:pos_app/core/providers/hive_provider.dart';
+import 'package:pos_app/core/restart_notice.dart';
 import 'package:pos_app/core/theme/app_theme.dart';
 import 'package:pos_app/core/whats_new/release_notes.dart';
 import 'package:pos_app/core/whats_new/whats_new_dialog.dart';
@@ -154,6 +156,34 @@ void main() {
       await launch(tester);
       expect(find.text(kWhatsNewGotIt), findsNothing);
       expect(box.get(kWhatsNewSeenKey), kAppVersion);
+    });
+
+    testWidgets('waits while a restart note is showing, then checks',
+        (tester) async {
+      // Already current: the check then writes nothing (a Hive write cannot
+      // finish inside the fake-async zone).
+      await put(tester, kWhatsNewSeenKey, kAppVersion);
+      restartNoticeShowing.value = true;
+      addTearDown(() => restartNoticeShowing.value = false);
+      late BuildContext ctx;
+      late WidgetRef ref;
+      await tester.pumpWidget(ProviderScope(
+        overrides: [settingsBoxProvider.overrideWithValue(box)],
+        child: MaterialApp(
+          home: Consumer(builder: (c, r, _) {
+            ctx = c;
+            ref = r;
+            return const Scaffold(body: SizedBox());
+          }),
+        ),
+      ));
+      var done = false;
+      unawaited(maybeShowWhatsNew(ctx, ref).then((_) => done = true));
+      await tester.pump();
+      expect(done, isFalse);
+      restartNoticeShowing.value = false;
+      await tester.pump();
+      expect(done, isTrue);
     });
   });
 }
