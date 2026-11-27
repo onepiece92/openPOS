@@ -98,6 +98,26 @@ void main() {
         'selected nav item', AppTheme.onBrandOrange, AppTheme.brandOrange);
   });
 
+  group('an error never reads as the accent', () {
+    double hueGap(Color a, Color b) {
+      final d = (HSLColor.fromColor(a).hue - HSLColor.fromColor(b).hue).abs();
+      return d > 180 ? 360 - d : d;
+    }
+
+    for (final (mode, theme) in [
+      ('light', AppTheme.light()),
+      ('dark', AppTheme.dark()),
+    ]) {
+      test('$mode: error vs accent ink differ by 1.5:1 or 35 degrees', () {
+        final cs = theme.colorScheme;
+        final ok = _contrast(cs.error, cs.primary) >= 1.5 ||
+            hueGap(cs.error, cs.primary) >= 35;
+        expect(ok, isTrue,
+            reason: 'error ${cs.error} vs accent ${cs.primary}');
+      });
+    }
+  });
+
   group('stock states can be told apart', () {
     double hueGap(Color a, Color b) {
       final d = (HSLColor.fromColor(a).hue - HSLColor.fromColor(b).hue).abs();

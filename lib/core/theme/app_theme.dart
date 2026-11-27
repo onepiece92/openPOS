@@ -255,7 +255,7 @@ abstract final class AppTheme {
         onTertiary: Color(0xFF28282B),
         tertiaryContainer: Color(0xFF4A3D5E),
         onTertiaryContainer: Color(0xFFEDE3F7),
-        error: Color(0xFFFFB3C1),
+        error: Color(0xFFF79CBA),
         onError: Color(0xFF28282B),
         errorContainer: Color(0xFF5C1A2A),
         onErrorContainer: Color(0xFFFFDAE0),
