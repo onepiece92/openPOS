@@ -103,15 +103,21 @@ class AppRootState extends State<AppRoot> {
   Timer? _autoBackupTimer;
   Future<void>? _autoBackupRun; // in flight; a restore waits for it
 
-  // Installed once startup has resolved (after the review clock, as in
-  // 1.1.0).
-  DatabaseExitGuard? _exitGuard;
+  // Installed in initState, before startUp resolves: a quit during startup
+  // first waits (bounded by the guard's timeout) for startUp — so a
+  // migration is never cut off half-way — then closes the database.
+  late final DatabaseExitGuard _exitGuard;
 
   // [AppRoot.startup] has not resolved yet: [StartupSurface] is showing.
   bool _starting = false;
   // The check is taking longer than [kStartupLineDelay]: show one line.
   bool _startupSlow = false;
   Timer? _startupSlowTimer;
+  // Runs for [kStartupLineMinVisible] once the line is up, so it never
+  // flashes for a few milliseconds; a result arriving meanwhile waits in
+  // [_heldStartupResult].
+  Timer? _startupLineMinTimer;
+  StartupResult? _heldStartupResult;
 
   @visibleForTesting
   bool get autoBackupScheduledForTest => _autoBackupTimer != null;
@@ -119,10 +125,14 @@ class AppRootState extends State<AppRoot> {
   @visibleForTesting
   ProviderContainer get containerForTest => _container;
 
+  @visibleForTesting
+  DatabaseExitGuard get exitGuardForTest => _exitGuard;
+
   @override
   void initState() {
     super.initState();
     _container = widget.container ?? ProviderContainer();
+    _exitGuard = DatabaseExitGuard(_closeDatabaseForExit);
     final startup = widget.startup;
     if (startup == null) {
       _applyStartup(StartupResult(
@@ -136,7 +146,13 @@ class AppRootState extends State<AppRoot> {
     // A fast open (milliseconds) never shows any text; only a slow one —
     // e.g. a migration on a cold low-end phone — gets a line.
     _startupSlowTimer = Timer(kStartupLineDelay, () {
-      if (mounted && _starting) setState(() => _startupSlow = true);
+      if (!mounted || !_starting) return;
+      _startupLineMinTimer = Timer(kStartupLineMinVisible, () {
+        _startupLineMinTimer = null;
+        final held = _heldStartupResult;
+        if (held != null) _showStartupResult(held);
+      });
+      setState(() => _startupSlow = true);
     });
     startup.then(_startupResolved,
         onError: (Object e) => _startupResolved(StartupResult(dbError: e)));
@@ -145,6 +161,17 @@ class AppRootState extends State<AppRoot> {
   void _startupResolved(StartupResult result) {
     _startupSlowTimer?.cancel();
     _startupSlowTimer = null;
+    if (!mounted) return;
+    // A line that just went up stays readable rather than flashing.
+    if (_startupLineMinTimer != null) {
+      _heldStartupResult = result;
+      return;
+    }
+    _showStartupResult(result);
+  }
+
+  void _showStartupResult(StartupResult result) {
+    _heldStartupResult = null;
     if (!mounted) return;
     setState(() {
       _starting = false;
@@ -161,7 +188,6 @@ class AppRootState extends State<AppRoot> {
     _resetChoice = result.resetChoice;
     final dbError = result.dbError;
     if (_fatal == null && dbError != null) _showDbOpenFailure(dbError);
-    _exitGuard = DatabaseExitGuard(_closeDatabaseForExit);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _autoBackupTimer = Timer(autoBackupDelay, _startAutoBackup);
@@ -202,6 +228,15 @@ class AppRootState extends State<AppRoot> {
     _autoBackupTimer?.cancel();
     _autoBackupTimer = null;
     if (_restoring) return;
+    // Quit during startup: let startUp finish first (the guard bounds the
+    // wait) — closing under a running migration or the first query would
+    // be worse than waiting for it.
+    final startup = widget.startup;
+    if (_starting && startup != null) {
+      try {
+        await startup;
+      } catch (_) {/* the error screen's container is closed below */}
+    }
     final container = _container;
     // Never opened (e.g. the error screen): do not create it just to close.
     if (!container.exists(databaseProvider)) return;
@@ -210,8 +245,9 @@ class AppRootState extends State<AppRoot> {
 
   @override
   void dispose() {
-    _exitGuard?.dispose();
+    _exitGuard.dispose();
     _startupSlowTimer?.cancel();
+    _startupLineMinTimer?.cancel();
     _autoBackupTimer?.cancel();
     _autoBackupTimer = null;
     _container.dispose();
@@ -682,6 +718,10 @@ class AppRootState extends State<AppRoot> {
 /// How long the launch surface stays blank before it says what it is
 /// waiting for. A normal open takes a few milliseconds and shows nothing.
 const kStartupLineDelay = Duration(milliseconds: 300);
+
+/// Once shown, the line stays at least this long (no flash when startup
+/// takes 300–400 ms).
+const kStartupLineMinVisible = Duration(milliseconds: 500);
 
 /// The launch surface's line while the database opens…
 const kOpeningAppText = 'Opening Open POS…';

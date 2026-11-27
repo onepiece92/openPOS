@@ -98,6 +98,72 @@ void main() {
       expect(kErasedToWords.containsKey('dir:$kReceiptsDirName'), isTrue);
     });
 
+    // The app's source, so a box or folder added anywhere — not only to
+    // the lists above — fails here until the confirm text names it.
+    final sources = {
+      for (final f in Directory('lib')
+          .listSync(recursive: true)
+          .whereType<File>()
+          .where((f) => f.path.endsWith('.dart')))
+        f.path: f.readAsStringSync(),
+    };
+    Set<String> found(List<String> patterns) => {
+          for (final src in sources.values)
+            for (final pat in patterns)
+              for (final m in RegExp(pat).allMatches(src)) m.group(1)!,
+        };
+
+    test('every Hive box the app opens, by any name, is mapped', () {
+      final boxes = {
+        ...kSnapshotHiveBoxes,
+        ...kStartupHiveBoxes,
+        ...found([
+          r"Hive\.(?:openBox|box|isBoxOpen|openLazyBox)(?:<[^>]*>)?\(\s*'(\w+)'",
+          r"const k\w*Box(?:Name)?\s*=\s*'(\w+)'",
+        ]),
+      };
+      expect(boxes, containsAll(['settings', 'held_orders', 'usage']));
+      for (final b in boxes) {
+        expect(kErasedToWords.containsKey('hive:$b'), isTrue,
+            reason: 'the app opens Hive box "$b": erase it in the reset, '
+                'add it to kErasedToWords and name it in kFactoryResetBody');
+      }
+    });
+
+    test('every data folder in the documents folder is mapped or kept', () {
+      // Kept on purpose: the automatic backups are how a reset is undone.
+      const kept = {'backups'};
+      final dirs = found([
+        // A folder: the name ends the string or another '/' follows
+        // (not a file such as end-of-day.txt).
+        r"(?:docs|dir)\.path\}/(\w+)(?=['/])",
+        r"p\.join\(\s*(?:docs|dir)\.path,\s*'(\w+)'",
+        r"const k\w*DirName\s*=\s*'(\w+)'",
+      ]);
+      expect(dirs, containsAll(['receipts', 'backups']));
+      for (final d in dirs) {
+        expect(kErasedToWords.containsKey('dir:$d') || kept.contains(d), isTrue,
+            reason: 'folder "$d": erase it in the reset and name it in '
+                'kFactoryResetBody, or keep it on purpose');
+      }
+      // A new place that writes into the documents folder must be looked
+      // at too (it may hold data the reset should erase).
+      final docUsers = {
+        for (final e in sources.entries)
+          if (e.value.contains('getApplicationDocumentsDirectory'))
+            e.key.replaceAll(r'\', '/'),
+      };
+      expect(
+          docUsers,
+          {
+            'lib/core/database/connection/native.dart',
+            'lib/features/backup/data/snapshot_providers.dart',
+            'lib/features/expenses/presentation/expenses_screen.dart',
+          },
+          reason: 'a new user of the documents folder: if it stores data, '
+              'erase it in the reset and map it in kErasedToWords');
+    });
+
     test('each mapped phrase appears in the body', () {
       for (final e in kErasedToWords.entries) {
         expect(kFactoryResetBody, contains(e.value),

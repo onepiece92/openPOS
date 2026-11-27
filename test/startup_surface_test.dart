@@ -50,6 +50,15 @@ class _Recorder extends QueryInterceptor {
   }
 }
 
+class _CloseRecorder extends QueryInterceptor {
+  bool closed = false;
+  @override
+  Future<void> close(QueryExecutor inner) {
+    closed = true;
+    return super.close(inner);
+  }
+}
+
 /// The launch: first frame up at once on a plain surface, the database
 /// check after it, and nothing that touches the database before it.
 void main() {
@@ -112,9 +121,63 @@ void main() {
       expect(find.text('Opening Open POS…'), findsNothing);
 
       databaseUpgradeRunning.value = false;
+      // Resolved long after the line went up: no extra hold.
+      await tester.pump(kStartupLineMinVisible);
       pending.complete(const StartupResult(fatal: 'x'));
       await tester.pump();
+      await tester.pump();
       expect(find.byType(StartupSurface), findsNothing);
+    });
+
+    testWidgets(
+        'a check that ends just after the line appears keeps it up for '
+        '${kStartupLineMinVisible.inMilliseconds} ms (no flash)',
+        (tester) async {
+      final pending = Completer<StartupResult>();
+      await tester.pumpWidget(AppRoot(startup: pending.future));
+      await tester.pump(kStartupLineDelay + const Duration(milliseconds: 1));
+      expect(find.text(kOpeningAppText), findsOneWidget);
+      // Startup finishes 40 ms later (a 340 ms launch).
+      await tester.pump(const Duration(milliseconds: 40));
+      pending.complete(const StartupResult(fatal: 'x'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.text(kOpeningAppText), findsOneWidget,
+          reason: 'still within the minimum');
+      await tester.pump(const Duration(milliseconds: 70));
+      await tester.pump();
+      expect(find.byType(StartupSurface), findsNothing);
+      expect(find.text('x'), findsOneWidget);
+    });
+
+    testWidgets(
+        'the exit guard is installed before startUp resolves; a quit then '
+        'waits for startUp before closing the database', (tester) async {
+      final closes = _CloseRecorder();
+      final db = AppDatabase(NativeDatabase.memory().interceptWith(closes));
+      final container = ProviderContainer(overrides: [
+        databaseProvider.overrideWith((ref) {
+          ref.onDispose(db.close);
+          return db;
+        }),
+      ]);
+      final pending = Completer<StartupResult>();
+      await tester
+          .pumpWidget(AppRoot(container: container, startup: pending.future));
+      final state = tester.state<AppRootState>(find.byType(AppRoot));
+      // startUp has opened the database and is still running (a migration).
+      container.read(databaseProvider);
+      var exited = false;
+      final quit =
+          state.exitGuardForTest.handleExitRequest().then((_) => exited = true);
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(exited, isFalse, reason: 'waits for startUp');
+      pending.complete(const StartupResult(fatal: 'x'));
+      await pumpUntil(tester, () => exited);
+      await quit;
+      expect(exited, isTrue);
+      expect(closes.closed, isTrue, reason: 'closed once startUp was done');
+      await tester.pump(kStartupLineMinVisible);
     });
 
     testWidgets('a migration already running shows "Updating your data…"',
@@ -127,7 +190,7 @@ void main() {
       expect(find.text('Updating your data…'), findsOneWidget);
       databaseUpgradeRunning.value = false;
       pending.complete(const StartupResult(fatal: 'x'));
-      await tester.pump();
+      await tester.pump(kStartupLineMinVisible);
     });
   });
 
