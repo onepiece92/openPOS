@@ -219,7 +219,8 @@ const kResetKeptNotice = 'Your data was kept. Nothing was erased.';
 ///    everything else is gone, and the kept keys are never deleted (no
 ///    clear-then-put window that could lose them).
 ///
-/// Every step is idempotent, so [finishPendingFactoryReset] can rerun the
+/// Each box is compacted after its deletes, so the erased values are gone
+/// from the .hive files, not only hidden. Every step is idempotent, so [finishPendingFactoryReset] can rerun the
 /// whole thing. Automatic backups (`backups/auto`) are not touched. Run
 /// with the app's widget tree and providers torn down, so nothing writes
 /// back stale state.
@@ -236,7 +237,7 @@ Future<void> eraseLocalStores({
   await heldOrders.flush();
   afterStep?.call(FactoryResetStep.heldTicketsCleared);
   await usage.clear();
-  await usage.flush();
+  await compactBox(usage);
   afterStep?.call(FactoryResetStep.usageCleared);
   if (receipts.existsSync()) await receipts.delete(recursive: true);
   afterStep?.call(FactoryResetStep.receiptsDeleted);
@@ -256,7 +257,15 @@ Future<void> eraseLocalStores({
     kFactoryResetPendingKey,
   ];
   await settings.deleteAll(doomed);
-  await settings.flush();
+  // Compacted: Hive only appends, so the deleted settings (shop name,
+  // address, PIN…) would otherwise stay readable in settings.hive.
+  try {
+    await compactBox(settings);
+  } catch (e) {
+    // The reset itself is done (the flag is gone); Hive compacts on its
+    // own later.
+    debugPrint('Factory reset: compacting settings failed: $e');
+  }
   afterStep?.call(FactoryResetStep.settingsCleared);
 }
 

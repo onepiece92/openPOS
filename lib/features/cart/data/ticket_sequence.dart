@@ -65,11 +65,13 @@ class TicketSequence {
 
 /// Deletes every held ticket in [box] but keeps (and first pins down) the
 /// ticket counter, so numbers handed out after a factory reset never repeat
-/// old ones.
+/// old ones. The box is compacted, so the tickets are gone from its file.
 Future<void> clearHeldTicketsKeepingCounter(Box<dynamic> box) async {
   final seq = TicketSequence(box)._highWaterMark;
   await box.deleteAll(box.keys.where((k) => k != kTicketSeqKey).toList());
   if (seq > 0) await box.put(kTicketSeqKey, seq);
+  // Hive only appends: without this the deleted tickets stay in the file.
+  await box.compact();
 }
 
 final ticketSequenceProvider = Provider<TicketSequence>(

@@ -122,6 +122,14 @@ Future<int> pruneAutoBackups(Directory dir, {required File protect}) async {
 
 const kAutoBackupInterval = Duration(hours: 24);
 
+/// Flushes [box] and rewrites its file without the entries deleted or
+/// overwritten since it was last compacted (Hive only appends), so their
+/// old values are gone from the disk.
+Future<void> compactBox(Box<dynamic> box) async {
+  await box.flush();
+  await box.compact();
+}
+
 /// `box name → file path` for every open snapshot box. Resolved from the
 /// live Box objects so it's always the path Hive is actually using.
 Map<String, String> snapshotHiveBoxFiles() => {
@@ -229,8 +237,11 @@ class SnapshotCoordinator {
     final usage = _ref.read(usageCounterProvider);
     await usage.ensureLoaded();
     await usage.flush();
+    // Compacted, not just flushed: a .hive file is append-only, so a held
+    // ticket or setting deleted since the last compaction still sits in
+    // it, and the backup copies the raw file. Small boxes: cheap.
     for (final name in kSnapshotHiveBoxes) {
-      if (Hive.isBoxOpen(name)) await Hive.box<dynamic>(name).flush();
+      if (Hive.isBoxOpen(name)) await compactBox(Hive.box<dynamic>(name));
     }
     final now = DateTime.now();
     // `VACUUM INTO` writes a consistent, self-contained copy through the
