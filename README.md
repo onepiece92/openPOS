@@ -1,6 +1,6 @@
 # Open POS
 
-**A free, 100% offline point-of-sale app that never sends your data anywhere.**
+**Free Offline POS: a point-of-sale app for small shops, cafes and market stands.**
 
 No subscription. No account. No internet connection needed. Ring up sales, manage tables and track your takings on an Android or iOS phone or tablet, with your data kept in the app on that device.
 
@@ -81,7 +81,7 @@ HOLD -->
 
 ## Why Open POS
 
-- **The app never sends your data anywhere on its own.** Its own code makes no network calls: no accounts, no cloud, no analytics service or tracking. An optional usage summary stays on your phone unless you choose to send it; if you do, it goes through your own WhatsApp or email app, which shows us your WhatsApp number or email address. Sales, customers and stock live in a database on your device. Your phone's own backup (Google or iCloud), if you have it turned on, may include app data.
+- **The app keeps your sales on your device.** Its own code makes no network calls: no accounts, no cloud, no analytics service or tracking. An optional usage summary stays on your phone unless you choose to send it; if you do, it goes through your own WhatsApp or email app, which shows us your WhatsApp number or email address. Sales, customers and stock live in a database on your device. Your phone's own backup (Google or iCloud), if you have it turned on, may include app data.
 - **Free, for good.** No subscription, no per-device fee, no premium tier. MIT licensed.
 - **Works with no internet.** A dropped connection never stops a sale, because the app never needed one.
 - **Made for small shops and cafes.** Tables, held tickets and simple reports, without the setup of a big system.
