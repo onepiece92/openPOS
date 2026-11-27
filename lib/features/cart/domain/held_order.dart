@@ -141,7 +141,11 @@ class ResumeCheck {
       this.taxRateRemoved = false,
       this.taxRateOff = false,
       this.paid = false,
-      this.busy = false});
+      this.busy = false,
+      this.gone = false});
+
+  /// The ticket is no longer stored (deleted elsewhere): nothing to resume.
+  final bool gone;
 
   /// The ticket was already paid (its sale is saved) and is gone: nothing
   /// to resume.
@@ -176,6 +180,7 @@ class ResumeCheck {
   /// What to tell the cashier, or null when nothing was removed.
   String? get message {
     if (paid) return kTicketPaidMessage;
+    if (gone) return kTicketGoneMessage;
     if (busy) return kTicketBusyMessage;
     if (emptied) return kTicketEmptyMessage;
     final parts = [
@@ -192,6 +197,7 @@ const kTicketTaxRemovedMessage =
 const kTicketTaxOffMessage =
     'A tax on this ticket is switched off and was removed.';
 const kTicketPaidMessage = 'This ticket was already paid, so it was removed.';
+const kTicketGoneMessage = 'This ticket is no longer available.';
 const kTicketBusyMessage = 'This ticket is being paid. Try again in a moment.';
 const kTicketEmptyMessage = 'None of the items on this ticket exist any more.';
 

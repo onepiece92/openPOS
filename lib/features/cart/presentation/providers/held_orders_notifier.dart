@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:drift/drift.dart' show QueryRow, Variable;
+import 'package:flutter/widgets.dart' show AppLifecycleListener;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
@@ -28,18 +29,33 @@ class HeldOrdersNotifier extends Notifier<List<HeldOrder>> {
   /// [paymentDone] / [paymentFailed]); [settlePaidTickets] leaves them be.
   final Set<String> _paying = {};
 
+  /// Tickets this run deleted because their sale is saved: a stale copy
+  /// of one is "already paid", any other missing ticket just "gone".
+  final Set<String> _sold = {};
+
   @override
   List<HeldOrder> build() {
     // A ticket still marked as being paid is left over from a run that
-    // ended mid-sale: settle it before it is ever offered again.
-    if (_box.keys.any((k) => _payingKeyOf(k) != null)) {
-      Future.microtask(() async {
-        try {
-          await settlePaidTickets();
-        } catch (_) {/* tried again on resume and next launch */}
-      });
-    }
+    // ended mid-sale: settle it before it is ever offered again — now, and
+    // each time the app comes back to the foreground, so a mark that could
+    // not be settled (the database busy, say) is not hidden all session.
+    Future.microtask(_settleQuietly);
+    try {
+      final lifecycle = AppLifecycleListener(onResume: _settleQuietly);
+      ref.onDispose(lifecycle.dispose);
+    } catch (_) {/* no Flutter binding (plain unit tests) */}
     return _loadAll();
+  }
+
+  /// [settlePaidTickets] when a ticket carries a mark (a key scan when none
+  /// does); never throws.
+  Future<void> _settleQuietly() async {
+    try {
+      if (!_box.isOpen || !_box.keys.any((k) => _payingKeyOf(k) != null)) {
+        return;
+      }
+      await settlePaidTickets();
+    } catch (_) {/* tried again on the next resume and launch */}
   }
 
   Map<String, dynamic>? _raw(Object? key) {
@@ -144,6 +160,7 @@ class HeldOrdersNotifier extends Notifier<List<HeldOrder>> {
   Future<void> paymentDone(String id) async {
     try {
       await _box.delete(id);
+      _sold.add(id);
       await _box.flush();
     } finally {
       _paying.remove(id);
@@ -183,6 +200,7 @@ class HeldOrdersNotifier extends Notifier<List<HeldOrder>> {
       if (_paying.contains(id)) continue; // paid again meanwhile
       if (sold) {
         await _box.delete(id);
+        _sold.add(id);
         removed++;
       } else {
         raw!.remove(_kPayingField);
@@ -341,9 +359,12 @@ class HeldOrdersNotifier extends Notifier<List<HeldOrder>> {
   Future<ResumeCheck> checkForResume(HeldOrder ticket) async {
     final paying = _raw(ticket.id)?[_kPayingField];
     if (!_box.containsKey(ticket.id)) {
-      // Deleted meanwhile — sold (and settled) or removed by hand.
+      // Sold (settled here), or deleted by hand / a restore: only the first
+      // is "already paid".
       state = _loadAll();
-      return ResumeCheck(ticket, paid: true);
+      return _sold.contains(ticket.id)
+          ? ResumeCheck(ticket, paid: true)
+          : ResumeCheck(ticket, gone: true);
     }
     if (paying is Map) {
       if (_paying.contains(ticket.id)) return ResumeCheck(ticket, busy: true);

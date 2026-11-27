@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -134,13 +135,30 @@ void main() {
     await tester.pumpWidget(app(showPayment));
     await tester.pump();
 
+    final ticketId = c.read(cartSessionProvider).heldTicketId!;
     await tester.tap(confirm());
     // The screen goes away while placeOrder is still saving.
     showPayment.value = false;
     await tester.pump();
     expect(find.text('elsewhere'), findsOneWidget);
+    for (var i = 0; i < 5; i++) {
+      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+      await tester.pump();
+    }
+
+    // While the sale is held open the ticket carries its sale key …
+    final raw = jsonDecode(heldBox.get(ticketId) as String) as Map;
+    final key = (raw['paying'] as Map?)?['key'] as String?;
+    expect(key, isNotNull, reason: 'marked as being paid before the sale');
+    expect(c.read(heldOrdersProvider), isEmpty, reason: 'and not listed');
 
     await settle(tester);
+
+    // … and the order's audit entry records the same key.
+    final audit = await tester.runAsync(() => (db.select(db.auditLog)
+          ..where((a) => a.action.equals('place')))
+        .getSingle());
+    expect(audit!.metadata, contains('"sale_key":"$key"'));
 
     final orders = await tester.runAsync(() => db.select(db.orders).get());
     expect(orders, hasLength(1), reason: 'the order itself was written');

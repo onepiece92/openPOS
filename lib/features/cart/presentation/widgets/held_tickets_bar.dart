@@ -420,7 +420,7 @@ class _HeldTicketsSheetState extends ConsumerState<_HeldTicketsSheet>
     final check =
         await ref.read(heldOrdersProvider.notifier).checkForResume(held);
     if (!nav.mounted) return;
-    if (check.paid || check.busy) {
+    if (check.paid || check.busy || check.gone) {
       // Already sold (removed now) or being paid: never loaded again.
       nav.pop();
       messenger?.showSnackBar(SnackBar(content: Text(check.message!)));

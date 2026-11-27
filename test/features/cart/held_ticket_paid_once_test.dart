@@ -156,4 +156,16 @@ void main() {
     expect(await c.read(heldOrdersProvider.notifier).settlePaidTickets(), 1);
     expect(box.containsKey(ticket.id), isFalse);
   });
+
+  test('a ticket deleted elsewhere is "no longer available", not "paid"',
+      () async {
+    final ticket = park();
+    c.read(heldOrdersProvider.notifier).delete(ticket.id);
+    final check =
+        await c.read(heldOrdersProvider.notifier).checkForResume(ticket);
+    expect(check.paid, isFalse);
+    expect(check.gone, isTrue);
+    expect(check.message, kTicketGoneMessage);
+    expect(kTicketGoneMessage, 'This ticket is no longer available.');
+  });
 }
