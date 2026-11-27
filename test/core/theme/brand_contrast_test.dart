@@ -89,4 +89,40 @@ void main() {
     _expectAA(
         'selected nav item', AppTheme.onBrandOrange, AppTheme.brandOrange);
   });
+
+  group('stock states can be told apart', () {
+    double hueGap(Color a, Color b) {
+      final d = (HSLColor.fromColor(a).hue - HSLColor.fromColor(b).hue).abs();
+      return d > 180 ? 360 - d : d;
+    }
+
+    for (final (mode, theme) in [
+      ('light', AppTheme.light()),
+      ('dark', AppTheme.dark()),
+    ]) {
+      test('$mode: in, low and out of stock differ by 1.5:1 or 60 degrees', () {
+        final cs = theme.colorScheme;
+        final states = {
+          'in stock': cs.onSurfaceVariant,
+          'low stock': StatusColors.warning(cs),
+          'out of stock': cs.error,
+        }.entries.toList();
+        for (var i = 0; i < states.length; i++) {
+          for (var j = i + 1; j < states.length; j++) {
+            final a = states[i], b = states[j];
+            final ok = _contrast(a.value, b.value) >= 1.5 ||
+                hueGap(a.value, b.value) >= 60;
+            expect(ok, isTrue, reason: '${a.key} vs ${b.key}');
+          }
+        }
+      });
+
+      test('$mode: low stock is not the accent and not the refund violet', () {
+        final cs = theme.colorScheme;
+        expect(StatusColors.warning(cs), isNot(cs.primary));
+        expect(StatusColors.warning(cs), isNot(AppTheme.brandOrange));
+        expect(StatusColors.warning(cs), isNot(cs.tertiary));
+      });
+    }
+  });
 }

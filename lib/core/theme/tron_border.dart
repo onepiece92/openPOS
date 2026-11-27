@@ -40,12 +40,12 @@ Path extractWrappedPath(PathMetric metric, double from, double to) {
 /// [t] is the animation progress (0.0 → 1.0), typically from
 /// [AnimationController.value] driven with [AnimationController.repeat].
 /// [radius] should match the border-radius of the widget being decorated.
-/// [color] defaults to the brand's safety orange (`#FF6600`).
+/// [color] defaults to the brand's neutral storm grey (`#717486`).
 class TronBorderPainter extends CustomPainter {
   const TronBorderPainter(
     this.t, {
     this.radius = 12.0,
-    this.color = const Color(0xFFFF6600),
+    this.color = const Color(0xFF717486),
   });
 
   /// Animation progress, 0.0 → 1.0.
@@ -54,7 +54,7 @@ class TronBorderPainter extends CustomPainter {
   /// Corner radius — should match the decorated widget's border-radius.
   final double radius;
 
-  /// Comet colour. Defaults to safety orange.
+  /// Comet colour. Defaults to neutral storm grey.
   final Color color;
 
   @override

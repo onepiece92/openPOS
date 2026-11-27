@@ -29,7 +29,7 @@ class InventoryFilterBar extends StatelessWidget {
           _Chip(
             label: 'All ($total)',
             selected: selected == null,
-            color: cs.primary,
+            color: cs.onSurfaceVariant,
             onTap: () => onSelect(null),
           ),
           _Chip(

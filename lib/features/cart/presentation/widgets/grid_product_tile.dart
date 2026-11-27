@@ -136,7 +136,7 @@ class GridProductTile extends ConsumerWidget {
                   style: tt.bodySmall?.copyWith(
                     fontWeight: FontWeight.w500,
                     color: outOfStock
-                        ? cs.error.withValues(alpha: 0.6)
+                        ? cs.error
                         : cs.onSurfaceVariant,
                   ),
                 ),

@@ -21,7 +21,7 @@ class InventoryCard extends ConsumerWidget {
     if (product.stockQuantity > 0 && product.stockQuantity <= threshold) {
       return StatusColors.warning(cs);
     }
-    return cs.primary;
+    return cs.onSurfaceVariant;
   }
 
   String _qtyLabel() {
