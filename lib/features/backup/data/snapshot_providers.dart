@@ -284,8 +284,8 @@ Future<bool> hasUserData(AppDatabase db) async {
 
 /// Wider than [hasUserData], for a factory reset: anything the user set up
 /// or recorded — products, orders, customers, expenses, restaurant tables,
-/// tax rates or product categories (the reseeded default expense
-/// categories do not count). Decides the pre-reset backup and whether a
+/// tax rates, product categories, custom expense categories or day closes
+/// (shifts); the reseeded default expense categories do not count. Decides the pre-reset backup and whether a
 /// pending reset may finish on its own (it may not while this is true).
 /// One query. Held tickets live in Hive: see [hasHeldTickets].
 ///
@@ -300,7 +300,9 @@ Future<bool> hasShopData(AppDatabase db) async {
           'OR EXISTS(SELECT 1 FROM expenses) '
           'OR EXISTS(SELECT 1 FROM tables) '
           'OR EXISTS(SELECT 1 FROM tax_rates) '
-          'OR EXISTS(SELECT 1 FROM categories) AS has_data')
+          'OR EXISTS(SELECT 1 FROM categories) '
+          'OR EXISTS(SELECT 1 FROM expense_categories WHERE is_default = 0) '
+          'OR EXISTS(SELECT 1 FROM shifts) AS has_data')
       .getSingle();
   return row.read<int>('has_data') != 0;
 }

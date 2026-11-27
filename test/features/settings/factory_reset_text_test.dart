@@ -394,6 +394,13 @@ void main() {
       ),
       ('a product', (d) => seedProduct(d, sku: 'A')),
       ('a customer', (d) => seedCustomer(d)),
+      (
+        'a custom expense category',
+        (d) => d
+            .into(d.expenseCategories)
+            .insert(ExpenseCategoriesCompanion.insert(name: 'Fuel'))
+      ),
+      ('a day close', (d) => d.into(d.shifts).insert(ShiftsCompanion.insert())),
     ]) {
       test('$name counts', () async {
         await insert(db);
