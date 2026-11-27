@@ -34,11 +34,27 @@ class AuditDao extends DatabaseAccessor<AppDatabase> with _$AuditDaoMixin {
     return row != null;
   }
 
-  Stream<List<AuditLogData>> watchRecent({int limit = 100}) =>
-      (select(auditLog)
-            ..orderBy([(a) => OrderingTerm.desc(a.createdAt)])
-            ..limit(limit))
-          .watch();
+  /// Whether an order was placed with held-ticket sale key [saleKey] (see
+  /// `AuditService.orderPlaced`), written no earlier than a day before
+  /// [since] — the window lets idx_audit_log_created_at do the seeking; the
+  /// key itself is random and unique.
+  Future<bool> hasSaleKey(String saleKey, DateTime since) async {
+    final row = await (select(auditLog)
+          ..where((a) =>
+              a.createdAt.isBiggerOrEqualValue(
+                  since.subtract(const Duration(days: 1))) &
+              a.entityType.equals('order') &
+              a.action.equals('place') &
+              a.metadata.like('%"sale_key":"$saleKey"%'))
+          ..limit(1))
+        .getSingleOrNull();
+    return row != null;
+  }
+
+  Stream<List<AuditLogData>> watchRecent({int limit = 100}) => (select(auditLog)
+        ..orderBy([(a) => OrderingTerm.desc(a.createdAt)])
+        ..limit(limit))
+      .watch();
 
   Future<List<AuditLogData>> queryByEntity(
     String entityType, {
@@ -47,8 +63,7 @@ class AuditDao extends DatabaseAccessor<AppDatabase> with _$AuditDaoMixin {
     return (select(auditLog)
           ..where(
             (a) => entityId != null
-                ? a.entityType.equals(entityType) &
-                    a.entityId.equals(entityId)
+                ? a.entityType.equals(entityType) & a.entityId.equals(entityId)
                 : a.entityType.equals(entityType),
           )
           ..orderBy([(a) => OrderingTerm.desc(a.createdAt)]))

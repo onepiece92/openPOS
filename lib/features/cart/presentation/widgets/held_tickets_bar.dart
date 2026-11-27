@@ -213,8 +213,7 @@ class _HeldTicketsSheetState extends ConsumerState<_HeldTicketsSheet>
         // ── Archive all footer ──────────────────────────────
         if (i == active.length) {
           return ListTile(
-            leading:
-                Icon(Icons.archive_rounded, color: cs.onSurfaceVariant),
+            leading: Icon(Icons.archive_rounded, color: cs.onSurfaceVariant),
             title: Text('Archive all tickets',
                 style: TextStyle(color: cs.onSurfaceVariant)),
             onTap: () {
@@ -261,10 +260,9 @@ class _HeldTicketsSheetState extends ConsumerState<_HeldTicketsSheet>
         // ── Clear all archived footer ───────────────────────
         if (i == archived.length) {
           return ListTile(
-            leading:
-                Icon(Icons.delete_sweep_rounded, color: cs.error),
-            title: Text('Delete all archived',
-                style: TextStyle(color: cs.error)),
+            leading: Icon(Icons.delete_sweep_rounded, color: cs.error),
+            title:
+                Text('Delete all archived', style: TextStyle(color: cs.error)),
             onTap: () async {
               final confirm = await showDialog<bool>(
                 context: ctx,
@@ -313,13 +311,11 @@ class _HeldTicketsSheetState extends ConsumerState<_HeldTicketsSheet>
               IconButton(
                 icon: Icon(Icons.unarchive_outlined, color: cs.primary),
                 tooltip: 'Restore',
-                onPressed: () => ref
-                    .read(heldOrdersProvider.notifier)
-                    .unarchive(ticket.id),
+                onPressed: () =>
+                    ref.read(heldOrdersProvider.notifier).unarchive(ticket.id),
               ),
               IconButton(
-                icon:
-                    Icon(Icons.delete_outline_rounded, color: cs.error),
+                icon: Icon(Icons.delete_outline_rounded, color: cs.error),
                 tooltip: 'Delete',
                 onPressed: () async {
                   final confirm = await showDialog<bool>(
@@ -423,6 +419,12 @@ class _HeldTicketsSheetState extends ConsumerState<_HeldTicketsSheet>
     final check =
         await ref.read(heldOrdersProvider.notifier).checkForResume(held);
     if (!nav.mounted) return;
+    if (check.paid || check.busy) {
+      // Already sold (removed now) or being paid: never loaded again.
+      nav.pop();
+      messenger?.showSnackBar(SnackBar(content: Text(check.message!)));
+      return;
+    }
     if (check.emptied) {
       // Every product is gone: keep the ticket, load nothing, offer delete.
       final notifier = ref.read(heldOrdersProvider.notifier);
@@ -455,8 +457,7 @@ class _HeldTicketsSheetState extends ConsumerState<_HeldTicketsSheet>
         ticket.customerId != null &&
         ref.read(featureOnProvider(Feature.customers)) &&
         ref.read(featureOnProvider(Feature.discounts))) {
-      final customers =
-          ref.read(customersStreamProvider).valueOrNull ?? [];
+      final customers = ref.read(customersStreamProvider).valueOrNull ?? [];
       try {
         final c = customers.firstWhere((c) => c.id == ticket.customerId);
         if (c.defaultDiscount > 0) {

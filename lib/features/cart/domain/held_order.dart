@@ -108,21 +108,19 @@ class HeldOrder {
         archivedAt: json['archivedAt'] != null
             ? DateTime.parse(json['archivedAt'] as String)
             : null,
-        items: (json['items'] as List)
-            .map((i) {
-              final m = i as Map<String, dynamic>;
-              return CartItem(
-                productId: m['productId'] as int,
-                name: m['name'] as String,
-                unitPrice: (m['unitPrice'] as num).toDouble(),
-                quantity: m['quantity'] as int,
-                isTaxable: m['isTaxable'] as bool,
-                lineDiscount: (m['lineDiscount'] as num?)?.toDouble() ?? 0.0,
-                unitLabel: m['unitLabel'] as String? ?? '',
-                unitsPerQty: (m['unitsPerQty'] as num?)?.toDouble() ?? 1.0,
-              );
-            })
-            .toList(),
+        items: (json['items'] as List).map((i) {
+          final m = i as Map<String, dynamic>;
+          return CartItem(
+            productId: m['productId'] as int,
+            name: m['name'] as String,
+            unitPrice: (m['unitPrice'] as num).toDouble(),
+            quantity: m['quantity'] as int,
+            isTaxable: m['isTaxable'] as bool,
+            lineDiscount: (m['lineDiscount'] as num?)?.toDouble() ?? 0.0,
+            unitLabel: m['unitLabel'] as String? ?? '',
+            unitsPerQty: (m['unitsPerQty'] as num?)?.toDouble() ?? 1.0,
+          );
+        }).toList(),
       );
 }
 
@@ -141,7 +139,17 @@ class ResumeCheck {
       {this.removedLines = 0,
       this.changed = false,
       this.taxRateRemoved = false,
-      this.taxRateOff = false});
+      this.taxRateOff = false,
+      this.paid = false,
+      this.busy = false});
+
+  /// The ticket was already paid (its sale is saved) and is gone: nothing
+  /// to resume.
+  final bool paid;
+
+  /// The ticket is being paid, or a payment of it could not be checked:
+  /// it is not resumed now.
+  final bool busy;
 
   /// The ticket to resume: lines for products that no longer exist are
   /// dropped, and a customer or table that no longer exists is cleared.
@@ -167,6 +175,8 @@ class ResumeCheck {
 
   /// What to tell the cashier, or null when nothing was removed.
   String? get message {
+    if (paid) return kTicketPaidMessage;
+    if (busy) return kTicketBusyMessage;
     if (emptied) return kTicketEmptyMessage;
     final parts = [
       removedLinesMessage(removedLines),
@@ -181,8 +191,9 @@ const kTicketTaxRemovedMessage =
     'The tax on this ticket no longer exists and was removed.';
 const kTicketTaxOffMessage =
     'A tax on this ticket is switched off and was removed.';
-const kTicketEmptyMessage =
-    'None of the items on this ticket exist any more.';
+const kTicketPaidMessage = 'This ticket was already paid, so it was removed.';
+const kTicketBusyMessage = 'This ticket is being paid. Try again in a moment.';
+const kTicketEmptyMessage = 'None of the items on this ticket exist any more.';
 
 /// "1 item no longer exists and was removed" / "N items no longer exist and
 /// were removed"; null for none.
@@ -216,8 +227,7 @@ ResumeCheck checkHeldOrder(
       ? const <int>[]
       : [
           for (final id in rates)
-            if (!liveTaxRateIds.contains(id) && !offTaxRateIds.contains(id))
-              id
+            if (!liveTaxRateIds.contains(id) && !offTaxRateIds.contains(id)) id
         ];
   final offRates = liveTaxRateIds == null || rates == null
       ? const <int>[]

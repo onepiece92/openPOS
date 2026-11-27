@@ -63,6 +63,7 @@ Future<int> sell(
   int pointsToEarn = 0,
   String paymentMethod = 'cash',
   bool trackStock = true,
+  String? saleKey,
 }) {
   final subtotal = items.fold(0.0, (s, i) => s + i.lineSubtotal);
   final total = subtotal - loyaltyDiscount;
@@ -90,6 +91,7 @@ Future<int> sell(
     paymentMethod: paymentMethod,
     tenderedAmount: total,
     trackStock: trackStock,
+    saleKey: saleKey,
   );
 }
 

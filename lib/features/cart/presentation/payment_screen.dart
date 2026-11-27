@@ -184,8 +184,17 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     final trackStock = ref.read(featureOnProvider(Feature.stockTracking));
     final fmt = ref.read(currencyFormatterProvider);
 
+    // A resumed ticket is marked as being paid, on disk, before the sale:
+    // if the app is killed after the sale is saved but before the ticket is
+    // deleted, the next launch finds the mark and the sale, and removes the
+    // ticket instead of offering it to be charged again.
+    final heldTicketId = session.heldTicketId;
+    String? saleKey;
     final int orderId;
     try {
+      if (heldTicketId != null) {
+        saleKey = await heldOrders!.beginPayment(heldTicketId);
+      }
       orderId = await placeOrder(
         db,
         audit,
@@ -197,8 +206,14 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         invoicePrefix: invoicePrefix,
         trackStock: trackStock,
         tipAmount: tip,
+        saleKey: saleKey,
       );
     } catch (e, st) {
+      if (saleKey != null) {
+        try {
+          await heldOrders!.paymentFailed(heldTicketId!);
+        } catch (_) {/* still marked: settled at the next launch */}
+      }
       // The user sees plain words; this is for support (logcat / console).
       debugPrint(saleFailureLog(e, st, release: kReleaseMode));
       _placing = false;
@@ -224,10 +239,12 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     }
 
     // The cart may have been resumed from a held ticket, which now stays on
-    // disk while it is edited — the sale is what retires it.
-    final heldTicketId = session.heldTicketId;
+    // disk while it is edited — the sale is what retires it. Awaited; if it
+    // fails the ticket stays marked and hidden, and is settled at launch.
     if (heldTicketId != null) {
-      heldOrders?.delete(heldTicketId);
+      try {
+        await heldOrders!.paymentDone(heldTicketId);
+      } catch (_) {}
     }
     cartNotifier.clear();
 
@@ -344,8 +361,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
                 inputFormatters: [
-                  FilteringTextInputFormatter.allow(
-                      RegExp(r'^\d*\.?\d{0,2}')),
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
                 ],
                 decoration: InputDecoration(
                   labelText: 'Tip amount',
@@ -426,7 +442,8 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                       style: tt.headlineSmall?.copyWith(
                         color: cs.onSecondaryContainer,
                         fontWeight: FontWeight.bold,
-                        fontFamily: AppFonts.mono, fontFamilyFallback: AppFonts.monoFallback,
+                        fontFamily: AppFonts.mono,
+                        fontFamilyFallback: AppFonts.monoFallback,
                       ),
                     ),
                   ],
@@ -502,7 +519,8 @@ class _PaymentActionBar extends ConsumerWidget {
 // ─── Tip line ─────────────────────────────────────────────────────────────────
 
 class _TipLine extends StatelessWidget {
-  const _TipLine({required this.label, required this.value, this.strong = false});
+  const _TipLine(
+      {required this.label, required this.value, this.strong = false});
   final String label;
   final String value;
   final bool strong;

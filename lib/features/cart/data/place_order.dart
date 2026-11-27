@@ -15,6 +15,10 @@ import 'package:pos_app/features/tips/tip_math.dart';
 /// All DB writes run inside a single transaction — if any step fails,
 /// nothing persists (no phantom orders, stock untouched, loyalty intact).
 /// Throws on any failure; caller is responsible for UI error handling.
+///
+/// [saleKey]: the key `HeldOrdersNotifier.beginPayment` wrote on the held
+/// ticket this sale came from; it is recorded with the order, in the same
+/// transaction, so the ticket can never be sold a second time.
 Future<int> placeOrder(
   AppDatabase db,
   AuditService audit, {
@@ -26,6 +30,7 @@ Future<int> placeOrder(
   String invoicePrefix = '',
   bool trackStock = true,
   double tipAmount = 0,
+  String? saleKey,
 }) {
   // Never negative; the tip is kept apart from the sale (`total` is tip-free).
   final tip = tipAmount > 0 ? roundMoney(tipAmount) : 0.0;
@@ -39,8 +44,7 @@ Future<int> placeOrder(
     // Read once: needed for the cost snapshot and again for stock below.
     final products = <int, Product?>{};
     for (final item in cart) {
-      products[item.productId] ??=
-          await db.productsDao.getById(item.productId);
+      products[item.productId] ??= await db.productsDao.getById(item.productId);
     }
     final unitCosts = <int, double?>{
       for (final entry in products.entries)
@@ -54,8 +58,7 @@ Future<int> placeOrder(
     );
 
     // Gap-free: computed inside the transaction, never reused (voids keep it).
-    final invoiceNo =
-        await db.ordersDao.nextInvoiceNo(prefix: invoicePrefix);
+    final invoiceNo = await db.ordersDao.nextInvoiceNo(prefix: invoicePrefix);
     final id = await db.ordersDao.insertOrder(
       OrdersCompanion.insert(
         invoiceNo: Value(invoiceNo),
@@ -74,8 +77,8 @@ Future<int> placeOrder(
             ? Value(tenderedAmount)
             : const Value.absent(),
         changeAmount: paymentMethod == 'cash'
-            ? Value(roundMoney(
-                (tenderedAmount - summary.total - tip).clamp(0, double.infinity)))
+            ? Value(roundMoney((tenderedAmount - summary.total - tip)
+                .clamp(0, double.infinity)))
             : const Value.absent(),
         customerId: session.customerId != null
             ? Value(session.customerId!)
@@ -169,8 +172,8 @@ Future<int> placeOrder(
 
     if (session.customerId != null) {
       if (summary.pointsRedeemed > 0) {
-        await db.customersDao.redeemLoyaltyPoints(
-            session.customerId!, summary.pointsRedeemed);
+        await db.customersDao
+            .redeemLoyaltyPoints(session.customerId!, summary.pointsRedeemed);
       }
       if (summary.pointsToEarn > 0) {
         await db.customersDao
@@ -183,6 +186,7 @@ Future<int> placeOrder(
       total: summary.total,
       paymentMethod: paymentMethod,
       tip: tip,
+      saleKey: saleKey,
     );
 
     return id;

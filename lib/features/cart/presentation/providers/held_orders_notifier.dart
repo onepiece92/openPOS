@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:drift/drift.dart' show QueryRow, Variable;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -23,8 +24,58 @@ export 'package:pos_app/features/cart/data/ticket_sequence.dart'
 class HeldOrdersNotifier extends Notifier<List<HeldOrder>> {
   Box<dynamic> get _box => ref.read(heldOrdersBoxProvider);
 
+  /// Tickets being paid in this run (between [beginPayment] and
+  /// [paymentDone] / [paymentFailed]); [settlePaidTickets] leaves them be.
+  final Set<String> _paying = {};
+
   @override
-  List<HeldOrder> build() => _loadAll();
+  List<HeldOrder> build() {
+    // A ticket still marked as being paid is left over from a run that
+    // ended mid-sale: settle it before it is ever offered again.
+    if (_box.keys.any((k) => _payingKeyOf(k) != null)) {
+      Future.microtask(() async {
+        try {
+          await settlePaidTickets();
+        } catch (_) {/* tried again on resume and next launch */}
+      });
+    }
+    return _loadAll();
+  }
+
+  Map<String, dynamic>? _raw(Object? key) {
+    if (key == kTicketSeqKey) return null;
+    final value = _box.get(key);
+    if (value is! String) return null;
+    try {
+      return jsonDecode(value) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String? _payingKeyOf(Object? key) {
+    final paying = _raw(key)?[_kPayingField];
+    return paying is Map ? paying['key'] as String? : null;
+  }
+
+  HeldOrder? _ticket(String id) {
+    final raw = _raw(id);
+    if (raw == null) return null;
+    try {
+      return HeldOrder.fromJson(raw);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Writes [ticket], keeping a payment marker the stored copy carries (a
+  /// ticket saved again while it is being paid must stay marked).
+  Future<void> _write(HeldOrder ticket) {
+    final json = ticket.toJson();
+    final paying = _raw(ticket.id)?[_kPayingField];
+    if (paying != null) json[_kPayingField] = paying;
+    return _box.put(ticket.id, jsonEncode(json));
+  }
 
   List<HeldOrder> _loadAll() {
     return _box
@@ -33,8 +84,11 @@ class HeldOrdersNotifier extends Notifier<List<HeldOrder>> {
         .where((e) => e.key != kTicketSeqKey)
         .map((e) {
           try {
-            return HeldOrder.fromJson(
-                jsonDecode(e.value as String) as Map<String, dynamic>);
+            final json = jsonDecode(e.value as String) as Map<String, dynamic>;
+            // Being paid, or paid before a kill and not yet settled: never
+            // listed, so it cannot be resumed and charged again.
+            if (json[_kPayingField] != null) return null;
+            return HeldOrder.fromJson(json);
           } catch (_) {
             return null;
           }
@@ -42,6 +96,109 @@ class HeldOrdersNotifier extends Notifier<List<HeldOrder>> {
         .whereType<HeldOrder>()
         .toList()
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  }
+
+  // ── Paying a held ticket ────────────────────────────────────────────────
+  //
+  // Paying a resumed ticket is two stores: the order goes to the database
+  // and the ticket leaves Hive. A kill between them must not leave a ticket
+  // that can be sold again, so:
+  //  1. [beginPayment] writes a random sale key on the ticket and flushes it
+  //     to disk before the sale. A marked ticket is not listed.
+  //  2. `placeOrder` records the same key with the order (in the audit
+  //     entry of the sale's own transaction).
+  //  3. [paymentDone] deletes the ticket (awaited); [paymentFailed] removes
+  //     the mark.
+  // A mark found later (a kill between 1 and 3) is settled by
+  // [settlePaidTickets]: an order with the key exists → the ticket is
+  // deleted; none → the sale never happened and the mark is removed.
+
+  /// Marks ticket [id] as being paid; returns the sale key to hand to
+  /// `placeOrder`, or null when there is no such ticket. Throws when the
+  /// mark cannot be written — the sale must not go ahead then.
+  Future<String?> beginPayment(String id) async {
+    final raw = _raw(id);
+    if (raw == null) return null;
+    final rnd = Random.secure();
+    final key = [
+      for (var i = 0; i < 16; i++)
+        rnd.nextInt(256).toRadixString(16).padLeft(2, '0')
+    ].join();
+    raw[_kPayingField] = {
+      'key': key,
+      'at': DateTime.now().toUtc().toIso8601String(),
+    };
+    _paying.add(id);
+    try {
+      await _box.put(id, jsonEncode(raw));
+      await _box.flush();
+    } catch (_) {
+      _paying.remove(id);
+      rethrow;
+    }
+    state = _loadAll();
+    return key;
+  }
+
+  /// The sale for ticket [id] is saved: the ticket is deleted.
+  Future<void> paymentDone(String id) async {
+    try {
+      await _box.delete(id);
+      await _box.flush();
+    } finally {
+      _paying.remove(id);
+      state = _loadAll();
+    }
+  }
+
+  /// The sale for ticket [id] was not saved: the ticket is listed again.
+  Future<void> paymentFailed(String id) async {
+    try {
+      final raw = _raw(id);
+      if (raw != null && raw.remove(_kPayingField) != null) {
+        await _box.put(id, jsonEncode(raw));
+      }
+    } finally {
+      _paying.remove(id);
+      state = _loadAll();
+    }
+  }
+
+  /// Settles tickets left marked by a run that ended mid-sale (see above).
+  /// Returns how many were deleted as already paid. A ticket whose order
+  /// cannot be looked up stays hidden until the next try.
+  Future<int> settlePaidTickets() async {
+    var removed = 0;
+    for (final id in _box.keys.toList()) {
+      if (id is! String || _paying.contains(id)) continue;
+      final raw = _raw(id);
+      final paying = raw?[_kPayingField];
+      if (paying is! Map) continue;
+      final bool sold;
+      try {
+        sold = await _soldWith(paying);
+      } catch (_) {
+        continue;
+      }
+      if (_paying.contains(id)) continue; // paid again meanwhile
+      if (sold) {
+        await _box.delete(id);
+        removed++;
+      } else {
+        raw!.remove(_kPayingField);
+        await _box.put(id, jsonEncode(raw));
+      }
+    }
+    await _box.flush();
+    state = _loadAll();
+    return removed;
+  }
+
+  Future<bool> _soldWith(Map<dynamic, dynamic> paying) {
+    final key = paying['key'] as String;
+    final at = DateTime.tryParse(paying['at'] as String? ?? '') ??
+        DateTime.fromMillisecondsSinceEpoch(0);
+    return ref.read(databaseProvider).auditDao.hasSaleKey(key, at.toLocal());
   }
 
   /// Saves the current cart as a held ticket and returns the new [HeldOrder].
@@ -78,7 +235,7 @@ class HeldOrdersNotifier extends Notifier<List<HeldOrder>> {
       taxEnabled: taxEnabled,
       taxRateIds: taxRateIds,
     );
-    _box.put(id, jsonEncode(ticket.toJson()));
+    _write(ticket);
     state = _loadAll();
     return ticket;
   }
@@ -97,7 +254,8 @@ class HeldOrdersNotifier extends Notifier<List<HeldOrder>> {
     bool taxEnabled = true,
     List<int>? taxRateIds,
   }) {
-    final existing = state.firstWhere((t) => t.id == id);
+    // From the box, not the list: a ticket being paid is not listed.
+    final existing = _ticket(id) ?? state.firstWhere((t) => t.id == id);
     // Auto-labelled tickets follow their customer; hand-picked labels stick.
     final wasAutoLabelled = existing.label == existing.customerName;
     final updated = HeldOrder(
@@ -117,7 +275,7 @@ class HeldOrdersNotifier extends Notifier<List<HeldOrder>> {
       taxRateIds: taxRateIds,
       archivedAt: existing.archivedAt,
     );
-    _box.put(existing.id, jsonEncode(updated.toJson()));
+    _write(updated);
     state = _loadAll();
     return updated;
   }
@@ -133,9 +291,7 @@ class HeldOrdersNotifier extends Notifier<List<HeldOrder>> {
     // the name it was saved with.
     final customerName = ref.read(featureOnProvider(Feature.customers))
         ? ref.read(cartCustomerNameProvider)
-        : (existingId == null
-            ? null
-            : state.where((t) => t.id == existingId).firstOrNull?.customerName);
+        : (existingId == null ? null : _ticket(existingId)?.customerName);
     // The tax switch and the chosen rates decide the total, so they are
     // parked with the ticket.
     final taxRateIds = [...ref.read(selectedTaxRatesProvider)];
@@ -178,7 +334,25 @@ class HeldOrdersNotifier extends Notifier<List<HeldOrder>> {
   /// no lines is left as it is (see [ResumeCheck.emptied]). A changed ticket is saved back, so it is cleaned only once.
   /// When the database cannot be read the ticket is returned unchanged
   /// (payment still refuses dead ids, see `placeOrder`).
+  ///
+  /// A ticket marked as being paid (see [beginPayment]) is never resumed: it
+  /// is settled first — deleted when its sale was saved — and the result
+  /// says [ResumeCheck.paid] or [ResumeCheck.busy].
   Future<ResumeCheck> checkForResume(HeldOrder ticket) async {
+    final paying = _raw(ticket.id)?[_kPayingField];
+    if (!_box.containsKey(ticket.id)) {
+      // Deleted meanwhile — sold (and settled) or removed by hand.
+      state = _loadAll();
+      return ResumeCheck(ticket, paid: true);
+    }
+    if (paying is Map) {
+      if (_paying.contains(ticket.id)) return ResumeCheck(ticket, busy: true);
+      await settlePaidTickets();
+      if (!_box.containsKey(ticket.id)) return ResumeCheck(ticket, paid: true);
+      if (_raw(ticket.id)?[_kPayingField] != null) {
+        return ResumeCheck(ticket, busy: true); // could not be checked
+      }
+    }
     final productIds = {for (final i in ticket.items) i.productId}.toList();
     final parts = <String>[];
     final args = <Variable<Object>>[];
@@ -240,7 +414,7 @@ class HeldOrdersNotifier extends Notifier<List<HeldOrder>> {
     // reactivated, and the cashier decides whether to delete it.
     if (!check.emptied && check.changed && _box.containsKey(ticket.id)) {
       // Like every write here: the box updates in memory at once.
-      unawaited(_box.put(ticket.id, jsonEncode(check.ticket.toJson())));
+      unawaited(_write(check.ticket));
       state = _loadAll();
     }
     return check;
@@ -255,7 +429,7 @@ class HeldOrdersNotifier extends Notifier<List<HeldOrder>> {
   void archive(String id) {
     final ticket = state.firstWhere((t) => t.id == id);
     final archived = ticket.copyWith(archivedAt: DateTime.now());
-    _box.put(id, jsonEncode(archived.toJson()));
+    _write(archived);
     state = _loadAll();
   }
 
@@ -263,7 +437,7 @@ class HeldOrdersNotifier extends Notifier<List<HeldOrder>> {
   void unarchive(String id) {
     final ticket = state.firstWhere((t) => t.id == id);
     final restored = ticket.copyWith(clearArchived: true);
-    _box.put(id, jsonEncode(restored.toJson()));
+    _write(restored);
     state = _loadAll();
   }
 
@@ -277,7 +451,7 @@ class HeldOrdersNotifier extends Notifier<List<HeldOrder>> {
   void archiveAll() {
     for (final ticket in state.where((t) => !t.isArchived)) {
       final archived = ticket.copyWith(archivedAt: DateTime.now());
-      _box.put(ticket.id, jsonEncode(archived.toJson()));
+      _write(archived);
     }
     state = _loadAll();
   }
@@ -290,6 +464,9 @@ class HeldOrdersNotifier extends Notifier<List<HeldOrder>> {
     state = _loadAll();
   }
 }
+
+/// Field of a stored ticket that marks it as being paid: `{key, at}`.
+const _kPayingField = 'paying';
 
 final heldOrdersProvider =
     NotifierProvider<HeldOrdersNotifier, List<HeldOrder>>(

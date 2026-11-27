@@ -34,11 +34,11 @@ class _GatedAudit extends AuditService {
     required double total,
     required String paymentMethod,
     double tip = 0,
+    String? saleKey,
   }) async {
     await gate.future;
-    return super
-        .orderPlaced(orderId,
-            total: total, paymentMethod: paymentMethod, tip: tip);
+    return super.orderPlaced(orderId,
+        total: total, paymentMethod: paymentMethod, tip: tip, saleKey: saleKey);
   }
 }
 
@@ -125,7 +125,8 @@ void main() {
 
   Finder confirm() => find.textContaining('Confirm & Charge');
 
-  testWidgets('cart and held ticket are cleared even if the screen closed '
+  testWidgets(
+      'cart and held ticket are cleared even if the screen closed '
       'while the order was being saved', (tester) async {
     resumeAHeldTicket();
     final showPayment = ValueNotifier(true);
@@ -220,8 +221,8 @@ void main() {
             isTaxable: false));
 
     String tenderedText(WidgetTester tester) => tester
-        .widget<TextField>(find.widgetWithText(
-            TextField, 'Amount received from customer'))
+        .widget<TextField>(
+            find.widgetWithText(TextField, 'Amount received from customer'))
         .controller!
         .text;
 
@@ -238,8 +239,7 @@ void main() {
       await tester.pumpWidget(app(ValueNotifier(true)));
       await tester.pump();
 
-      expect(tenderedText(tester), '12.50',
-          reason: 'not rounded up to 1000');
+      expect(tenderedText(tester), '12.50', reason: 'not rounded up to 1000');
       expect(find.textContaining('987.50'), findsNothing);
 
       // Confirming without touching the field records tendered = total.
@@ -271,7 +271,8 @@ void main() {
       expect(order.changeAmount, 7.5);
     });
 
-    testWidgets('an untouched field follows the amount due; an edited one '
+    testWidgets(
+        'an untouched field follows the amount due; an edited one '
         'is left alone', (tester) async {
       addToCart(price: 12.5);
       await tester.pumpWidget(app(ValueNotifier(true)));
