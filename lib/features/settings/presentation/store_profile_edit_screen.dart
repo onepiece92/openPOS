@@ -93,7 +93,7 @@ class _StoreProfileEditScreenState
                     controller: _taglineCtrl,
                     decoration: const InputDecoration(
                       labelText: 'Tagline',
-                      hintText: 'e.g. Fresh & Fast',
+                      hintText: 'e.g. Corner Shop',
                       prefixIcon: Icon(Icons.short_text_rounded),
                       border: OutlineInputBorder(),
                     ),
@@ -133,7 +133,7 @@ class _StoreProfileEditScreenState
                     ],
                     decoration: const InputDecoration(
                       labelText: 'Phone',
-                      hintText: 'e.g. +977-9800000000',
+                      hintText: 'e.g. +977 98XXXXXXXX',
                       prefixIcon: Icon(Icons.phone_outlined),
                       border: OutlineInputBorder(),
                     ),

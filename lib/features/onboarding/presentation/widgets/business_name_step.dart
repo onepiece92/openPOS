@@ -46,7 +46,7 @@ class BusinessNameStep extends StatelessWidget {
             textCapitalization: TextCapitalization.words,
             decoration: const InputDecoration(
               labelText: 'Business name',
-              hintText: 'e.g. Rebuzz Store',
+              hintText: 'e.g. Corner Shop',
               prefixIcon: Icon(Icons.business_rounded),
               border: OutlineInputBorder(),
             ),
