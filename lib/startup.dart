@@ -96,7 +96,7 @@ Future<StartupResult> startUp({
   }
   return StartupResult(
       notice: restoreRecoveryNotice(recovery) ??
-          (resetFinished ? kFactoryResetFinishedNotice : null));
+          (resetFinished ? finishedResetNotice() : null));
 }
 
 /// Opens the Hive boxes before the ProviderContainer exists so providers

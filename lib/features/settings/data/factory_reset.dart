@@ -237,6 +237,32 @@ const kResetChoiceTitle = 'Finish the factory reset?';
 const kResetChoiceMessage = "A factory reset on this device didn't finish, "
     'and your data is still here. Erase everything now, or keep your data?';
 const kResetChoiceFinish = 'Finish erasing';
+
+/// Added to [kResetChoiceMessage] when that reset deletes the backups.
+const kResetChoiceDeletesBackups =
+    'Finishing it also deletes the backups on this device.';
+
+/// The question's text for the pending reset in [settings].
+String resetChoiceMessage(Box<dynamic> settings) =>
+    resetDeletesBackups(settings)
+        ? '$kResetChoiceMessage $kResetChoiceDeletesBackups'
+        : kResetChoiceMessage;
+
+/// Told after a reset that could not delete every backup it was asked to:
+/// the reset itself is finished.
+const kResetBackupsLeftNotice = "Some backups couldn't be deleted.";
+
+/// Set by [eraseLocalStores] when "Delete my backups too" could not delete
+/// them all; read (and cleared) by whoever reports the finished reset.
+bool factoryResetLeftBackups = false;
+
+/// The notice after a factory reset was finished at launch: says so, and
+/// that some backups could not be deleted when that happened.
+String finishedResetNotice() {
+  if (!factoryResetLeftBackups) return kFactoryResetFinishedNotice;
+  factoryResetLeftBackups = false;
+  return '$kFactoryResetFinishedNotice $kResetBackupsLeftNotice';
+}
 const kResetChoiceKeep = 'Keep my data';
 
 /// "Keep my data" could not be saved (the flag would not clear).
@@ -303,10 +329,12 @@ Future<void> eraseLocalStores({
   if (temp != null) await sweepTempLeftovers(temp, sharePlusCache: true);
   afterStep?.call(FactoryResetStep.tempFilesDeleted);
   // Kept unless the user asked for them to go (the default keeps them).
+  // A backup that will not go does not stop the reset (it would loop on
+  // the error screen): the rest is finished and the user is told.
   if (backups != null &&
       resetDeletesBackups(settings) &&
-      await backups.exists()) {
-    await backups.delete(recursive: true);
+      !await _deleteAllIn(backups)) {
+    factoryResetLeftBackups = true;
   }
   afterStep?.call(FactoryResetStep.backupsDeleted);
   final doomed = [
@@ -325,6 +353,32 @@ Future<void> eraseLocalStores({
     debugPrint('Factory reset: compacting settings failed: $e');
   }
   afterStep?.call(FactoryResetStep.settingsCleared);
+}
+
+/// Deletes [dir] and everything in it, one entry at a time when the folder
+/// will not go at once. True when nothing is left; never throws.
+Future<bool> _deleteAllIn(Directory dir) async {
+  try {
+    if (!await dir.exists()) return true;
+    await dir.delete(recursive: true);
+    return true;
+  } catch (e) {
+    debugPrint('Factory reset: deleting the backups failed: $e');
+  }
+  try {
+    await for (final e in dir.list(recursive: true, followLinks: false)) {
+      if (e is File || e is Link) {
+        try {
+          await e.delete();
+        } catch (_) {}
+      }
+    }
+    return !(await dir
+        .list(recursive: true, followLinks: false)
+        .any((e) => e is File || e is Link));
+  } catch (_) {
+    return false;
+  }
 }
 
 /// What the launch found about a pending factory reset.

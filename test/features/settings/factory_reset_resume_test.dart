@@ -437,6 +437,36 @@ void main() {
       expectKept();
     });
 
+    test('backups that will not delete: the reset still finishes, and says '
+        'so', () async {
+      // A folder the app may not change: its files cannot be deleted.
+      final auto = Directory(p.join(backups().path, 'auto'));
+      Process.runSync('chmod', ['555', auto.path]);
+      addTearDown(() => Process.runSync('chmod', ['755', auto.path]));
+      factoryResetLeftBackups = false;
+
+      expect(await reset(deleteBackups: true), FactoryResetOutcome.done,
+          reason: 'never the error screen over a backup');
+      expect(await shopState(), 'fresh');
+      expect(isFactoryResetPending(settings), isFalse);
+      expect(factoryResetLeftBackups, isTrue);
+      expect(finishedResetNotice(),
+          "The factory reset was finished. Some backups couldn't be deleted.");
+      expect(factoryResetLeftBackups, isFalse, reason: 'told once');
+      expect(finishedResetNotice(), kFactoryResetFinishedNotice);
+    });
+
+    test('the Finish erasing question says when the backups go too',
+        () async {
+      await markFactoryResetPending(settings, deleteBackups: true);
+      expect(resetChoiceMessage(settings),
+          '$kResetChoiceMessage $kResetChoiceDeletesBackups');
+      expect(kResetChoiceDeletesBackups,
+          'Finishing it also deletes the backups on this device.');
+      await markFactoryResetPending(settings);
+      expect(resetChoiceMessage(settings), kResetChoiceMessage);
+    });
+
     test('Keep my data on a pending delete-reset clears the choice too',
         () async {
       await markFactoryResetPending(settings, deleteBackups: true);

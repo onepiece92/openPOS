@@ -555,6 +555,10 @@ class AppRootState extends State<AppRoot> {
       switch (outcome) {
         case FactoryResetOutcome.done:
           await startReviewClock(); // a fresh install's clock
+          if (factoryResetLeftBackups) {
+            factoryResetLeftBackups = false;
+            notice = kResetBackupsLeftNotice;
+          }
         case FactoryResetOutcome.refused:
           notice = kFactoryResetFailedNotice;
         case FactoryResetOutcome.undecided:
@@ -616,7 +620,7 @@ class AppRootState extends State<AppRoot> {
       // startUp() skipped this when recovery failed; no-op otherwise.
       await startReviewClock();
       notice = pendingReset == PendingFactoryReset.finished
-          ? kFactoryResetFinishedNotice
+          ? finishedResetNotice()
           : restoreRecoveryNotice(recovered);
       // A restore that ended on this error screen may have been accepted
       // after all (commit recorded, not confirmed): finish its merge and
@@ -1018,7 +1022,7 @@ class _ResetChoiceScreenState extends State<_ResetChoiceScreen> {
                           TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(height: 12),
-                    const Text(kResetChoiceMessage,
+                    Text(resetChoiceMessage(Hive.box<dynamic>('settings')),
                         textAlign: TextAlign.center),
                     if (widget.keepFailed) ...[
                       const SizedBox(height: 12),
