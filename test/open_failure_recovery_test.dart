@@ -698,6 +698,51 @@ void main() {
       await done(tester);
     });
 
+    testWidgets(
+        'after that, Try again settles the journal and a file still missing '
+        'gets both exits back', (tester) async {
+      final marker = File(p.join(docs.path, 'restore_merge.json'));
+      await tester.runAsync(openBoxes);
+      late AppRootState state;
+      await tester.pumpWidget(AppRoot(
+        startupDbError: DatabaseMissingError(dbFile().path),
+        // Recovery settles the journal (as the real one would).
+        recoverForRetry: () async {
+          if (journal().existsSync()) journal().deleteSync();
+          return RestoreRecovery.none;
+        },
+        // The REAL restoreFrom runs (it ends on its own fatal screen and
+        // sets _dbOpenFailure false); then the journal is left behind, as
+        // snapshot_service does when nothing reopens.
+        restoreForTest: (zip) async {
+          try {
+            await state.restoreFrom(zip);
+          } finally {
+            marker.writeAsStringSync('{}');
+            RestoreJournal.begin(journal(), plan: const [], staged: const []);
+          }
+        },
+      ));
+      state = tester.state<AppRootState>(find.byType(AppRoot));
+      final junk = File(p.join(docs.path, 'junk.zip'))
+        ..writeAsStringSync('not a zip');
+      await tester.runAsync(() async {
+        unawaited(state.restoreFromErrorScreen(junk));
+      });
+      await pumpUntil(tester,
+          () => find.text(kRestoreReopenFailedMessage).evaluate().isNotEmpty);
+      await tester.pump();
+      expect(find.text('Try again'), findsOneWidget);
+      expect(find.text(kStartFreshButton), findsNothing);
+
+      await tester.runAsync(() => tester.tap(find.text('Try again')));
+      await pumpUntil(
+          tester, () => find.text(kStartFreshButton).evaluate().isNotEmpty);
+      expect(find.text("Open POS couldn't open its data."), findsOneWidget);
+      expect(find.text(kRestoreLatestBackupButton), findsOneWidget);
+      await done(tester);
+    });
+
     testWidgets('without a journal the same failure re-offers both exits',
         (tester) async {
       await tester.runAsync(openBoxes);

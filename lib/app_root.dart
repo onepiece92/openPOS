@@ -687,6 +687,9 @@ class AppRootState extends State<AppRoot> {
         setState(() {
           _dbFileDamaged = false; // hides both exits; Try again stays
           _errorNote = null;
+          // Still an open failure: once Try again's recovery has settled
+          // the journal, a file that is still damaged gets its exits back.
+          _dbOpenFailure = true;
         });
       }
       return;
