@@ -119,12 +119,15 @@ final _brokenName = RegExp(r'^(\d{8}-\d{6}(?:-\d+)?)(-wal|-shm|-journal)?$');
 /// in total (main + journals: a hot WAL can hold most of the data) than
 /// [keepLargerThan] bytes. Returns how many files were deleted.
 ///
-/// A journal whose own main copy is missing (a kill split the set while
-/// it was being moved) is never deleted here: it counts toward the newest
-/// set's size, so it can only make that set more likely to be kept — unless
-/// [everything] (a factory reset the user confirmed): then every
+/// A journal whose own main copy is missing (a kill split a set while it
+/// was being moved: the main went to one stamp, its `-wal` to the next
+/// Start fresh's) is never deleted here. Its likely owner is the newest set
+/// with a main copy OLDER than it; that set is never deleted either (the
+/// two only make sense together) and the orphan's size counts toward it —
+/// unless [everything] (a factory reset the user confirmed): then every
 /// `.broken-*` file goes, orphans included, since any of them can hold the
-/// old shop's sales.
+/// old shop's sales. Names that don't match the `.broken-<stamp>` pattern
+/// are left alone on purpose, even then: they are not ours.
 Future<int> deleteBrokenDatabaseCopies(
   File db, {
   String? keepStamp,
@@ -152,22 +155,30 @@ Future<int> deleteBrokenDatabaseCopies(
     return size;
   }
 
-  // Orphan journals join the newest set that still has its main copy.
-  final newest =
-      withMain.isEmpty ? null : (withMain.toList()..sort(_compareStamps)).last;
-  var orphanSize = 0;
-  for (final entry in sets.entries) {
-    if (!withMain.contains(entry.key)) orphanSize += await sizeOf(entry.value);
+  // Each orphan belongs to the newest set with a main copy older than it.
+  final ordered = sets.keys.toList()..sort(_compareStamps);
+  final ownsOrphan = <String>{};
+  final orphanSize = <String, int>{};
+  String? owner;
+  for (final stamp in ordered) {
+    if (withMain.contains(stamp)) {
+      owner = stamp;
+    } else if (owner != null) {
+      ownsOrphan.add(owner);
+      orphanSize[owner] = (orphanSize[owner] ?? 0) + await sizeOf(sets[stamp]!);
+    }
   }
   var deleted = 0;
   for (final entry in sets.entries) {
     final stamp = entry.key;
-    if (!everything && (!withMain.contains(stamp) || stamp == keepStamp)) {
+    if (!everything &&
+        (!withMain.contains(stamp) ||
+            stamp == keepStamp ||
+            ownsOrphan.contains(stamp))) {
       continue;
     }
     if (keepLargerThan != null) {
-      final size =
-          await sizeOf(entry.value) + (stamp == newest ? orphanSize : 0);
+      final size = await sizeOf(entry.value) + (orphanSize[stamp] ?? 0);
       if (size > keepLargerThan) continue;
     }
     for (final f in entry.value) {
