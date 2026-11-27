@@ -93,7 +93,7 @@ class _StoreProfileEditScreenState
                     controller: _taglineCtrl,
                     decoration: const InputDecoration(
                       labelText: 'Tagline',
-                      hintText: 'e.g. Corner Shop',
+                      hintText: 'e.g. Fresh coffee all day',
                       prefixIcon: Icon(Icons.short_text_rounded),
                       border: OutlineInputBorder(),
                     ),

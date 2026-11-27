@@ -291,7 +291,8 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
     final picked = await showAppSheet<Product>(
       context: context,
       draggable: true,
-      initialSize: 0.5,
+      // Opens tall so its search field clears the on-screen keyboard.
+      initialSize: 0.9,
       builder: (_) => _ComponentPickerSheet(products: eligible),
     );
     if (picked == null) return;
