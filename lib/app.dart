@@ -290,7 +290,11 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: 'backup',
-            pageBuilder: (_, state) => _slide(state, const BackupScreen()),
+            pageBuilder: (_, state) => _slide(
+                state,
+                BackupScreen(
+                    openDeviceBackups: state.uri.queryParameters['show'] ==
+                        kShowDeviceBackupsQuery)),
           ),
           GoRoute(
             path: 'printer',

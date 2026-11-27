@@ -15,8 +15,30 @@ import 'package:pos_app/features/backup/data/snapshot_service.dart';
 import 'package:pos_app/features/usage/usage_providers.dart';
 import 'package:pos_app/features/usage/domain/usage_event.dart';
 
+/// Switches automatic backups on or off — the Backup screen's tile and the
+/// Settings row both call this, on the one setting, so they always agree.
+/// Switching on takes one right away so the switch has a visible effect.
+Future<void> setAutoBackups(WidgetRef ref, bool on) async {
+  await ref.read(settingsProvider.notifier).setAutoBackupEnabled(on);
+  if (on) {
+    unawaited(ref.read(snapshotCoordinatorProvider).runAutoBackupIfDue());
+  }
+}
+
+/// The time of the last automatic backup as the tile and the Settings row
+/// show it.
+String autoBackupTimeText(DateTime t) => DateFormat.MMMd().add_jm().format(t);
+
+/// Query that opens the Backup screen on its list of device backups
+/// (`/settings/backup?show=device`).
+const kShowDeviceBackupsQuery = 'device';
+
 class BackupScreen extends ConsumerStatefulWidget {
-  const BackupScreen({super.key});
+  const BackupScreen({super.key, this.openDeviceBackups = false});
+
+  /// Opens the list of device backups as the screen appears (the Settings
+  /// row "Automatic backups").
+  final bool openDeviceBackups;
 
   @override
   ConsumerState<BackupScreen> createState() => _BackupScreenState();
@@ -26,6 +48,16 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
   bool _isExporting = false;
   bool _isImporting = false;
   bool _isSnapshotting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.openDeviceBackups) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _showLocalSnapshots();
+      });
+    }
+  }
 
   // ── Full backup (zip snapshot) ─────────────────────────────────────────────
 
@@ -572,8 +604,7 @@ class _AutoBackupTile extends ConsumerWidget {
     final tt = Theme.of(context).textTheme;
     final enabled = ref.watch(autoBackupEnabledProvider);
     final lastAt = ref.watch(autoBackupLastAtProvider);
-    final last =
-        lastAt == null ? 'never' : DateFormat.MMMd().add_jm().format(lastAt);
+    final last = lastAt == null ? 'never' : autoBackupTimeText(lastAt);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -629,17 +660,7 @@ class _AutoBackupTile extends ConsumerWidget {
               ),
               Switch(
                 value: enabled,
-                onChanged: (v) async {
-                  await ref
-                      .read(settingsProvider.notifier)
-                      .setAutoBackupEnabled(v);
-                  if (v) {
-                    // Take one right away so the toggle has a visible effect.
-                    unawaited(ref
-                        .read(snapshotCoordinatorProvider)
-                        .runAutoBackupIfDue());
-                  }
-                },
+                onChanged: (v) => setAutoBackups(ref, v),
               ),
             ],
           ),
